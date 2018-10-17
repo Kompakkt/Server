@@ -198,3 +198,13 @@ GitHub.sublime-settings
 
 
 # End of https://www.gitignore.io/api/node,sublimetext,jetbrains+all,visualstudiocode
+
+# Ignore build output folder
+dist/
+dist/*
+
+# Ignore uploads folder
+src/uploads/
+src/uploads/*
+src/models/
+src/models/*
