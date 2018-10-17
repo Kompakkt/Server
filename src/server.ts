@@ -1,3 +1,5 @@
+import { Configuration } from './services/configuration';
+
 // Node libraries
 const path = require('path');
 const fs = require('fs');
@@ -22,32 +24,11 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 // TODO: Make configuration external
-const Configuration = {
-    // Directories
-    uploads_dir: 'uploads',
-    mongo_db_dir: 'data',
 
-    // Upload settings
-    useSubfolder: true,
-    subfolderPath: 'models',
-    port: 8080,
-    useToken: true,
-
-    // MongoDB settings
-    mongo_port: '5984',
-    // mongo_host: 'miskatonic.hki.uni-koeln.de',
-    mongo_host: 'localhost',
-    mongo_db_name: 'objectsrepository',
-    mongo_collections: [
-        'Person',
-        'Institute',
-        'DigitalObject'
-    ]
-};
 
 // File upload with Multer + Uppie
 const multer  = require('multer');
-const upload = multer({ dest: Configuration.uploads_dir });
+const upload = multer({ dest: Configuration.Uploads.UploadDirectory });
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
@@ -59,17 +40,17 @@ server.use(cors());
 // MongoDB setup
 const MongoClient = require('mongodb').MongoClient;
 const ObjectId = require('mongodb').ObjectId;
-const client = new MongoClient(`mongodb://${Configuration.mongo_host}:${Configuration.mongo_port}/`);
+const client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, { useNewUrlParser: true } );
 
 client.connect((error) => {
   if (error) {
     throw error;
   }
 
-  const db = client.db(Configuration.mongo_db_name.toLowerCase());
+  const db = client.db(Configuration.Mongo.Databases.ObjectsRepository.Name.toLowerCase());
 
   // Init collections
-  Configuration.mongo_collections.forEach(collection => {
+  Configuration.Mongo.Databases.ObjectsRepository.Collections.forEach(collection => {
     db.createCollection(collection.toLowerCase());
   });
 });
@@ -86,7 +67,7 @@ server.get('/api/v1/get/find/:collection/:identifier', (request, response) => {
 
         console.log(`GET ${request.params.identifier} in ${request.params.collection}`);
 
-        const db = client.db(Configuration.mongo_db_name.toLowerCase());
+        const db = client.db(Configuration.Mongo.Databases.ObjectsRepository.Name.toLowerCase());
         const collection = db.collection(request.params.collection.toLowerCase());
         collection.findOne({'_id': new ObjectId(request.params.identifier)}, ( db_error, result) => {
             response.send(result);
@@ -100,7 +81,7 @@ server.get('/api/v1/get/findall/:collection', (request, response) => {
             throw error;
         }
 
-        const db = client.db(Configuration.mongo_db_name.toLowerCase());
+        const db = client.db(Configuration.Mongo.Databases.ObjectsRepository.Name.toLowerCase());
         const collection = db.collection(request.params.collection.toLowerCase());
         collection.find({}).toArray(( db_error, result) => {
             response.send(result);
@@ -174,11 +155,11 @@ server.post('/upload', upload.array('files[]'), (request, response) => {
             });
 
             if (relativeDestination != null) {
-                if (Configuration.useSubfolder) {
-                    newFullPath = __dirname + '/' + Configuration.subfolderPath;
+                if (Configuration.Uploads.createSubfolders) {
+                    newFullPath = __dirname + '/' + Configuration.Uploads.subfolderPath;
                 }
 
-                if (Configuration.useToken) {
+                if (Configuration.Uploads.useToken) {
                     newFullPath += '/' + token;
                 }
 
@@ -204,6 +185,6 @@ server.post('/upload', upload.array('files[]'), (request, response) => {
     }
 });
 
-server.listen(Configuration.port, () => {
-    console.log(`Server started and listening on port ${Configuration.port}`);
+server.listen(Configuration.Express.Port, () => {
+    console.log(`Server started and listening on port ${Configuration.Express.Port}`);
 });
