@@ -49,7 +49,7 @@ const Mongo = {
     },
     /**
      * Save the most used Database as a variable
-     * to reduce the amount of calls needed 
+     * to reduce the amount of calls needed
      */
     initObjectsRepository: () => {
         this.Connection.then(() => {

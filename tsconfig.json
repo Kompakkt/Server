@@ -1,16 +1,20 @@
 {
   "compilerOptions": {
-    "target": "es5",
+  	"baseUrl": ".",
+    "paths": {
+      "*": [
+        "*",
+        "node_modules/*"
+      ]
+    },
+    "moduleResolution": "node",
+    "target": "es6",
     "module": "commonjs",
     "sourceMap": true,
     "outDir": "./dist/",
     "noImplicitAny": false,
+    "lib": ["es6","dom"]
   },
-  "exclude": [
-  	"node_modules",
-  	"**/*.spec.ts",
-  	"**/*.test.ts"
-  ],
   "include": [
   	"src/**/*.ts"
   ]

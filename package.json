@@ -5,7 +5,8 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "ts-node src/server.ts",
-	"dev": "./node_modules/nodemon/bin/nodemon.js"
+    "build": "tsc -p .",
+    "dev": "./node_modules/nodemon/bin/nodemon.js"
   },
   "repository": {
     "type": "git",
