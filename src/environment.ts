@@ -1,7 +1,7 @@
 const Environment = {
-    verbose: true,
+    verbose: false,
     rootDirectory: `${__dirname}`,
-    configFile: undefined
+    configFile: undefined,
 };
 
 Environment['configFile'] = `${Environment.rootDirectory}/config.json`;

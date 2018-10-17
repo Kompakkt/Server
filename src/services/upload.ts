@@ -2,11 +2,18 @@ import { Configuration } from './configuration';
 import { dirname } from 'path';
 import { ensureDirSync, moveSync } from 'fs-extra';
 import { RootDirectory, Verbose } from '../environment';
+import { Server } from './express';
 
-// TODO: replace somehow
+import * as multer from 'multer';
+
+// Additional step to generate a unique token-subfolder on upload
+// TODO: Overwrite this with MongoDB _id
+// https://www.mongodb.com/blog/post/generating-globally-unique-identifiers-for-use-with-mongodb
+
 import * as sha256 from 'sha256';
 
 const Upload = {
+    Multer: multer({ dest: `${RootDirectory}/${Configuration.Uploads.UploadDirectory}` }),
     handle: (request, response) => {
         if (Verbose) {
             console.log('INFO: Upload Request received');
@@ -63,5 +70,11 @@ const Upload = {
         }
     }
 };
+
+Server.post('/upload', Upload.Multer.array('files[]'), (request, response) => {
+    Upload.handle(request, response);
+});
+
+console.log(Upload.Multer);
 
 export { Upload };
