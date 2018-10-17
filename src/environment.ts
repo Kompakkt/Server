@@ -4,7 +4,7 @@ const Environment = {
     configFile: undefined
 };
 
-Environment['configFile'] = `${Environment.rootDirectory}/config.json`
+Environment['configFile'] = `${Environment.rootDirectory}/config.json`;
 
 const Verbose = Environment.verbose;
 const RootDirectory = Environment.rootDirectory;

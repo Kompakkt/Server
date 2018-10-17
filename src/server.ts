@@ -1,4 +1,6 @@
 import { Configuration } from './services/configuration';
+import { Upload } from './services/upload';
+import { RootDirectory } from './environment';
 
 // Node libraries
 const path = require('path');
@@ -28,7 +30,7 @@ const cors = require('cors');
 
 // File upload with Multer + Uppie
 const multer  = require('multer');
-const upload = multer({ dest: Configuration.Uploads.UploadDirectory });
+const upload = multer({ dest: `${RootDirectory}/${Configuration.Uploads.UploadDirectory}` });
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
@@ -135,54 +137,7 @@ server.use(express.static(__dirname + '/dist/ObjectsRepository/models/'));
 
 // UPLOAD API
 server.post('/upload', upload.array('files[]'), (request, response) => {
-    console.log('Upload requested!');
-    try {
-        const paths = request.body.paths;
-        const files = request.files;
-        const token = sha256(Math.random().toString(36).substring(7));
-
-        files.forEach(file => {
-            const originalName = file.originalname;
-            const newName = file.filename;
-            let relativeDestination = null;
-            let oldFullPath = __dirname + '/uploads/';
-            let newFullPath = null;
-
-            paths.forEach(_path => {
-                if (_path.indexOf(originalName) !== -1) {
-                    relativeDestination = path.dirname(_path);
-                }
-            });
-
-            if (relativeDestination != null) {
-                if (Configuration.Uploads.createSubfolders) {
-                    newFullPath = __dirname + '/' + Configuration.Uploads.subfolderPath;
-                }
-
-                if (Configuration.Uploads.useToken) {
-                    newFullPath += '/' + token;
-                }
-
-                newFullPath += '/' + relativeDestination;
-
-                if (newFullPath != null) {
-                    fse.ensureDirSync(newFullPath);
-                }
-
-                oldFullPath += newName;
-                newFullPath += '/' + originalName;
-
-                fse.moveSync(oldFullPath, newFullPath);
-                console.log('File moved to ' + newFullPath);
-            }
-        });
-        response.sendStatus(201);
-
-        // response.send(data.map(x => ({ id: x.$loki, fileName: x.filename, originalName: x.originalname })));
-    } catch (err) {
-        response.sendStatus(400);
-        console.error(err);
-    }
+    Upload.handle(request, response);
 });
 
 server.listen(Configuration.Express.Port, () => {
