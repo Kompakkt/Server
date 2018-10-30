@@ -6,7 +6,7 @@ import { Mongo } from './services/mongo';
 
 // TODO: Move to upload.ts
 // For upload
-import { ensureDirSync, moveSync, pathExistsSync } from 'fs-extra';
+import { ensureDirSync, moveSync, pathExistsSync, removeSync } from 'fs-extra';
 import { dirname } from 'path';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
@@ -64,6 +64,20 @@ Server.post('/uploadfinished', (request, response) => {
 
         response.json(JSON.stringify(foundFiles));
         response.end('Done!');
+    }
+});
+
+Server.post('/uploadcancel', (request, response) => {
+    const Token = request.headers['semirandomtoken'];
+    const path = Configuration.Uploads.createSubfolders
+    ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
+    : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+
+    if (!pathExistsSync(path)) {
+        response.status(400).end('Path with this token does not exist');
+    } else {
+        removeSync(path);
+        response.status(200).end('Successfully cancelled upload');
     }
 });
 
