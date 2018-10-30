@@ -4,6 +4,7 @@ import { ensureDirSync, moveSync } from 'fs-extra';
 import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
 
+import * as cors from 'cors';
 import * as multer from 'multer';
 
 // Additional step to generate a unique token-subfolder on upload
@@ -13,7 +14,7 @@ import * as multer from 'multer';
 import * as sha256 from 'sha256';
 
 const Upload = {
-    Multer: multer({ dest: `${RootDirectory}/${Configuration.Uploads.UploadDirectory}` }),
+    Multer: '',
     handle: (request, response) => {
         if (Verbose) {
             console.log('INFO: Upload Request received');
@@ -70,11 +71,5 @@ const Upload = {
         }
     }
 };
-
-Server.post('/upload', Upload.Multer.array('files[]'), (request, response) => {
-    Upload.handle(request, response);
-});
-
-console.log(Upload.Multer);
 
 export { Upload };

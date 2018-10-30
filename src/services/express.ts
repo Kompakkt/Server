@@ -21,6 +21,18 @@ Server.use(express.static(RootDirectory + Configuration.Uploads.subfolderPath));
 Server.use(bodyParser.json());
 // Enable CORS
 // TODO: Find out which routes need CORS
-Server.use(cors());
+Server.use(cors({
+    origin: (origin, callback) => {
+        callback(null, true);
+        /*
+        if (Configuration.Express.OriginWhitelist.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+        */
+    },
+    credentials: true
+}));
 
 export { Express, Server };

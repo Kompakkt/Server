@@ -26,13 +26,19 @@ const LoadConfig = () => {
             Hostname: 'localhost'
         },
         Uploads: {
+            TempDirectory: 'temp',
             UploadDirectory: 'uploads',
             createSubfolders: true,
-            subfolderPath: 'models',
-            useToken: true
+            subfolderPath: 'models'
         },
         Express: {
-            Port: 8080
+            Port: 8080,
+            OriginWhitelist: [
+                'http://localhost:4200',
+                'http://localhost:8080',
+                'http://localhost:8080/upload',
+                'http://localhost:8080/uploadfinished'
+            ]
         }
     };
 
