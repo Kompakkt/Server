@@ -12,7 +12,11 @@ const LoadConfig = () => {
                         'person',
                         'institute',
                         'digitalobject',
-                        'annotation'
+                        'annotation',
+                        'tag',
+                        'physicalobject',
+                        'model',
+                        'compilation'
                     ]
                 },
                 Accounts: {

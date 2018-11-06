@@ -1,74 +1,64 @@
 import { Configuration } from './configuration';
-import { dirname } from 'path';
-import { ensureDirSync, moveSync } from 'fs-extra';
 import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
 
-import * as cors from 'cors';
+import { ensureDirSync, moveSync, pathExistsSync, removeSync } from 'fs-extra';
+import { dirname } from 'path';
+import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 
-// Additional step to generate a unique token-subfolder on upload
-// TODO: Overwrite this with MongoDB _id
-// https://www.mongodb.com/blog/post/generating-globally-unique-identifiers-for-use-with-mongodb
-
-import * as sha256 from 'sha256';
-
 const Upload = {
-    Multer: '',
-    handle: (request, response) => {
-        if (Verbose) {
-            console.log('INFO: Upload Request received');
+    Multer: multer({
+        dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
+        onFileUploadStart: function(file) {
+            console.log(file.originalname + ' is starting ...');
+        },
+        onFileUploadComplete: function (file) {
+            console.log(file.fieldname + ' uploaded to  ' + file.path);
         }
-        try {
-            const paths = request.body.paths;
-            const files = request.files;
-            const token = sha256(Math.random().toString(36).substring(7));
-
-            files.forEach(file => {
-                const originalName = file.originalname;
-                const newName = file.filename;
-                let relativeDestination = null;
-                let oldFullPath = RootDirectory + '/uploads/';
-                let newFullPath = null;
-
-                paths.forEach(_path => {
-                    if (_path.indexOf(originalName) !== -1) {
-                        relativeDestination = dirname(_path);
-                    }
-                });
-
-                if (relativeDestination != null) {
-                    if (Configuration.Uploads.createSubfolders) {
-                        newFullPath = RootDirectory + '/' + Configuration.Uploads.subfolderPath;
-                    }
-
-                    if (Configuration.Uploads.useToken) {
-                        newFullPath += '/' + token;
-                    }
-
-                    newFullPath += '/' + relativeDestination;
-
-                    if (newFullPath != null) {
-                        ensureDirSync(newFullPath);
-                    }
-
-                    oldFullPath += newName;
-                    newFullPath += '/' + originalName;
-
-                    moveSync(oldFullPath, newFullPath);
-                    console.log('File moved to ' + newFullPath);
-                }
-            });
-            response.sendStatus(201);
-
-            if (Verbose) {
-                console.log('INFO: Upload succeeded');
-            }
-            // response.send(data.map(x => ({ id: x.$loki, fileName: x.filename, originalName: x.originalname })));
-        } catch (err) {
-            response.sendStatus(400);
-            console.error(err);
+    }),
+    UploadRequest: (request, response) => {
+        const tempPath = `${request['file'].destination}/${request['file'].filename}`;
+        let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
+        if (Configuration.Uploads.createSubfolders) {
+            newPath += `${Configuration.Uploads.subfolderPath}/`;
         }
+        newPath += `${request.headers['semirandomtoken']}/`;
+        newPath += `${request.headers['relpath']}`;
+
+        ensureDirSync(dirname(newPath));
+        moveSync(tempPath, newPath);
+        response.end('Uploaded');
+    },
+    UploadCancel: (request, response) => {
+        const Token = request.headers['semirandomtoken'];
+        const path = Configuration.Uploads.createSubfolders
+            ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
+            : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+
+        if (!pathExistsSync(path)) {
+            response.status(400).end('Path with this token does not exist');
+        } else {
+            removeSync(path);
+            response.status(200).end('Successfully cancelled upload');
+        }
+    },
+    UploadFinish: (request, response) => {
+        const Token = request.headers['semirandomtoken'];
+    const path = Configuration.Uploads.createSubfolders
+    ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
+    : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+
+    if (!pathExistsSync(path)) {
+        response.status(400).end('Path with this token does not exist');
+    } else {
+        const foundFiles = klawSync(path);
+
+        // TODO: remove nested top directories until a file is top-level
+
+        response.json(JSON.stringify(foundFiles));
+        response.end('Done!');
+    }
     }
 };
 
