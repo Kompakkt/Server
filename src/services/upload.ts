@@ -13,11 +13,12 @@ const Upload = {
         onFileUploadStart: function(file) {
             console.log(file.originalname + ' is starting ...');
         },
-        onFileUploadComplete: function (file) {
+        onFileUploadComplete: function(file) {
             console.log(file.fieldname + ' uploaded to  ' + file.path);
         }
     }),
     UploadRequest: (request, response) => {
+        // TODO: Checksum
         const tempPath = `${request['file'].destination}/${request['file'].filename}`;
         let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
         if (Configuration.Uploads.createSubfolders) {
@@ -45,20 +46,20 @@ const Upload = {
     },
     UploadFinish: (request, response) => {
         const Token = request.headers['semirandomtoken'];
-    const path = Configuration.Uploads.createSubfolders
-    ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
-    : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+        const path = Configuration.Uploads.createSubfolders
+            ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
+            : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
-    if (!pathExistsSync(path)) {
-        response.status(400).end('Path with this token does not exist');
-    } else {
-        const foundFiles = klawSync(path);
+        if (!pathExistsSync(path)) {
+            response.status(400).end('Path with this token does not exist');
+        } else {
+            const foundFiles = klawSync(path);
 
-        // TODO: remove nested top directories until a file is top-level
+            // TODO: remove nested top directories until a file is top-level
 
-        response.json(JSON.stringify(foundFiles));
-        response.end('Done!');
-    }
+            response.json(JSON.stringify(foundFiles));
+            response.end('Done!');
+        }
     }
 };
 

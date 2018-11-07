@@ -21,6 +21,9 @@ const Mongo = {
     Client: undefined,
     Connection: undefined,
     DBObjectsRepository: undefined,
+    Retry: 0,
+    MaxRetries: 10,
+    ReconnectInterval: undefined,
     /**
      * Initialize a MongoDB Client
      * uses hostname and port defined in Configuration file
@@ -47,6 +50,32 @@ const Mongo = {
     establishConnection: () => {
         this.Connection = this.Client.connect();
     },
+    initReconnect: () => {
+        this.Connection.then(() => {
+            this.DBObjectsRepository.on('close', () => {
+                console.log('Connection closed. Retrying...');
+                setTimeout(() => {
+                    Mongo.Connection = undefined;
+                    Mongo.ReconnectInterval = setInterval(() => {
+                        if (Mongo.Connection === undefined) {
+                            Mongo.Retry++;
+                            if (Mongo.Retry <= Mongo.MaxRetries) {
+                                Mongo.establishConnection();
+                            } else {
+                                console.log(`Reconnect failed after ${Mongo.MaxRetries} tries`);
+                                Mongo.ReconnectInterval = undefined;
+                                Mongo.Retry = 0;
+                            }
+                        } else {
+                            console.log('Reconnected!');
+                            Mongo.ReconnectInterval = undefined;
+                            Mongo.Retry = 0;
+                        }
+                    }, 1000);
+                }, 1000);
+            });
+        });
+    },
     /**
      * Save the most used Database as a variable
      * to reduce the amount of calls needed
@@ -54,6 +83,66 @@ const Mongo = {
     initObjectsRepository: () => {
         this.Connection.then(() => {
             this.DBObjectsRepository = this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
+        });
+    },
+    /**
+     * When the user submits the metadataform this function
+     * adds the missing data to defined collections
+     */
+    submit: (request, response) => {
+        this.Connection.then(async () => {
+            if (Verbose) {
+                console.log('VERBOSE: Handling submit request');
+                console.log(InspectObject(request.body));
+            }
+
+            const resultObject = request.body;
+
+            /**
+             * Adds data {field} to a collection {collection}
+             * and returns the {_id} of the created object.
+             * If {field} already has an {_id} property the server
+             * will assume the object already exists in the collection
+             * and instead return the existing {_id}
+             */
+            const addAndGetId = async (field, collection) => {
+                    return (field['_id'] !== undefined && field['_id'].length > 0) ?
+                         String(field['_id']) :
+                         await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
+                            return String(result.ops[0]['_id']);
+                        });
+                    };
+
+            /**
+             * Use addAndGetId function on all Arrays containing
+             * data that need to be added to collections
+             */
+
+            // TODO: Eleganter lösen
+            resultObject['contact_person'] = await Promise.all(
+                resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
+
+            resultObject['digobj_rightsowner_person'] = await Promise.all(
+                resultObject['digobj_rightsowner_person'].map(async person => addAndGetId(person, 'person')));
+
+            resultObject['digobj_person'] = await Promise.all(
+                resultObject['digobj_person'].map(async person => addAndGetId(person, 'person')));
+
+            resultObject['digobj_rightsowner_institution'] = await Promise.all(
+                resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
+
+            /*
+            resultObject['digobj_tags'] = await Promise.all(
+                resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
+            */
+
+
+            if (Verbose) {
+                console.log('VERBOSE: Finished Object');
+                console.log(InspectObject(resultObject));
+            }
+
+            response.send(resultObject);
         });
     },
     /**
@@ -148,6 +237,15 @@ const Mongo = {
     }
 };
 
+const ReconnectProxy = new Proxy(Mongo, {
+    get (target, property, receiver) {
+        console.log(target);
+        console.log(property);
+        console.log(receiver);
+        return target[property];
+    }
+});
+
 /**
  * Initialization
  */
@@ -155,5 +253,6 @@ Mongo.initClient();
 Mongo.establishConnection();
 Mongo.initObjectsRepository();
 Mongo.initCollections();
+Mongo.initReconnect();
 
 export { Mongo };

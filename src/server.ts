@@ -17,6 +17,8 @@ Server.get('/api/v1/get/findall/:collection', Mongo.getAllFromObjectCollection);
 Server.post('/api/v1/post/push/:collection', Mongo.addToObjectCollection);
 // Post multiple documents to collection
 Server.post('/api/v1/post/pushmultiple/:collection', Mongo.addMultipleToObjectCollection);
+// On user submit
+Server.post('/api/v1/post/submit', Mongo.submit);
 
 // Upload API
 // Upload a file to the server

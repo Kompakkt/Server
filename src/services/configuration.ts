@@ -10,7 +10,7 @@ const LoadConfig = () => {
                     Name: 'objectsrepository',
                     Collections: [
                         'person',
-                        'institute',
+                        'institution',
                         'digitalobject',
                         'annotation',
                         'tag',
