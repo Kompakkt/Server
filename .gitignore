@@ -203,11 +203,5 @@ GitHub.sublime-settings
 dist/
 dist/*
 
-# Ignore uploaded files except testmodel
-src/uploads/*
-!src/uploads/models/testmodel
-src/models/
-src/models/*
-
 # Ignore configuration file to prevent leakage of sensitive data
 **/config.json
