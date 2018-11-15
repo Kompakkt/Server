@@ -203,9 +203,9 @@ GitHub.sublime-settings
 dist/
 dist/*
 
-# Ignore uploads folder
-src/uploads/
+# Ignore uploaded files except testmodel
 src/uploads/*
+!src/uploads/models/testmodel
 src/models/
 src/models/*
 
