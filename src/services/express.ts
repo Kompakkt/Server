@@ -38,10 +38,7 @@ Server.use(bodyParser.json());
 Server.use(corser.create());
 // Static
 if (Configuration.Uploads.createSubfolders) {
-    Server.use('/models',
-        express.static(
-            `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}
-        `));
+    Server.use('/models', express.static(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}`));
 } else  {
     Server.use('/models', express.static(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}`));
 }
