@@ -42,7 +42,12 @@ const LoadConfig = () => {
                 'http://localhost:8080',
                 'http://localhost:8080/upload',
                 'http://localhost:8080/uploadfinished'
-            ]
+            ],
+            enableHTTPS: false,
+            SSLPaths: {
+                PrivateKey: '',
+                Certificate: ''
+            }
         }
     };
 
