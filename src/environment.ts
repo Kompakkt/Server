@@ -1,5 +1,5 @@
 const Environment = {
-    verbose: false,
+    verbose: true,
     rootDirectory: `${__dirname}`,
     configFile: undefined,
 };
