@@ -110,12 +110,12 @@ const Mongo = {
              * and instead return the existing {_id}
              */
             const addAndGetId = async (field, collection) => {
-                    return (field['_id'] !== undefined && field['_id'].length > 0) ?
-                         String(field['_id']) :
-                         await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
-                            return String(result.ops[0]['_id']);
-                        });
-                    };
+                return (field['_id'] !== undefined && field['_id'].length > 0) ?
+                    String(field['_id']) :
+                    await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
+                        return String(result.ops[0]['_id']);
+                    });
+            };
 
             /**
              * Use addAndGetId function on all Arrays containing
@@ -157,23 +157,53 @@ const Mongo = {
      * On success, sends a response containing the added Object
      */
     addToObjectCollection: (request, response) => {
-        this.Connection.then(() => {
+        this.Connection.then(async () => {
+            const RequestCollection = request.params.collection.toLowerCase();
+
             if (Verbose) {
-                console.log('VERBOSE: Adding the following document to collection ' + request.params.collection);
-                console.log(request.params.collection.toLowerCase());
+                console.log('VERBOSE: Adding the following document to collection ' + RequestCollection);
+                console.log(RequestCollection);
                 console.log(InspectObject(request.body));
             }
 
-            const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
+            const collection = this.DBObjectsRepository.collection(RequestCollection);
 
-            collection.insertOne(request.body, (db_error, result) => {
-                response.send(result.ops);
+            // Check if Object with _id already exists
+            const searchParameter = { '_id': request.body['_id'] };
 
-                if (Verbose) {
-                    console.log('VERBOSE: Success! Added the following');
-                    console.log(result.ops);
+            if (await collection.findOne(searchParameter).then((result) => result) !== null) {
+                // If it already exists, update
+                switch (RequestCollection) {
+                    case 'compilation':
+                        const newModels = request.body['models'];
+                        await newModels.forEach(async (model) => {
+                            await collection.findOneAndUpdate(searchParameter, { $push: { models: model } })
+                                .then((result) => {
+                                    console.log(`Added model: `);
+                                    console.log(InspectObject(model));
+                                })
+                                .catch(db_error => {
+                                    console.error(db_error);
+                                });
+                            collection.findOne(searchParameter).then((result) => response.send(result));
+                        });
+                        break;
+
+                    default:
+                        response.sendStatus(400);
+                        response.send('Not implemented');
+                        break;
                 }
-            });
+            } else {
+                collection.insertOne(request.body, (db_error, result) => {
+                    response.send(result.ops);
+
+                    if (Verbose) {
+                        console.log('VERBOSE: Success! Added the following');
+                        console.log(result.ops);
+                    }
+                });
+            }
         });
     },
     /**
@@ -224,7 +254,7 @@ const Mongo = {
                 case 'compilation':
                     collection.findOne(searchParameter).then((result: Compilation) => {
                         result.models = result.models.map(model => this.DBObjectsRepository.collection('model')
-                            .findOne({'_id': model._id})
+                            .findOne({ '_id': model._id })
                             .then((model_result) => {
                                 return model_result;
                             }).catch((db_error) => {
@@ -233,7 +263,7 @@ const Mongo = {
                         response.send(result);
                     }).catch((db_error) => {
                         console.error(db_error);
-                        response.send(400);
+                        response.sendStatus(400);
                     });
 
                     break;
@@ -264,7 +294,7 @@ const Mongo = {
 };
 
 const ReconnectProxy = new Proxy(Mongo, {
-    get (target, property, receiver) {
+    get(target, property, receiver) {
         console.log(target);
         console.log(property);
         console.log(receiver);
