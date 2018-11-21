@@ -9,15 +9,15 @@ export interface Model {
     finished: boolean;
     online: boolean;
     processed?: {
-        time: {
+        time?: {
             start: string;
             end: string;
             total: string;
         };
-        low: string;
-        medium: string;
-        high: string;
-        raw: string;
+        low?: string;
+        medium?: string;
+        high?: string;
+        raw?: string;
     };
     preview?: string;
 }
