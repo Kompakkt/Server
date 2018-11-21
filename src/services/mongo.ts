@@ -168,6 +168,14 @@ const Mongo = {
 
             const collection = this.DBObjectsRepository.collection(RequestCollection);
 
+            const addAndGetId = async (field, collection) => {
+                return (field['_id'] !== undefined && field['_id'].length > 0) ?
+                    String(field['_id']) :
+                    await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
+                        return String(result.ops[0]['_id']);
+                    });
+            };
+
             // Check if Object with _id already exists
             const searchParameter = { '_id': request.body['_id'] };
 
@@ -177,7 +185,7 @@ const Mongo = {
                     case 'compilation':
                         const newModels = request.body['models'];
                         await newModels.forEach(async (model) => {
-                            await collection.findOneAndUpdate(searchParameter, { $push: { models: model } })
+                            await collection.findOneAndUpdate(searchParameter, { $push: { models: addAndGetId(model, 'model') } })
                                 .then((result) => {
                                     console.log(`Added model: `);
                                     console.log(InspectObject(model));
@@ -185,8 +193,8 @@ const Mongo = {
                                 .catch(db_error => {
                                     console.error(db_error);
                                 });
-                            collection.findOne(searchParameter).then((result) => response.send(result));
                         });
+                        collection.findOne(searchParameter).then((result) => response.send(result));
                         break;
 
                     default:
@@ -245,21 +253,23 @@ const Mongo = {
      * TODO: Handle No Objects found?
      */
     getFromObjectCollection: (request, response) => {
-        this.Connection.then(() => {
-            const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
+        this.Connection.then(async () => {
+            const RequestCollection = request.params.collection.toLowerCase();
+
+            const collection = this.DBObjectsRepository.collection(RequestCollection);
 
             const searchParameter = { '_id': request.params.identifier };
 
-            switch (collection) {
+            const resolve = async (identifier, collection_name) => {
+                const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+                return await resolve_collection.findOne({'_id': ObjectId(identifier)}).then((resolve_result) => resolve_result);
+            };
+
+            switch (RequestCollection) {
                 case 'compilation':
-                    collection.findOne(searchParameter).then((result: Compilation) => {
-                        result.models = result.models.map(model => this.DBObjectsRepository.collection('model')
-                            .findOne({ '_id': model._id })
-                            .then((model_result) => {
-                                return model_result;
-                            }).catch((db_error) => {
-                                console.error(db_error);
-                            }));
+                    console.log('Resolving compilation');
+                    collection.findOne(searchParameter).then(async (result: Compilation) => {
+                        result.models = await Promise.all(result.models.map(async (model) => resolve(model._id, 'model')));
                         response.send(result);
                     }).catch((db_error) => {
                         console.error(db_error);
