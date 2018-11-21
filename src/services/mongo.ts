@@ -218,7 +218,7 @@ const Mongo = {
         this.Connection.then(() => {
             const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
 
-            const searchParameter = { '_id': new ObjectId(request.params.identifier) };
+            const searchParameter = { '_id': request.params.identifier };
 
             switch (collection) {
                 case 'compilation':
