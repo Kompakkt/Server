@@ -168,49 +168,40 @@ const Mongo = {
 
             const collection = this.DBObjectsRepository.collection(RequestCollection);
 
-            const addAndGetId = async (field, collection) => {
-                return (field['_id'] !== undefined && field['_id'].length > 0) ?
+            const addAndGetId = async (field, add_to_coll) => {
+                return {'_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
                     String(field['_id']) :
-                    await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
+                    await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                         return String(result.ops[0]['_id']);
-                    });
+                    })};
             };
 
-            // Check if Object with _id already exists
-            const searchParameter = { '_id': request.body['_id'] };
+            switch (RequestCollection) {
+                case 'compilation':
+                    const resultObject = request.body;
+                    resultObject['models'] = await Promise.all(
+                        resultObject['models'].map(async model => addAndGetId(model, 'model')));
 
-            if (await collection.findOne(searchParameter).then((result) => result) !== null) {
-                // If it already exists, update
-                switch (RequestCollection) {
-                    case 'compilation':
-                        const newModels = request.body['models'];
-                        await newModels.forEach(async (model) => {
-                            await collection.findOneAndUpdate(searchParameter, { $push: { models: addAndGetId(model, 'model') } })
-                                .then((result) => {
-                                    console.log(`Added model: `);
-                                    console.log(InspectObject(model));
-                                })
-                                .catch(db_error => {
-                                    console.error(db_error);
-                                });
-                        });
-                        collection.findOne(searchParameter).then((result) => response.send(result));
-                        break;
+                    collection.insertOne(resultObject, (db_error, result) => {
+                        response.send(result.ops);
 
-                    default:
-                        response.sendStatus(400);
-                        response.send('Not implemented');
-                        break;
-                }
-            } else {
-                collection.insertOne(request.body, (db_error, result) => {
-                    response.send(result.ops);
+                        if (Verbose) {
+                            console.log('VERBOSE: Success! Added the following');
+                            console.log(result.ops);
+                        }
+                    });
+                    break;
 
-                    if (Verbose) {
-                        console.log('VERBOSE: Success! Added the following');
-                        console.log(result.ops);
-                    }
-                });
+                default:
+                    collection.insertOne(request.body, (db_error, result) => {
+                        response.send(result.ops);
+
+                        if (Verbose) {
+                            console.log('VERBOSE: Success! Added the following');
+                            console.log(result.ops);
+                        }
+                    });
+                    break;
             }
         });
     },
@@ -262,14 +253,14 @@ const Mongo = {
 
             const resolve = async (identifier, collection_name) => {
                 const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-                return await resolve_collection.findOne({'_id': ObjectId(identifier)}).then((resolve_result) => resolve_result);
+                return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
             };
 
             switch (RequestCollection) {
                 case 'compilation':
                     console.log('Resolving compilation');
                     collection.findOne(searchParameter).then(async (result: Compilation) => {
-                        result.models = await Promise.all(result.models.map(async (model) => resolve(model._id, 'model')));
+                        result.models = await Promise.all(result.models.map(async (model) => await resolve(model._id, 'model')));
                         response.send(result);
                     }).catch((db_error) => {
                         console.error(db_error);
