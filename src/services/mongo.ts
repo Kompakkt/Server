@@ -12,6 +12,10 @@ import { Configuration } from './configuration';
 import { Verbose } from '../environment';
 import { inspect as InspectObject } from 'util';
 
+/** Interfaces */
+import { Compilation } from '../interfaces/compilation.interface';
+import { Model } from '../interfaces/model.interface';
+
 /**
  * Object containing variables which define an established connection
  * to a MongoDB Server specified in Configuration
@@ -214,9 +218,31 @@ const Mongo = {
         this.Connection.then(() => {
             const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
 
-            collection.findOne({ '_id': new ObjectId(request.params.identifier) }, (db_error, result) => {
-                response.send(result);
-            });
+            const searchParameter = { '_id': new ObjectId(request.params.identifier) };
+
+            switch (collection) {
+                case 'compilation':
+                    collection.findOne(searchParameter).then((result: Compilation) => {
+                        result.models = result.models.map(model => this.DBObjectsRepository.collection('model')
+                            .findOne({'_id': model._id})
+                            .then((model_result) => {
+                                return model_result;
+                            }).catch((db_error) => {
+                                console.error(db_error);
+                            }));
+                        response.send(result);
+                    }).catch((db_error) => {
+                        console.error(db_error);
+                        response.send(400);
+                    });
+
+                    break;
+                default:
+                    collection.findOne(searchParameter, (db_error, result) => {
+                        response.send(result);
+                    });
+                    break;
+            }
         });
     },
     /**
