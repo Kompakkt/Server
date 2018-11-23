@@ -238,6 +238,28 @@ const Mongo = {
 
     },
     /**
+     * Express HTTP POST request
+     * Finds a model by it's ObjectId and
+     * updates it's preview screenshot
+     */
+    updateScreenshot: (request, response) => {
+        this.Connection.then(() => {
+            if (Verbose) {
+                console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+            }
+
+            const collection = this.DBObjectsRepository.collection('model');
+
+            collection.findOneAndUpdate(
+                {'_id': ObjectId(request.params.identifier)},
+                { $set: { preview: request.body.data } },
+                (db_error, result) => {
+                console.log(result);
+                response.send(result);
+            });
+        });
+    },
+    /**
      * Express HTTP GET request
      * Finds any document in any collection by its MongoDB identifier
      * On success, sends a response containing the Object
