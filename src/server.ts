@@ -19,6 +19,8 @@ Server.post('/api/v1/post/push/:collection', Mongo.addToObjectCollection);
 Server.post('/api/v1/post/pushmultiple/:collection', Mongo.addMultipleToObjectCollection);
 // On user submit
 Server.post('/api/v1/post/submit', Mongo.submit);
+// On Screenshot update
+Server.post('/api/v1/post/screenshot/:identifier', Mongo.updateScreenshot);
 
 // Upload API
 // Upload a file to the server
