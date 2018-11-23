@@ -32,7 +32,7 @@ const Server = Express.server;
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
-Server.use(bodyParser.json());
+Server.use(bodyParser.json({limit: '50mb'}));
 // Enable CORS
 // TODO: Find out which routes need CORS
 Server.use(corser.create());
