@@ -169,27 +169,66 @@ const Mongo = {
             const collection = this.DBObjectsRepository.collection(RequestCollection);
 
             const addAndGetId = async (field, add_to_coll) => {
-                return {'_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
-                    String(field['_id']) :
-                    await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
-                        return String(result.ops[0]['_id']);
-                    })};
+                return {
+                    '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
+                        String(field['_id']) :
+                        await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
+                            return String(result.ops[0]['_id']);
+                        })
+                };
             };
 
             switch (RequestCollection) {
                 case 'compilation':
                     const resultObject = request.body;
-                    resultObject['models'] = await Promise.all(
-                        resultObject['models'].map(async model => addAndGetId(model, 'model')));
 
-                    collection.insertOne(resultObject, (db_error, result) => {
-                        response.send(result.ops);
 
-                        if (Verbose) {
-                            console.log('VERBOSE: Success! Added the following');
-                            console.log(result.ops);
-                        }
+                    const bExists = new Promise<any>((resolve, reject) => {
+                        collection.findOne({ '_id': resultObject._id }, (db_error, result) => {
+                            resolve(result);
+                        });
                     });
+
+                    await bExists.then(async (result) => {
+                        // Add models in models Array to model collection and return their ObjectId
+                        resultObject['models'] = await Promise.all(
+                            resultObject['models'].map(async model => addAndGetId(model, 'model')));
+
+                        // Result will be null if no compilation with the ObjectId exists
+                        if (result === null) {
+                            // Add new compilation
+                            collection.insertOne(resultObject, (db_error, db_result) => {
+                                response.send(db_result.ops);
+
+                                if (Verbose) {
+                                    console.log('VERBOSE: Success! Added the following');
+                                    console.log(db_result.ops);
+                                }
+                            });
+                        } else {
+                            // Update compilation
+                            // Only models will be updated
+                            const updateArray = [];
+                            resultObject['models'].map(model => updateArray.push(model));
+                            collection.findOneAndUpdate(
+                                { '_id': resultObject._id },
+                                { $push: { models: { $each: updateArray } } },
+                                (db_error, db_result) => {
+                                    response.send(db_result);
+
+                                    if (Verbose) {
+                                        console.log('VERBOSE: Success! Added the following');
+                                        console.log(db_result);
+                                    }
+                                }
+                            );
+                        }
+                    }).catch(error => {
+                        console.log(error);
+                        response.send(error);
+                    });
+
+
                     break;
 
                 default:
@@ -251,12 +290,12 @@ const Mongo = {
             const collection = this.DBObjectsRepository.collection('model');
 
             collection.findOneAndUpdate(
-                {'_id': ObjectId(request.params.identifier)},
+                { '_id': ObjectId(request.params.identifier) },
                 { $set: { preview: request.body.data } },
                 (db_error, result) => {
-                console.log(result);
-                response.send(result);
-            });
+                    console.log(result);
+                    response.send(result);
+                });
         });
     },
     /**
