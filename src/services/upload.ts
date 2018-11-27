@@ -32,7 +32,7 @@ const Upload = {
         response.end('Uploaded');
     },
     UploadCancel: (request, response) => {
-        const Token = request.headers['semirandomtoken'];
+        const Token = request.body.uuid;
         const path = Configuration.Uploads.createSubfolders
             ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
             : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
@@ -45,7 +45,8 @@ const Upload = {
         }
     },
     UploadFinish: (request, response) => {
-        const Token = request.headers['semirandomtoken'];
+        console.log(request.body);
+        const Token = request.body.uuid;
         const path = Configuration.Uploads.createSubfolders
             ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
             : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
@@ -54,6 +55,8 @@ const Upload = {
             response.status(400).end('Path with this token does not exist');
         } else {
             const foundFiles = klawSync(path);
+
+            console.log(foundFiles);
 
             // TODO: remove nested top directories until a file is top-level
 
