@@ -298,6 +298,13 @@ const Mongo = {
                 });
         });
     },
+    resolve: async (identifier, collection_name) => {
+        if (Verbose) {
+            console.log(`Resolving ${collection_name} ${identifier}`);
+        }
+        const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+        return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
+    },
     /**
      * Express HTTP GET request
      * Finds any document in any collection by its MongoDB identifier
@@ -312,17 +319,16 @@ const Mongo = {
 
             const searchParameter = { '_id': request.params.identifier };
 
-            const resolve = async (identifier, collection_name) => {
-                const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-                return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
-            };
-
             switch (RequestCollection) {
                 case 'compilation':
-                    console.log('Resolving compilation');
                     collection.findOne(searchParameter).then(async (result: Compilation) => {
-                        result.models = await Promise.all(result.models.map(async (model) => await resolve(model._id, 'model')));
-                        response.send(result);
+                        if (result) {
+                            result.models = await Promise.all(result.models.map(async (model) =>
+                                await Mongo.resolve(model._id, 'model')));
+                            response.send(result);
+                        } else {
+                            response.send({});
+                        }
                     }).catch((db_error) => {
                         console.error(db_error);
                         response.sendStatus(400);
@@ -345,13 +351,38 @@ const Mongo = {
      * TODO: Handle No Objects found?
      */
     getAllFromObjectCollection: (request, response) => {
-        this.Connection.then(() => {
-            const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
+        const RequestCollection = request.params.collection.toLowerCase();
 
-            collection.find({}).toArray((db_error, result) => {
-                response.send(result);
-            });
-        });
+        const collection = this.DBObjectsRepository.collection(RequestCollection);
+
+        switch (RequestCollection) {
+            case 'compilation':
+                collection.find({}).toArray(async (db_error, results) => {
+                    if (results) {
+                        results = await Promise.all(results.map(async (result) => await Promise.all(result.models.map(async (model) =>
+                            await Mongo.resolve(model._id, 'model')))));
+
+                        // The above returns an array of arrays of single compilations
+                        // Turn it into an array of single compilations
+                        // TODO: Solve in one line
+                        for (let i = results.length - 1; i >= 0; i--) {
+                            results[i] = results[i][0];
+                        }
+
+                        response.send(results);
+                    } else {
+                        response.send({});
+                    }
+                });
+                break;
+            default:
+                this.Connection.then(() => {
+                    collection.find({}).toArray((db_error, result) => {
+                        response.send(result);
+                    });
+                });
+                break;
+        }
     }
 };
 
