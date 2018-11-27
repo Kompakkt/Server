@@ -328,7 +328,7 @@ const Mongo = {
                 case 'compilation':
                     collection.findOne(searchParameter).then(async (result: Compilation) => {
                         result.models = await Promise.all(result.models.map(async (model) =>
-                            await this.resolveCompilation(model._id, 'model')));
+                            await Mongo.resolveCompilation(model._id, 'model')));
                         response.send(result);
                     }).catch((db_error) => {
                         console.error(db_error);
@@ -361,7 +361,7 @@ const Mongo = {
                 case 'compilation':
                     collection.find({}).toArray(async (db_error, results) => {
                         results = await results.map(result =>
-                            Promise.all(result.models.map(async (model) => await this.resolveCompilation(model._id, 'model'))));
+                            Promise.all(result.models.map(async (model) => await Mongo.resolveCompilation(model._id, 'model'))));
                         response.send(results);
                     });
                     break;
