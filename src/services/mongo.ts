@@ -359,17 +359,17 @@ const Mongo = {
             case 'compilation':
                 collection.find({}).toArray(async (db_error, results) => {
                     if (results) {
-                        results = await Promise.all(results.map(async (result) => await Promise.all(result.models.map(async (model) =>
+                        const resultObject = results;
+                        // Returns an Array of Arrays of models
+                        const models = await Promise.all(results.map(async (result) => await Promise.all(result.models.map(async (model) =>
                             await Mongo.resolve(model._id, 'model')))));
 
-                        // The above returns an array of arrays of single compilations
-                        // Turn it into an array of single compilations
-                        // TODO: Solve in one line
-                        for (let i = results.length - 1; i >= 0; i--) {
-                            results[i] = results[i][0];
+                        // Insert array of models into result Object
+                        for (let i = resultObject.length - 1; i >= 0; i--) {
+                            resultObject[i].models = models[i];
                         }
 
-                        response.send(results);
+                        response.send(resultObject);
                     } else {
                         response.send({});
                     }
