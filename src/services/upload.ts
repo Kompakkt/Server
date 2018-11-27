@@ -44,7 +44,7 @@ const Upload = {
             response.status(200).end('Successfully cancelled upload');
         }
     },
-    UploadFinish: (request, response) => {
+    UploadFinish: async (request, response) => {
         console.log(request.body);
         const Token = request.body.uuid;
         const path = Configuration.Uploads.createSubfolders
@@ -56,11 +56,17 @@ const Upload = {
         } else {
             const foundFiles = klawSync(path);
 
-            console.log(foundFiles);
+            const responseFiles = [];
+
+            await foundFiles.map(file => {
+                if (file.stats.isFile()) {
+                    responseFiles.push(file.path.substr(file.path.indexOf('/models/') + 1));
+                }
+            });
 
             // TODO: remove nested top directories until a file is top-level
 
-            response.json(JSON.stringify(foundFiles));
+            response.json(responseFiles);
             response.end('Done!');
         }
     }
