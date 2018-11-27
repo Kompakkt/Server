@@ -12,6 +12,10 @@ import { Configuration } from './configuration';
 import { Verbose } from '../environment';
 import { inspect as InspectObject } from 'util';
 
+import * as base64img from 'base64-img';
+import * as PNGtoJPEG from 'png-to-jpeg';
+import { readFile } from 'fs';
+
 /** Interfaces */
 import { Compilation } from '../interfaces/compilation.interface';
 import { Model } from '../interfaces/model.interface';
@@ -283,19 +287,47 @@ const Mongo = {
      */
     updateScreenshot: (request, response) => {
         this.Connection.then(() => {
+            const imagedata = request.body.data;
             if (Verbose) {
                 console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+                console.log(`VERBOSE: Size before: ${Buffer.from(imagedata).length}`);
             }
 
             const collection = this.DBObjectsRepository.collection('model');
 
-            collection.findOneAndUpdate(
-                { '_id': ObjectId(request.params.identifier) },
-                { $set: { preview: request.body.data } },
-                (db_error, result) => {
-                    console.log(result);
-                    response.send(result);
+
+            base64img.img(imagedata, '.', 'tmp', (err, filepath) => {
+                if (err) {
+                    console.error(err);
+                    response.send('Failed compressing image');
+                    return;
+                }
+
+                readFile(filepath, (fs_err, fs_data) => {
+                    if (fs_err) {
+                        console.error(fs_err);
+                        response.send('Failed compressing image');
+                        return;
+                    }
+
+                    PNGtoJPEG({ quality: 60 })(fs_data).then(jpeg_data => {
+                        jpeg_data = new Buffer(jpeg_data).toString('base64');
+
+                        if (Verbose) {
+                            console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+                            console.log(`VERBOSE: Size before: ${Buffer.from(jpeg_data).length}`);
+                        }
+
+                        collection.findOneAndUpdate(
+                            { '_id': ObjectId(request.params.identifier) },
+                            { $set: { preview: request.body.data } },
+                            (db_error, result) => {
+                                console.log(result);
+                                response.send(result);
+                            });
+                    });
                 });
+            });
         });
     },
     resolve: async (identifier, collection_name) => {
