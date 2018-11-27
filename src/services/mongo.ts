@@ -299,6 +299,18 @@ const Mongo = {
         });
     },
     /**
+     * Resolve compilation
+     * Iterates through the ObjectIds of a compilation
+     * and inserts the data associated with those ObjectIds
+     */
+    resolveCompilation: async (identifier, collection_name) => {
+        if (Verbose) {
+            console.log('VERBOSE: Resolving compilation');
+        }
+        const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+        return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
+    },
+    /**
      * Express HTTP GET request
      * Finds any document in any collection by its MongoDB identifier
      * On success, sends a response containing the Object
@@ -361,18 +373,6 @@ const Mongo = {
                     break;
             }
         });
-    },
-    /**
-     * Resolve compilation
-     * Iterates through the ObjectIds of a compilation
-     * and inserts the data associated with those ObjectIds
-     */
-    resolveCompilation: async (identifier, collection_name) => {
-        if (Verbose) {
-            console.log('VERBOSE: Resolving compilation');
-        }
-        const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-        return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
     }
 };
 
