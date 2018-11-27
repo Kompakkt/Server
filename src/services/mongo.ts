@@ -374,8 +374,10 @@ const Mongo = {
             switch (RequestCollection) {
                 case 'compilation':
                     collection.find({}).toArray(async (db_error, results) => {
+                        console.log(results);
                         results = await results.map(result =>
                             Promise.all(result.models.map(async (model) => await resolveCompilation(model._id, 'model'))));
+                        console.log(results);
                         response.send(results);
                     });
                     break;
