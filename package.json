@@ -25,6 +25,7 @@
     "@types/node": "^10.12.10",
     "body-parser": "^1.18.3",
     "corser": "^2.0.1",
+    "event-stream": "^4.0.1",
     "express": "^4.16.4",
     "fs-extra": "^7.0.1",
     "klaw-sync": "^6.0.0",
