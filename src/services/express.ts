@@ -35,7 +35,12 @@ const Server = Express.server;
 Server.use(bodyParser.json({limit: '50mb'}));
 // Enable CORS
 // TODO: Find out which routes need CORS
-Server.use(corser.create());
+Server.use(corser.create({
+    supportsCredentials: true,
+    origins: Conf.Express.OriginWhitelist,
+    methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
+    requestHeaders: corser.simpleRequestHeaders.concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath'])
+}));
 // Static
 if (Conf.Uploads.createSubfolders) {
     Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
