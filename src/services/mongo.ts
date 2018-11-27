@@ -312,24 +312,16 @@ const Mongo = {
 
             const searchParameter = { '_id': request.params.identifier };
 
-            /** TODO: Define somewhere else to not re-use code without cancelling the Connection
-             * Resolve compilation
-             * Iterates through the ObjectIds of a compilation
-             * and inserts the data associated with those ObjectIds
-             */
-            const resolveCompilation = async (identifier, collection_name) => {
-                if (Verbose) {
-                    console.log('VERBOSE: Resolving compilation');
-                }
+            const resolve = async (identifier, collection_name) => {
                 const resolve_collection = this.DBObjectsRepository.collection(collection_name);
                 return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
             };
 
             switch (RequestCollection) {
                 case 'compilation':
+                    console.log('Resolving compilation');
                     collection.findOne(searchParameter).then(async (result: Compilation) => {
-                        result.models = await Promise.all(result.models.map(async (model) =>
-                            await resolveCompilation(model._id, 'model')));
+                        result.models = await Promise.all(result.models.map(async (model) => await resolve(model._id, 'model')));
                         response.send(result);
                     }).catch((db_error) => {
                         console.error(db_error);
@@ -354,40 +346,11 @@ const Mongo = {
      */
     getAllFromObjectCollection: (request, response) => {
         this.Connection.then(() => {
-            const RequestCollection = request.params.collection.toLowerCase();
+            const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
 
-            const collection = this.DBObjectsRepository.collection(RequestCollection);
-
-            /** TODO: Define somewhere else to not re-use code without cancelling the Connection
-             * Resolve compilation
-             * Iterates through the ObjectIds of a compilation
-             * and inserts the data associated with those ObjectIds
-             */
-            const resolveCompilation = async (identifier, collection_name) => {
-                if (Verbose) {
-                    console.log('VERBOSE: Resolving compilation');
-                }
-                const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-                return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
-            };
-
-            switch (RequestCollection) {
-                case 'compilation':
-                    collection.find({}).toArray(async (db_error, results) => {
-                        console.log(results);
-                        results = await results.map(result =>
-                            Promise.all(result.models.map(async (model) => await resolveCompilation(model._id, 'model'))));
-                        console.log(results);
-                        response.send(results);
-                    });
-                    break;
-
-                default:
-                    collection.find({}).toArray((db_error, result) => {
-                        response.send(result);
-                    });
-                    break;
-            }
+            collection.find({}).toArray((db_error, result) => {
+                response.send(result);
+            });
         });
     }
 };
