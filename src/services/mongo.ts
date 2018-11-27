@@ -304,11 +304,13 @@ const Mongo = {
      * and inserts the data associated with those ObjectIds
      */
     resolveCompilation: async (identifier, collection_name) => {
-        if (Verbose) {
-            console.log('VERBOSE: Resolving compilation');
-        }
-        const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-        return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
+        return await this.Connection.then(async () => {
+            if (Verbose) {
+                console.log('VERBOSE: Resolving compilation');
+            }
+            const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+            return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
+        });
     },
     /**
      * Express HTTP GET request
