@@ -37,7 +37,7 @@ Server.use(bodyParser.json({limit: '50mb'}));
 // TODO: Find out which routes need CORS
 Server.use(corser.create({
     supportsCredentials: true,
-    origins: Conf.Express.OriginWhitelist,
+    /*origins: Conf.Express.OriginWhitelist,*/
     methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
     requestHeaders: corser.simpleRequestHeaders.concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath'])
 }));
