@@ -37,11 +37,13 @@ const Upload = {
             ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
             : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
+        console.log(`Cancelling upload request ${Token}`);
+
         if (!pathExistsSync(path)) {
-            response.status(400).end('Path with this token does not exist');
+            response.json({message: 'Path with this token does not exist'});
         } else {
             removeSync(path);
-            response.status(200).end('Successfully cancelled upload');
+            response.json({message: 'Successfully cancelled upload'});
         }
     },
     UploadFinish: async (request, response) => {
