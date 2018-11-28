@@ -3,7 +3,7 @@ import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
 
 import { ensureDirSync, moveSync, pathExistsSync, removeSync } from 'fs-extra';
-import { dirname } from 'path';
+import { dirname, extname } from 'path';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 
@@ -52,21 +52,23 @@ const Upload = {
             : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
         if (!pathExistsSync(path)) {
-            response.status(400).end('Path with this token does not exist');
+            response.json([]).end('Upload not finished');
         } else {
             const foundFiles = klawSync(path);
 
-            const responseFiles = [];
+            const modelExt = [
+                '.ply',
+                '.obj',
+                '.babylon'
+            ];
 
-            await foundFiles.map(file => {
-                if (file.stats.isFile()) {
-                    responseFiles.push(file.path.substr(file.path.indexOf('/models/') + 1));
-                }
-            });
+            const modelFiles = await foundFiles.filter(file => {
+                return modelExt.indexOf(extname(file.path)) !== -1;
+            }).map(file => file.path.substr(file.path.indexOf('models/')));
 
             // TODO: remove nested top directories until a file is top-level
 
-            response.json(responseFiles);
+            response.json(modelFiles);
             response.end('Done!');
         }
     }
