@@ -3,6 +3,7 @@ import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
 import * as bodyParser from 'body-parser';
 import * as corser from 'corser';
+import * as compression from 'compression';
 
 import { readFileSync } from 'fs';
 import * as HTTP from 'http';
@@ -33,6 +34,8 @@ const Server = Express.server;
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
 Server.use(bodyParser.json({limit: '50mb'}));
+// Gzipping Middleware
+Server.use(compression());
 // Enable CORS
 // TODO: Find out which routes need CORS
 Server.use(corser.create({
