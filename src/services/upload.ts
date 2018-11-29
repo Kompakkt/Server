@@ -49,6 +49,7 @@ const Upload = {
     UploadFinish: async (request, response) => {
         console.log(request.body);
         const Token = request.body.uuid;
+        const Type = request.body.type;
         const path = Configuration.Uploads.createSubfolders
             ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
             : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
@@ -58,19 +59,23 @@ const Upload = {
         } else {
             const foundFiles = klawSync(path);
 
-            const modelExt = [
-                '.ply',
-                '.obj',
-                '.babylon'
-            ];
-
-            const modelFiles = await foundFiles.filter(file => {
-                return modelExt.indexOf(extname(file.path)) !== -1;
-            }).map(file => file.path.substr(file.path.indexOf('models/')));
-
             // TODO: remove nested top directories until a file is top-level
+            // TODO: Add more type cases for image, audio, video
+            if (Type === 'model') {
+                const modelExt = [
+                    '.ply',
+                    '.obj',
+                    '.babylon'
+                ];
 
-            response.json(modelFiles);
+                const modelFiles = await foundFiles.filter(file => {
+                    return modelExt.indexOf(extname(file.path)) !== -1;
+                }).map(file => file.path.substr(file.path.indexOf('models/')));
+                response.json(modelFiles);
+            } else {
+                const resultFiles = await foundFiles.map(file => file.path.substr(file.path.indexOf('models/')));
+                response.json(resultFiles);
+            }
             response.end('Done!');
         }
     }
