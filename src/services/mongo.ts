@@ -407,11 +407,17 @@ const Mongo = {
                     }
                 });
                 break;
+            case 'model':
+                collection.find({}).toArray((db_error, results) => {
+                    response.send(results.filter(model =>
+                        (model.preview.length !== undefined) &&
+                        (model.preview.length !== null) &&
+                        (model.preview.length > 0)));
+                });
+                break;
             default:
-                this.Connection.then(() => {
-                    collection.find({}).toArray((db_error, result) => {
-                        response.send(result);
-                    });
+                collection.find({}).toArray((db_error, result) => {
+                    response.send(result);
                 });
                 break;
         }
