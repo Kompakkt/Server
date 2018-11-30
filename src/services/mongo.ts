@@ -409,12 +409,13 @@ const Mongo = {
                 break;
             case 'model':
                 collection.find({}).toArray((db_error, results) => {
-                    response.send(results.filter(model =>
-                        model.preview !== undefined).filter(model => model.preview.length > 0)
-                    .catch(err => {
+                    try {
+                        response.send(results.filter(model =>
+                            model.preview !== undefined).filter(model => model.preview.length > 0));
+                    } catch (err) {
                         console.error(err);
                         response.send([]);
-                    }));
+                    }
                 });
                 break;
             default:
