@@ -410,9 +410,7 @@ const Mongo = {
             case 'model':
                 collection.find({}).toArray((db_error, results) => {
                     response.send(results.filter(model =>
-                        (model.preview.length !== undefined) &&
-                        (model.preview.length !== null) &&
-                        (model.preview.length > 0)));
+                        model.preview !== undefined).filter(model => model.preview.length > 0));
                 });
                 break;
             default:
