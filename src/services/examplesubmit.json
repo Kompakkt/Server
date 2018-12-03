@@ -1,0 +1,114 @@
+{
+    "digobj_type": "type_3d",
+    "digobj_title": "mein titel",
+    "digobj_description": "meine beschreibung",
+    "digobj_licence": "BY",
+    "digobj_rightsowner": "1",
+    "digobj_rightsowner_person": [
+        {
+            "person_surname": "nachname",
+            "person_prename": "vorname",
+            "person_email": "kai.niebes@outlook.com",
+            "person_role": "RIGHTS_OWNER",
+            "person_phonenumber": "0123451234",
+            "person_note": "note",
+            "person_institution": "idh"
+        }
+    ],
+    "digobj_rightsowner_institution": [],
+    "contact_person": [
+        {
+            "person_surname": "niebes",
+            "person_prename": "kai",
+            "person_email": "kai.niebes@mustermail.de",
+            "person_role": "CONTACT_PERSON",
+            "person_phonenumber": "152112342134",
+            "person_note": null,
+            "person_institution": null
+        }
+    ],
+    "digobj_discipline": "",
+    "digobj_tags": "",
+    "digobj_objecttype": "",
+    "digobj_externalIdentifier": [],
+    "digobj_dimensions": [],
+    "digobj_creation": [],
+    "digobj_person": [],
+    "digobj_externalLink": [],
+    "digobj_metadata_files": "",
+    "digobj_statement": "",
+    "phyObjs": [
+        {
+            "phyobj_title": "phsyisch titel",
+            "phyobj_description": "physisch beschreibung",
+            "phyobj_rightsowner": "1",
+            "phyobj_rightsowner_person": [
+                {
+                    "person_surname": "rechte",
+                    "person_prename": "inhaber",
+                    "person_email": "rechte@inhaber.de",
+                    "person_role": "RIGHTS_OWNER",
+                    "person_phonenumber": "12352351235",
+                    "person_note": "rechte note",
+                    "person_institution": "rechte institution"
+                }
+            ],
+            "phyobj_rightsowner_institution": [],
+            "phyobj_externalIdentifier": [
+                {
+                    "externalId_type": "identifier",
+                    "externalId_value": "wert"
+                }
+            ],
+            "phyobj_externalLink": [
+                {
+                    "externalLink_description": "extern",
+                    "externalLink_value": "http://localhost/"
+                }
+            ],
+            "phyobj_place": [
+                {
+                    "phyobj_placename": "hier",
+                    "phyobj_address": {
+                        "address_building": "idh",
+                        "address_number": "22",
+                        "address_street": "meister eggard",
+                        "address_postcode": "51234",
+                        "address_city": "kölle",
+                        "address_country": "schland"
+                    },
+                    "phyobj_place_geopolarea": ""
+                }
+            ],
+            "phyobj_person": [
+                {
+                    "person_surname": "test",
+                    "person_prename": "person",
+                    "person_email": "test@mail.com",
+                    "person_role": "DATA_CREATOR",
+                    "person_phonenumber": "152312351246",
+                    "person_note": "test note",
+                    "person_institution": "test inst"
+                }
+            ],
+            "phyobj_institution": [
+                {
+                    "institution_name": "idhstitut",
+                    "institution_address": {
+                        "address_building": "idh",
+                        "address_number": "12",
+                        "address_street": "am institut",
+                        "address_postcode": "1523",
+                        "address_city": "kölle ",
+                        "address_country": "schland"
+                    },
+                    "institution_university": "kölle uni",
+                    "institution_role": "CREATOR",
+                    "institution_note": "kölle note"
+                }
+            ],
+            "phyobj_metadata_files": "",
+            "phyobj_collection": "testcompilation"
+        }
+    ]
+}
