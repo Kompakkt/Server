@@ -97,60 +97,88 @@ const Mongo = {
      * When the user submits the metadataform this function
      * adds the missing data to defined collections
      */
-    submit: (request, response) => {
-        this.Connection.then(async () => {
-            if (Verbose) {
-                console.log('VERBOSE: Handling submit request');
-                console.log(InspectObject(request.body));
-            }
+    submit: async (request, response) => {
+        if (Verbose) {
+            console.log('VERBOSE: Handling submit request');
+            console.log(InspectObject(request.body));
+        }
 
-            const resultObject = request.body;
+        const resultObject = request.body;
 
-            /**
-             * Adds data {field} to a collection {collection}
-             * and returns the {_id} of the created object.
-             * If {field} already has an {_id} property the server
-             * will assume the object already exists in the collection
-             * and instead return the existing {_id}
-             */
-            const addAndGetId = async (field, collection) => {
-                return (field['_id'] !== undefined && field['_id'].length > 0) ?
+        /**
+         * Adds data {field} to a collection {collection}
+         * and returns the {_id} of the created object.
+         * If {field} already has an {_id} property the server
+         * will assume the object already exists in the collection
+         * and instead return the existing {_id}
+         */
+        const addAndGetId = async (field, add_to_coll) => {
+            return {
+                '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
                     String(field['_id']) :
-                    await this.DBObjectsRepository.collection(collection).insertOne(field).then(result => {
+                    await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                         return String(result.ops[0]['_id']);
-                    });
+                    })
             };
+        };
 
-            /**
-             * Use addAndGetId function on all Arrays containing
-             * data that need to be added to collections
-             */
+        /**
+         * Use addAndGetId function on all Arrays containing
+         * data that need to be added to collections
+         */
 
-            // TODO: Eleganter lösen
-            resultObject['contact_person'] = await Promise.all(
-                resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
+        // TODO: Eleganter lösen
+        resultObject['digobj_rightsowner_person'] = await Promise.all(
+            resultObject['digobj_rightsowner_person'].map(async person => addAndGetId(person, 'person')));
 
-            resultObject['digobj_rightsowner_person'] = await Promise.all(
-                resultObject['digobj_rightsowner_person'].map(async person => addAndGetId(person, 'person')));
+        resultObject['digobj_rightsowner_institution'] = await Promise.all(
+            resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
 
-            resultObject['digobj_person'] = await Promise.all(
-                resultObject['digobj_person'].map(async person => addAndGetId(person, 'person')));
+        resultObject['contact_person'] = await Promise.all(
+            resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
 
-            resultObject['digobj_rightsowner_institution'] = await Promise.all(
-                resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
+        resultObject['digobj_person'] = await Promise.all(
+            resultObject['digobj_person'].map(async person => addAndGetId(person, 'person')));
 
-            /*
-            resultObject['digobj_tags'] = await Promise.all(
-                resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
-            */
+        resultObject['phyObjs'] = await Promise.all(
+            resultObject['phyObjs'].map(async phyObj => {
+                phyObj['phyobj_rightsowner_person'] = await Promise.all(
+                    phyObj['phyobj_rightsowner_person'].map(
+                        phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'person')
+                    ));
+                phyObj['phyobj_person'] = await Promise.all(
+                    phyObj['phyobj_person'].map(
+                        phyObjPerson => addAndGetId(phyObjPerson, 'person')
+                    ));
+                phyObj['phyobj_institution'] = await Promise.all(
+                    phyObj['phyobj_institution'].map(
+                        phyObjInstitution => addAndGetId(phyObjInstitution, 'institution')
+                    ));
+                return phyObj;
+            }));
 
+        /* TODO: Tags als Objekte
+        resultObject['digobj_tags'] = await Promise.all(
+            resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
+        */
 
+        if (Verbose) {
+            console.log('VERBOSE: Finished Object');
+            console.log(InspectObject(resultObject));
+        }
+
+        const collection = this.DBObjectsRepository.collection('digitalobject');
+
+        collection.insertOne(resultObject, (db_error, db_result) => {
+            if (db_error) {
+                console.error(db_error);
+                response.send('Failed to add');
+            }
             if (Verbose) {
                 console.log('VERBOSE: Finished Object');
-                console.log(InspectObject(resultObject));
+                console.log(InspectObject(db_result.ops[0]));
             }
-
-            response.send(resultObject);
+            response.send(db_result.ops[0]);
         });
     },
     /**
