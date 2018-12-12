@@ -2,7 +2,7 @@ import { Configuration } from './configuration';
 import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
 
-import { ensureDirSync, moveSync, pathExistsSync, removeSync } from 'fs-extra';
+import { ensureDirSync, moveSync, pathExistsSync, removeSync, move } from 'fs-extra';
 import { dirname, extname } from 'path';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
@@ -17,6 +17,31 @@ const Upload = {
             console.log(file.fieldname + ' uploaded to  ' + file.path);
         }
     }),
+    AddMetadata: (request, response) => {
+        const tempPath = `${request['file'].path}`;
+        let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
+        if (Configuration.Uploads.createSubfolders) {
+            newPath += `${Configuration.Uploads.subfolderPath}/`;
+        }
+        newPath += `${request.headers['semirandomtoken']}/`;
+        newPath += `${request.headers['metadatakey']}/`;
+        // Filename gets a prefix of the metadata input field selected
+        const filename = `${request.headers['prefix']}-${request['file'].originalname}`;
+        newPath += filename;
+
+        ensureDirSync(dirname(newPath));
+        move(tempPath, newPath).then(res => {
+            const responseObject = {
+                metadata_file: filename,
+                metadata_object: request.headers['metadatakey'],
+                metadata_link: `models/${request.headers['semirandomtoken']}/${request.headers['metadatakey']}/${filename}`
+            };
+            response.end(JSON.stringify(responseObject));
+        }).catch(e => response.end(`File already exists`));
+    },
+    CancelMetadata: (request, response) => {
+        // TODO: Either remove on it's own via request or delete with the rest of the upload cancel
+    },
     UploadRequest: (request, response) => {
         // TODO: Checksum
         const tempPath = `${request['file'].destination}/${request['file'].filename}`;
@@ -40,10 +65,10 @@ const Upload = {
         console.log(`Cancelling upload request ${Token}`);
 
         if (!pathExistsSync(path)) {
-            response.json({message: 'Path with this token does not exist'});
+            response.json({ message: 'Path with this token does not exist' });
         } else {
             removeSync(path);
-            response.json({message: 'Successfully cancelled upload'});
+            response.json({ message: 'Successfully cancelled upload' });
         }
     },
     UploadFinish: async (request, response) => {

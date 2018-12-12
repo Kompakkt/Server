@@ -49,7 +49,7 @@ Server.use(corser.create({
     supportsCredentials: true,
     /*origins: Conf.Express.OriginWhitelist,*/
     methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
-    requestHeaders: corser.simpleRequestHeaders.concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath'])
+    requestHeaders: corser.simpleRequestHeaders.concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
 }));
 // Static
 if (Conf.Uploads.createSubfolders) {

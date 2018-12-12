@@ -30,5 +30,8 @@ Server.post('/upload', Upload.Multer.single('file'), Upload.UploadRequest);
 Server.post('/uploadfinished', Upload.UploadFinish);
 // User signals that upload was cancelled
 Server.post('/uploadcancel', Upload.UploadCancel);
+// Metadata
+Server.post('/addmetadata', Upload.Multer.single('file'), Upload.AddMetadata);
+Server.post('/cancelmetadata', Upload.Multer.single('file'), Upload.CancelMetadata);
 
 Express.startListening();
