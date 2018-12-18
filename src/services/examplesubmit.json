@@ -1,114 +1,304 @@
 {
-    "digobj_type": "type_3d",
-    "digobj_title": "mein titel",
-    "digobj_description": "meine beschreibung",
-    "digobj_licence": "BY",
-    "digobj_rightsowner": "1",
-    "digobj_rightsowner_person": [
-        {
-            "person_surname": "nachname",
-            "person_prename": "vorname",
-            "person_email": "kai.niebes@outlook.com",
-            "person_role": "RIGHTS_OWNER",
-            "person_phonenumber": "0123451234",
-            "person_note": "note",
-            "person_institution": "idh"
-        }
-    ],
-    "digobj_rightsowner_institution": [],
-    "contact_person": [
-        {
-            "person_surname": "niebes",
-            "person_prename": "kai",
-            "person_email": "kai.niebes@mustermail.de",
-            "person_role": "CONTACT_PERSON",
-            "person_phonenumber": "152112342134",
-            "person_note": null,
-            "person_institution": null
-        }
-    ],
-    "digobj_discipline": "",
-    "digobj_tags": "",
-    "digobj_objecttype": "",
-    "digobj_externalIdentifier": [],
-    "digobj_dimensions": [],
-    "digobj_creation": [],
-    "digobj_person": [],
-    "digobj_externalLink": [],
-    "digobj_metadata_files": "",
-    "digobj_statement": "",
-    "phyObjs": [
-        {
-            "phyobj_title": "phsyisch titel",
-            "phyobj_description": "physisch beschreibung",
-            "phyobj_rightsowner": "1",
-            "phyobj_rightsowner_person": [
-                {
-                    "person_surname": "rechte",
-                    "person_prename": "inhaber",
-                    "person_email": "rechte@inhaber.de",
-                    "person_role": "RIGHTS_OWNER",
-                    "person_phonenumber": "12352351235",
-                    "person_note": "rechte note",
-                    "person_institution": "rechte institution"
-                }
-            ],
-            "phyobj_rightsowner_institution": [],
-            "phyobj_externalIdentifier": [
-                {
-                    "externalId_type": "identifier",
-                    "externalId_value": "wert"
-                }
-            ],
-            "phyobj_externalLink": [
-                {
-                    "externalLink_description": "extern",
-                    "externalLink_value": "http://localhost/"
-                }
-            ],
-            "phyobj_place": [
-                {
-                    "phyobj_placename": "hier",
-                    "phyobj_address": {
-                        "address_building": "idh",
-                        "address_number": "22",
-                        "address_street": "meister eggard",
-                        "address_postcode": "51234",
-                        "address_city": "kölle",
-                        "address_country": "schland"
-                    },
-                    "phyobj_place_geopolarea": ""
-                }
-            ],
-            "phyobj_person": [
-                {
-                    "person_surname": "test",
-                    "person_prename": "person",
-                    "person_email": "test@mail.com",
-                    "person_role": "DATA_CREATOR",
-                    "person_phonenumber": "152312351246",
-                    "person_note": "test note",
-                    "person_institution": "test inst"
-                }
-            ],
-            "phyobj_institution": [
-                {
-                    "institution_name": "idhstitut",
-                    "institution_address": {
-                        "address_building": "idh",
-                        "address_number": "12",
-                        "address_street": "am institut",
-                        "address_postcode": "1523",
-                        "address_city": "kölle ",
-                        "address_country": "schland"
-                    },
-                    "institution_university": "kölle uni",
-                    "institution_role": "CREATOR",
-                    "institution_note": "kölle note"
-                }
-            ],
-            "phyobj_metadata_files": "",
-            "phyobj_collection": "testcompilation"
-        }
-    ]
+ "digobj_type": "type_3d",
+ "digobj_title": "asd",
+ "digobj_description": "asd",
+ "digobj_licence": "BY",
+ "digobj_rightsowner": "1",
+ "digobj_rightsowner_person": [
+  {
+   "person_surname": "asd",
+   "person_prename": "asd",
+   "person_email": "asd@asd.de",
+   "person_role": "RIGHTS_OWNER",
+   "person_phonenumber": "asd",
+   "person_note": "asd",
+   "person_institution": "Neue Institution hinzufügen",
+   "person_institution_data": [
+    {
+     "institution_name": "asd",
+     "institution_address": {
+      "address_building": "asd",
+      "address_number": "asd",
+      "address_street": "asd",
+      "address_postcode": "asd",
+      "address_city": "asd",
+      "address_country": "asd"
+     },
+     "institution_university": "asd",
+     "institution_role": "N/A",
+     "institution_note": "asd"
+    }
+   ]
+  }
+ ],
+ "digobj_rightsowner_institution": [],
+ "contact_person": [
+  {
+   "person_surname": "asd",
+   "person_prename": "asd",
+   "person_email": "asd@asd.de",
+   "person_role": "CONTACT_PERSON",
+   "person_phonenumber": "asd",
+   "person_note": "",
+   "person_institution": "",
+   "person_institution_data": []
+  },
+  {
+   "person_surname": "qwe",
+   "person_prename": "qwe",
+   "person_email": "qwe@qwe.de",
+   "person_role": "CONTACT_PERSON",
+   "person_phonenumber": "qwe",
+   "person_note": "",
+   "person_institution": "",
+   "person_institution_data": []
+  }
+ ],
+ "digobj_discipline": [
+  "Theaterwissenschaften",
+  "Filmwissenschaften",
+  "Medienwissenschaften"
+ ],
+ "digobj_tags": [
+  {
+   "display": "qwe",
+   "value": "qwe"
+  },
+  {
+   "display": "rtz",
+   "value": "rtz"
+  },
+  {
+   "display": "zui",
+   "value": "zui"
+  },
+  {
+   "display": "asd",
+   "value": "asd"
+  },
+  {
+   "display": "dfg",
+   "value": "dfg"
+  },
+  {
+   "display": "ghj",
+   "value": "ghj"
+  },
+  {
+   "display": "<yx",
+   "value": "<yx"
+  }
+ ],
+ "digobj_objecttype": "asd",
+ "digobj_externalIdentifier": [
+  {
+   "externalId_type": "asd",
+   "externalId_value": "asd"
+  },
+  {
+   "externalId_type": "asd",
+   "externalId_value": "asd"
+  },
+  {
+   "externalId_type": "asd",
+   "externalId_value": "asd"
+  },
+  {
+   "externalId_type": "asd",
+   "externalId_value": "asd"
+  }
+ ],
+ "digobj_dimensions": [
+  {
+   "dimension_type": "asd",
+   "dimension_value": 234,
+   "dimension_name": "asd"
+  },
+  {
+   "dimension_type": "qwe",
+   "dimension_value": 456,
+   "dimension_name": "qwe"
+  }
+ ],
+ "digobj_creation": [
+  {
+   "creation_technique": "asd",
+   "creation_program": "asd",
+   "creation_equipment": "asd",
+   "creation_date": "2018-12-13"
+  },
+  {
+   "creation_technique": "asd",
+   "creation_program": "asd",
+   "creation_equipment": "asd",
+   "creation_date": "2018-12-14"
+  }
+ ],
+ "digobj_person": [
+  {
+   "person_surname": "asd",
+   "person_prename": "asd",
+   "person_email": "asd@asd.de",
+   "person_role": "DATA_CREATOR",
+   "person_phonenumber": "asd",
+   "person_note": "asd",
+   "person_institution": "Neue Institution hinzufügen",
+   "person_institution_data": [
+    {
+     "institution_name": "asd",
+     "institution_address": {
+      "address_building": "asd",
+      "address_number": "sad",
+      "address_street": "asd",
+      "address_postcode": "asd",
+      "address_city": "asd",
+      "address_country": "asd"
+     },
+     "institution_university": "asd",
+     "institution_role": "N/A",
+     "institution_note": "asd"
+    }
+   ]
+  },
+  {
+   "person_surname": "qwe",
+   "person_prename": "qwe",
+   "person_email": "qwe@qwe.de",
+   "person_role": "EDITOR",
+   "person_phonenumber": "qwe",
+   "person_note": "qwe",
+   "person_institution": "Universität zu Köln",
+   "person_institution_data": []
+  }
+ ],
+ "digobj_externalLink": [
+  {
+   "externalLink_description": "asd",
+   "externalLink_value": "asd"
+  },
+  {
+   "externalLink_description": "qwe",
+   "externalLink_value": "qwe"
+  }
+ ],
+ "digobj_metadata_files": "",
+ "digobj_statement": "asd",
+ "phyObjs": [
+  {
+   "phyobj_title": "asd",
+   "phyobj_description": "asd",
+   "phyobj_rightsowner": "2",
+   "phyobj_rightsowner_person": [],
+   "phyobj_rightsowner_institution": [
+    {
+     "institution_name": "asd",
+     "institution_address": {
+      "address_building": "asd",
+      "address_number": "sad",
+      "address_street": "asd",
+      "address_postcode": "asd",
+      "address_city": "asd",
+      "address_country": "asd"
+     },
+     "institution_university": "asd",
+     "institution_role": "RIGHTS_OWNER",
+     "institution_note": "asd"
+    }
+   ],
+   "phyobj_externalIdentifier": [
+    {
+     "externalId_type": "asd",
+     "externalId_value": "asd"
+    },
+    {
+     "externalId_type": "qwe",
+     "externalId_value": "qwe"
+    },
+    {
+     "externalId_type": "yxc",
+     "externalId_value": "yxc"
+    }
+   ],
+   "phyobj_externalLink": [
+    {
+     "externalLink_description": "asd",
+     "externalLink_value": "asd"
+    },
+    {
+     "externalLink_description": "qwe",
+     "externalLink_value": "qwe"
+    }
+   ],
+   "phyobj_place": [
+    {
+     "phyobj_placename": "dfg",
+     "phyobj_address": {
+      "address_building": "dfg",
+      "address_number": "dfg",
+      "address_street": "dfg",
+      "address_postcode": "dfg",
+      "address_city": "dfg",
+      "address_country": "dfg"
+     },
+     "phyobj_place_geopolarea": "dfg"
+    },
+    {
+     "phyobj_placename": "cbv",
+     "phyobj_address": {
+      "address_building": "cvb",
+      "address_number": "cvb",
+      "address_street": "cvb",
+      "address_postcode": "cvb",
+      "address_city": "cvb",
+      "address_country": "cvb"
+     },
+     "phyobj_place_geopolarea": "cvb"
+    }
+   ],
+   "phyobj_person": [
+    {
+     "person_surname": "asd",
+     "person_prename": "asd",
+     "person_email": "asd@asd.de",
+     "person_role": "EDITOR",
+     "person_phonenumber": "sdf",
+     "person_note": "",
+     "person_institution": "Universität zu Köln",
+     "person_institution_data": []
+    }
+   ],
+   "phyobj_institution": [
+    {
+     "institution_name": "asd",
+     "institution_address": {
+      "address_building": "asd",
+      "address_number": "asd",
+      "address_street": "asd",
+      "address_postcode": "asd",
+      "address_city": "asd",
+      "address_country": "asd"
+     },
+     "institution_university": "asd",
+     "institution_role": "DATA_CREATOR",
+     "institution_note": "asd"
+    },
+    {
+     "institution_name": "yxc",
+     "institution_address": {
+      "address_building": "yxc",
+      "address_number": "yxc",
+      "address_street": "yxc",
+      "address_postcode": "yxc",
+      "address_city": "yxc",
+      "address_country": "yxc"
+     },
+     "institution_university": "yxc",
+     "institution_role": "EDITOR",
+     "institution_note": "yxc"
+    }
+   ],
+   "phyobj_metadata_files": "",
+   "phyobj_collection": "yxc"
+  }
+ ]
 }

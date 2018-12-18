@@ -103,7 +103,7 @@ const Mongo = {
             console.log(InspectObject(request.body));
         }
 
-        const resultObject = request.body;
+        const resultObject = { ...request.body };
 
         /**
          * Adds data {field} to a collection {collection}
@@ -129,7 +129,14 @@ const Mongo = {
 
         // TODO: Eleganter lösen
         resultObject['digobj_rightsowner_person'] = await Promise.all(
-            resultObject['digobj_rightsowner_person'].map(async person => addAndGetId(person, 'person')));
+            resultObject['digobj_rightsowner_person'].map(async person => {
+                if (person['person_institution'] === 'Neue Institution hinzufügen') {
+                    const institution = person['person_institution_data'].pop();
+                    const newInst = await addAndGetId(institution, 'institution');
+                    person['person_institution_data'][0] = newInst;
+                }
+                return addAndGetId(person, 'person');
+            }));
 
         resultObject['digobj_rightsowner_institution'] = await Promise.all(
             resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
@@ -138,29 +145,52 @@ const Mongo = {
             resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
 
         resultObject['digobj_person'] = await Promise.all(
-            resultObject['digobj_person'].map(async person => addAndGetId(person, 'person')));
+            resultObject['digobj_person'].map(async person => {
+                if (person['person_institution'] === 'Neue Institution hinzufügen') {
+                    const institution = person['person_institution_data'].pop();
+                    const newInst = await addAndGetId(institution, 'institution');
+                    person['person_institution_data'][0] = newInst;
+                }
+                return addAndGetId(person, 'person');
+            }));
 
         resultObject['phyObjs'] = await Promise.all(
             resultObject['phyObjs'].map(async phyObj => {
-                phyObj['phyobj_rightsowner_person'] = await Promise.all(
-                    phyObj['phyobj_rightsowner_person'].map(
-                        phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'person')
-                    ));
-                phyObj['phyobj_person'] = await Promise.all(
-                    phyObj['phyobj_person'].map(
-                        phyObjPerson => addAndGetId(phyObjPerson, 'person')
-                    ));
-                phyObj['phyobj_institution'] = await Promise.all(
-                    phyObj['phyobj_institution'].map(
-                        phyObjInstitution => addAndGetId(phyObjInstitution, 'institution')
-                    ));
-                return phyObj;
+                if (phyObj['phyobj_rightsowner_person'].length > 0 && !phyObj['phyobj_rightsowner_person'][0]['_id']) {
+                    phyObj['phyobj_rightsowner_person'] = await Promise.all(
+                        phyObj['phyobj_rightsowner_person'].map(
+                            phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'person')
+                        ));
+                }
+                if (phyObj['phyobj_rightsowner_institution'].length > 0 && !phyObj['phyobj_rightsowner_institution'][0]['_id']) {
+                    phyObj['phyobj_rightsowner_institution'] = await Promise.all(
+                        phyObj['phyobj_rightsowner_institution'].map(
+                            phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'institution')
+                        ));
+                }
+                if (phyObj['phyobj_person'] && !phyObj['phyobj_person']['_id']) {
+                    phyObj['phyobj_person'] = await Promise.all(
+                        phyObj['phyobj_person'].map(
+                            async (phyObjPerson) => {
+                                if (phyObjPerson['person_institution'] === 'Neue Institution hinzufügen') {
+                                    const institution = phyObjPerson['person_institution_data'].pop();
+                                    const newInst = await addAndGetId(institution, 'institution');
+                                    phyObjPerson['person_institution_data'][0] = newInst;
+                                }
+                                return addAndGetId(phyObjPerson, 'person');
+                            }));
+                }
+                if (phyObj['phyobj_institution'] && !phyObj['phyobj_institution']['_id']) {
+                    phyObj['phyobj_institution'] = await Promise.all(
+                        phyObj['phyobj_institution'].map(
+                            phyObjInstitution => addAndGetId(phyObjInstitution, 'institution')
+                        ));
+                }
+                return addAndGetId(phyObj, 'physicalobject');
             }));
 
-        /* TODO: Tags als Objekte
         resultObject['digobj_tags'] = await Promise.all(
             resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
-        */
 
         if (Verbose) {
             console.log('VERBOSE: Finished Object');
@@ -358,12 +388,20 @@ const Mongo = {
             });
         });
     },
-    resolve: async (identifier, collection_name) => {
+    resolve: async (obj, collection_name) => {
         if (Verbose) {
-            console.log(`Resolving ${collection_name} ${identifier}`);
+            if (obj['_id']) {
+                console.log(`Resolving ${collection_name} ${obj['_id']}`);
+            } else {
+                console.log(`Resolving ${collection_name} ${obj}`);
+            }
         }
         const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-        return await resolve_collection.findOne({ '_id': ObjectId(identifier) }).then((resolve_result) => resolve_result);
+        if (obj['_id']) {
+            return await resolve_collection.findOne({ '_id': ObjectId(obj['_id']) }).then((resolve_result) => resolve_result);
+        } else {
+            return await resolve_collection.findOne({ '_id': ObjectId(obj) }).then((resolve_result) => resolve_result);
+        }
     },
     /**
      * Express HTTP GET request
@@ -372,36 +410,96 @@ const Mongo = {
      * TODO: Handle No Objects found?
      */
     getFromObjectCollection: (request, response) => {
-        this.Connection.then(async () => {
-            const RequestCollection = request.params.collection.toLowerCase();
+        const RequestCollection = request.params.collection.toLowerCase();
 
-            const collection = this.DBObjectsRepository.collection(RequestCollection);
+        const collection = this.DBObjectsRepository.collection(RequestCollection);
 
-            const searchParameter = { '_id': request.params.identifier };
+        const searchParameter = { '_id': ObjectId(request.params.identifier) };
 
-            switch (RequestCollection) {
-                case 'compilation':
-                    collection.findOne(searchParameter).then(async (result: Compilation) => {
-                        if (result) {
-                            result.models = await Promise.all(result.models.map(async (model) =>
-                                await Mongo.resolve(model._id, 'model')));
-                            response.send(result);
-                        } else {
-                            response.send({});
-                        }
-                    }).catch((db_error) => {
-                        console.error(db_error);
-                        response.sendStatus(400);
-                    });
-
-                    break;
-                default:
-                    collection.findOne(searchParameter, (db_error, result) => {
+        switch (RequestCollection) {
+            case 'compilation':
+                collection.findOne(searchParameter).then(async (result: Compilation) => {
+                    if (result) {
+                        result.models = await Promise.all(result.models.map(async (model) =>
+                            await Mongo.resolve(model._id, 'model')));
                         response.send(result);
-                    });
-                    break;
-            }
-        });
+                    } else {
+                        response.send({});
+                    }
+                }).catch((db_error) => {
+                    console.error(db_error);
+                    response.sendStatus(400);
+                });
+
+                break;
+            case 'digitalobject':
+                collection.findOne(searchParameter).then(async (result) => {
+                    if (result) {
+                        result['digobj_rightsowner_person'] = await Promise.all(
+                            result['digobj_rightsowner_person'].map(async (person) => {
+                                const newPerson = await Mongo.resolve(person, 'person');
+                                if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
+                                    newPerson['person_institution_data'] = await Promise.all(
+                                        newPerson['person_institution_data']
+                                            .map(async (institution) => await Mongo.resolve(institution, 'institution')));
+                                }
+                                return newPerson;
+                            }));
+                        result['contact_person'] = await Promise.all(
+                            result['contact_person'].map(async (person) =>
+                                await Mongo.resolve(person, 'person')));
+                        result['digobj_person'] = await Promise.all(
+                            result['digobj_person'].map(async (person) => {
+                                const newPerson = await Mongo.resolve(person, 'person');
+                                if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
+                                    newPerson['person_institution_data'] = await Promise.all(
+                                        newPerson['person_institution_data']
+                                            .map(async (institution) => await Mongo.resolve(institution, 'institution')));
+                                }
+                                return newPerson;
+                            }));
+                        result['digobj_tags'] = await Promise.all(
+                            result['digobj_tags'].map(async (tag) =>
+                                await Mongo.resolve(tag, 'tag')));
+                        result['phyObjs'] = await Promise.all(
+                            result['phyObjs'].map(async (resPhyObj) => {
+                                const phyObj = await Mongo.resolve(resPhyObj, 'physicalobject');
+                                phyObj['phyobj_rightsowner_person'] = await Promise.all(phyObj['phyobj_rightsowner_person']
+                                    .map(async (person) =>
+                                        await Mongo.resolve(person, 'person')));
+                                phyObj['phyobj_rightsowner_institution'] = await Promise.all(phyObj['phyobj_rightsowner_institution']
+                                    .map(async (institution) =>
+                                        await Mongo.resolve(institution, 'institution')));
+
+                                phyObj['phyobj_person'] = await Promise.all(phyObj['phyobj_person'].map(async (person) => {
+                                    const newPerson = await Mongo.resolve(person, 'person');
+                                    if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
+                                        newPerson['person_institution_data'] = await Promise.all(
+                                            newPerson['person_institution_data']
+                                                .map(async (institution) => await Mongo.resolve(institution, 'institution')));
+                                    }
+                                    return newPerson;
+                                }));
+                                phyObj['phyobj_institution'] = await Promise.all(phyObj['phyobj_institution'].map(async (institution) =>
+                                    await Mongo.resolve(institution, 'institution')));
+                                return phyObj;
+                            }));
+                        response.send(result);
+                    } else {
+                        response.send({});
+                    }
+                });
+                break;
+            default:
+                collection.findOne(searchParameter, (db_error, result) => {
+                    if (result) {
+                        response.send(result);
+                    } else {
+                        response.send({});
+                    }
+                });
+                break;
+        }
     },
     /**
      * Express HTTP GET request
