@@ -122,6 +122,18 @@ const Mongo = {
             };
         };
 
+
+        const collection = this.DBObjectsRepository.collection('digitalobject');
+
+
+        /**
+         * Handle re-submit for changing a finished DigitalObject
+         */
+        if (resultObject['_id']) {
+            console.log(`Re-submitting DigitalObject ${resultObject['_id']}`);
+            collection.deleteOne({_id: resultObject['_id']});
+        }
+
         /**
          * Use addAndGetId function on all Arrays containing
          * data that need to be added to collections
@@ -189,15 +201,10 @@ const Mongo = {
                 return addAndGetId(phyObj, 'physicalobject');
             }));
 
-        resultObject['digobj_tags'] = await Promise.all(
-            resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
-
-        if (Verbose) {
-            console.log('VERBOSE: Finished Object');
-            console.log(InspectObject(resultObject));
+        if (resultObject['digobj_tags'] && resultObject['digobj_tags'].length > 0) {
+            resultObject['digobj_tags'] = await Promise.all(
+                resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
         }
-
-        const collection = this.DBObjectsRepository.collection('digitalobject');
 
         collection.insertOne(resultObject, (db_error, db_result) => {
             if (db_error) {
@@ -205,8 +212,7 @@ const Mongo = {
                 response.send('Failed to add');
             }
             if (Verbose) {
-                console.log('VERBOSE: Finished Object');
-                console.log(InspectObject(db_result.ops[0]));
+                console.log(`VERBOSE: Finished Object ${db_result.ops[0]['_id']}`);
             }
             response.send(db_result.ops[0]);
         });
