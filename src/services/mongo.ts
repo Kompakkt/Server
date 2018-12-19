@@ -229,9 +229,7 @@ const Mongo = {
             const RequestCollection = request.params.collection.toLowerCase();
 
             if (Verbose) {
-                console.log('VERBOSE: Adding the following document to collection ' + RequestCollection);
-                console.log(RequestCollection);
-                console.log(InspectObject(request.body));
+                console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
             }
 
             const collection = this.DBObjectsRepository.collection(RequestCollection);
@@ -250,53 +248,49 @@ const Mongo = {
                 case 'compilation':
                     const resultObject = request.body;
 
+                    if (resultObject['_id']) {
+                        const OldModels = [];
+                        let NewModels = [];
 
-                    const bExists = new Promise<any>((resolve, reject) => {
-                        collection.findOne({ '_id': resultObject._id }, (db_error, result) => {
-                            resolve(result);
+                        // Sort which models need to be added
+                        resultObject['models'].forEach(model => {
+                            if (model['_id']) {
+                                OldModels.push(model);
+                            } else {
+                                NewModels.push(model);
+                            }
                         });
-                    });
 
-                    await bExists.then(async (result) => {
-                        // Add models in models Array to model collection and return their ObjectId
-                        resultObject['models'] = await Promise.all(
-                            resultObject['models'].map(async model => addAndGetId(model, 'model')));
+                        NewModels = await Promise.all(
+                            NewModels.map(async model => addAndGetId(model, 'model')));
 
-                        // Result will be null if no compilation with the ObjectId exists
-                        if (result === null) {
-                            // Add new compilation
-                            collection.insertOne(resultObject, (db_error, db_result) => {
-                                response.send(db_result.ops);
+                        resultObject['models'] = OldModels.concat(NewModels);
 
-                                if (Verbose) {
-                                    console.log('VERBOSE: Success! Added the following');
-                                    console.log(db_result.ops);
-                                }
-                            });
-                        } else {
-                            // Update compilation
-                            // Only models will be updated
-                            const updateArray = [];
-                            resultObject['models'].map(model => updateArray.push(model));
-                            collection.findOneAndUpdate(
-                                { '_id': resultObject._id },
-                                { $push: { models: { $each: updateArray } } },
-                                (db_error, db_result) => {
-                                    response.send(db_result);
-
-                                    if (Verbose) {
-                                        console.log('VERBOSE: Success! Added the following');
-                                        console.log(db_result);
+                        // Re-create compilation instance
+                        collection.deleteOne({_id: resultObject['_id']}, (del_error, del_result) => {
+                            if (del_error) {
+                                console.error('Failed to remove compilation instance');
+                            } else {
+                                collection.insertOne(resultObject, (db_error, db_result) => {
+                                    if (db_error) {
+                                        console.error('Failed to insert compilation');
+                                    } else {
+                                        console.log(`Re-inserted compilation ${db_result.ops[0]['_id']}`);
+                                        response.send(db_result.ops[0]);
                                     }
-                                }
-                            );
-                        }
-                    }).catch(error => {
-                        console.log(error);
-                        response.send(error);
-                    });
+                                });
+                            }
+                        });
+                    } else {
+                        // Add new compilation
+                        collection.insertOne(resultObject, (db_error, db_result) => {
+                            response.send(db_result.ops);
 
-
+                            if (Verbose) {
+                                console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
+                            }
+                        });
+                    }
                     break;
 
                 default:
