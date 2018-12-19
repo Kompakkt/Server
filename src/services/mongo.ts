@@ -445,6 +445,9 @@ const Mongo = {
                                 }
                                 return newPerson;
                             }));
+                        result['digobj_rightsowner_institution'] = await Promise.all(
+                            result['digobj_rightsowner_institution'].map(async (institution) =>
+                                await Mongo.resolve(institution, 'institution')));
                         result['contact_person'] = await Promise.all(
                             result['contact_person'].map(async (person) =>
                                 await Mongo.resolve(person, 'person')));
