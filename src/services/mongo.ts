@@ -464,9 +464,11 @@ const Mongo = {
                                 }
                                 return newPerson;
                             }));
-                        result['digobj_tags'] = await Promise.all(
-                            result['digobj_tags'].map(async (tag) =>
-                                await Mongo.resolve(tag, 'tag')));
+                        if (result['digobj_tags'].length > 0) {
+                            result['digobj_tags'] = await Promise.all(
+                                result['digobj_tags'].map(async (tag) =>
+                                    await Mongo.resolve(tag, 'tag')));
+                        }
                         result['phyObjs'] = await Promise.all(
                             result['phyObjs'].map(async (resPhyObj) => {
                                 const phyObj = await Mongo.resolve(resPhyObj, 'physicalobject');
