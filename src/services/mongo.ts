@@ -414,7 +414,10 @@ const Mongo = {
 
         const collection = this.DBObjectsRepository.collection(RequestCollection);
 
-        const searchParameter = { '_id': ObjectId(request.params.identifier) };
+        let searchParameter = { '_id': request.params.identifier };
+        if (ObjectId.isValid(request.params.identifier)) {
+            searchParameter = { '_id': ObjectId(request.params.identifier) };
+        }
 
         switch (RequestCollection) {
             case 'compilation':
