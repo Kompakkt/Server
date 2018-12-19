@@ -2,8 +2,8 @@ import { Configuration } from './configuration';
 import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
 
-import { ensureDirSync, moveSync, pathExistsSync, removeSync, move } from 'fs-extra';
-import { dirname, extname } from 'path';
+import { ensureDirSync, moveSync, pathExistsSync, removeSync, move, statSync } from 'fs-extra';
+import { dirname, extname, basename } from 'path';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 
@@ -34,7 +34,9 @@ const Upload = {
             const responseObject = {
                 metadata_file: filename,
                 metadata_object: request.headers['metadatakey'],
-                metadata_link: `models/${request.headers['semirandomtoken']}/${request.headers['metadatakey']}/${filename}`
+                metadata_link: `models/${request.headers['semirandomtoken']}/${request.headers['metadatakey']}/${filename}`,
+                metadata_format: `${extname(newPath)}`,
+                metadata_size: `${statSync(newPath).size} bytes`
             };
             response.end(JSON.stringify(responseObject));
         }).catch(e => response.end(`File already exists`));
@@ -95,8 +97,30 @@ const Upload = {
 
                 const modelFiles = await foundFiles.filter(file => {
                     return modelExt.indexOf(extname(file.path)) !== -1;
-                }).map(file => file.path.substr(file.path.indexOf('models/')));
-                response.json(modelFiles);
+                }); // .map(file => file.path.substr(file.path.indexOf('models/')));
+
+                const ResponseFile = {
+                    file_name: '',
+                    file_link: '',
+                    file_size: 0,
+                    file_format: ''
+                };
+                if (modelFiles.length > 0) {
+                    const ResponseFiles = modelFiles.map(modelFile => {
+                        const result = {...ResponseFile};
+                        result.file_format = extname(modelFile.path);
+                        result.file_link = `${modelFile.path.substr(modelFile.path.indexOf('models/'))}`;
+                        result.file_name = `${basename(modelFile.path)}`;
+                        result.file_size = parseInt(`${modelFile.stats.size}`, 10);
+                        return result;
+                    }).sort((a, b) => a.file_size - b.file_size);
+
+                    console.log(ResponseFiles);
+
+                    response.json(ResponseFiles);
+                } else {
+                    response.json(foundFiles);
+                }
             } else {
                 const resultFiles = await foundFiles.map(file => file.path.substr(file.path.indexOf('models/')));
                 response.json(resultFiles);
