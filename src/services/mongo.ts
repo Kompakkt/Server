@@ -298,8 +298,9 @@ const Mongo = {
                         response.send(result.ops);
 
                         if (Verbose) {
-                            console.log('VERBOSE: Success! Added the following');
-                            console.log(result.ops);
+                            if (result.ops[0] && result.ops[0]['_id']) {
+                                console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
+                            }
                         }
                     });
                     break;
@@ -315,10 +316,10 @@ const Mongo = {
      */
     addMultipleToObjectCollection: (request, response) => {
         this.Connection.then(() => {
+            const RequestCollection = request.params.collection.toLowerCase();
+
             if (Verbose) {
-                console.log('VERBOSE: Adding the following document to collection ' + request.params.collection);
-                console.log(request.params.collection.toLowerCase());
-                console.log(InspectObject(request.body));
+                console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
             }
 
             const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
@@ -326,8 +327,9 @@ const Mongo = {
             collection.insertMany(request.body, (db_error, result) => {
                 response.send(result.ops);
                 if (Verbose) {
-                    console.log('VERBOSE: Success! Added the following');
-                    console.log(result.ops);
+                    if (result.ops[0] && result.ops[0]['_id']) {
+                        console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
+                    }
                 }
             });
         });
