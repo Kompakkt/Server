@@ -457,8 +457,9 @@ const Mongo = {
                         for (let i = 0; i < result['phyObjs'].length; i++) {
                             result['phyObjs'][i] = await Mongo.resolve(result['phyObjs'][i], 'physicalobject');
                             await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_person', 'person');
-                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_person', 'person');
                             await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_institution', 'institution');
+                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_person', 'person');
+                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_institution', 'institution');
                         }
                         response.send(result);
                     } else {
