@@ -68,8 +68,11 @@ const LoadConfig = () => {
         return confObj;
 
     } catch (error) {
-        console.error(error);
-        console.log('Failed loading configuration file. Falling back to default configuration');
+        if (error.code === 'ENOENT') {
+            console.log('Config file not found. Falling back to default configuration');
+        } else {
+            console.log('Failed loading configuration file. Falling back to default configuration');
+        }
         return DefaultConfiguration;
     }
 };
