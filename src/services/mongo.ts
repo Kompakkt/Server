@@ -392,18 +392,12 @@ const Mongo = {
     },
     resolve: async (obj, collection_name) => {
         if (Verbose) {
-            if (obj['_id']) {
-                console.log(`Resolving ${collection_name} ${obj['_id']}`);
-            } else {
-                console.log(`Resolving ${collection_name} ${obj}`);
-            }
+            console.log(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
         }
         const resolve_collection = this.DBObjectsRepository.collection(collection_name);
-        if (obj['_id']) {
-            return await resolve_collection.findOne({ '_id': ObjectId(obj['_id']) }).then((resolve_result) => resolve_result);
-        } else {
-            return await resolve_collection.findOne({ '_id': ObjectId(obj) }).then((resolve_result) => resolve_result);
-        }
+        const id = (obj['_id']) ? obj['_id'] : obj;
+        return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? ObjectId(id) : id })
+            .then((resolve_result) => resolve_result);
     },
     /**
      * Express HTTP GET request
@@ -425,8 +419,10 @@ const Mongo = {
             case 'compilation':
                 collection.findOne(searchParameter).then(async (result: Compilation) => {
                     if (result) {
-                        result.models = await Promise.all(result.models.map(async (model) =>
-                            await Mongo.resolve(model._id, 'model')));
+                        for (let i = 0; i < result.models.length; i++) {
+                            result.models[i] = await Mongo.resolve(result.models[i]._id, 'model');
+                        }
+
                         response.send(result);
                     } else {
                         response.send({});
@@ -440,60 +436,30 @@ const Mongo = {
             case 'digitalobject':
                 collection.findOne(searchParameter).then(async (result) => {
                     if (result) {
-                        result['digobj_rightsowner_person'] = await Promise.all(
-                            result['digobj_rightsowner_person'].map(async (person) => {
-                                const newPerson = await Mongo.resolve(person, 'person');
-                                if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
-                                    newPerson['person_institution_data'] = await Promise.all(
-                                        newPerson['person_institution_data']
-                                            .map(async (institution) => await Mongo.resolve(institution, 'institution')));
+                        const resolveTopLevel = async (obj, property, field) => {
+                            for (let i = 0; i < obj[property].length; i++) {
+                                obj[property][i] =
+                                await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+                            }
+                        };
+                        const resolveNestedInst = async (obj) => {
+                            if (obj['person_institution'] && obj['person_institution'] === 'Neue Institution hinzufügen') {
+                                for (let j = 0; j < obj['person_institution_data'].length; j++) {
+                                    obj['person_institution_data'][j] =
+                                        await Mongo.resolve(obj['person_institution_data'][j], 'institution');
                                 }
-                                return newPerson;
-                            }));
-                        result['digobj_rightsowner_institution'] = await Promise.all(
-                            result['digobj_rightsowner_institution'].map(async (institution) =>
-                                await Mongo.resolve(institution, 'institution')));
-                        result['contact_person'] = await Promise.all(
-                            result['contact_person'].map(async (person) =>
-                                await Mongo.resolve(person, 'person')));
-                        result['digobj_person'] = await Promise.all(
-                            result['digobj_person'].map(async (person) => {
-                                const newPerson = await Mongo.resolve(person, 'person');
-                                if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
-                                    newPerson['person_institution_data'] = await Promise.all(
-                                        newPerson['person_institution_data']
-                                            .map(async (institution) => await Mongo.resolve(institution, 'institution')));
-                                }
-                                return newPerson;
-                            }));
-                        if (result['digobj_tags'].length > 0) {
-                            result['digobj_tags'] = await Promise.all(
-                                result['digobj_tags'].map(async (tag) =>
-                                    await Mongo.resolve(tag, 'tag')));
+                            }
+                            return obj;
+                        };
+                        [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
+                            ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']]
+                            .forEach(async prop => await resolveTopLevel(result, prop[0], prop[1]));
+                        for (let i = 0; i < result['phyObjs'].length; i++) {
+                            result['phyObjs'][i] = await Mongo.resolve(result['phyObjs'][i], 'physicalobject');
+                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_person', 'person');
+                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_person', 'person');
+                            await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_institution', 'institution');
                         }
-                        result['phyObjs'] = await Promise.all(
-                            result['phyObjs'].map(async (resPhyObj) => {
-                                const phyObj = await Mongo.resolve(resPhyObj, 'physicalobject');
-                                phyObj['phyobj_rightsowner_person'] = await Promise.all(phyObj['phyobj_rightsowner_person']
-                                    .map(async (person) =>
-                                        await Mongo.resolve(person, 'person')));
-                                phyObj['phyobj_rightsowner_institution'] = await Promise.all(phyObj['phyobj_rightsowner_institution']
-                                    .map(async (institution) =>
-                                        await Mongo.resolve(institution, 'institution')));
-
-                                phyObj['phyobj_person'] = await Promise.all(phyObj['phyobj_person'].map(async (person) => {
-                                    const newPerson = await Mongo.resolve(person, 'person');
-                                    if (newPerson['person_institution'] === 'Neue Institution hinzufügen') {
-                                        newPerson['person_institution_data'] = await Promise.all(
-                                            newPerson['person_institution_data']
-                                                .map(async (institution) => await Mongo.resolve(institution, 'institution')));
-                                    }
-                                    return newPerson;
-                                }));
-                                phyObj['phyobj_institution'] = await Promise.all(phyObj['phyobj_institution'].map(async (institution) =>
-                                    await Mongo.resolve(institution, 'institution')));
-                                return phyObj;
-                            }));
                         response.send(result);
                     } else {
                         response.send({});
@@ -502,11 +468,7 @@ const Mongo = {
                 break;
             default:
                 collection.findOne(searchParameter, (db_error, result) => {
-                    if (result) {
-                        response.send(result);
-                    } else {
-                        response.send({});
-                    }
+                    response.send(result ? result : {});
                 });
                 break;
         }
