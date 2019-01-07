@@ -249,6 +249,7 @@ const Mongo = {
                     const resultObject = request.body;
 
                     if (resultObject['_id']) {
+
                         const OldModels = [];
                         let NewModels = [];
 
@@ -266,19 +267,14 @@ const Mongo = {
 
                         resultObject['models'] = OldModels.concat(NewModels);
 
-                        // Re-create compilation instance
-                        collection.deleteOne({_id: resultObject['_id']}, (del_error, del_result) => {
-                            if (del_error) {
-                                console.error('Failed to remove compilation instance');
+                        // Update compilation instance
+                        collection.updateOne({_id: resultObject['_id']}, { $set: resultObject }, (up_error, up_result) => {
+                            if (up_error) {
+                                console.error('Failed to update compilation instance');
+                                response.send(404);
                             } else {
-                                collection.insertOne(resultObject, (db_error, db_result) => {
-                                    if (db_error) {
-                                        console.error('Failed to insert compilation');
-                                    } else {
-                                        console.log(`Re-inserted compilation ${db_result.ops[0]['_id']}`);
-                                        response.send(db_result.ops[0]);
-                                    }
-                                });
+                                console.log(`Updated ${resultObject['_id']}`);
+                                response.send({});
                             }
                         });
                     } else {
