@@ -27,7 +27,7 @@ const LoadConfig = () => {
                     ]
                 }
             },
-            Port: 5984,
+            Port: 27017,
             Hostname: 'localhost'
         },
         Uploads: {
