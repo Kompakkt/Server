@@ -1,4 +1,5 @@
 import * as express from 'express';
+import { worker } from 'cluster';
 import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
 import * as bodyParser from 'body-parser';
@@ -18,15 +19,15 @@ const Express = {
             const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
             HTTPS.createServer({key: privateKey, cert: certificate}, Server).listen(Conf.Express.Port);
-            console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
+            if (worker.id === 1) {
+              console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
+            }
         } else {
             HTTP.createServer(Server).listen(Conf.Express.Port);
-            console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
+            if (worker.id === 1) {
+              console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
+            }
         }
-
-        /*Server.listen(Conf.Express.Port, () => {
-            console.log(`Server started and listening on port ${Conf.Express.Port}`);
-        });*/
     }
 };
 

@@ -1,6 +1,7 @@
 import { readJsonSync } from 'fs-extra';
 import { Verbose, RootDirectory, ConfigFile } from '../environment';
 import { inspect as InspectObject } from 'util';
+import { isMaster } from 'cluster';
 
 const LoadConfig = () => {
     const DefaultConfiguration = {
@@ -54,13 +55,13 @@ const LoadConfig = () => {
     if (Verbose) { console.log('INFO: Loading configuration'); }
 
     try {
-        if (Verbose) {
+        if (Verbose && isMaster) {
             console.log(`INFO: Config file path: ${ConfigFile}`);
         }
 
         const confObj = readJsonSync(`${ConfigFile}`);
 
-        if (Verbose) {
+        if (Verbose && isMaster) {
             console.log('INFO: Configuration details: ');
             console.log(InspectObject(confObj, { showHidden: false, depth: null }));
         }
@@ -68,10 +69,12 @@ const LoadConfig = () => {
         return confObj;
 
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            console.log('Config file not found. Falling back to default configuration');
-        } else {
-            console.log('Failed loading configuration file. Falling back to default configuration');
+        if (isMaster) {
+          if (error.code === 'ENOENT') {
+              console.log('Config file not found. Falling back to default configuration');
+          } else {
+              console.log('Failed loading configuration file. Falling back to default configuration');
+          }
         }
         return DefaultConfiguration;
     }
