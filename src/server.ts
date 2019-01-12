@@ -8,8 +8,9 @@ import { Mongo } from './services/mongo';
 
 if (isMaster) {
     const CPUs = cpus().length;
-    console.log(`Forking for ${CPUs} CPUs`);
-    for (let i = 0; i < CPUs * 2; i++) {
+    const threads = ((CPUs >= 4) ? CPUs / 2 : 4);
+    console.log(`Creating ${threads} threads`);
+    for (let i = 0; i < threads; i++) {
         fork();
     }
 } else {
