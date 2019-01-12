@@ -194,15 +194,20 @@ const Mongo = {
         return addAndGetId(person, 'person');
       }));
 
-    if (ObjectId.isValid(resultObject['digobj_rightsowner'])) {
-      const newRightsOwner = {};
-      newRightsOwner['person_role'] = 'RIGHTS_OWNER';
-      newRightsOwner['_id'] = resultObject['digobj_rightsowner'];
-      resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
-    }
-
     resultObject['digobj_rightsowner_institution'] = await Promise.all(
       resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
+
+    if (ObjectId.isValid(resultObject['digobj_rightsowner'])) {
+      const newRightsOwner = {};
+      newRightsOwner['_id'] = resultObject['digobj_rightsowner'];
+      if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1 ) {
+        newRightsOwner['person_role'] = 'RIGHTS_OWNER';
+        resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
+      } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2 ) {
+        newRightsOwner['institution_role'] = 'RIGHTS_OWNER';
+        resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
+      }
+    }
 
     resultObject['contact_person'] = await Promise.all(
       resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
