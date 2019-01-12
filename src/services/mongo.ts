@@ -186,7 +186,7 @@ const Mongo = {
     // TODO: Eleganter lösen
     resultObject['digobj_rightsowner_person'] = await Promise.all(
       resultObject['digobj_rightsowner_person'].map(async person => {
-        if (person['person_institution'] === 'Neue Institution hinzufügen') {
+        if (person['person_institution'] === 'add_new_institution') {
           const institution = person['person_institution_data'].pop();
           const newInst = await addAndGetId(institution, 'institution');
           person['person_institution_data'][0] = newInst;
@@ -232,7 +232,7 @@ const Mongo = {
 
     resultObject['digobj_person'] = await Promise.all(
       resultObject['digobj_person'].map(async person => {
-        if (person['person_institution'] === 'Neue Institution hinzufügen') {
+        if (person['person_institution'] === 'add_new_institution') {
           const institution = person['person_institution_data'].pop();
           const newInst = await addAndGetId(institution, 'institution');
           person['person_institution_data'][0] = newInst;
@@ -287,7 +287,7 @@ const Mongo = {
           phyObj['phyobj_person'] = await Promise.all(
             phyObj['phyobj_person'].map(
               async (phyObjPerson) => {
-                if (phyObjPerson['person_institution'] === 'Neue Institution hinzufügen') {
+                if (phyObjPerson['person_institution'] === 'add_new_institution') {
                   const institution = phyObjPerson['person_institution_data'].pop();
                   const newInst = await addAndGetId(institution, 'institution');
                   phyObjPerson['person_institution_data'][0] = newInst;
