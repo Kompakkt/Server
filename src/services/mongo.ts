@@ -557,9 +557,11 @@ const Mongo = {
               }
               return obj;
             };
-            [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
-            ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']]
-              .forEach(async prop => await resolveTopLevel(result, prop[0], prop[1]));
+            const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
+            ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
+            for (let i = 0; i < props.length; i++) {
+              await resolveTopLevel(result, props[i][0], props[i][1]);
+            }
             for (let i = 0; i < result['phyObjs'].length; i++) {
               result['phyObjs'][i] = await Mongo.resolve(result['phyObjs'][i], 'physicalobject');
               await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_person', 'person');
@@ -567,7 +569,6 @@ const Mongo = {
               await resolveTopLevel(result['phyObjs'][i], 'phyobj_person', 'person');
               await resolveTopLevel(result['phyObjs'][i], 'phyobj_institution', 'institution');
             }
-            console.log(result);
             response.send(result);
           } else {
             response.send({});
