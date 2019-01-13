@@ -3,6 +3,7 @@ import { worker } from 'cluster';
 import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
 import * as bodyParser from 'body-parser';
+import * as cookieParser from 'cookie-parser';
 import * as corser from 'corser';
 import * as compression from 'compression';
 import * as zlib from 'zlib';
@@ -11,8 +12,24 @@ import { readFileSync } from 'fs';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
 
+import * as passport from 'passport';
+import * as LdapStrategy from 'passport-ldapauth';
+import * as expressSession from 'express-session';
+import * as uuid from 'uuid';
+
 const Express = {
     server: express(),
+    passport: passport,
+    getLDAPConfig: (request, callback) => callback(null, {
+      server: {
+        url: Conf.Express.LDAP.Host,
+        bindDN: Conf.Express.LDAP.DN,
+        bindCredentials: `${request.body.password}`,
+        searchBase: Conf.Express.LDAP.searchBase,
+        searchFilter: `(cn=${request.body.username})`,
+        reconnect: true
+      }
+    }),
     startListening: () => {
         if (Conf.Express.enableHTTPS) {
             const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
@@ -36,6 +53,8 @@ const Server = Express.server;
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
 Server.use(bodyParser.json({limit: '50mb'}));
+// Same for cookies
+Server.use(cookieParser());
 // Gzipping Middleware
 Server.use(compression({
     strategy: zlib.Z_FILTERED,
@@ -50,7 +69,8 @@ Server.use(corser.create({
     supportsCredentials: true,
     /*origins: Conf.Express.OriginWhitelist,*/
     methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
-    requestHeaders: corser.simpleRequestHeaders.concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
+    requestHeaders: corser.simpleRequestHeaders
+    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
 }));
 // Static
 if (Conf.Uploads.createSubfolders) {
@@ -58,5 +78,19 @@ if (Conf.Uploads.createSubfolders) {
 } else  {
     Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}`));
 }
+// Passport
+Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));
+
+Express.passport.serializeUser((user: any, done) => done(null, JSON.stringify(user)));
+Express.passport.deserializeUser((id, done) => done(null, id));
+
+Server.use(Express.passport.initialize());
+Server.use(expressSession({
+  genid: (req) => uuid(),
+  secret: Conf.Express.PassportSecret,
+  resave: false,
+  saveUninitialized: false
+}));
+Server.use(Express.passport.session());
 
 export { Express, Server };

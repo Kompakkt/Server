@@ -29,6 +29,7 @@ const Mongo = {
   Client: undefined,
   Connection: undefined,
   DBObjectsRepository: undefined,
+  AccountsRepository: undefined,
   Retry: 0,
   MaxRetries: 10,
   ReconnectInterval: undefined,
@@ -62,7 +63,9 @@ const Mongo = {
     this.Connection.then(() => {
       this.DBObjectsRepository.on('close', () => {
         console.log('Connection closed. Retrying...');
-        setTimeout(() => {
+        console.error('Reconnect not implemented');
+
+        /* setTimeout(() => {
           Mongo.Connection = undefined;
           Mongo.ReconnectInterval = setInterval(() => {
             if (Mongo.Connection === undefined) {
@@ -80,7 +83,7 @@ const Mongo = {
               Mongo.Retry = 0;
             }
           }, 1000);
-        }, 1000);
+        }, 1000); */
       });
     });
   },
@@ -91,6 +94,86 @@ const Mongo = {
   initObjectsRepository: () => {
     this.Connection.then(() => {
       this.DBObjectsRepository = this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
+      this.AccountsRepository = this.Client.db(Configuration.Mongo.Databases.Accounts.Name);
+    });
+  },
+  /**
+   * Adds a new LDAP user or updates LDAP user sessionID
+   */
+  addToAccounts: async (request, response) => {
+    this.Connection.then(async () => {
+      const username = request.body.username;
+      const sessionID = request.sessionID;
+      const ldap = this.AccountsRepository.collection('ldap');
+      const found = await ldap.find({username: username}).toArray();
+      switch (found.length) {
+        case 0:
+          // No Account with this LDAP username
+          // Create new
+          ldap.insertOne({username: username, sessionID: sessionID}, (ins_err, ins_res) => {
+            if (ins_err) {
+              response.sendStatus(400);
+              console.error(ins_res);
+            } else {
+              console.log(ins_res.ops);
+              response.send({status: 'ok'});
+            }
+          });
+          break;
+        case 1:
+          // Account found
+          // Update session ID
+          ldap.updateOne({username: username}, {$set: {sessionID: sessionID}}, (up_err, up_res) => {
+            if (up_err) {
+              response.sendStatus(400);
+              console.error(up_err);
+            } else {
+              response.send({status: 'ok'});
+            }
+          });
+          break;
+        default:
+          // Too many Accountst
+          console.error('Multiple Accounts found for LDAP username ' + username);
+          response.sendStatus(400);
+          break;
+      }
+    });
+  },
+  /**
+   * Gets LDAP user to confirm validity of sessionID
+   */
+  checkAccount: (request, response) => {
+    this.Connection.then(async () => {
+      const sessionID = request.sessionID;
+      const ldap = this.AccountsRepository.collection('ldap');
+      const found = await ldap.find({sessionID: sessionID}).toArray();
+      switch (found.length) {
+        case 0:
+          // Invalid sessionID
+          // Check for config admins
+          // TODO: Either salt and hash passwords or remove completely
+          const username = request.headers['username'] || request.cookies['username'];
+          const password = request.headers['password'] || request.cookies['password'];
+          const local = Configuration.Express.InsecureAdminAccounts.filter(acc => acc.username === username && acc.password === password);
+          if (local.length === 1) {
+            response.send({status: 'ok'});
+          } else {
+            response.sendStatus(400);
+          }
+          break;
+        case 1:
+          // Valid sessionID
+          response.send({status: 'ok'});
+          break;
+        default:
+          // Multiple sessionID. Invalidate all
+          ldap.updateMany({sessionID: sessionID}, {$set: {sessionID: null}}, (up_err, up_res) => {
+            console.log('Invalidated multiple sessionIDs due to being the same');
+            response.sendStatus(400);
+          });
+          break;
+      }
     });
   },
   /**
@@ -439,12 +522,6 @@ const Mongo = {
         }
       });
     });
-  },
-  /**
-   * TODO: Handle user accounts
-   */
-  addToAccounts: (collection, data) => {
-
   },
   /**
    * Express HTTP POST request

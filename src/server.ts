@@ -44,6 +44,10 @@ if (isMaster) {
     Server.post('/addmetadata', Upload.Multer.single('file'), Upload.AddMetadata);
     Server.post('/cancelmetadata', Upload.Multer.single('file'), Upload.CancelMetadata);
 
+    // Authentication
+    Server.post('/login', Express.passport.authenticate('ldapauth', {session: true}), Mongo.addToAccounts);
+    Server.get('/auth', Mongo.checkAccount);
+
     Express.startListening();
 
 }

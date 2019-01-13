@@ -48,7 +48,16 @@ const LoadConfig = () => {
             SSLPaths: {
                 PrivateKey: '',
                 Certificate: ''
-            }
+            },
+            PassportSecret: 'change me',
+            LDAP: {
+              DN: 'cn=admin,dc=example,dc=org',
+              Host: 'ldap://localhost',
+              searchBase: 'dc=example,dc=org'
+            },
+            InsecureAdminAccounts: [
+              {username: 'localadmin', password: 'changeme'}
+            ]
         }
     };
 
