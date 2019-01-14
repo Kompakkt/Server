@@ -20,16 +20,19 @@ import * as uuid from 'uuid';
 const Express = {
     server: express(),
     passport: passport,
-    getLDAPConfig: (request, callback) => callback(null, {
+    getLDAPConfig: (request, callback) => {
+      const DN = (Conf.Express.LDAP.DNauthUID) ? `uid=${request.body.username},${Conf.Express.LDAP.DN}` : Conf.Express.LDAP.DN;
+      callback(null, {
       server: {
         url: Conf.Express.LDAP.Host,
-        bindDN: Conf.Express.LDAP.DN,
+        bindDN: DN,
         bindCredentials: `${request.body.password}`,
         searchBase: Conf.Express.LDAP.searchBase,
-        searchFilter: `(cn=${request.body.username})`,
+        searchFilter: `(uid=${request.body.username})`,
         reconnect: true
       }
-    }),
+      });
+    },
     startListening: () => {
         if (Conf.Express.enableHTTPS) {
             const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);

@@ -52,6 +52,7 @@ const LoadConfig = () => {
             PassportSecret: 'change me',
             LDAP: {
               DN: 'cn=admin,dc=example,dc=org',
+              DNauthUID: true,
               Host: 'ldap://localhost',
               searchBase: 'dc=example,dc=org'
             },
