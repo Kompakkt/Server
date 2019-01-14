@@ -102,15 +102,24 @@ const Mongo = {
    */
   addToAccounts: async (request, response) => {
     this.Connection.then(async () => {
+      const user = request.user;
       const username = request.body.username;
       const sessionID = request.sessionID;
       const ldap = this.AccountsRepository.collection('ldap');
       const found = await ldap.find({username: username}).toArray();
       switch (found.length) {
+        // TODO: Pack this into config somehow...
         case 0:
           // No Account with this LDAP username
           // Create new
-          ldap.insertOne({username: username, sessionID: sessionID}, (ins_err, ins_res) => {
+          ldap.insertOne(
+            { username: username,
+              sessionID: sessionID,
+              fullname: user['cn'],
+              prename: user['givenName'],
+              surname: user['sn'],
+              status: user['UniColognePersonStatus'],
+              mail: user['mail']}, (ins_err, ins_res) => {
             if (ins_err) {
               response.sendStatus(400);
               console.error(ins_res);
@@ -123,7 +132,14 @@ const Mongo = {
         case 1:
           // Account found
           // Update session ID
-          ldap.updateOne({username: username}, {$set: {sessionID: sessionID}}, (up_err, up_res) => {
+          ldap.updateOne({username: username},
+            {$set:
+              { sessionID: sessionID,
+                fullname: user['cn'],
+                prename: user['givenName'],
+                surname: user['sn'],
+                status: user['UniColognePersonStatus'],
+                mail: user['mail']}}, (up_err, up_res) => {
             if (up_err) {
               response.sendStatus(400);
               console.error(up_err);
