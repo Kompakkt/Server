@@ -37,6 +37,7 @@ const LoadConfig = () => {
             subfolderPath: 'models'
         },
         Express: {
+            Host: '127.0.0.1',
             Port: 8080,
             OriginWhitelist: [
                 'http://localhost:4200',

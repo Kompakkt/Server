@@ -38,12 +38,12 @@ const Express = {
             const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
             const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
-            HTTPS.createServer({key: privateKey, cert: certificate}, Server).listen(Conf.Express.Port);
+            HTTPS.createServer({key: privateKey, cert: certificate}, Server).listen(Conf.Express.Port, Conf.Express.Host);
             if (worker.id === 1) {
               console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
             }
         } else {
-            HTTP.createServer(Server).listen(Conf.Express.Port);
+            HTTP.createServer(Server).listen(Conf.Express.Port, Conf.Express.Host);
             if (worker.id === 1) {
               console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
             }
