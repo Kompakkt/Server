@@ -38,7 +38,7 @@ const Express = {
             const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
             const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
-            const options = {key: privateKey, cert: certificate}
+            const options = {key: privateKey, cert: certificate};
             if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
               options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
             }
@@ -88,7 +88,7 @@ if (Conf.Uploads.createSubfolders) {
 // Passport
 Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));
 
-Express.passport.serializeUser((user: any, done) => done(null, JSON.stringify(user)));
+Express.passport.serializeUser((user: any, done) => done(null, user.description));
 Express.passport.deserializeUser((id, done) => done(null, id));
 
 Server.use(Express.passport.initialize());
@@ -96,7 +96,11 @@ Server.use(expressSession({
   genid: (req) => uuid(),
   secret: Conf.Express.PassportSecret,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: false,
+    sameSite: false
+  }
 }));
 Server.use(Express.passport.session());
 
