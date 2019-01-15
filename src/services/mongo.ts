@@ -119,7 +119,9 @@ const Mongo = {
               prename: user['givenName'],
               surname: user['sn'],
               status: user['UniColognePersonStatus'],
-              mail: user['mail']}, (ins_err, ins_res) => {
+              mail: user['mail'],
+              data: {compilations: [], annotations: [], models: []}
+            }, (ins_err, ins_res) => {
             if (ins_err) {
               response.sendStatus(400);
               console.error(ins_res);
