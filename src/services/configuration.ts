@@ -48,7 +48,8 @@ const LoadConfig = () => {
             enableHTTPS: false,
             SSLPaths: {
                 PrivateKey: '',
-                Certificate: ''
+                Certificate: '',
+                Passphrase: ''
             },
             PassportSecret: 'change me',
             LDAP: {
