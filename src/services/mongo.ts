@@ -172,14 +172,14 @@ const Mongo = {
     this.Connection.then(async () => {
       const sessionID = request.sessionID;
       const ldap = this.AccountsRepository.collection('ldap');
-      ldap.findOne({sessionID: sessionID}, (f_err, f_res) => {
-        if (f_err) {
-          response.sendStatus(400);
-          console.error(f_err);
-        } else {
-          response.send({status: 'ok', data: f_res.data});
-        }
-      });
+      const found = await ldap.findOne({sessionID: sessionID});
+      found.data.compilations = await Promise.all(found.data.compilations
+        .map(async compilation => await Mongo.resolve(compilation, 'compilation')));
+      found.data.models = await Promise.all(found.data.models
+        .map(async model => await Mongo.resolve(model, 'model')));
+      found.data.annotations = await Promise.all(found.data.annotations
+        .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
+      response.send({status: 'ok', data: found.data});
     });
   },
   /**
