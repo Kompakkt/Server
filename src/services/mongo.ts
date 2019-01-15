@@ -60,7 +60,7 @@ const Mongo = {
       next();
     } else {
       console.warn('Incoming request while not connected to MongoDB');
-      response.send({message: 'Cannot connect to Database. Contact sysadmin'});
+      response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
   /**
@@ -89,7 +89,7 @@ const Mongo = {
             data: { compilations: [], annotations: [], models: [] }
           }, (ins_err, ins_res) => {
             if (ins_err) {
-              response.send({status: 'error'});
+              response.send({ status: 'error' });
               console.error(ins_res);
             } else {
               console.log(ins_res.ops);
@@ -113,12 +113,12 @@ const Mongo = {
             }
           }, (up_err, up_res) => {
             if (up_err) {
-              response.send({status: 'error'});
+              response.send({ status: 'error' });
               console.error(up_err);
             } else {
               ldap.findOne({ sessionID: sessionID, username: username }, (f_err, f_res) => {
                 if (f_err) {
-                  response.send({status: 'error'});
+                  response.send({ status: 'error' });
                   console.error(f_err);
                 } else {
                   response.send({ status: 'ok', data: f_res.data });
@@ -130,7 +130,7 @@ const Mongo = {
       default:
         // Too many Accountst
         console.error('Multiple Accounts found for LDAP username ' + username);
-        response.send({status: 'error'});
+        response.send({ status: 'error' });
         break;
     }
   },
@@ -483,7 +483,7 @@ const Mongo = {
             if (result.result.ok === 1) {
               response.send({});
             } else {
-              response.send({status: 'error'});
+              response.send({ status: 'error' });
             }
             if (Verbose) {
               console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
@@ -491,7 +491,26 @@ const Mongo = {
           });
         }
         break;
-
+      case 'model':
+      case 'annotation':
+        collection.insertOne(request.body, async (db_error, db_result) => {
+          const userData = await ldap.findOne({ sessionID: sessionID });
+          if (RequestCollection === 'model') {
+            userData.data.models.push(`${db_result.ops[0]['_id']}`);
+          } else if (RequestCollection === 'annotation') {
+            userData.data.annotations.push(`${db_result.ops[0]['_id']}`);
+          }
+          const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
+          if (result.result.ok === 1) {
+            response.send(db_result.ops);
+          } else {
+            response.send({ status: 'error' });
+          }
+          if (Verbose) {
+            console.log(`VERBOSE: Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
+          }
+        });
+        break;
       default:
         collection.insertOne(request.body, (db_error, result) => {
           response.send(result.ops);
@@ -592,7 +611,7 @@ const Mongo = {
           }
         }).catch((db_error) => {
           console.error(db_error);
-          response.send({status: 'error'});
+          response.send({ status: 'error' });
         });
 
         break;
