@@ -127,7 +127,7 @@ const Mongo = {
               console.error(ins_res);
             } else {
               console.log(ins_res.ops);
-              response.send({status: 'ok'});
+              response.send({status: 'ok', data: ins_res.ops[0].data});
             }
           });
           break;
@@ -146,7 +146,14 @@ const Mongo = {
               response.sendStatus(400);
               console.error(up_err);
             } else {
-              response.send({status: 'ok'});
+              ldap.findOne({sessionID: sessionID, username: username}, (f_err, f_res) => {
+                if (f_err) {
+                  response.sendStatus(400);
+                  console.error(f_err);
+                } else {
+                  response.send({status: 'ok', data: f_res.data});
+                }
+              });
             }
           });
           break;
@@ -159,36 +166,45 @@ const Mongo = {
     });
   },
   /**
-   * Gets LDAP user to confirm validity of sessionID
+   * Get ObjectRepository data for current user
    */
-  checkAccount: (request, response) => {
+  getLinkedData: (request, response) => {
     this.Connection.then(async () => {
       const sessionID = request.sessionID;
+      const ldap = this.AccountsRepository.collection('ldap');
+      ldap.findOne({sessionID: sessionID}, (f_err, f_res) => {
+        if (f_err) {
+          response.sendStatus(400);
+          console.error(f_err);
+        } else {
+          response.send({status: 'ok', data: f_res.data});
+        }
+      });
+    });
+  },
+  /**
+   * Gets LDAP user to confirm validity of sessionID
+   */
+  checkAccount: (request, response, next) => {
+    this.Connection.then(async () => {
+      const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
+        request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
       const ldap = this.AccountsRepository.collection('ldap');
       const found = await ldap.find({sessionID: sessionID}).toArray();
       switch (found.length) {
         case 0:
           // Invalid sessionID
-          // Check for config admins
-          // TODO: Either salt and hash passwords or remove completely
-          const username = request.headers['username'] || request.cookies['username'];
-          const password = request.headers['password'] || request.cookies['password'];
-          const local = Configuration.Express.InsecureAdminAccounts.filter(acc => acc.username === username && acc.password === password);
-          if (local.length === 1) {
-            response.send({status: 'ok'});
-          } else {
-            response.sendStatus(400);
-          }
+          response.send({message: 'Invalid session'});
           break;
         case 1:
           // Valid sessionID
-          response.send({status: 'ok'});
+          next();
           break;
         default:
           // Multiple sessionID. Invalidate all
           ldap.updateMany({sessionID: sessionID}, {$set: {sessionID: null}}, (up_err, up_res) => {
             console.log('Invalidated multiple sessionIDs due to being the same');
-            response.sendStatus(400);
+            response.send({message: 'Invalid session'});
           });
           break;
       }
