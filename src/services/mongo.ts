@@ -540,33 +540,6 @@ const Mongo = {
   },
   /**
    * Express HTTP POST request
-   * Handles multiple documents that need to be added
-   * to our Database
-   * request.body is any Array of JavaScript Objects
-   * On success, sends a response containing the added Array
-   */
-  addMultipleToObjectCollection: (request, response) => {
-    this.Connection.then(() => {
-      const RequestCollection = request.params.collection.toLowerCase();
-
-      if (Verbose) {
-        console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
-      }
-
-      const collection = this.DBObjectsRepository.collection(request.params.collection.toLowerCase());
-
-      collection.insertMany(request.body, (db_error, result) => {
-        response.send(result.ops);
-        if (Verbose) {
-          if (result.ops[0] && result.ops[0]['_id']) {
-            console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
-          }
-        }
-      });
-    });
-  },
-  /**
-   * Express HTTP POST request
    * Finds a model by it's ObjectId and
    * updates it's preview screenshot
    */

@@ -28,8 +28,6 @@ if (isMaster) {
     // Post single document to collection
     // http://localhost:8080/api/v1/post/push/person/
     Server.post('/api/v1/post/push/:collection', Mongo.checkAccount, Mongo.addToObjectCollection);
-    // Post multiple documents to collection
-    Server.post('/api/v1/post/pushmultiple/:collection', Mongo.checkAccount, Mongo.addMultipleToObjectCollection);
     // On user submit
     Server.post('/api/v1/post/submit', Mongo.checkAccount, Mongo.submit);
     // On Screenshot update
