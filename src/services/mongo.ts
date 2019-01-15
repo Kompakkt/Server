@@ -30,185 +30,154 @@ const Mongo = {
   Connection: undefined,
   DBObjectsRepository: undefined,
   AccountsRepository: undefined,
-  Retry: 0,
-  MaxRetries: 10,
-  ReconnectInterval: undefined,
   /**
    * Initialize a MongoDB Client
    * uses hostname and port defined in Configuration file
-   */
-  initClient: () => {
-    this.Client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, { useNewUrlParser: true });
-  },
-  /**
    * Make sure our predefined collections exist in the Database
-   */
-  initCollections: () => {
-    this.Connection.then(() => {
-      Configuration.Mongo.Databases.ObjectsRepository.Collections.forEach(collection => {
-        this.DBObjectsRepository.createCollection(collection.toLowerCase());
-      });
-    });
-  },
-  /**
-   * Establish connection to the server
-   * Saving this as a variable allows re-using the same connection
-   * This reduces latency on all calls
-   * TODO: If the connection closes, re-open it
-   */
-  establishConnection: () => {
-    this.Connection = this.Client.connect();
-  },
-  initReconnect: () => {
-    this.Connection.then(() => {
-      this.DBObjectsRepository.on('close', () => {
-        console.log('Connection closed. Retrying...');
-        console.error('Reconnect not implemented');
-
-        /* setTimeout(() => {
-          Mongo.Connection = undefined;
-          Mongo.ReconnectInterval = setInterval(() => {
-            if (Mongo.Connection === undefined) {
-              Mongo.Retry++;
-              if (Mongo.Retry <= Mongo.MaxRetries) {
-                Mongo.establishConnection();
-              } else {
-                console.log(`Reconnect failed after ${Mongo.MaxRetries} tries`);
-                Mongo.ReconnectInterval = undefined;
-                Mongo.Retry = 0;
-              }
-            } else {
-              console.log('Reconnected!');
-              Mongo.ReconnectInterval = undefined;
-              Mongo.Retry = 0;
-            }
-          }, 1000);
-        }, 1000); */
-      });
-    });
-  },
-  /**
    * Save the most used Database as a variable
    * to reduce the amount of calls needed
    */
-  initObjectsRepository: () => {
-    this.Connection.then(() => {
-      this.DBObjectsRepository = this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
-      this.AccountsRepository = this.Client.db(Configuration.Mongo.Databases.Accounts.Name);
+  init: async () => {
+    this.Client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, {
+      useNewUrlParser: true,
+      reconnectTries: Number.POSITIVE_INFINITY,
+      reconnectInterval: 1000,
     });
+    this.Connection = await this.Client.connect();
+    this.DBObjectsRepository = await this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
+    this.AccountsRepository = await this.Client.db(Configuration.Mongo.Databases.Accounts.Name);
+    Configuration.Mongo.Databases.ObjectsRepository.Collections.forEach(collection => {
+      this.DBObjectsRepository.createCollection(collection.toLowerCase());
+    });
+  },
+  /**
+   * Checks if MongoDB is still connected
+   * used as Middleware
+   */
+  isMongoDBConnected: async (request, response, next) => {
+    const isConnected = await this.Client.isConnected();
+    if (isConnected) {
+      next();
+    } else {
+      console.warn('Incoming request while not connected to MongoDB');
+      response.send({message: 'Cannot connect to Database. Contact sysadmin'});
+    }
   },
   /**
    * Adds a new LDAP user or updates LDAP user sessionID
    */
   addToAccounts: async (request, response) => {
-    this.Connection.then(async () => {
-      const user = request.user;
-      const username = request.body.username;
-      const sessionID = request.sessionID;
-      const ldap = this.AccountsRepository.collection('ldap');
-      const found = await ldap.find({username: username}).toArray();
-      switch (found.length) {
-        // TODO: Pack this into config somehow...
-        case 0:
-          // No Account with this LDAP username
-          // Create new
-          ldap.insertOne(
-            { username: username,
-              sessionID: sessionID,
-              fullname: user['cn'],
-              prename: user['givenName'],
-              surname: user['sn'],
-              status: user['UniColognePersonStatus'],
-              mail: user['mail'],
-              data: {compilations: [], annotations: [], models: []}
-            }, (ins_err, ins_res) => {
+    const user = request.user;
+    const username = request.body.username;
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    const found = await ldap.find({ username: username }).toArray();
+    switch (found.length) {
+      // TODO: Pack this into config somehow...
+      case 0:
+        // No Account with this LDAP username
+        // Create new
+        ldap.insertOne(
+          {
+            username: username,
+            sessionID: sessionID,
+            fullname: user['cn'],
+            prename: user['givenName'],
+            surname: user['sn'],
+            status: user['UniColognePersonStatus'],
+            mail: user['mail'],
+            data: { compilations: [], annotations: [], models: [] }
+          }, (ins_err, ins_res) => {
             if (ins_err) {
               response.sendStatus(400);
               console.error(ins_res);
             } else {
               console.log(ins_res.ops);
-              response.send({status: 'ok', data: ins_res.ops[0].data});
+              response.send({ status: 'ok', data: ins_res.ops[0].data });
             }
           });
-          break;
-        case 1:
-          // Account found
-          // Update session ID
-          ldap.updateOne({username: username},
-            {$set:
-              { sessionID: sessionID,
-                fullname: user['cn'],
-                prename: user['givenName'],
-                surname: user['sn'],
-                status: user['UniColognePersonStatus'],
-                mail: user['mail']}}, (up_err, up_res) => {
+        break;
+      case 1:
+        // Account found
+        // Update session ID
+        ldap.updateOne({ username: username },
+          {
+            $set:
+            {
+              sessionID: sessionID,
+              fullname: user['cn'],
+              prename: user['givenName'],
+              surname: user['sn'],
+              status: user['UniColognePersonStatus'],
+              mail: user['mail']
+            }
+          }, (up_err, up_res) => {
             if (up_err) {
               response.sendStatus(400);
               console.error(up_err);
             } else {
-              ldap.findOne({sessionID: sessionID, username: username}, (f_err, f_res) => {
+              ldap.findOne({ sessionID: sessionID, username: username }, (f_err, f_res) => {
                 if (f_err) {
                   response.sendStatus(400);
                   console.error(f_err);
                 } else {
-                  response.send({status: 'ok', data: f_res.data});
+                  response.send({ status: 'ok', data: f_res.data });
                 }
               });
             }
           });
-          break;
-        default:
-          // Too many Accountst
-          console.error('Multiple Accounts found for LDAP username ' + username);
-          response.sendStatus(400);
-          break;
-      }
-    });
+        break;
+      default:
+        // Too many Accountst
+        console.error('Multiple Accounts found for LDAP username ' + username);
+        response.sendStatus(400);
+        break;
+    }
   },
   /**
    * Get ObjectRepository data for current user
    */
-  getLinkedData: (request, response) => {
-    this.Connection.then(async () => {
-      const sessionID = request.sessionID;
-      const ldap = this.AccountsRepository.collection('ldap');
-      const found = await ldap.findOne({sessionID: sessionID});
-      found.data.compilations = await Promise.all(found.data.compilations
-        .map(async compilation => await Mongo.resolve(compilation, 'compilation')));
-      found.data.models = await Promise.all(found.data.models
-        .map(async model => await Mongo.resolve(model, 'model')));
-      found.data.annotations = await Promise.all(found.data.annotations
-        .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
-      response.send({status: 'ok', data: found.data});
-    });
+  getLinkedData: async (request, response) => {
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    const found = await ldap.findOne({ sessionID: sessionID });
+    if (!found || !found.data) {
+      response.send({});
+      return;
+    }
+    found.data.compilations = await Promise.all(found.data.compilations
+      .map(async compilation => await Mongo.resolve(compilation, 'compilation')));
+    found.data.models = await Promise.all(found.data.models
+      .map(async model => await Mongo.resolve(model, 'model')));
+    found.data.annotations = await Promise.all(found.data.annotations
+      .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
+    response.send({ status: 'ok', data: found.data });
   },
   /**
    * Gets LDAP user to confirm validity of sessionID
    */
-  checkAccount: (request, response, next) => {
-    this.Connection.then(async () => {
-      const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
-        request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
-      const ldap = this.AccountsRepository.collection('ldap');
-      const found = await ldap.find({sessionID: sessionID}).toArray();
-      switch (found.length) {
-        case 0:
-          // Invalid sessionID
-          response.send({message: 'Invalid session'});
-          break;
-        case 1:
-          // Valid sessionID
-          next();
-          break;
-        default:
-          // Multiple sessionID. Invalidate all
-          ldap.updateMany({sessionID: sessionID}, {$set: {sessionID: null}}, (up_err, up_res) => {
-            console.log('Invalidated multiple sessionIDs due to being the same');
-            response.send({message: 'Invalid session'});
-          });
-          break;
-      }
-    });
+  checkAccount: async (request, response, next) => {
+    const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
+      request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    const found = await ldap.find({ sessionID: sessionID }).toArray();
+    switch (found.length) {
+      case 0:
+        // Invalid sessionID
+        response.send({ message: 'Invalid session' });
+        break;
+      case 1:
+        // Valid sessionID
+        next();
+        break;
+      default:
+        // Multiple sessionID. Invalidate all
+        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: null } }, (up_err, up_res) => {
+          console.log('Invalidated multiple sessionIDs due to being the same');
+          response.send({ message: 'Invalid session' });
+        });
+        break;
+    }
   },
   /**
    * When the user submits the metadataform this function
@@ -255,9 +224,9 @@ const Mongo = {
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
-              .updateOne({ _id : ObjectId(field['_id'])}, { $push: { roles: { $each: field['roles'] }}}).then(result => {
-                return String(field['_id']);
-              }) :
+                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(result => {
+                  return String(field['_id']);
+                }) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                 return String(result.ops[0]['_id']);
               })
@@ -275,9 +244,9 @@ const Mongo = {
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
-              .updateOne({ _id : ObjectId(field['_id'])}, { $push: { roles: { $each: field['roles'] }}}).then(result => {
-                return String(field['_id']);
-              }) :
+                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(result => {
+                  return String(field['_id']);
+                }) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                 return String(result.ops[0]['_id']);
               })
@@ -317,10 +286,10 @@ const Mongo = {
     if (ObjectId.isValid(resultObject['digobj_rightsowner'])) {
       const newRightsOwner = {};
       newRightsOwner['_id'] = resultObject['digobj_rightsowner'];
-      if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1 ) {
+      if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
         newRightsOwner['person_role'] = 'RIGHTS_OWNER';
         resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
-      } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2 ) {
+      } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2) {
         newRightsOwner['institution_role'] = 'RIGHTS_OWNER';
         resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
       }
@@ -332,7 +301,7 @@ const Mongo = {
     if (resultObject['contact_person_existing'] instanceof Array && resultObject['contact_person_existing'].length > 0) {
       if (resultObject['contact_person_existing'][0] === 'add_to_new_rightsowner_person') {
         // Contact Person is the same as Rightsowner Person
-        const newContact = {...resultObject['digobj_rightsowner_person'][0]};
+        const newContact = { ...resultObject['digobj_rightsowner_person'][0] };
         newContact['person_role'] = 'CONTACT_PERSON';
         if (resultObject['contact_person'] instanceof Array) {
           resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
@@ -379,7 +348,7 @@ const Mongo = {
         if (phyObj['phyobj_person_existing'] instanceof Array && phyObj['phyobj_person_existing'].length > 0) {
           if (phyObj['phyobj_person_existing'][0] === 'add_to_new_rightsowner_person') {
             // Contact Person is the same as Rightsowner Person
-            const newContact = {...phyObj['phyobj_rightsowner_person'][0]};
+            const newContact = { ...phyObj['phyobj_rightsowner_person'][0] };
             newContact['person_role'] = 'CONTACT_PERSON';
             if (phyObj['phyobj_person'] instanceof Array) {
               phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
@@ -451,92 +420,90 @@ const Mongo = {
    * request.body is any JavaScript Object
    * On success, sends a response containing the added Object
    */
-  addToObjectCollection: (request, response) => {
-    this.Connection.then(async () => {
-      const RequestCollection = request.params.collection.toLowerCase();
+  addToObjectCollection: async (request, response) => {
+    const RequestCollection = request.params.collection.toLowerCase();
 
-      if (Verbose) {
-        console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
-      }
+    if (Verbose) {
+      console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
+    }
 
-      const collection = this.DBObjectsRepository.collection(RequestCollection);
-      const sessionID = request.sessionID;
-      const ldap = this.AccountsRepository.collection('ldap');
+    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
 
-      const addAndGetId = async (field, add_to_coll) => {
-        return {
-          '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
-            String(field['_id']) :
-            await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
-              return String(result.ops[0]['_id']);
-            })
-        };
+    const addAndGetId = async (field, add_to_coll) => {
+      return {
+        '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
+          String(field['_id']) :
+          await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
+            return String(result.ops[0]['_id']);
+          })
       };
+    };
 
-      switch (RequestCollection) {
-        case 'compilation':
-          const resultObject = request.body;
+    switch (RequestCollection) {
+      case 'compilation':
+        const resultObject = request.body;
 
-          if (resultObject['_id']) {
+        if (resultObject['_id']) {
 
-            const OldModels = [];
-            let NewModels = [];
+          const OldModels = [];
+          let NewModels = [];
 
-            // Sort which models need to be added
-            resultObject['models'].forEach(model => {
-              if (model['_id']) {
-                OldModels.push(model);
-              } else {
-                NewModels.push(model);
-              }
-            });
-
-            NewModels = await Promise.all(
-              NewModels.map(async model => addAndGetId(model, 'model')));
-
-            resultObject['models'] = OldModels.concat(NewModels);
-
-            // Update compilation instance
-            collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
-              if (up_error) {
-                console.error('Failed to update compilation instance');
-                response.send(404);
-              } else {
-                console.log(`Updated ${resultObject['_id']}`);
-                response.send({});
-              }
-            });
-          } else {
-            // Add new compilation
-            collection.insertOne(resultObject, async (db_error, db_result) => {
-              const userData = await ldap.findOne({sessionID: sessionID});
-              userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
-              const result = await ldap.updateOne({sessionID: sessionID}, {$set: {data: userData.data}});
-              if (result.result.ok === 1) {
-                response.send({});
-              } else {
-                response.sendStatus(400);
-              }
-              if (Verbose) {
-                console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
-              }
-            });
-          }
-          break;
-
-        default:
-          collection.insertOne(request.body, (db_error, result) => {
-            response.send(result.ops);
-
-            if (Verbose) {
-              if (result.ops[0] && result.ops[0]['_id']) {
-                console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
-              }
+          // Sort which models need to be added
+          resultObject['models'].forEach(model => {
+            if (model['_id']) {
+              OldModels.push(model);
+            } else {
+              NewModels.push(model);
             }
           });
-          break;
-      }
-    });
+
+          NewModels = await Promise.all(
+            NewModels.map(async model => addAndGetId(model, 'model')));
+
+          resultObject['models'] = OldModels.concat(NewModels);
+
+          // Update compilation instance
+          collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
+            if (up_error) {
+              console.error('Failed to update compilation instance');
+              response.send(404);
+            } else {
+              console.log(`Updated ${resultObject['_id']}`);
+              response.send({});
+            }
+          });
+        } else {
+          // Add new compilation
+          collection.insertOne(resultObject, async (db_error, db_result) => {
+            const userData = await ldap.findOne({ sessionID: sessionID });
+            userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
+            const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
+            if (result.result.ok === 1) {
+              response.send({});
+            } else {
+              response.sendStatus(400);
+            }
+            if (Verbose) {
+              console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
+            }
+          });
+        }
+        break;
+
+      default:
+        collection.insertOne(request.body, (db_error, result) => {
+          response.send(result.ops);
+
+          if (Verbose) {
+            if (result.ops[0] && result.ops[0]['_id']) {
+              console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
+            }
+          }
+        });
+        break;
+    }
   },
   /**
    * Express HTTP POST request
@@ -544,46 +511,44 @@ const Mongo = {
    * updates it's preview screenshot
    */
   updateScreenshot: (request, response) => {
-    this.Connection.then(() => {
-      const imagedata = request.body.data;
-      if (Verbose) {
-        console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
-        console.log(`VERBOSE: Size before: ${Buffer.from(imagedata).length}`);
+    const imagedata = request.body.data;
+    if (Verbose) {
+      console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+      console.log(`VERBOSE: Size before: ${Buffer.from(imagedata).length}`);
+    }
+
+    const collection = this.DBObjectsRepository.collection('model');
+
+
+    base64img.img(imagedata, '.', 'tmp', (err, filepath) => {
+      if (err) {
+        console.error(err);
+        response.send('Failed compressing image');
+        return;
       }
 
-      const collection = this.DBObjectsRepository.collection('model');
-
-
-      base64img.img(imagedata, '.', 'tmp', (err, filepath) => {
-        if (err) {
-          console.error(err);
+      readFile(filepath, (fs_err, fs_data) => {
+        if (fs_err) {
+          console.error(fs_err);
           response.send('Failed compressing image');
           return;
         }
 
-        readFile(filepath, (fs_err, fs_data) => {
-          if (fs_err) {
-            console.error(fs_err);
-            response.send('Failed compressing image');
-            return;
+        PNGtoJPEG({ quality: 60 })(fs_data).then(jpeg_data => {
+          jpeg_data = new Buffer(jpeg_data).toString('base64');
+
+          if (Verbose) {
+            console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+            console.log(`VERBOSE: Size before: ${Buffer.from(jpeg_data).length}`);
           }
 
-          PNGtoJPEG({ quality: 60 })(fs_data).then(jpeg_data => {
-            jpeg_data = new Buffer(jpeg_data).toString('base64');
-
-            if (Verbose) {
-              console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
-              console.log(`VERBOSE: Size before: ${Buffer.from(jpeg_data).length}`);
-            }
-
-            collection.findOneAndUpdate(
-              { '_id': ObjectId(request.params.identifier) },
-              { $set: { preview: request.body.data } },
-              (db_error, result) => {
-                console.log(result);
-                response.send(result);
-              });
-          });
+          collection.findOneAndUpdate(
+            { '_id': ObjectId(request.params.identifier) },
+            { $set: { preview: request.body.data } },
+            (db_error, result) => {
+              console.log(result);
+              response.send(result);
+            });
         });
       });
     });
@@ -726,22 +691,9 @@ const Mongo = {
   }
 };
 
-const ReconnectProxy = new Proxy(Mongo, {
-  get(target, property, receiver) {
-    console.log(target);
-    console.log(property);
-    console.log(receiver);
-    return target[property];
-  }
-});
-
 /**
  * Initialization
  */
-Mongo.initClient();
-Mongo.establishConnection();
-Mongo.initObjectsRepository();
-Mongo.initCollections();
-Mongo.initReconnect();
+Mongo.init();
 
 export { Mongo };

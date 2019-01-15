@@ -14,6 +14,9 @@ if (isMaster) {
         fork();
     }
 } else {
+    // Check if MongoDB is connected
+    Server.use(Mongo.isMongoDBConnected);
+
     // MongoDB REST API
     // GET
     // Find document by ID in collection
