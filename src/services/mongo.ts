@@ -89,7 +89,7 @@ const Mongo = {
             data: { compilations: [], annotations: [], models: [] }
           }, (ins_err, ins_res) => {
             if (ins_err) {
-              response.sendStatus(400);
+              response.send({status: 'error'});
               console.error(ins_res);
             } else {
               console.log(ins_res.ops);
@@ -113,12 +113,12 @@ const Mongo = {
             }
           }, (up_err, up_res) => {
             if (up_err) {
-              response.sendStatus(400);
+              response.send({status: 'error'});
               console.error(up_err);
             } else {
               ldap.findOne({ sessionID: sessionID, username: username }, (f_err, f_res) => {
                 if (f_err) {
-                  response.sendStatus(400);
+                  response.send({status: 'error'});
                   console.error(f_err);
                 } else {
                   response.send({ status: 'ok', data: f_res.data });
@@ -130,7 +130,7 @@ const Mongo = {
       default:
         // Too many Accountst
         console.error('Multiple Accounts found for LDAP username ' + username);
-        response.sendStatus(400);
+        response.send({status: 'error'});
         break;
     }
   },
@@ -483,7 +483,7 @@ const Mongo = {
             if (result.result.ok === 1) {
               response.send({});
             } else {
-              response.sendStatus(400);
+              response.send({status: 'error'});
             }
             if (Verbose) {
               console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
@@ -592,7 +592,7 @@ const Mongo = {
           }
         }).catch((db_error) => {
           console.error(db_error);
-          response.sendStatus(400);
+          response.send({status: 'error'});
         });
 
         break;
