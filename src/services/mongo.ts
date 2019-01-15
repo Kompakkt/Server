@@ -460,6 +460,8 @@ const Mongo = {
       }
 
       const collection = this.DBObjectsRepository.collection(RequestCollection);
+      const sessionID = request.sessionID;
+      const ldap = this.AccountsRepository.collection('ldap');
 
       const addAndGetId = async (field, add_to_coll) => {
         return {
@@ -506,9 +508,15 @@ const Mongo = {
             });
           } else {
             // Add new compilation
-            collection.insertOne(resultObject, (db_error, db_result) => {
-              response.send(db_result.ops);
-
+            collection.insertOne(resultObject, async (db_error, db_result) => {
+              const userData = await ldap.findOne({sessionID: sessionID});
+              userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
+              const result = await ldap.updateOne({sessionID: sessionID}, {$set: {data: userData.data}});
+              if (result.result.ok === 1) {
+                response.send({});
+              } else {
+                response.sendStatus(400);
+              }
               if (Verbose) {
                 console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
               }
