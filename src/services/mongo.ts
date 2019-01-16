@@ -154,7 +154,7 @@ const Mongo = {
     const ldap = this.AccountsRepository.collection('ldap');
     const found = await ldap.findOne({ sessionID: sessionID });
     if (!found || !found.data) {
-      response.send({});
+      response.send({ status: 'ok' });
       return;
     }
     found.data.compilations = await Promise.all(found.data.compilations
@@ -483,7 +483,7 @@ const Mongo = {
               response.send(404);
             } else {
               console.log(`Updated ${resultObject['_id']}`);
-              response.send({});
+              response.send({ status: 'ok' });
             }
           });
         } else {
@@ -493,7 +493,7 @@ const Mongo = {
             userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
             const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
             if (result.result.ok === 1) {
-              response.send({});
+              response.send({ status: 'ok' });
             } else {
               response.send({ status: 'error' });
             }
@@ -619,7 +619,7 @@ const Mongo = {
 
             response.send(result);
           } else {
-            response.send({});
+            response.send({ status: 'ok' });
           }
         }).catch((db_error) => {
           console.error(db_error);
@@ -659,7 +659,7 @@ const Mongo = {
             }
             response.send(result);
           } else {
-            response.send({});
+            response.send({ status: 'ok' });
           }
         });
         break;
@@ -698,7 +698,7 @@ const Mongo = {
 
             response.send(resultObject);
           } else {
-            response.send({});
+            response.send({ status: 'ok' });
           }
         });
         break;
