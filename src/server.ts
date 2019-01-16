@@ -37,7 +37,7 @@ if (isMaster) {
   // On user submit
   Server.post('/api/v1/post/submit', Mongo.checkAccount, Mongo.submit);
   // On Screenshot update
-  Server.post('/api/v1/post/screenshot/:identifier', Mongo.checkAccount, Mongo.updateScreenshot);
+  Server.post('/api/v1/post/settings/:identifier', Mongo.checkAccount, Mongo.updateSettings);
   // Remove document from collection
   Server.post('/api/v1/post/remove/:collection/:identifier',
     Express.passport.authenticate('ldapauth', { session: false }),

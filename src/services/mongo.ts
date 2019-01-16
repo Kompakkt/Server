@@ -541,29 +541,33 @@ const Mongo = {
    * Finds a model by it's ObjectId and
    * updates it's preview screenshot
    */
-  updateScreenshot: async (request, response) => {
-    const imagedata = request.body.data;
-    if (Verbose) {
-      console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
-      console.log(`VERBOSE: Size before: ${Buffer.from(imagedata).length}`);
-    }
-
+  updateSettings: async (request, response) => {
+    const preview = request.body.preview;
+    const cameraPositionInitial = request.body.cameraPositionInitial;
+    const background = request.body.background;
+    const lights = request.body.lights;
+    const identifier = (ObjectId.isValid(request.params.identifier)) ?
+      ObjectId(request.params.identifier) : request.params.identifier;
     const collection = this.DBObjectsRepository.collection('model');
 
-    let tempFile = base64img.imgSync(imagedata, '.', 'tmp');
+    // Process image
+    let tempFile = base64img.imgSync(preview, '.', 'tmp');
     tempFile = readFileSync(tempFile);
     let final_image = '';
     await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
       final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
     });
-    const result = await collection.updateOne({ '_id': ObjectId(request.params.identifier) },
-      { $set: { preview: `${final_image}` } });
-    response.send((result.result.ok === 1) ? { status: 'ok', preview: `${final_image}` } : { status: 'error' });
 
-    if (Verbose) {
-      console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
-      console.log(`VERBOSE: Size before: ${Buffer.from(final_image).length}`);
-    }
+    // Overwrite old settings
+    const settings = {
+      preview: `${final_image}`,
+      cameraPositionInitial: cameraPositionInitial,
+      background: background,
+      ligths: lights
+    };
+    const result = await collection.updateOne({ '_id': identifier },
+      { $set: { settings: settings } });
+    response.send((result.result.ok === 1) ? { status: 'ok', settings: settings} : { status: 'error' });
   },
   /**
    * Simple resolving by collection name and Id
