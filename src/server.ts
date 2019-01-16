@@ -36,6 +36,11 @@ if (isMaster) {
   Server.post('/api/v1/post/submit', Mongo.checkAccount, Mongo.submit);
   // On Screenshot update
   Server.post('/api/v1/post/screenshot/:identifier', Mongo.checkAccount, Mongo.updateScreenshot);
+  // Remove document from collection
+  Server.post('/api/v1/post/remove/:collection/:identifier',
+    Express.passport.authenticate('ldapauth', { session: false }),
+    Mongo.checkAccount,
+    Mongo.removeObjectFromObjectCollection);
 
   // Upload API
   // Upload a file to the server

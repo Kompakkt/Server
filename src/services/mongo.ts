@@ -700,6 +700,50 @@ const Mongo = {
         });
         break;
     }
+  },
+  /**
+   * Remove document from collection by ID
+   */
+  removeObjectFromObjectCollection: async (request, response) => {
+    const RequestCollection = request.params.collection.toLowerCase();
+
+    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+
+    let searchParameter = { '_id': request.params.identifier };
+    if (ObjectId.isValid(request.params.identifier)) {
+      searchParameter = { '_id': ObjectId(request.params.identifier) };
+    }
+
+    const delete_result = await collection.deleteOne(searchParameter);
+    if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
+      const find_result = await ldap.findOne({ sessionID: sessionID });
+      switch (RequestCollection) {
+        case 'compilations':
+          find_result.data.compilations = find_result.data.compilations.filter(id => id !== request.params.identifier);
+          break;
+        case 'models':
+          find_result.data.models = find_result.data.models.filter(id => id !== request.params.identifier);
+          break;
+        case 'annotations':
+          find_result.data.annotations = find_result.data.annotations.filter(id => id !== request.params.identifier);
+          break;
+        default: break;
+      }
+      const update_result =  await ldap.updateOne({ sessionID: sessionID }, {$set: {data: find_result.data}});
+      if (update_result.result.ok === 1) {
+        console.log(`Deleted ${RequestCollection} ${request.params.identifier}`);
+        response.send({ status: 'ok' });
+      } else {
+        console.log(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
+        response.send({ status: 'error' });
+      }
+    } else {
+      console.log(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
+      console.log(delete_result);
+      response.send({ status: 'error' });
+    }
   }
 };
 
