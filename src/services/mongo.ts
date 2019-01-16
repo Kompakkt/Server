@@ -565,6 +565,9 @@ const Mongo = {
       console.log(`VERBOSE: Size before: ${Buffer.from(final_image).length}`);
     }
   },
+  /**
+   * Simple resolving by collection name and Id
+   */
   resolve: async (obj, collection_name) => {
     if (Verbose) {
       console.log(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
@@ -573,6 +576,39 @@ const Mongo = {
     const id = (obj['_id']) ? obj['_id'] : obj;
     return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? ObjectId(id) : id })
       .then((resolve_result) => resolve_result);
+  },
+  /**
+   * Heavy nested resolving for DigitalObject
+   */
+  resolveDigitalObject: async (digitalObject) => {
+    const resolveTopLevel = async (obj, property, field) => {
+      for (let i = 0; i < obj[property].length; i++) {
+        obj[property][i] =
+          await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+      }
+    };
+    const resolveNestedInst = async (obj) => {
+      if (obj['person_institution'] && obj['person_institution'] === 'Neue Institution hinzufügen') {
+        for (let j = 0; j < obj['person_institution_data'].length; j++) {
+          obj['person_institution_data'][j] =
+            await Mongo.resolve(obj['person_institution_data'][j], 'institution');
+        }
+      }
+      return obj;
+    };
+    const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
+    ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
+    for (let i = 0; i < props.length; i++) {
+      await resolveTopLevel(digitalObject, props[i][0], props[i][1]);
+    }
+    for (let i = 0; i < digitalObject['phyObjs'].length; i++) {
+      digitalObject['phyObjs'][i] = await Mongo.resolve(digitalObject['phyObjs'][i], 'physicalobject');
+      await resolveTopLevel(digitalObject['phyObjs'][i], 'phyobj_rightsowner_person', 'person');
+      await resolveTopLevel(digitalObject['phyObjs'][i], 'phyobj_rightsowner_institution', 'institution');
+      await resolveTopLevel(digitalObject['phyObjs'][i], 'phyobj_person', 'person');
+      await resolveTopLevel(digitalObject['phyObjs'][i], 'phyobj_institution', 'institution');
+    }
+    return digitalObject;
   },
   /**
    * Express HTTP GET request
@@ -606,42 +642,10 @@ const Mongo = {
           console.error(db_error);
           response.send({ status: 'error' });
         });
-
         break;
       case 'digitalobject':
         collection.findOne(searchParameter).then(async (result) => {
-          if (result) {
-            const resolveTopLevel = async (obj, property, field) => {
-              for (let i = 0; i < obj[property].length; i++) {
-                obj[property][i] =
-                  await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
-              }
-            };
-            const resolveNestedInst = async (obj) => {
-              if (obj['person_institution'] && obj['person_institution'] === 'Neue Institution hinzufügen') {
-                for (let j = 0; j < obj['person_institution_data'].length; j++) {
-                  obj['person_institution_data'][j] =
-                    await Mongo.resolve(obj['person_institution_data'][j], 'institution');
-                }
-              }
-              return obj;
-            };
-            const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
-            ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
-            for (let i = 0; i < props.length; i++) {
-              await resolveTopLevel(result, props[i][0], props[i][1]);
-            }
-            for (let i = 0; i < result['phyObjs'].length; i++) {
-              result['phyObjs'][i] = await Mongo.resolve(result['phyObjs'][i], 'physicalobject');
-              await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_person', 'person');
-              await resolveTopLevel(result['phyObjs'][i], 'phyobj_rightsowner_institution', 'institution');
-              await resolveTopLevel(result['phyObjs'][i], 'phyobj_person', 'person');
-              await resolveTopLevel(result['phyObjs'][i], 'phyobj_institution', 'institution');
-            }
-            response.send(result);
-          } else {
-            response.send({ status: 'ok' });
-          }
+          response.send((result) ? await Mongo.resolveDigitalObject(result) : { status: 'error' });
         });
         break;
       default:
@@ -731,7 +735,7 @@ const Mongo = {
           break;
         default: break;
       }
-      const update_result =  await ldap.updateOne({ sessionID: sessionID }, {$set: {data: find_result.data}});
+      const update_result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: find_result.data } });
       if (update_result.result.ok === 1) {
         console.log(`Deleted ${RequestCollection} ${request.params.identifier}`);
         response.send({ status: 'ok' });
@@ -744,6 +748,12 @@ const Mongo = {
       console.log(delete_result);
       response.send({ status: 'error' });
     }
+  },
+  /**
+   * Search
+   */
+  searchObjectWithFilter: async (request, response) => {
+
   }
 };
 
