@@ -14,7 +14,7 @@ import { inspect as InspectObject } from 'util';
 
 import * as base64img from 'base64-img';
 import * as PNGtoJPEG from 'png-to-jpeg';
-import { readFile } from 'fs';
+import { readFile, writeFileSync, readFileSync } from 'fs';
 
 /** Interfaces */
 import { Compilation } from '../interfaces/compilation.interface';
@@ -541,7 +541,7 @@ const Mongo = {
    * Finds a model by it's ObjectId and
    * updates it's preview screenshot
    */
-  updateScreenshot: (request, response) => {
+  updateScreenshot: async (request, response) => {
     const imagedata = request.body.data;
     if (Verbose) {
       console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
@@ -550,39 +550,18 @@ const Mongo = {
 
     const collection = this.DBObjectsRepository.collection('model');
 
+    let tempFile = base64img.imgSync(imagedata, '.', 'tmp');
+    tempFile = readFileSync(tempFile);
+    await PNGtoJPEG({ quality: 60 })(tempFile).then(async jpeg_data => writeFileSync('./tmp', jpeg_data));
+    const final_image = base64img.base64Sync('./tmp');
+    const result = await collection.updateOne({ '_id': ObjectId(request.params.identifier) },
+      { $set: { preview: `${final_image}` } });
+    response.send((result.result.ok === 1) ? { status: 'ok', preview: `${final_image}` } : { status: 'error' });
 
-    base64img.img(imagedata, '.', 'tmp', (err, filepath) => {
-      if (err) {
-        console.error(err);
-        response.send('Failed compressing image');
-        return;
-      }
-
-      readFile(filepath, (fs_err, fs_data) => {
-        if (fs_err) {
-          console.error(fs_err);
-          response.send('Failed compressing image');
-          return;
-        }
-
-        PNGtoJPEG({ quality: 60 })(fs_data).then(jpeg_data => {
-          jpeg_data = new Buffer(jpeg_data).toString('base64');
-
-          if (Verbose) {
-            console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
-            console.log(`VERBOSE: Size before: ${Buffer.from(jpeg_data).length}`);
-          }
-
-          collection.findOneAndUpdate(
-            { '_id': ObjectId(request.params.identifier) },
-            { $set: { preview: request.body.data } },
-            (db_error, result) => {
-              console.log(result);
-              response.send(result);
-            });
-        });
-      });
-    });
+    if (Verbose) {
+      console.log('VERBOSE: Updating preview screenshot for model with identifier: ' + request.params.identifier);
+      console.log(`VERBOSE: Size before: ${Buffer.from(final_image).length}`);
+    }
   },
   resolve: async (obj, collection_name) => {
     if (Verbose) {
