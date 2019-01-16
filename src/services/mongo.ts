@@ -9,7 +9,7 @@ import { Configuration } from './configuration';
 /**
  * Imported for detailed logging
  */
-import { Verbose } from '../environment';
+import { Verbose, RootDirectory } from '../environment';
 import { inspect as InspectObject } from 'util';
 
 import * as base64img from 'base64-img';
@@ -552,8 +552,10 @@ const Mongo = {
 
     let tempFile = base64img.imgSync(imagedata, '.', 'tmp');
     tempFile = readFileSync(tempFile);
-    await PNGtoJPEG({ quality: 60 })(tempFile).then(async jpeg_data => writeFileSync('./tmp', jpeg_data));
-    const final_image = base64img.base64Sync('./tmp');
+    let final_image = '';
+    await PNGtoJPEG({ quality: 60 })(tempFile).then(async jpeg_data => {
+      final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
+    });
     const result = await collection.updateOne({ '_id': ObjectId(request.params.identifier) },
       { $set: { preview: `${final_image}` } });
     response.send((result.result.ok === 1) ? { status: 'ok', preview: `${final_image}` } : { status: 'error' });
