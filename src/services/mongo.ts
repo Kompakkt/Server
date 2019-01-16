@@ -68,8 +68,8 @@ const Mongo = {
    * used as Middleware
    */
   fixObjectId: async (request, response, next) => {
-    if (request && request.body && request.body['_id']) {
-      if (ObjectId.isValid(request.body['_id'])) {
+    if (request) {
+      if (request.body && request.body['_id'] && ObjectId.isValid(request.body['_id'])) {
         request.body['_id'] = ObjectId(request.body['_id']);
       }
     }
@@ -620,15 +620,12 @@ const Mongo = {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
-
-    let searchParameter = { '_id': request.params.identifier };
-    if (ObjectId.isValid(request.params.identifier)) {
-      searchParameter = { '_id': ObjectId(request.params.identifier) };
-    }
+    const identifier = (ObjectId.isValid(request.params.identifier)) ?
+      ObjectId(request.params.identifier) : request.params.identifier;
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.findOne(searchParameter).then(async (result: Compilation) => {
+        collection.findOne({ '_id': identifier }).then(async (result: Compilation) => {
           if (result) {
             for (let i = 0; i < result.models.length; i++) {
               result.models[i] = await Mongo.resolve(result.models[i]._id, 'model');
@@ -644,12 +641,12 @@ const Mongo = {
         });
         break;
       case 'digitalobject':
-        collection.findOne(searchParameter).then(async (result) => {
+        collection.findOne({ '_id': identifier }).then(async (result) => {
           response.send((result) ? await Mongo.resolveDigitalObject(result) : { status: 'error' });
         });
         break;
       default:
-        collection.findOne(searchParameter, (db_error, result) => {
+        collection.findOne({ '_id': identifier }, (db_error, result) => {
           response.send(result ? result : { status: 'ok' });
         });
         break;
@@ -715,12 +712,10 @@ const Mongo = {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
 
-    let searchParameter = { '_id': request.params.identifier };
-    if (ObjectId.isValid(request.params.identifier)) {
-      searchParameter = { '_id': ObjectId(request.params.identifier) };
-    }
+    const identifier = (ObjectId.isValid(request.params.identifier)) ?
+      ObjectId(request.params.identifier) : request.params.identifier;
 
-    const delete_result = await collection.deleteOne(searchParameter);
+    const delete_result = await collection.deleteOne({ '_id': identifier });
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
       const find_result = await ldap.findOne({ sessionID: sessionID });
       switch (RequestCollection) {
@@ -753,7 +748,59 @@ const Mongo = {
    * Search
    */
   searchObjectWithFilter: async (request, response) => {
+    const RequestCollection = request.params.collection.toLowerCase();
 
+    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const filter = request.params.filter.toLowerCase().split('+');
+    const allObjects = await collection.find({}).toArray();
+
+    const getNestedValues = (obj) => {
+      const result = [];
+      for (const key of Object.keys(obj)) {
+        const prop = obj[key];
+        if (obj.hasOwnProperty(key)) {
+          if (typeof(prop) === 'object') {
+            result.concat(getNestedValues(prop));
+          } else {
+            result.push(prop);
+          }
+        }
+      }
+      return result;
+    };
+
+    const filterResults = (objs) => {
+      const result = [];
+      for (let i = 0; i < objs.length; i++) {
+        const asText = getNestedValues(objs[i]).join(' ');
+        for (let j = 0; j < filter.length; j++) {
+          if (asText.indexOf(filter[j]) === -1) {
+            break;
+          }
+          if (j === filter.length - 1) {
+            result.push(objs[i]._id);
+          }
+        }
+      }
+      return result;
+    };
+
+    switch (RequestCollection) {
+      case 'digitalobject':
+        await Promise.all(allObjects.map(async digObj => await Mongo.resolveDigitalObject(digObj)));
+        break;
+      case 'model':
+        for (let i = 0; i < allObjects.length; i++) {
+          const tempDigObj = await Mongo.resolve(allObjects[i].relatedDigitalObject, 'digitalobject');
+          allObjects[i].relatedDigitalObject = await Mongo.resolveDigitalObject(tempDigObj);
+          allObjects[i].preview = '';
+        }
+        break;
+      default:
+        break;
+    }
+
+    response.send(filterResults(allObjects));
   }
 };
 
