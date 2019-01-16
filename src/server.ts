@@ -16,6 +16,7 @@ if (isMaster) {
 } else {
     // Check if MongoDB is connected
     Server.use(Mongo.isMongoDBConnected);
+    Server.use(Mongo.fixObjectId);
 
     // MongoDB REST API
     // GET

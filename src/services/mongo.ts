@@ -64,6 +64,18 @@ const Mongo = {
     }
   },
   /**
+   * Fix cases where an ObjectId is sent but it is not detected as one
+   * used as Middleware
+   */
+  fixObjectId: async (request, response, next) => {
+    if (request && request.body && request.body['_id']) {
+      if (ObjectId.isValid(request.body['_id'])) {
+        request.body['_id'] = ObjectId(request.body['_id']);
+      }
+    }
+    next();
+  },
+  /**
    * Adds a new LDAP user or updates LDAP user sessionID
    */
   addToAccounts: async (request, response) => {
@@ -446,7 +458,6 @@ const Mongo = {
         const resultObject = request.body;
 
         if (resultObject['_id']) {
-
           const OldModels = [];
           let NewModels = [];
 
@@ -465,6 +476,7 @@ const Mongo = {
           resultObject['models'] = OldModels.concat(NewModels);
 
           // Update compilation instance
+          const found = await collection.findOne({ _id: resultObject['_id'] });
           collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
             if (up_error) {
               console.error('Failed to update compilation instance');
