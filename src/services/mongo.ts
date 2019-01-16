@@ -553,7 +553,7 @@ const Mongo = {
     let tempFile = base64img.imgSync(imagedata, '.', 'tmp');
     tempFile = readFileSync(tempFile);
     let final_image = '';
-    await PNGtoJPEG({ quality: 60 })(tempFile).then(async jpeg_data => {
+    await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
       final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
     });
     const result = await collection.updateOne({ '_id': ObjectId(request.params.identifier) },
