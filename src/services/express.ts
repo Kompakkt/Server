@@ -18,11 +18,11 @@ import * as expressSession from 'express-session';
 import * as uuid from 'uuid';
 
 const Express = {
-    server: express(),
-    passport: passport,
-    getLDAPConfig: (request, callback) => {
-      const DN = (Conf.Express.LDAP.DNauthUID) ? `uid=${request.body.username},${Conf.Express.LDAP.DN}` : Conf.Express.LDAP.DN;
-      callback(null, {
+  server: express(),
+  passport: passport,
+  getLDAPConfig: (request, callback) => {
+    const DN = (Conf.Express.LDAP.DNauthUID) ? `uid=${request.body.username},${Conf.Express.LDAP.DN}` : Conf.Express.LDAP.DN;
+    callback(null, {
       server: {
         url: Conf.Express.LDAP.Host,
         bindDN: DN,
@@ -31,59 +31,59 @@ const Express = {
         searchFilter: `(uid=${request.body.username})`,
         reconnect: true
       }
-      });
-    },
-    startListening: () => {
-        if (Conf.Express.enableHTTPS) {
-            const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
-            const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
+    });
+  },
+  startListening: () => {
+    if (Conf.Express.enableHTTPS) {
+      const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
+      const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
-            const options = {key: privateKey, cert: certificate};
-            if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
-              options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
-            }
-            HTTPS.createServer(options, Server).listen(Conf.Express.Port, Conf.Express.Host);
-            if (worker.id === 1) {
-              console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
-            }
-        } else {
-            HTTP.createServer(Server).listen(Conf.Express.Port, Conf.Express.Host);
-            if (worker.id === 1) {
-              console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
-            }
-        }
+      const options = { key: privateKey, cert: certificate };
+      if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
+        options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
+      }
+      HTTPS.createServer(options, Server).listen(Conf.Express.Port, Conf.Express.Host);
+      if (worker.id === 1) {
+        console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
+      }
+    } else {
+      HTTP.createServer(Server).listen(Conf.Express.Port, Conf.Express.Host);
+      if (worker.id === 1) {
+        console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
+      }
     }
+  }
 };
 
 const Server = Express.server;
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
-Server.use(bodyParser.json({limit: '50mb'}));
+Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
 Server.use(cookieParser());
 // Gzipping Middleware
 Server.use(compression({
-    strategy: zlib.Z_FILTERED,
-    level: 9,
-    memLevel: 9,
-    windowBits: 15,
-    chunkSize: 65536
+  strategy: zlib.Z_FILTERED,
+  level: 9,
+  memLevel: 9,
+  windowBits: 15,
+  chunkSize: 65536
 }));
 // Enable CORS
 // TODO: Find out which routes need CORS
 Server.use(corser.create({
-    supportsCredentials: true,
-    /*origins: Conf.Express.OriginWhitelist,*/
-    methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
-    requestHeaders: corser.simpleRequestHeaders
+  supportsCredentials: true,
+  /*origins: Conf.Express.OriginWhitelist,*/
+  methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
+  requestHeaders: corser.simpleRequestHeaders
     .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
 }));
 // Static
 if (Conf.Uploads.createSubfolders) {
-    Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
-} else  {
-    Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}`));
+  Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
+} else {
+  Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}`));
 }
 // Passport
 Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));

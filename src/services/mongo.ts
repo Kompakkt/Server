@@ -665,7 +665,7 @@ const Mongo = {
         break;
       default:
         collection.findOne(searchParameter, (db_error, result) => {
-          response.send(result ? result : {});
+          response.send(result ? result : { status: 'ok' });
         });
         break;
     }
