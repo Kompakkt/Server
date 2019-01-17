@@ -563,7 +563,7 @@ const Mongo = {
       preview: `${final_image}`,
       cameraPositionInitial: cameraPositionInitial,
       background: background,
-      ligths: lights
+      lights: lights
     };
     const result = await collection.updateOne({ '_id': identifier },
       { $set: { settings: settings } });
