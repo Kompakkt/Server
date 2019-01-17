@@ -554,9 +554,16 @@ const Mongo = {
     let tempFile = base64img.imgSync(preview, '.', 'tmp');
     tempFile = readFileSync(tempFile);
     let final_image = '';
-    await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
-      final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
-    });
+
+    try {
+      await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
+        final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
+      });
+    } catch (err) {
+      console.log('Corrupt or invalid PNG. Conversion failed');
+      response.send({ status: 'error' });
+      return;
+    }
 
     // Overwrite old settings
     const settings = {
