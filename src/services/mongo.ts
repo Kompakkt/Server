@@ -551,18 +551,23 @@ const Mongo = {
     const collection = this.DBObjectsRepository.collection('model');
 
     // Process image
-    let tempFile = base64img.imgSync(preview, '.', 'tmp');
-    tempFile = readFileSync(tempFile);
+    // TODO: Use real images instead of base64
+    let tempFile;
+    try {
+      tempFile = base64img.imgSync(preview, '.', 'tmp');
+      tempFile = readFileSync(tempFile);
+    } catch (err) {
+      console.log('Failed saving base64 to temp image');
+      response.send({ status: 'error' });
+      return;
+    }
     let final_image = '';
-
     try {
       await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
         final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
       });
     } catch (err) {
-      console.log('Corrupt or invalid PNG. Conversion failed');
-      response.send({ status: 'error' });
-      return;
+      final_image = preview;
     }
 
     // Overwrite old settings
