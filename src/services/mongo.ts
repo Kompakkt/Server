@@ -688,17 +688,6 @@ const Mongo = {
           }
         });
         break;
-      case 'model':
-        collection.find({}).toArray((db_error, results) => {
-          try {
-            response.send(results.filter(model =>
-              model.preview !== undefined).filter(model => model.preview.length > 0));
-          } catch (err) {
-            console.error(err);
-            response.send([]);
-          }
-        });
-        break;
       default:
         collection.find({}).toArray((db_error, result) => {
           response.send(result);
