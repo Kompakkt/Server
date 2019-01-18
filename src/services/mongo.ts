@@ -662,13 +662,20 @@ const Mongo = {
 
             // Insert array of models into result Object
             for (let i = resultObject.length - 1; i >= 0; i--) {
-              resultObject[i].models = models[i];
+              if (models[i]['finished'] && models[i]['online']) {
+                resultObject[i].models = models[i];
+              }
             }
 
             response.send(resultObject);
           } else {
             response.send({ status: 'ok' });
           }
+        });
+        break;
+      case 'model':
+        collection.find({}).toArray((db_error, result) => {
+          response.send(result.filter(model => model['finished'] && model['online']));
         });
         break;
       default:
