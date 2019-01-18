@@ -455,73 +455,44 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'compilation':
+      case 'model':
+      case 'annotation':
         const resultObject = request.body;
-
+        if (resultObject['models']) {
+          resultObject['models'] = await Promise.all(resultObject['models'].map(async model => addAndGetId(model, 'model')));
+        }
         if (resultObject['_id']) {
-          const OldModels = [];
-          let NewModels = [];
-
-          // Sort which models need to be added
-          resultObject['models'].forEach(model => {
-            if (model['_id']) {
-              OldModels.push(model);
-            } else {
-              NewModels.push(model);
-            }
-          });
-
-          NewModels = await Promise.all(
-            NewModels.map(async model => addAndGetId(model, 'model')));
-
-          resultObject['models'] = OldModels.concat(NewModels);
-
-          // Update compilation instance
+          // Update existing
           const found = await collection.findOne({ _id: resultObject['_id'] });
           collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
             if (up_error) {
-              console.error('Failed to update compilation instance');
-              response.send(404);
+              console.error(`Failed to update ${RequestCollection} instance`);
+              response.send({ status: 'error' });
             } else {
               console.log(`Updated ${resultObject['_id']}`);
               response.send({ status: 'ok' });
             }
           });
         } else {
-          // Add new compilation
-          collection.insertOne(resultObject, async (db_error, db_result) => {
+          // Insert new + LDAP
+          collection.insertOne(request.body, async (db_error, db_result) => {
             const userData = await ldap.findOne({ sessionID: sessionID });
-            userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
+            switch (RequestCollection) {
+              case 'model': userData.data.models.push(`${db_result.ops[0]['_id']}`); break;
+              case 'annotation': userData.data.annotations.push(`${db_result.ops[0]['_id']}`); break;
+              case 'compilation': userData.data.compilations.push(`${db_result.ops[0]['_id']}`); break;
+            }
             const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
             if (result.result.ok === 1) {
-              response.send({ status: 'ok' });
+              response.send(db_result.ops);
             } else {
               response.send({ status: 'error' });
             }
             if (Verbose) {
-              console.log(`VERBOSE: Success! Added new compilation ${db_result.ops[0]['_id']}`);
+              console.log(`VERBOSE: Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
             }
           });
         }
-        break;
-      case 'model':
-      case 'annotation':
-        collection.insertOne(request.body, async (db_error, db_result) => {
-          const userData = await ldap.findOne({ sessionID: sessionID });
-          if (RequestCollection === 'model') {
-            userData.data.models.push(`${db_result.ops[0]['_id']}`);
-          } else if (RequestCollection === 'annotation') {
-            userData.data.annotations.push(`${db_result.ops[0]['_id']}`);
-          }
-          const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
-          if (result.result.ok === 1) {
-            response.send(db_result.ops);
-          } else {
-            response.send({ status: 'error' });
-          }
-          if (Verbose) {
-            console.log(`VERBOSE: Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
-          }
-        });
         break;
       default:
         collection.insertOne(request.body, (db_error, result) => {
@@ -579,7 +550,7 @@ const Mongo = {
     };
     const result = await collection.updateOne({ '_id': identifier },
       { $set: { settings: settings } });
-    response.send((result.result.ok === 1) ? { status: 'ok', settings: settings} : { status: 'error' });
+    response.send((result.result.ok === 1) ? { status: 'ok', settings: settings } : { status: 'error' });
   },
   /**
    * Simple resolving by collection name and Id
@@ -764,7 +735,7 @@ const Mongo = {
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
         if (obj.hasOwnProperty(key)) {
-          if (typeof(prop) === 'object') {
+          if (typeof (prop) === 'object') {
             result.concat(getNestedValues(prop));
           } else {
             result.push(prop);
