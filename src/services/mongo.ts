@@ -484,7 +484,7 @@ const Mongo = {
             }
             const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
             if (result.result.ok === 1) {
-              response.send(db_result.ops);
+              response.send(db_result.ops[0]);
             } else {
               response.send({ status: 'error' });
             }
