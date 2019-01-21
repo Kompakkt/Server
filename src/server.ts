@@ -27,8 +27,6 @@ if (isMaster) {
   Server.get('/api/v1/get/findall/:collection', Mongo.checkAccount, Mongo.getAllFromObjectCollection);
   // Return data linked to currently logged in LDAP Account
   Server.get('/api/v1/get/ldata', Mongo.checkAccount, Mongo.getLinkedData);
-  // Return data linked to currently logged in LDAP Account
-  Server.get('/api/v1/get/search/:collection/:filter', Mongo.checkAccount, Mongo.searchObjectWithFilter);
 
   // POST
   // Post single document to collection
@@ -43,6 +41,8 @@ if (isMaster) {
     Express.passport.authenticate('ldapauth', { session: false }),
     Mongo.checkAccount,
     Mongo.removeObjectFromObjectCollection);
+  // Return search data
+  Server.post('/api/v1/post/search/:collection', Mongo.checkAccount, Mongo.searchObjectWithFilter);
 
   // Upload API
   // Upload a file to the server

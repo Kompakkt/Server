@@ -734,17 +734,21 @@ const Mongo = {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
-    const filter = request.params.filter.toLowerCase().split('+');
+    const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
     const allObjects = await collection.find({}).toArray();
 
     const getNestedValues = (obj) => {
-      const result = [];
+      let result = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
         if (obj.hasOwnProperty(key)) {
-          if (typeof (prop) === 'object') {
-            result.concat(getNestedValues(prop));
-          } else {
+          if (typeof (prop) === 'object' && !Array.isArray(prop)) {
+            result = result.concat(getNestedValues(prop));
+          } else if (typeof (prop) === 'object' && Array.isArray(prop)) {
+            for (let i = 0; i < prop.length; i++) {
+              result = result.concat(getNestedValues(prop[i]));
+            }
+          } else if (typeof (prop) === 'string') {
             result.push(prop);
           }
         }
@@ -755,7 +759,7 @@ const Mongo = {
     const filterResults = (objs) => {
       const result = [];
       for (let i = 0; i < objs.length; i++) {
-        const asText = getNestedValues(objs[i]).join(' ');
+        const asText = getNestedValues(objs[i]).join('').toLowerCase();
         for (let j = 0; j < filter.length; j++) {
           if (asText.indexOf(filter[j]) === -1) {
             break;
@@ -776,7 +780,7 @@ const Mongo = {
         for (let i = 0; i < allObjects.length; i++) {
           const tempDigObj = await Mongo.resolve(allObjects[i].relatedDigitalObject, 'digitalobject');
           allObjects[i].relatedDigitalObject = await Mongo.resolveDigitalObject(tempDigObj);
-          allObjects[i].preview = '';
+          allObjects[i].settings.preview = '';
         }
         break;
       default:
