@@ -751,7 +751,7 @@ const Mongo = {
       let result = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
-        if (obj.hasOwnProperty(key)) {
+        if (obj.hasOwnProperty(key) && prop) {
           if (typeof (prop) === 'object' && !Array.isArray(prop)) {
             result = result.concat(getNestedValues(prop));
           } else if (typeof (prop) === 'object' && Array.isArray(prop)) {
