@@ -80,11 +80,9 @@ Server.use(corser.create({
     .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
 }));
 // Static
-if (Conf.Uploads.createSubfolders) {
-  Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
-} else {
-  Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}`));
-}
+Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
+Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`));
+
 // Passport
 Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));
 
