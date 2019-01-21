@@ -15,6 +15,10 @@ import { inspect as InspectObject } from 'util';
 import * as base64img from 'base64-img';
 import * as PNGtoJPEG from 'png-to-jpeg';
 import { readFile, writeFileSync, readFileSync } from 'fs';
+import { ensureDirSync } from 'fs-extra';
+import * as imagemin from 'imagemin';
+import * as mozjpeg from 'imagemin-mozjpeg';
+import * as pngquant from 'imagemin-pngquant';
 
 /** Interfaces */
 import { Compilation } from '../interfaces/compilation.interface';
@@ -521,29 +525,33 @@ const Mongo = {
       ObjectId(request.params.identifier) : request.params.identifier;
     const collection = this.DBObjectsRepository.collection('model');
 
-    // Process image
-    // TODO: Use real images instead of base64
-    let tempFile;
+    // Base64 to Buffer to optimized PNG
+    // TODO: Convert to progressive JPEG?
+    // TODO: Real Error handling?
+    let finalImagePath = '';
     try {
-      tempFile = base64img.imgSync(preview, '.', 'tmp');
-      tempFile = readFileSync(tempFile);
-    } catch (err) {
-      console.log('Failed saving base64 to temp image');
+      if (preview.indexOf('data:image') !== -1) {
+        const tempBuff = Buffer.from(preview.replace(/^data:image\/(png|gif|jpeg);base64,/, ''), 'base64');
+        await imagemin.buffer(tempBuff, { plugins: [ pngquant.default({
+          speed: 1,
+          strip: true,
+          dithering: 1
+        }) ] }).then(res => {
+          ensureDirSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/`);
+          writeFileSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${identifier}.png`, res);
+          finalImagePath = `/previews/${identifier}.png`;
+        }).catch(e => console.error(e));
+      } else {
+        finalImagePath = `/previews/${preview.split('previews/')[1]}`;
+      }
+    } catch (e) {
+      console.error(e);
       response.send({ status: 'error' });
-      return;
-    }
-    let final_image = '';
-    try {
-      await PNGtoJPEG({ quality: 25 })(tempFile).then(async jpeg_data => {
-        final_image = `data:image/png;base64,${jpeg_data.toString('base64')}`;
-      });
-    } catch (err) {
-      final_image = preview;
     }
 
     // Overwrite old settings
     const settings = {
-      preview: `${final_image}`,
+      preview: finalImagePath,
       cameraPositionInitial: cameraPositionInitial,
       background: background,
       lights: lights
