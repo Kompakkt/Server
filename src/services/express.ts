@@ -9,7 +9,7 @@ import * as compression from 'compression';
 import * as zlib from 'zlib';
 
 import { readFileSync, writeFileSync } from 'fs';
-import { ensureDirSync, pathExistsSync, moveSync } from 'fs-extra';
+import { ensureDirSync, pathExistsSync, copySync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
 
@@ -87,7 +87,7 @@ Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDi
 // Create preview directory and default preview file
 ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
 if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
-  moveSync(`${RootDirectory}/assets/noimage.png`,
+  copySync(`${RootDirectory}/assets/noimage.png`,
     `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
 }
 
