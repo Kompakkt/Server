@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "start": "ts-node src/server.ts",
-    "build": "tsc -p .; mkdir -p dist/assets/;cp src/assets/noimage.png dist/assets/noimage.png",
+    "build": "tsc -p .",
     "dev": "./node_modules/nodemon/bin/nodemon.js"
   },
   "repository": {
