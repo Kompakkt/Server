@@ -661,23 +661,19 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.find({}).toArray(async (db_error, results) => {
-          if (results) {
-            results = results.filter(compilation =>
+        collection.find({}).toArray(async (db_error, compilations) => {
+          if (compilations) {
+            compilations = compilations.filter(compilation =>
               !compilation.password || (compilation.password && compilation.password.length === 0));
-            const resultObject = results;
-            // Returns an Array of Arrays of models
-            const models = await Promise.all(results.map(async (result) => await Promise.all(result.models.map(async (model) =>
-              await Mongo.resolve(model._id, 'model')))));
 
-            // Insert array of models into result Object
-            for (let i = resultObject.length - 1; i >= 0; i--) {
-              if (models[i]['finished'] && models[i]['online']) {
-                resultObject[i].models = models[i];
+            // Resolve models. forEach and map seem to be broken
+            for (let i = 0; i < compilations.length; i++) {
+              for (let j = 0; j < compilations[i].models.length; j++) {
+                compilations[i].models[j] = await Mongo.resolve(compilations[i].models[j]._id, 'model');
               }
             }
 
-            response.send(resultObject);
+            response.send(compilations);
           } else {
             response.send({ status: 'ok' });
           }
