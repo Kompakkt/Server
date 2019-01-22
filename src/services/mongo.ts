@@ -671,6 +671,7 @@ const Mongo = {
               for (let j = 0; j < compilations[i].models.length; j++) {
                 compilations[i].models[j] = await Mongo.resolve(compilations[i].models[j]._id, 'model');
               }
+              compilations[i].models = compilations[i].models.filter(model => model.finished && model.online);
             }
 
             response.send(compilations);
