@@ -465,6 +465,9 @@ const Mongo = {
         if (resultObject['models']) {
           resultObject['models'] = await Promise.all(resultObject['models'].map(async model => addAndGetId(model, 'model')));
         }
+        if (resultObject['settings']) {
+          resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview'].split('previews/').slice(-1)[0]}`;
+        }
         if (resultObject['_id']) {
           // Update existing
           const found = await collection.findOne({ _id: resultObject['_id'] });

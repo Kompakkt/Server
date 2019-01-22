@@ -8,7 +8,8 @@ import * as corser from 'corser';
 import * as compression from 'compression';
 import * as zlib from 'zlib';
 
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { ensureDirSync, pathExistsSync, moveSync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
 
@@ -82,6 +83,13 @@ Server.use(corser.create({
 // Static
 Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
 Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`));
+
+// Create preview directory and default preview file
+ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
+if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
+  moveSync(`${RootDirectory}/assets/noimage.png`,
+    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
+}
 
 // Passport
 Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));
