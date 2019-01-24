@@ -42,6 +42,7 @@ const Mongo = {
    * to reduce the amount of calls needed
    */
   init: async () => {
+    // TODO: First connection
     this.Client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, {
       useNewUrlParser: true,
       reconnectTries: Number.POSITIVE_INFINITY,
@@ -314,25 +315,28 @@ const Mongo = {
     resultObject['contact_person'] = await Promise.all(
       resultObject['contact_person'].map(async person => addAndGetId(person, 'person')));
 
-    if (resultObject['contact_person_existing'] instanceof Array && resultObject['contact_person_existing'].length > 0) {
-      if (resultObject['contact_person_existing'][0] === 'add_to_new_rightsowner_person') {
-        // Contact Person is the same as Rightsowner Person
-        const newContact = { ...resultObject['digobj_rightsowner_person'][0] };
-        newContact['person_role'] = 'CONTACT_PERSON';
-        if (resultObject['contact_person'] instanceof Array) {
-          resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
-        } else {
-          addAndGetId(newContact, 'person');
-        }
-      } else if (ObjectId.isValid(resultObject['contact_person_existing'][0])) {
-        // Contact Person is existing Person
-        const newContact = {};
-        newContact['person_role'] = 'CONTACT_PERSON';
-        newContact['_id'] = resultObject['contact_person_existing'][0];
-        if (resultObject['contact_person'] instanceof Array) {
-          resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
-        } else {
-          addAndGetId(newContact, 'person');
+    if (resultObject['contact_person_existing'] instanceof Array) {
+      for (let i = 0; i < resultObject['contact_person_existing'].length; i++) {
+        if (resultObject['contact_person_existing'][i]['value']
+          && resultObject['contact_person_existing'][i]['value'] === 'add_to_new_rightsowner_person') {
+          // Contact Person is the same as Rightsowner Person
+          const newContact = { ...resultObject['digobj_rightsowner_person'][0] };
+          newContact['person_role'] = 'CONTACT_PERSON';
+          if (resultObject['contact_person'] instanceof Array) {
+            resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
+          } else {
+            addAndGetId(newContact, 'person');
+          }
+        } else if (ObjectId.isValid(resultObject['contact_person_existing'][i])) {
+          // Contact Person is existing Person
+          const newContact = {};
+          newContact['person_role'] = 'CONTACT_PERSON';
+          newContact['_id'] = resultObject['contact_person_existing'][i];
+          if (resultObject['contact_person'] instanceof Array) {
+            resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
+          } else {
+            addAndGetId(newContact, 'person');
+          }
         }
       }
     }
@@ -361,28 +365,31 @@ const Mongo = {
             ));
         }
 
-        if (phyObj['phyobj_person_existing'] instanceof Array && phyObj['phyobj_person_existing'].length > 0) {
-          if (phyObj['phyobj_person_existing'][0] === 'add_to_new_rightsowner_person') {
-            // Contact Person is the same as Rightsowner Person
-            const newContact = { ...phyObj['phyobj_rightsowner_person'][0] };
-            newContact['person_role'] = 'CONTACT_PERSON';
-            if (phyObj['phyobj_person'] instanceof Array) {
-              phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
-            } else {
-              addAndGetId(newContact, 'person');
-            }
-          } else if (ObjectId.isValid(phyObj['phyobj_person_existing'][0])) {
-            // Contact Person is existing Person
-            const newContact = {};
-            newContact['person_role'] = 'CONTACT_PERSON';
-            newContact['_id'] = phyObj['phyobj_person_existing'][0];
-            if (phyObj['phyobj_person'] instanceof Array) {
-              phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
-            } else {
-              addAndGetId(newContact, 'person');
+        /*if (phyObj['phyobj_person_existing'] instanceof Array) {
+          for (let i = 0; i < phyObj['phyobj_person_existing'].length; i++) {
+            if (phyObj['phyobj_person_existing'][i]['value']
+              && phyObj['phyobj_person_existing'][i]['value'] === 'add_to_new_rightsowner_person') {
+              // Contact Person is the same as Rightsowner Person
+              const newContact = { ...phyObj['phyobj_rightsowner_person'][0] };
+              newContact['person_role'] = 'CONTACT_PERSON';
+              if (phyObj['phyobj_person'] instanceof Array) {
+                phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
+              } else {
+                addAndGetId(newContact, 'person');
+              }
+            } else if (ObjectId.isValid(phyObj['phyobj_person_existing'][i])) {
+              // Contact Person is existing Person
+              const newContact = {};
+              newContact['person_role'] = 'CONTACT_PERSON';
+              newContact['_id'] = phyObj['phyobj_person_existing'][i];
+              if (phyObj['phyobj_person'] instanceof Array) {
+                phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
+              } else {
+                addAndGetId(newContact, 'person');
+              }
             }
           }
-        }
+        }*/
 
         if (phyObj['phyobj_rightsowner_institution'].length > 0 && !phyObj['phyobj_rightsowner_institution'][0]['_id']) {
           phyObj['phyobj_rightsowner_institution'] = await Promise.all(
@@ -745,7 +752,7 @@ const Mongo = {
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
-    const allObjects = await collection.find({}).toArray();
+    let allObjects = await collection.find({}).toArray();
 
     const getNestedValues = (obj) => {
       let result = [];
@@ -787,10 +794,15 @@ const Mongo = {
         await Promise.all(allObjects.map(async digObj => await Mongo.resolveDigitalObject(digObj)));
         break;
       case 'model':
+        allObjects = allObjects.filter(model =>
+          model && model.finished && model.online
+          && model.relatedDigitalObject && model.relatedDigitalObject['_id']);
         for (let i = 0; i < allObjects.length; i++) {
-          const tempDigObj = await Mongo.resolve(allObjects[i].relatedDigitalObject, 'digitalobject');
-          allObjects[i].relatedDigitalObject = await Mongo.resolveDigitalObject(tempDigObj);
-          allObjects[i].settings.preview = '';
+          if (allObjects[i].relatedDigitalObject['_id']) {
+            const tempDigObj = await Mongo.resolve(allObjects[i].relatedDigitalObject, 'digitalobject');
+            allObjects[i].relatedDigitalObject = await Mongo.resolveDigitalObject(tempDigObj);
+            allObjects[i].settings.preview = '';
+          }
         }
         break;
       default:
