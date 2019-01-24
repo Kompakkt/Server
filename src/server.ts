@@ -22,7 +22,8 @@ if (isMaster) {
   // GET
   // Find document by ID in collection
   // http://localhost:8080/api/v1/get/find/Person/5bbf023850c06f445ccab442
-  Server.get('/api/v1/get/find/:collection/:identifier', Mongo.checkAccount, Mongo.getFromObjectCollection);
+  Server.get(['/api/v1/get/find/:collection/:identifier', '/api/v1/get/find/:collection/:identifier/:password'],
+    Mongo.checkAccount, Mongo.getFromObjectCollection);
   // Return all documents of a collection
   Server.get('/api/v1/get/findall/:collection', Mongo.checkAccount, Mongo.getAllFromObjectCollection);
   // Return data linked to currently logged in LDAP Account

@@ -627,11 +627,19 @@ const Mongo = {
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       ObjectId(request.params.identifier) : request.params.identifier;
+    const password = (request.params.password) ? request.params.password : '';
 
     switch (RequestCollection) {
       case 'compilation':
         collection.findOne({ '_id': identifier }).then(async (result: Compilation) => {
           if (result) {
+            if (result['password'] && result['password'].length > 0) {
+              if (result['password'] !== password || (password === '' && result['password'] !== '')) {
+                response.send({ status: 'ok', message: 'Password protected compilation' });
+                return;
+              }
+            }
+
             for (let i = 0; i < result.models.length; i++) {
               result.models[i] = await Mongo.resolve(result.models[i]._id, 'model');
             }
