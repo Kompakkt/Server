@@ -571,6 +571,15 @@ const Mongo = {
     response.send((result.result.ok === 1) ? { status: 'ok', settings: settings } : { status: 'error' });
   },
   /**
+   * Check if current user is owner of password protected document
+   */
+  isOwner: async (request, identifier) => {
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    const found = await ldap.findOne({ sessionID: sessionID });
+    return JSON.stringify(found.data).indexOf(identifier) !== -1;
+  },
+  /**
    * Simple resolving by collection name and Id
    */
   resolve: async (obj, collection_name) => {
@@ -634,10 +643,11 @@ const Mongo = {
         collection.findOne({ '_id': identifier }).then(async (result: Compilation) => {
           if (result) {
             if (result['password'] && result['password'].length > 0) {
-              if (result['password'] !== password || (password === '' && result['password'] !== '')) {
+              const _owner = await Mongo.isOwner(request, identifier);
+              if (!_owner) { if (result['password'] !== password || (password === '' && result['password'] !== '')) {
                 response.send({ status: 'ok', message: 'Password protected compilation' });
                 return;
-              }
+              }}
             }
 
             for (let i = 0; i < result.models.length; i++) {
