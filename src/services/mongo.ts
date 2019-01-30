@@ -230,34 +230,41 @@ const Mongo = {
     const addAndGetId = async (field, add_to_coll) => {
       switch (add_to_coll) {
         case 'person':
-          // Add new roles to person
-          field['roles'] = [{
-            role: field['person_role'],
-            relatedDigitalObject: resultObject['_id']
-          }];
-          if (field['_id'] !== undefined && field['_id'].length > 0) {
-            console.log(`Adding role ${field['person_role']} to person ${field['_id']}`);
-          }
-          return {
-            '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
-              await this.DBObjectsRepository.collection(add_to_coll)
-                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(result => {
-                  return String(field['_id']);
-                }) :
-              await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
-                return String(result.ops[0]['_id']);
-              })
-          };
-          break;
         case 'institution':
-          // Add new roles to institution
-          field['roles'] = [{
-            role: field['institution_role'],
-            relatedDigitalObject: resultObject['_id']
-          }];
-          if (field['_id'] !== undefined && field['_id'].length > 0) {
-            console.log(`Adding role ${field['institution_role']} to institution ${field['_id']}`);
+          // Add new roles to person or institution
+          field['roles'] = [];
+          if (field['institution_role']) {
+            if (field['institution_role'] instanceof Array) {
+              for (let i = 0; i < field['institution_role'].length; i++) {
+                field['roles'].push({
+                  role: field['institution_role'][i],
+                  relatedDigitalObject: resultObject['_id']
+                });
+              }
+            } else {
+              field['roles'].push({
+                role: field['institution_role'],
+                relatedDigitalObject: resultObject['_id']
+              });
+            }
           }
+          if (field['person_role']) {
+            if (field['person_role'] instanceof Array) {
+              for (let i = 0; i < field['person_role'].length; i++) {
+                field['roles'].push({
+                  role: field['person_role'][i],
+                  relatedDigitalObject: resultObject['_id']
+                });
+              }
+            } else {
+              field['roles'].push({
+                role: field['person_role'],
+                relatedDigitalObject: resultObject['_id']
+              });
+            }
+          }
+          console.log(field['person_role'], field['institution_role'], field['roles']);
+
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
@@ -286,10 +293,10 @@ const Mongo = {
      * data that need to be added to collections
      */
 
-    // TODO: Eleganter lösen
     resultObject['digobj_rightsowner_person'] = await Promise.all(
       resultObject['digobj_rightsowner_person'].map(async person => {
-        if (person['person_institution'] === 'add_new_institution') {
+        if (person['person_institution'][0]
+          && person['person_institution'][0]['value'] === 'add_new_institution') {
           const institution = person['person_institution_data'].pop();
           const newInst = await addAndGetId(institution, 'institution');
           person['person_institution_data'][0] = newInst;
@@ -298,9 +305,11 @@ const Mongo = {
       }));
 
     resultObject['digobj_rightsowner_institution'] = await Promise.all(
-      resultObject['digobj_rightsowner_institution'].map(async institution => addAndGetId(institution, 'institution')));
+      resultObject['digobj_rightsowner_institution']
+      .map(async institution => addAndGetId(institution, 'institution')));
 
-    if (ObjectId.isValid(resultObject['digobj_rightsowner'])) {
+    if (resultObject['digobj_rightsowner']
+      && ObjectId.isValid(resultObject['digobj_rightsowner']['_id'])) {
       const newRightsOwner = {};
       newRightsOwner['_id'] = resultObject['digobj_rightsowner'];
       if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
@@ -322,28 +331,21 @@ const Mongo = {
           // Contact Person is the same as Rightsowner Person
           const newContact = { ...resultObject['digobj_rightsowner_person'][0] };
           newContact['person_role'] = 'CONTACT_PERSON';
-          if (resultObject['contact_person'] instanceof Array) {
-            resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
-          } else {
-            addAndGetId(newContact, 'person');
-          }
-        } else if (ObjectId.isValid(resultObject['contact_person_existing'][i])) {
+          resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
+        } else if (ObjectId.isValid(resultObject['contact_person_existing'][i]['_id'])) {
           // Contact Person is existing Person
           const newContact = {};
           newContact['person_role'] = 'CONTACT_PERSON';
-          newContact['_id'] = resultObject['contact_person_existing'][i];
-          if (resultObject['contact_person'] instanceof Array) {
-            resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
-          } else {
-            addAndGetId(newContact, 'person');
-          }
+          newContact['_id'] = resultObject['contact_person_existing'][i]['_id'];
+          resultObject['contact_person'].push(await addAndGetId(newContact, 'person'));
         }
       }
     }
 
     resultObject['digobj_person'] = await Promise.all(
       resultObject['digobj_person'].map(async person => {
-        if (person['person_institution'] === 'add_new_institution') {
+        if (person['person_institution'][0]
+          && person['person_institution'][0]['value'] === 'add_new_institution') {
           const institution = person['person_institution_data'].pop();
           const newInst = await addAndGetId(institution, 'institution');
           person['person_institution_data'][0] = newInst;
@@ -351,11 +353,28 @@ const Mongo = {
         return addAndGetId(person, 'person');
       }));
 
+    if (resultObject['digobj_person_existing'] instanceof Array) {
+      for (let i = 0; i < resultObject['digobj_person_existing'].length; i++) {
+        if (resultObject['digobj_person_existing'][i]['value']
+          && resultObject['digobj_person_existing'][i]['value'] === 'add_to_new_rightsowner_person') {
+          const newContact = { ...resultObject['digobj_rightsowner_person'][0] };
+          newContact['person_role'] = resultObject['digobj_person_existing'][i]['person_role'];
+          resultObject['digobj_person'].push(await addAndGetId(newContact, 'person'));
+        } else if (ObjectId.isValid(resultObject['digobj_person_existing'][i]['_id'])) {
+          const newContact = {};
+          newContact['person_role'] = resultObject['digobj_person_existing'][i]['person_role'];
+          newContact['_id'] = resultObject['contact_person_existing'][i]['_id'];
+          resultObject['digobj_person'].push(await addAndGetId(newContact, 'person'));
+        }
+      }
+    }
+
     resultObject['phyObjs'] = await Promise.all(
       resultObject['phyObjs'].map(async phyObj => {
-        if (ObjectId.isValid(phyObj['phyobj_rightsowner'])) {
+        // Rightsowner Person
+        if (ObjectId.isValid(phyObj['phyobj_rightsowner']['_id'])) {
           const newPhyRightsOwnerPerson = {};
-          newPhyRightsOwnerPerson['_id'] = phyObj['phyobj_rightsowner'];
+          newPhyRightsOwnerPerson['_id'] = phyObj['phyobj_rightsowner']['_id'];
           newPhyRightsOwnerPerson['person_role'] = 'RIGHTS_OWNER';
           phyObj['phyobj_rightsowner_person'] = await addAndGetId(newPhyRightsOwnerPerson, 'person');
         } else if (phyObj['phyobj_rightsowner_person'].length > 0 && !phyObj['phyobj_rightsowner_person'][0]['_id']) {
@@ -365,43 +384,26 @@ const Mongo = {
             ));
         }
 
-        /*if (phyObj['phyobj_person_existing'] instanceof Array) {
-          for (let i = 0; i < phyObj['phyobj_person_existing'].length; i++) {
-            if (phyObj['phyobj_person_existing'][i]['value']
-              && phyObj['phyobj_person_existing'][i]['value'] === 'add_to_new_rightsowner_person') {
-              // Contact Person is the same as Rightsowner Person
-              const newContact = { ...phyObj['phyobj_rightsowner_person'][0] };
-              newContact['person_role'] = 'CONTACT_PERSON';
-              if (phyObj['phyobj_person'] instanceof Array) {
-                phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
-              } else {
-                addAndGetId(newContact, 'person');
-              }
-            } else if (ObjectId.isValid(phyObj['phyobj_person_existing'][i])) {
-              // Contact Person is existing Person
-              const newContact = {};
-              newContact['person_role'] = 'CONTACT_PERSON';
-              newContact['_id'] = phyObj['phyobj_person_existing'][i];
-              if (phyObj['phyobj_person'] instanceof Array) {
-                phyObj['phyobj_person'].push(await addAndGetId(newContact, 'person'));
-              } else {
-                addAndGetId(newContact, 'person');
-              }
-            }
-          }
-        }*/
-
-        if (phyObj['phyobj_rightsowner_institution'].length > 0 && !phyObj['phyobj_rightsowner_institution'][0]['_id']) {
+        // Rightsowner Institution
+        if (ObjectId.isValid(phyObj['phyobj_rightsowner_institution']['_id'])) {
+          const newPhyRightsOwnerInstitution = {};
+          newPhyRightsOwnerInstitution['_id'] = phyObj['phyobj_rightsowner']['_id'];
+          newPhyRightsOwnerInstitution['institution_role'] = phyObj['institution_role'];
+          phyObj['phyobj_rightsowner_institution'] = await addAndGetId(newPhyRightsOwnerInstitution, 'institution');
+        } else if (phyObj['phyobj_rightsowner_institution'].length > 0 && !phyObj['phyobj_rightsowner_institution'][0]['_id']) {
           phyObj['phyobj_rightsowner_institution'] = await Promise.all(
             phyObj['phyobj_rightsowner_institution'].map(
               phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'institution')
             ));
         }
+
+        // Person
         if (phyObj['phyobj_person'] && !phyObj['phyobj_person']['_id']) {
           phyObj['phyobj_person'] = await Promise.all(
             phyObj['phyobj_person'].map(
               async (phyObjPerson) => {
-                if (phyObjPerson['person_institution'] === 'add_new_institution') {
+                if (phyObjPerson['person_institution'] && phyObjPerson['person_institution'][0]
+                  && phyObjPerson['person_institution'][0]['value'] === 'add_new_institution') {
                   const institution = phyObjPerson['person_institution_data'].pop();
                   const newInst = await addAndGetId(institution, 'institution');
                   phyObjPerson['person_institution_data'][0] = newInst;
@@ -409,12 +411,50 @@ const Mongo = {
                 return addAndGetId(phyObjPerson, 'person');
               }));
         }
+
+        if (phyObj['phyobj_person_existing'] instanceof Array) {
+          for (let i = 0; i < phyObj['phyobj_person_existing'].length; i++) {
+            if (phyObj['phyobj_person_existing'][i]['value']
+              && phyObj['phyobj_person_existing'][i]['value'] === 'add_to_new_rightsowner_person') {
+              // Contact Person is the same as Rightsowner Person
+              const newPerson = { ...phyObj['phyobj_rightsowner_person'][0] };
+              newPerson['person_role'] = phyObj['phyobj_person_existing'][i]['person_role'];
+              phyObj['phyobj_person'].push(await addAndGetId(newPerson, 'person'));
+            } else if (ObjectId.isValid(phyObj['phyobj_person_existing'][i]['_id'])) {
+              // Contact Person is existing Person
+              const newPerson = {};
+              newPerson['person_role'] = phyObj['phyobj_person_existing'][i]['person_role'];
+              newPerson['_id'] = phyObj['phyobj_person_existing'][i]['_id'];
+              phyObj['phyobj_person'].push(await addAndGetId(newPerson, 'person'));
+            }
+          }
+        }
+
+        // Institution
         if (phyObj['phyobj_institution'] && !phyObj['phyobj_institution']['_id']) {
           phyObj['phyobj_institution'] = await Promise.all(
             phyObj['phyobj_institution'].map(
               phyObjInstitution => addAndGetId(phyObjInstitution, 'institution')
             ));
         }
+
+        if (phyObj['phyobj_institution_existing'] instanceof Array) {
+          for (let i = 0; i < phyObj['phyobj_institution_existing'].length; i++) {
+            if (ObjectId.isValid(phyObj['phyobj_institution_existing'][i]['_id'])) {
+              const newInst = {};
+              newInst['institution_role'] = phyObj['phyobj_institution_existing'][i]['institution_role'];
+              newInst['_id'] = phyObj['phyobj_institution_existing'][i]['_id'];
+              phyObj['phyobj_institution'].push(await addAndGetId(newInst, 'institution'));
+            } else if (phyObj['phyobj_institution_existing'][i]['value']
+                && phyObj['phyobj_institution_existing'][i]['value'] === 'add_to_new_rightsowner_institution') {
+              const newInst = {...phyObj['phyobj_rightsowner_institution'][0]};
+              newInst['institution_role'] = phyObj['phyobj_institution_existing'][i]['institution_role'];
+              newInst['_id'] = phyObj['phyobj_rightsowner_institution'][0]['_id'];
+              phyObj['phyobj_institution'].push(await addAndGetId(newInst, 'institution'));
+            }
+          }
+        }
+
         return addAndGetId(phyObj, 'physicalobject');
       }));
 
