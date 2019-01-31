@@ -308,16 +308,27 @@ const Mongo = {
       resultObject['digobj_rightsowner_institution']
       .map(async institution => addAndGetId(institution, 'institution')));
 
-    if (resultObject['digobj_rightsowner']
-      && ObjectId.isValid(resultObject['digobj_rightsowner']['_id'])) {
-      const newRightsOwner = {};
-      newRightsOwner['_id'] = resultObject['digobj_rightsowner'];
-      if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
-        newRightsOwner['person_role'] = 'RIGHTS_OWNER';
-        resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
-      } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2) {
-        newRightsOwner['institution_role'] = 'RIGHTS_OWNER';
-        resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
+    if (resultObject['digobj_rightsowner'] instanceof Array) {
+      for (let i = 0; i < resultObject['digobj_rightsowner'].length; i++) {
+        if (resultObject['digobj_rightsowner'][i]['value']
+          && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_person') {
+          // New Rightsowner Person
+          const newRightsOwner = {...resultObject['digobj_rightsowner_person'][0]};
+          resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
+        } else if (resultObject['digobj_rightsowner'][i]['value']
+          && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_institution') {
+          // New Rightsowner Institution
+          const newRightsOwner = {...resultObject['digobj_rightsowner_institution'][0]};
+          resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
+        } else {
+          // Existing Rightsowner Person or Institution
+          const newRightsOwner = {...resultObject['digobj_rightsowner'][i]};
+          if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
+            resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
+          } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2) {
+            resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
+          }
+        }
       }
     }
 
