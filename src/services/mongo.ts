@@ -653,10 +653,10 @@ const Mongo = {
       }
     };
     const resolveNestedInst = async (obj) => {
-      if (obj['person_institution'] && obj['person_institution'] === 'Neue Institution hinzufügen') {
+      if (obj['person_institution_data']) {
         for (let j = 0; j < obj['person_institution_data'].length; j++) {
           obj['person_institution_data'][j] =
-            await Mongo.resolve(obj['person_institution_data'][j], 'institution');
+            await Mongo.resolve(obj['person_institution_data'][j]['_id'], 'institution');
         }
       }
       return obj;
