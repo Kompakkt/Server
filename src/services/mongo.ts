@@ -355,11 +355,12 @@ const Mongo = {
 
     resultObject['digobj_person'] = await Promise.all(
       resultObject['digobj_person'].map(async person => {
-        if (person['person_institution'][0]
-          && person['person_institution'][0]['value'] === 'add_new_institution') {
-          const institution = person['person_institution_data'].pop();
+        for (let i = 0; i < person['person_institution'].length; i++) {
+          if (person['person_institution'][i]['value'] === 'add_new_institution') {
+            const institution = person['person_institution_data'].pop();
           const newInst = await addAndGetId(institution, 'institution');
           person['person_institution_data'][0] = newInst;
+          }
         }
         return addAndGetId(person, 'person');
       }));
