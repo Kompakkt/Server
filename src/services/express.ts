@@ -1,4 +1,5 @@
 import * as express from 'express';
+import * as socketIo from 'socket.io';
 import { worker } from 'cluster';
 import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
@@ -21,6 +22,20 @@ import * as uuid from 'uuid';
 const Express = {
   server: express(),
   passport: passport,
+  createServer: () => {
+    if (Conf.Express.enableHTTPS) {
+      const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
+      const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
+
+      const options = { key: privateKey, cert: certificate };
+      if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
+        options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
+      }
+      return HTTPS.createServer(options, Express.server);
+    } else {
+      return HTTP.createServer(Express.server);
+    }
+  },
   getLDAPConfig: (request, callback) => {
     const DN = (Conf.Express.LDAP.DNauthUID) ? `uid=${request.body.username},${Conf.Express.LDAP.DN}` : Conf.Express.LDAP.DN;
     callback(null, {
@@ -35,27 +50,15 @@ const Express = {
     });
   },
   startListening: () => {
-    if (Conf.Express.enableHTTPS) {
-      const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
-      const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
-
-      const options = { key: privateKey, cert: certificate };
-      if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
-        options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
-      }
-      HTTPS.createServer(options, Server).listen(Conf.Express.Port, Conf.Express.Host);
-      if (worker.id === 1) {
-        console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
-      }
-    } else {
-      HTTP.createServer(Server).listen(Conf.Express.Port, Conf.Express.Host);
-      if (worker.id === 1) {
-        console.log(`HTTP Server started and listening on port ${Conf.Express.Port}`);
-      }
+    Listener.listen(Conf.Express.Port, Conf.Express.Host);
+    if (worker.id === 1) {
+      console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
     }
   }
 };
 
+const Listener = Express.createServer();
+const WebSocket = socketIo(Listener);
 const Server = Express.server;
 
 // ExpressJS Middleware
@@ -110,4 +113,4 @@ Server.use(expressSession({
 }));
 Server.use(Express.passport.session());
 
-export { Express, Server };
+export { Express, Server, WebSocket };

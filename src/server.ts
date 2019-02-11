@@ -1,7 +1,7 @@
 import { isMaster, fork } from 'cluster';
 import { cpus } from 'os';
 import { Configuration } from './services/configuration';
-import { Server, Express } from './services/express';
+import { Server, Express, WebSocket } from './services/express';
 import { Upload } from './services/upload';
 import { RootDirectory } from './environment';
 import { Mongo } from './services/mongo';
@@ -61,6 +61,10 @@ if (isMaster) {
   Server.post('/login', Express.passport.authenticate('ldapauth', { session: true }), Mongo.addToAccounts);
   Server.get('/auth', Mongo.checkAccount, (req, res) => res.send({ status: 'ok' }));
 
-  Express.startListening();
+  // WebSocket
+  WebSocket.on('connection', socket => {
+    console.log(`Connection from ${socket.id}`);
+  });
 
+  Express.startListening();
 }
