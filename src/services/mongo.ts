@@ -110,7 +110,7 @@ const Mongo = {
               console.error(ins_res);
             } else {
               console.log(ins_res.ops);
-              response.send({ status: 'ok', data: ins_res.ops[0].data });
+              response.send({ status: 'ok', data: ins_res.ops[0].data, _id: ins_res.ops[0]._id, fullname: ins_res.ops[0].fullname });
             }
           });
         break;
@@ -138,14 +138,14 @@ const Mongo = {
                   response.send({ status: 'error' });
                   console.error(f_err);
                 } else {
-                  response.send({ status: 'ok', data: f_res.data });
+                  response.send({ status: 'ok', data: f_res.data, _id: f_res._id, fullname: f_res.fullname });
                 }
               });
             }
           });
         break;
       default:
-        // Too many Accountst
+        // Too many Accounts
         console.error('Multiple Accounts found for LDAP username ' + username);
         response.send({ status: 'error' });
         break;
@@ -168,7 +168,7 @@ const Mongo = {
       .map(async model => await Mongo.resolve(model, 'model')));
     found.data.annotations = await Promise.all(found.data.annotations
       .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
-    response.send({ status: 'ok', data: found.data });
+    response.send({ status: 'ok', data: found.data, _id: found._id, fullname: found.fullname });
   },
   /**
    * Gets LDAP user to confirm validity of sessionID
