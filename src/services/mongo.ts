@@ -580,9 +580,6 @@ const Mongo = {
    */
   updateSettings: async (request, response) => {
     const preview = request.body.preview;
-    const cameraPositionInitial = request.body.cameraPositionInitial;
-    const background = request.body.background;
-    const lights = request.body.lights;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       ObjectId(request.params.identifier) : request.params.identifier;
     const collection = this.DBObjectsRepository.collection('model');
@@ -612,12 +609,7 @@ const Mongo = {
     }
 
     // Overwrite old settings
-    const settings = {
-      preview: finalImagePath,
-      cameraPositionInitial: cameraPositionInitial,
-      background: background,
-      lights: lights
-    };
+    const settings = { ...request.body, preview: finalImagePath };
     const result = await collection.updateOne({ '_id': identifier },
       { $set: { settings: settings } });
     response.send((result.result.ok === 1) ? { status: 'ok', settings: settings } : { status: 'error' });
