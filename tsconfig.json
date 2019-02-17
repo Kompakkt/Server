@@ -13,6 +13,9 @@
     "sourceMap": true,
     "outDir": "./dist/",
     "noImplicitAny": false,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "lib": ["es6","dom"]
   },
   "include": [
