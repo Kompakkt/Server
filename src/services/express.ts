@@ -1,6 +1,5 @@
 import * as express from 'express';
 import * as socketIo from 'socket.io';
-import { worker } from 'cluster';
 import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
 import * as bodyParser from 'body-parser';
