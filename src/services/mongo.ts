@@ -27,7 +27,7 @@ const Mongo = {
     await this.Client.connect(async (error, client) => {
       if (error) {
         Logger.err(`Couldn't connect to MongoDB. Make sure it is running and check your configuration`);
-        process.exit(0);
+        process.exit(1);
       }
       this.Connection = client;
       this.DBObjectsRepository = await this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
