@@ -305,23 +305,23 @@ const Mongo = {
 
     resultObject['digobj_rightsowner_institution'] = await Promise.all(
       resultObject['digobj_rightsowner_institution']
-      .map(async institution => addAndGetId(institution, 'institution')));
+        .map(async institution => addAndGetId(institution, 'institution')));
 
     if (resultObject['digobj_rightsowner'] instanceof Array) {
       for (let i = 0; i < resultObject['digobj_rightsowner'].length; i++) {
         if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_person') {
           // New Rightsowner Person
-          const newRightsOwner = {...resultObject['digobj_rightsowner_person'][0]};
+          const newRightsOwner = { ...resultObject['digobj_rightsowner_person'][0] };
           resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
         } else if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_institution') {
           // New Rightsowner Institution
-          const newRightsOwner = {...resultObject['digobj_rightsowner_institution'][0]};
+          const newRightsOwner = { ...resultObject['digobj_rightsowner_institution'][0] };
           resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
         } else {
           // Existing Rightsowner Person or Institution
-          const newRightsOwner = {...resultObject['digobj_rightsowner'][i]};
+          const newRightsOwner = { ...resultObject['digobj_rightsowner'][i] };
           if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
             resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
           } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2) {
@@ -357,8 +357,8 @@ const Mongo = {
         for (let i = 0; i < person['person_institution'].length; i++) {
           if (person['person_institution'][i]['value'] === 'add_new_institution') {
             const institution = person['person_institution_data'].pop();
-          const newInst = await addAndGetId(institution, 'institution');
-          person['person_institution_data'][0] = newInst;
+            const newInst = await addAndGetId(institution, 'institution');
+            person['person_institution_data'][0] = newInst;
           }
         }
         return addAndGetId(person, 'person');
@@ -457,8 +457,8 @@ const Mongo = {
               newInst['_id'] = phyObj['phyobj_institution_existing'][i]['_id'];
               phyObj['phyobj_institution'].push(await addAndGetId(newInst, 'institution'));
             } else if (phyObj['phyobj_institution_existing'][i]['value']
-                && phyObj['phyobj_institution_existing'][i]['value'] === 'add_to_new_rightsowner_institution') {
-              const newInst = {...phyObj['phyobj_rightsowner_institution'][0]};
+              && phyObj['phyobj_institution_existing'][i]['value'] === 'add_to_new_rightsowner_institution') {
+              const newInst = { ...phyObj['phyobj_rightsowner_institution'][0] };
               newInst['institution_role'] = phyObj['phyobj_institution_existing'][i]['institution_role'];
               newInst['_id'] = phyObj['phyobj_rightsowner_institution'][0]['_id'];
               phyObj['phyobj_institution'].push(await addAndGetId(newInst, 'institution'));
@@ -511,29 +511,36 @@ const Mongo = {
       };
     };
 
+    const updateExisting = async (object) => {
+      const found = await collection.findOne({ _id: object['_id'] });
+      collection.updateOne({ _id: object['_id'] }, { $set: object }, (up_error, up_result) => {
+        if (up_error) {
+          Logger.err(`Failed to update ${RequestCollection} instance`);
+          response.send({ status: 'error' });
+        } else {
+          Logger.info(`Updated ${object['_id']}`);
+          response.send({ status: 'ok' });
+        }
+      });
+    };
+
     switch (RequestCollection) {
       case 'compilation':
       case 'model':
       case 'annotation':
         const resultObject = request.body;
         if (resultObject['models']) {
+          // Compilations should have all their models added to the model database and referenced by _id
           resultObject['models'] = await Promise.all(resultObject['models'].map(async model => addAndGetId(model, 'model')));
         }
         if (resultObject['settings']) {
+          // Preview image URLs might have a corrupted address because of Kompakkt runnning in an iframe
+          // This removes the host address from the URL so images will load correctly
           resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview'].split('previews/').slice(-1)[0]}`;
         }
+
         if (resultObject['_id']) {
-          // Update existing
-          const found = await collection.findOne({ _id: resultObject['_id'] });
-          collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
-            if (up_error) {
-              Logger.err(`Failed to update ${RequestCollection} instance`);
-              response.send({ status: 'error' });
-            } else {
-              Logger.info(`Updated ${resultObject['_id']}`);
-              response.send({ status: 'ok' });
-            }
-          });
+          updateExisting(resultObject);
         } else {
           // Insert new + LDAP
           collection.insertOne(request.body, async (db_error, db_result) => {
@@ -582,11 +589,13 @@ const Mongo = {
     try {
       if (preview.indexOf('data:image') !== -1) {
         const tempBuff = Buffer.from(preview.replace(/^data:image\/(png|gif|jpeg);base64,/, ''), 'base64');
-        await imagemin.buffer(tempBuff, { plugins: [ pngquant.default({
-          speed: 1,
-          strip: true,
-          dithering: 1
-        }) ] }).then(res => {
+        await imagemin.buffer(tempBuff, {
+          plugins: [pngquant.default({
+            speed: 1,
+            strip: true,
+            dithering: 1
+          })]
+        }).then(res => {
           ensureDirSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/`);
           writeFileSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${identifier}.png`, res);
           finalImagePath = `/previews/${identifier}.png`;
@@ -677,10 +686,12 @@ const Mongo = {
           if (result) {
             if (result['password'] && result['password'].length > 0) {
               const _owner = await Mongo.isOwner(request, identifier);
-              if (!_owner) { if (result['password'] !== password || (password === '' && result['password'] !== '')) {
-                response.send({ status: 'ok', message: 'Password protected compilation' });
-                return;
-              }}
+              if (!_owner) {
+                if (result['password'] !== password || (password === '' && result['password'] !== '')) {
+                  response.send({ status: 'ok', message: 'Password protected compilation' });
+                  return;
+                }
+              }
             }
 
             for (let i = 0; i < result.models.length; i++) {
