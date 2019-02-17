@@ -19,18 +19,24 @@ const Mongo = {
   DBObjectsRepository: undefined,
   AccountsRepository: undefined,
   init: async () => {
-    // TODO: First connection
     this.Client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, {
       useNewUrlParser: true,
       reconnectTries: Number.POSITIVE_INFINITY,
       reconnectInterval: 1000,
     });
-    this.Connection = await this.Client.connect();
-    this.DBObjectsRepository = await this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
-    this.AccountsRepository = await this.Client.db(Configuration.Mongo.Databases.Accounts.Name);
-    Configuration.Mongo.Databases.ObjectsRepository.Collections.forEach(collection => {
-      this.DBObjectsRepository.createCollection(collection.toLowerCase());
+    await this.Client.connect(async (error, client) => {
+      if (error) {
+        Logger.err(`Couldn't connect to MongoDB. Make sure it is running and check your configuration`);
+        process.exit(0);
+      }
+      this.Connection = client;
+      this.DBObjectsRepository = await this.Client.db(Configuration.Mongo.Databases.ObjectsRepository.Name);
+      this.AccountsRepository = await this.Client.db(Configuration.Mongo.Databases.Accounts.Name);
+      Configuration.Mongo.Databases.ObjectsRepository.Collections.forEach(collection => {
+        this.DBObjectsRepository.createCollection(collection.toLowerCase());
+      });
     });
+
   },
   isMongoDBConnected: async (_, response, next) => {
     const isConnected = await this.Client.isConnected();
