@@ -4,7 +4,7 @@ const Environment = {
   verbose: false,
   rootDirectory: `${__dirname}`,
   configFile: undefined,
-  logLevel: LogLevel.Log
+  logLevel: LogLevel.All
 };
 
 Environment['configFile'] = `${Environment.rootDirectory}/config.json`;

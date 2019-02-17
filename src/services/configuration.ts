@@ -60,9 +60,7 @@ const LoadConfig = () => {
         Host: 'ldap://localhost',
         searchBase: 'dc=example,dc=org'
       },
-      InsecureAdminAccounts: [
-        { username: 'localadmin', password: 'changeme' }
-      ]
+      InsecureAdminAccounts: []
     }
   };
 

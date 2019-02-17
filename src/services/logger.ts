@@ -1,12 +1,14 @@
-import { ensureFileSync, writeFileSync, statSync } from 'fs-extra';
+import { ensureFileSync, writeFileSync, statSync, createWriteStream } from 'fs-extra';
 import { RootDirectory, Environment } from '../environment';
 import { LogLevel } from '../enums';
 import { inspect } from 'util';
 import { join } from 'path';
+import { performance } from 'perf_hooks';
 
 const Logger = {
   path: join(RootDirectory, 'server.log'),
   stack: new Set([]),
+  autosave: setInterval(() => Logger.writeToLog(), 30000),
   info: (content) => {
     const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
@@ -41,7 +43,7 @@ const Logger = {
       : content;
   },
   shouldWrite: () => {
-    if (Logger.stack.size >= 64) {
+    if (Logger.stack.size >= 128) {
       Logger.writeToLog();
     }
   },
