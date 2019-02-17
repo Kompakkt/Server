@@ -2,6 +2,7 @@ import { readJsonSync } from 'fs-extra';
 import { Verbose, RootDirectory, ConfigFile } from '../environment';
 import { inspect as InspectObject } from 'util';
 import { isMaster } from 'cluster';
+import * as merge from 'deepmerge';
 
 const LoadConfig = () => {
   const DefaultConfiguration = {
@@ -78,7 +79,7 @@ const LoadConfig = () => {
       console.log(InspectObject(confObj, { showHidden: false, depth: null }));
     }
 
-    return confObj;
+    return merge(DefaultConfiguration, confObj);
 
   } catch (error) {
     if (isMaster) {
