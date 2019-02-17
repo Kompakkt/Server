@@ -1,5 +1,6 @@
 import { isMaster, fork } from 'cluster';
 import { cpus } from 'os';
+import { Logger } from './services/logger';
 import { Configuration } from './services/configuration';
 import { Server, Express, WebSocket } from './services/express';
 import { Upload } from './services/upload';
@@ -9,7 +10,7 @@ import { Mongo } from './services/mongo';
 if (isMaster) {
   const CPUs = cpus().length;
   const threads = ((CPUs >= 4) ? CPUs / 2 : 4);
-  console.log(`Creating ${threads} threads`);
+  Logger.info(`Creating ${threads} threads`);
   for (let i = 0; i < threads; i++) {
     fork();
   }
@@ -63,7 +64,7 @@ if (isMaster) {
 
   // WebSocket
   WebSocket.on('connection', socket => {
-    console.log(`Connection from ${socket.id}`);
+    Logger.info(`Connection from ${socket.id}`);
   });
 
   Express.startListening();

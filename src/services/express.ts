@@ -19,6 +19,8 @@ import * as LdapStrategy from 'passport-ldapauth';
 import * as expressSession from 'express-session';
 import * as uuid from 'uuid';
 
+import { Logger } from './logger';
+
 const Express = {
   server: express(),
   passport: passport,
@@ -51,9 +53,7 @@ const Express = {
   },
   startListening: () => {
     Listener.listen(Conf.Express.Port, Conf.Express.Host);
-    if (worker.id === 1) {
-      console.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
-    }
+    Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
   }
 };
 

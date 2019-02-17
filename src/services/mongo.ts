@@ -5,11 +5,12 @@
  */
 import { MongoClient, ObjectId } from 'mongodb';
 import { Configuration } from './configuration';
+import { Logger } from './logger';
 
 /**
  * Imported for detailed logging
  */
-import { Verbose, RootDirectory } from '../environment';
+import { RootDirectory } from '../environment';
 import { inspect as InspectObject } from 'util';
 
 import * as base64img from 'base64-img';
@@ -64,7 +65,7 @@ const Mongo = {
     if (isConnected) {
       next();
     } else {
-      console.warn('Incoming request while not connected to MongoDB');
+      Logger.warn('Incoming request while not connected to MongoDB');
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
@@ -107,9 +108,9 @@ const Mongo = {
           }, (ins_err, ins_res) => {
             if (ins_err) {
               response.send({ status: 'error' });
-              console.error(ins_res);
+              Logger.err(ins_res);
             } else {
-              console.log(ins_res.ops);
+              Logger.info(ins_res.ops);
               response.send({ status: 'ok', data: ins_res.ops[0].data, _id: ins_res.ops[0]._id, fullname: ins_res.ops[0].fullname });
             }
           });
@@ -131,12 +132,12 @@ const Mongo = {
           }, (up_err, up_res) => {
             if (up_err) {
               response.send({ status: 'error' });
-              console.error(up_err);
+              Logger.err(up_err);
             } else {
               ldap.findOne({ sessionID: sessionID, username: username }, (f_err, f_res) => {
                 if (f_err) {
                   response.send({ status: 'error' });
-                  console.error(f_err);
+                  Logger.err(f_err);
                 } else {
                   response.send({ status: 'ok', data: f_res.data, _id: f_res._id, fullname: f_res.fullname });
                 }
@@ -146,7 +147,7 @@ const Mongo = {
         break;
       default:
         // Too many Accounts
-        console.error('Multiple Accounts found for LDAP username ' + username);
+        Logger.warn('Multiple Accounts found for LDAP username ' + username);
         response.send({ status: 'error' });
         break;
     }
@@ -190,7 +191,7 @@ const Mongo = {
       default:
         // Multiple sessionID. Invalidate all
         ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: null } }, (up_err, up_res) => {
-          console.log('Invalidated multiple sessionIDs due to being the same');
+          Logger.log('Invalidated multiple sessionIDs due to being the same');
           response.send({ message: 'Invalid session' });
         });
         break;
@@ -201,10 +202,8 @@ const Mongo = {
    * adds the missing data to defined collections
    */
   submit: async (request, response) => {
-    if (Verbose) {
-      console.log('VERBOSE: Handling submit request');
-      console.log(InspectObject(request.body));
-    }
+    Logger.info('Handling submit request');
+    Logger.info(request.body);
 
     const collection = this.DBObjectsRepository.collection('digitalobject');
     const resultObject = { ...request.body };
@@ -213,11 +212,11 @@ const Mongo = {
      * Handle re-submit for changing a finished DigitalObject
      */
     if (resultObject['_id']) {
-      console.log(`Re-submitting DigitalObject ${resultObject['_id']}`);
+      Logger.info(`Re-submitting DigitalObject ${resultObject['_id']}`);
       collection.deleteOne({ _id: resultObject['_id'] });
     } else {
       resultObject['_id'] = ObjectId();
-      console.log(`Generated DigitalObject ID ${resultObject['_id']}`);
+      Logger.info(`Generated DigitalObject ID ${resultObject['_id']}`)
     }
 
     /**
@@ -263,7 +262,7 @@ const Mongo = {
               });
             }
           }
-          console.log(field['person_role'], field['institution_role'], field['roles']);
+          Logger.info(`${field['person_role']}, ${field['institution_role']}, ${field['roles']}`);
 
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
@@ -475,16 +474,14 @@ const Mongo = {
         resultObject['digobj_tags'].map(async tag => addAndGetId(tag, 'tag')));
     }
 
-    console.log(resultObject);
+    Logger.info(resultObject);
 
     collection.insertOne(resultObject, (db_error, db_result) => {
       if (db_error) {
-        console.error(db_error);
+        Logger.err(db_error);
         response.send('Failed to add');
       }
-      if (Verbose) {
-        console.log(`VERBOSE: Finished Object ${db_result.ops[0]['_id']}`);
-      }
+      Logger.info(`Finished Object ${db_result.ops[0]['_id']}`);
       response.send(db_result.ops[0]);
     });
   },
@@ -498,9 +495,7 @@ const Mongo = {
   addToObjectCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    if (Verbose) {
-      console.log('VERBOSE: Adding to the following collection ' + RequestCollection);
-    }
+    Logger.info('Adding to the following collection ' + RequestCollection);
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const sessionID = request.sessionID;
@@ -532,10 +527,10 @@ const Mongo = {
           const found = await collection.findOne({ _id: resultObject['_id'] });
           collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, (up_error, up_result) => {
             if (up_error) {
-              console.error(`Failed to update ${RequestCollection} instance`);
+              Logger.err(`Failed to update ${RequestCollection} instance`);
               response.send({ status: 'error' });
             } else {
-              console.log(`Updated ${resultObject['_id']}`);
+              Logger.info(`Updated ${resultObject['_id']}`);
               response.send({ status: 'ok' });
             }
           });
@@ -554,9 +549,7 @@ const Mongo = {
             } else {
               response.send({ status: 'error' });
             }
-            if (Verbose) {
-              console.log(`VERBOSE: Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
-            }
+            Logger.info(`Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
           });
         }
         break;
@@ -564,10 +557,8 @@ const Mongo = {
         collection.insertOne(request.body, (db_error, result) => {
           response.send(result.ops);
 
-          if (Verbose) {
-            if (result.ops[0] && result.ops[0]['_id']) {
-              console.log(`VERBOSE: Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
-            }
+          if (result.ops[0] && result.ops[0]['_id']) {
+            Logger.info(`Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
           }
         });
         break;
@@ -599,12 +590,12 @@ const Mongo = {
           ensureDirSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/`);
           writeFileSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${identifier}.png`, res);
           finalImagePath = `/previews/${identifier}.png`;
-        }).catch(e => console.error(e));
+        }).catch(e => Logger.err(e));
       } else {
         finalImagePath = `/previews/${preview.split('previews/')[1]}`;
       }
     } catch (e) {
-      console.error(e);
+      Logger.err(e);
       response.send({ status: 'error' });
     }
 
@@ -627,9 +618,7 @@ const Mongo = {
    * Simple resolving by collection name and Id
    */
   resolve: async (obj, collection_name) => {
-    if (Verbose) {
-      console.log(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
-    }
+    Logger.info(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
     const resolve_collection = this.DBObjectsRepository.collection(collection_name);
     const id = (obj['_id']) ? obj['_id'] : obj;
     return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? ObjectId(id) : id })
@@ -703,7 +692,7 @@ const Mongo = {
             response.send({ status: 'ok' });
           }
         }).catch((db_error) => {
-          console.error(db_error);
+          Logger.err(db_error);
           response.send({ status: 'error' });
         });
         break;
@@ -794,15 +783,15 @@ const Mongo = {
       }
       const update_result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: find_result.data } });
       if (update_result.result.ok === 1) {
-        console.log(`Deleted ${RequestCollection} ${request.params.identifier}`);
+        Logger.info(`Deleted ${RequestCollection} ${request.params.identifier}`);
         response.send({ status: 'ok' });
       } else {
-        console.log(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
+        Logger.warn(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
         response.send({ status: 'error' });
       }
     } else {
-      console.log(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
-      console.log(delete_result);
+      Logger.warn(`Failed deleting ${RequestCollection} ${request.params.identifier}`);
+      Logger.warn(delete_result);
       response.send({ status: 'error' });
     }
   },

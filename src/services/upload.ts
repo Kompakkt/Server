@@ -1,6 +1,7 @@
 import { Configuration } from './configuration';
 import { RootDirectory, Verbose } from '../environment';
 import { Server } from './express';
+import { Logger } from './logger';
 
 import { ensureDirSync, moveSync, pathExistsSync, removeSync, move, statSync } from 'fs-extra';
 import { dirname, extname, basename } from 'path';
@@ -11,10 +12,10 @@ const Upload = {
   Multer: multer({
     dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
     onFileUploadStart: function(file) {
-      console.log(file.originalname + ' is starting ...');
+      Logger.info(file.originalname + ' is starting ...');
     },
     onFileUploadComplete: function(file) {
-      console.log(file.fieldname + ' uploaded to  ' + file.path);
+      Logger.info(file.fieldname + ' uploaded to  ' + file.path);
     }
   }),
   AddMetadata: (request, response) => {
@@ -64,7 +65,7 @@ const Upload = {
       ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
       : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
-    console.log(`Cancelling upload request ${Token}`);
+    Logger.info(`Cancelling upload request ${Token}`);
 
     if (!pathExistsSync(path)) {
       response.json({ message: 'Path with this token does not exist' });
@@ -74,7 +75,7 @@ const Upload = {
     }
   },
   UploadFinish: async (request, response) => {
-    console.log(request.body);
+    Logger.info(request.body);
     const Token = request.body.uuid;
     const Type = request.body.type;
     const path = Configuration.Uploads.createSubfolders
@@ -115,7 +116,7 @@ const Upload = {
             return result;
           }).sort((a, b) => a.file_size - b.file_size);
 
-          console.log(ResponseFiles);
+          Logger.info(ResponseFiles);
 
           response.json(ResponseFiles);
         } else {
