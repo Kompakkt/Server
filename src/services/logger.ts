@@ -1,9 +1,8 @@
-import { ensureFileSync, writeFileSync, statSync, createWriteStream } from 'fs-extra';
+import { ensureFileSync, writeFileSync, statSync } from 'fs-extra';
 import { RootDirectory, Environment } from '../environment';
 import { LogLevel } from '../enums';
 import { inspect } from 'util';
 import { join } from 'path';
-import { performance } from 'perf_hooks';
 
 const Logger = {
   path: join(RootDirectory, 'server.log'),
@@ -38,7 +37,7 @@ const Logger = {
     return now.toISOString();
   },
   prepareContent: (content) => {
-    return (typeof(content) === 'object')
+    return (typeof (content) === 'object')
       ? `\n${inspect(content, { showHidden: false, depth: null })}`
       : content;
   },

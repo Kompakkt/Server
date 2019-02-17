@@ -8,7 +8,7 @@ import * as corser from 'corser';
 import * as compression from 'compression';
 import * as zlib from 'zlib';
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { ensureDirSync, pathExistsSync, copySync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
@@ -20,7 +20,7 @@ import * as uuid from 'uuid';
 
 import { Logger } from './logger';
 
-const Express = {
+const Express: any = {
   server: express(),
   passport: passport,
   createServer: () => {
@@ -49,16 +49,17 @@ const Express = {
         reconnect: true
       }
     });
-  },
-  startListening: () => {
-    Listener.listen(Conf.Express.Port, Conf.Express.Host);
-    Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
   }
 };
 
 const Listener = Express.createServer();
 const WebSocket = socketIo(Listener);
 const Server = Express.server;
+
+Express.startListening = () => {
+  Listener.listen(Conf.Express.Port, Conf.Express.Host);
+  Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
+};
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
@@ -101,7 +102,7 @@ Express.passport.deserializeUser((id, done) => done(null, id));
 
 Server.use(Express.passport.initialize());
 Server.use(expressSession({
-  genid: (req) => uuid(),
+  genid: () => uuid(),
   secret: Conf.Express.PassportSecret,
   resave: false,
   saveUninitialized: false,

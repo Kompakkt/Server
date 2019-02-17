@@ -1,7 +1,6 @@
 import { readJsonSync } from 'fs-extra';
 import { Logger } from './logger';
-import { Verbose, RootDirectory, ConfigFile } from '../environment';
-import { inspect as InspectObject } from 'util';
+import { ConfigFile } from '../environment';
 import { isMaster } from 'cluster';
 import * as merge from 'deepmerge';
 

@@ -1,6 +1,5 @@
 import { Configuration } from './configuration';
-import { RootDirectory, Verbose } from '../environment';
-import { Server } from './express';
+import { RootDirectory } from '../environment';
 import { Logger } from './logger';
 
 import { ensureDirSync, moveSync, pathExistsSync, removeSync, move, statSync } from 'fs-extra';
@@ -31,7 +30,7 @@ const Upload = {
     newPath += filename;
 
     ensureDirSync(dirname(newPath));
-    move(tempPath, newPath).then(res => {
+    move(tempPath, newPath).then(_ => {
       const responseObject = {
         metadata_file: filename,
         metadata_object: request.headers['metadatakey'],
@@ -40,9 +39,9 @@ const Upload = {
         metadata_size: `${statSync(newPath).size} bytes`
       };
       response.end(JSON.stringify(responseObject));
-    }).catch(e => response.end(`File already exists`));
+    }).catch(() => response.end(`File already exists`));
   },
-  CancelMetadata: (request, response) => {
+  CancelMetadata: () => {
     // TODO: Either remove on it's own via request or delete with the rest of the upload cancel
   },
   UploadRequest: (request, response) => {

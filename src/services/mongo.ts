@@ -1,47 +1,23 @@
-/**
- * Imported external configuration
- * MongoClient is the main way to connect to a MongoDB server
- * ObjectId is the type & constructor of a MongoDB unique identifier
- */
 import { MongoClient, ObjectId } from 'mongodb';
 import { Configuration } from './configuration';
+
+import { RootDirectory } from '../environment';
 import { Logger } from './logger';
 
-/**
- * Imported for detailed logging
- */
-import { RootDirectory } from '../environment';
-import { inspect as InspectObject } from 'util';
-
-import * as base64img from 'base64-img';
-import * as PNGtoJPEG from 'png-to-jpeg';
-import { readFile, writeFileSync, readFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
-import * as mozjpeg from 'imagemin-mozjpeg';
 import * as pngquant from 'imagemin-pngquant';
 
-/** Interfaces */
+// TODO: Use interfaces
 import { Compilation } from '../interfaces/compilation.interface';
-import { Model } from '../interfaces/model.interface';
+// import { Model } from '../interfaces/model.interface';
 
-/**
- * Object containing variables which define an established connection
- * to a MongoDB Server specified in Configuration
- * @type {Object}
- */
 const Mongo = {
   Client: undefined,
   Connection: undefined,
   DBObjectsRepository: undefined,
   AccountsRepository: undefined,
-  /**
-   * Initialize a MongoDB Client
-   * uses hostname and port defined in Configuration file
-   * Make sure our predefined collections exist in the Database
-   * Save the most used Database as a variable
-   * to reduce the amount of calls needed
-   */
   init: async () => {
     // TODO: First connection
     this.Client = new MongoClient(`mongodb://${Configuration.Mongo.Hostname}:${Configuration.Mongo.Port}/`, {
@@ -56,11 +32,7 @@ const Mongo = {
       this.DBObjectsRepository.createCollection(collection.toLowerCase());
     });
   },
-  /**
-   * Checks if MongoDB is still connected
-   * used as Middleware
-   */
-  isMongoDBConnected: async (request, response, next) => {
+  isMongoDBConnected: async (_, response, next) => {
     const isConnected = await this.Client.isConnected();
     if (isConnected) {
       next();
@@ -73,7 +45,7 @@ const Mongo = {
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
    */
-  fixObjectId: async (request, response, next) => {
+  fixObjectId: async (request, _, next) => {
     if (request) {
       if (request.body && request.body['_id'] && ObjectId.isValid(request.body['_id'])) {
         request.body['_id'] = ObjectId(request.body['_id']);
@@ -81,9 +53,6 @@ const Mongo = {
     }
     next();
   },
-  /**
-   * Adds a new LDAP user or updates LDAP user sessionID
-   */
   addToAccounts: async (request, response) => {
     const user = request.user;
     const username = request.body.username;
@@ -129,7 +98,7 @@ const Mongo = {
               status: user['UniColognePersonStatus'],
               mail: user['mail']
             }
-          }, (up_err, up_res) => {
+          }, (up_err, _) => {
             if (up_err) {
               response.send({ status: 'error' });
               Logger.err(up_err);
@@ -152,10 +121,7 @@ const Mongo = {
         break;
     }
   },
-  /**
-   * Get ObjectRepository data for current user
-   */
-  getLinkedData: async (request, response) => {
+  getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
     const found = await ldap.findOne({ sessionID: sessionID });
@@ -171,10 +137,7 @@ const Mongo = {
       .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
     response.send({ status: 'ok', data: found.data, _id: found._id, fullname: found.fullname });
   },
-  /**
-   * Gets LDAP user to confirm validity of sessionID
-   */
-  checkAccount: async (request, response, next) => {
+  validateLoginSession: async (request, response, next) => {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
       request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
@@ -190,7 +153,7 @@ const Mongo = {
         break;
       default:
         // Multiple sessionID. Invalidate all
-        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: null } }, (up_err, up_res) => {
+        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: null } }, () => {
           Logger.log('Invalidated multiple sessionIDs due to being the same');
           response.send({ message: 'Invalid session' });
         });
@@ -216,7 +179,7 @@ const Mongo = {
       collection.deleteOne({ _id: resultObject['_id'] });
     } else {
       resultObject['_id'] = ObjectId();
-      Logger.info(`Generated DigitalObject ID ${resultObject['_id']}`)
+      Logger.info(`Generated DigitalObject ID ${resultObject['_id']}`);
     }
 
     /**
@@ -267,14 +230,13 @@ const Mongo = {
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
-                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(result => {
+                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(() => {
                   return String(field['_id']);
                 }) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                 return String(result.ops[0]['_id']);
               })
           };
-          break;
         default:
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
@@ -283,7 +245,6 @@ const Mongo = {
                 return String(result.ops[0]['_id']);
               })
           };
-          break;
       }
     };
 
@@ -485,14 +446,7 @@ const Mongo = {
       response.send(db_result.ops[0]);
     });
   },
-  /**
-   * Express HTTP POST request
-   * Handles a single document that needs to be added
-   * to our Database
-   * request.body is any JavaScript Object
-   * On success, sends a response containing the added Object
-   */
-  addToObjectCollection: async (request, response) => {
+  addObjectToCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     Logger.info('Adding to the following collection ' + RequestCollection);
@@ -513,7 +467,8 @@ const Mongo = {
 
     const updateExisting = async (object) => {
       const found = await collection.findOne({ _id: object['_id'] });
-      collection.updateOne({ _id: object['_id'] }, { $set: object }, (up_error, up_result) => {
+      if (found.length !== 1) return;
+      collection.updateOne({ _id: object['_id'] }, { $set: object }, (up_error, _) => {
         if (up_error) {
           Logger.err(`Failed to update ${RequestCollection} instance`);
           response.send({ status: 'error' });
@@ -543,7 +498,7 @@ const Mongo = {
           updateExisting(resultObject);
         } else {
           // Insert new + LDAP
-          collection.insertOne(request.body, async (db_error, db_result) => {
+          collection.insertOne(request.body, async (_, db_result) => {
             const userData = await ldap.findOne({ sessionID: sessionID });
             switch (RequestCollection) {
               case 'model': userData.data.models.push(`${db_result.ops[0]['_id']}`); break;
@@ -561,7 +516,7 @@ const Mongo = {
         }
         break;
       default:
-        collection.insertOne(request.body, (db_error, result) => {
+        collection.insertOne(request.body, (_, result) => {
           response.send(result.ops);
 
           if (result.ops[0] && result.ops[0]['_id']) {
@@ -571,12 +526,7 @@ const Mongo = {
         break;
     }
   },
-  /**
-   * Express HTTP POST request
-   * Finds a model by it's ObjectId and
-   * updates it's preview screenshot
-   */
-  updateSettings: async (request, response) => {
+  updateModelSettings: async (request, response) => {
     const preview = request.body.preview;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       ObjectId(request.params.identifier) : request.params.identifier;
@@ -614,10 +564,7 @@ const Mongo = {
       { $set: { settings: settings } });
     response.send((result.result.ok === 1) ? { status: 'ok', settings: settings } : { status: 'error' });
   },
-  /**
-   * Check if current user is owner of password protected document
-   */
-  isOwner: async (request, identifier) => {
+  isUserOwnerOfObject: async (request, identifier) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
     const found = await ldap.findOne({ sessionID: sessionID });
@@ -637,12 +584,6 @@ const Mongo = {
    * Heavy nested resolving for DigitalObject
    */
   resolveDigitalObject: async (digitalObject) => {
-    const resolveTopLevel = async (obj, property, field) => {
-      for (let i = 0; i < obj[property].length; i++) {
-        obj[property][i] =
-          await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
-      }
-    };
     const resolveNestedInst = async (obj) => {
       if (obj['person_institution_data']) {
         for (let j = 0; j < obj['person_institution_data'].length; j++) {
@@ -651,6 +592,12 @@ const Mongo = {
         }
       }
       return obj;
+    };
+    const resolveTopLevel = async (obj, property, field) => {
+      for (let i = 0; i < obj[property].length; i++) {
+        obj[property][i] =
+          await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+      }
     };
     const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
     ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
@@ -666,13 +613,7 @@ const Mongo = {
     }
     return digitalObject;
   },
-  /**
-   * Express HTTP GET request
-   * Finds any document in any collection by its MongoDB identifier
-   * On success, sends a response containing the Object
-   * TODO: Handle No Objects found?
-   */
-  getFromObjectCollection: (request, response) => {
+  getObjectFromCollection: (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
@@ -685,7 +626,7 @@ const Mongo = {
         collection.findOne({ '_id': identifier }).then(async (result: Compilation) => {
           if (result) {
             if (result['password'] && result['password'].length > 0) {
-              const _owner = await Mongo.isOwner(request, identifier);
+              const _owner = await Mongo.isUserOwnerOfObject(request, identifier);
               if (!_owner) {
                 if (result['password'] !== password || (password === '' && result['password'] !== '')) {
                   response.send({ status: 'ok', message: 'Password protected compilation' });
@@ -713,27 +654,20 @@ const Mongo = {
         });
         break;
       default:
-        collection.findOne({ '_id': identifier }, (db_error, result) => {
+        collection.findOne({ '_id': identifier }, (_, result) => {
           response.send(result ? result : { status: 'ok' });
         });
         break;
     }
   },
-  /**
-   * Express HTTP GET request
-   * Finds all documents in any collection
-   * On success, sends a response containing an Array
-   * of all Objects in the specified collection
-   * TODO: Handle No Objects found?
-   */
-  getAllFromObjectCollection: (request, response) => {
+  getAllObjectsFromCollection: (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.find({}).toArray(async (db_error, compilations) => {
+        collection.find({}).toArray(async (_, compilations) => {
           if (compilations) {
             compilations = compilations.filter(compilation =>
               !compilation.password || (compilation.password && compilation.password.length === 0));
@@ -753,21 +687,18 @@ const Mongo = {
         });
         break;
       case 'model':
-        collection.find({}).toArray((db_error, result) => {
+        collection.find({}).toArray((_, result) => {
           response.send(result.filter(model => model['finished'] && model['online']));
         });
         break;
       default:
-        collection.find({}).toArray((db_error, result) => {
+        collection.find({}).toArray((_, result) => {
           response.send(result);
         });
         break;
     }
   },
-  /**
-   * Remove document from collection by ID
-   */
-  removeObjectFromObjectCollection: async (request, response) => {
+  removeObjectFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
@@ -806,9 +737,6 @@ const Mongo = {
       response.send({ status: 'error' });
     }
   },
-  /**
-   * Search
-   */
   searchObjectWithFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
@@ -817,7 +745,7 @@ const Mongo = {
     let allObjects = await collection.find({}).toArray();
 
     const getNestedValues = (obj) => {
-      let result = [];
+      let result: string[] = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
         if (obj.hasOwnProperty(key) && prop) {
@@ -836,7 +764,7 @@ const Mongo = {
     };
 
     const filterResults = (objs) => {
-      const result = [];
+      const result: any[] = [];
       for (let i = 0; i < objs.length; i++) {
         const asText = getNestedValues(objs[i]).join('').toLowerCase();
         for (let j = 0; j < filter.length; j++) {
@@ -875,9 +803,6 @@ const Mongo = {
   }
 };
 
-/**
- * Initialization
- */
 Mongo.init();
 
 export { Mongo };
