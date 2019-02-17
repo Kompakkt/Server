@@ -455,7 +455,7 @@ const Mongo = {
   addObjectToCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    Logger.info('Adding to the following collection ' + RequestCollection);
+    Logger.info('Adding to the following collection: ' + RequestCollection);
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const sessionID = request.sessionID;
@@ -473,7 +473,10 @@ const Mongo = {
 
     const updateExisting = async (object) => {
       const found = await collection.findOne({ _id: object['_id'] });
-      if (found.length !== 1) return;
+      if (!found) {
+        response.send({ status: 'error' });
+        Logger.warn(`Tried to update non-existant object with id ${object['_id']}`);
+      }
       collection.updateOne({ _id: object['_id'] }, { $set: object }, (up_error, _) => {
         if (up_error) {
           Logger.err(`Failed to update ${RequestCollection} instance`);
@@ -718,14 +721,14 @@ const Mongo = {
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
       const find_result = await ldap.findOne({ sessionID: sessionID });
       switch (RequestCollection) {
-        case 'compilations':
-          find_result.data.compilations = find_result.data.compilations.filter(id => id !== request.params.identifier);
+        case 'compilation':
+          find_result.data.compilations = find_result.data.compilations.filter(id => id !== identifier.toString());
           break;
-        case 'models':
-          find_result.data.models = find_result.data.models.filter(id => id !== request.params.identifier);
+        case 'model':
+          find_result.data.models = find_result.data.models.filter(id => id !== identifier.toString());
           break;
-        case 'annotations':
-          find_result.data.annotations = find_result.data.annotations.filter(id => id !== request.params.identifier);
+        case 'annotation':
+          find_result.data.annotations = find_result.data.annotations.filter(id => id !== identifier.toString());
           break;
         default: break;
       }
