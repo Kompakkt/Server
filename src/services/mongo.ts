@@ -59,6 +59,9 @@ const Mongo = {
     }
     next();
   },
+  getUnusedObjectId: async (_, response) => {
+    response.send(new ObjectId());
+  },
   addToAccounts: async (request, response) => {
     const user = request.user;
     const username = request.body.username;

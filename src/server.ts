@@ -17,6 +17,8 @@ Server.get(['/api/v1/get/find/:collection/:identifier', '/api/v1/get/find/:colle
 Server.get('/api/v1/get/findall/:collection', Mongo.validateLoginSession, Mongo.getAllObjectsFromCollection);
 // Return data linked to currently logged in LDAP Account
 Server.get('/api/v1/get/ldata', Mongo.validateLoginSession, Mongo.getCurrentUserData);
+// Return a MongoDB ObjectId
+Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
 // POST
 // Post single document to collection
