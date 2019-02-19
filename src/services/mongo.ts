@@ -141,7 +141,8 @@ const Mongo = {
       .map(async model => await Mongo.resolve(model, 'model')));
     found.data.annotations = await Promise.all(found.data.annotations
       .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
-    response.send({ status: 'ok', data: found.data, _id: found._id, fullname: found.fullname });
+    response.send({ status: 'ok', data: found.data, _id: found._id,
+        fullname: found.fullname, username: found.username, rank: found.status });
   },
   validateLoginSession: async (request, response, next) => {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
