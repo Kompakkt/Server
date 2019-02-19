@@ -54,7 +54,9 @@ Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: '
 
 // WebSocket
 WebSocket.on('connection', socket => {
-  Logger.info(`Connection from ${socket.id}`);
+  Logger.info(`SocketIO connection ${socket.id}`);
+
+  socket.on('message', data => socket.emit('message', data));
 });
 
 Express.startListening();
