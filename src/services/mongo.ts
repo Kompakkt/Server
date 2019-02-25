@@ -82,14 +82,15 @@ const Mongo = {
             surname: user['sn'],
             status: user['UniColognePersonStatus'],
             mail: user['mail'],
-            data: { compilations: [], annotations: [], models: [] }
+            data: { compilations: [], annotations: [], models: [] },
+            role: ''
           }, (ins_err, ins_res) => {
             if (ins_err) {
               response.send({ status: 'error' });
               Logger.err(ins_res);
             } else {
               Logger.info(ins_res.ops);
-              response.send({ status: 'ok', data: ins_res.ops[0].data, _id: ins_res.ops[0]._id, fullname: ins_res.ops[0].fullname });
+              response.send({ status: 'ok', ...ins_res.ops[0] });
             }
           });
         break;
@@ -105,7 +106,8 @@ const Mongo = {
               prename: user['givenName'],
               surname: user['sn'],
               status: user['UniColognePersonStatus'],
-              mail: user['mail']
+              mail: user['mail'],
+              role: user['role'] || ''
             }
           }, (up_err, _) => {
             if (up_err) {
@@ -117,7 +119,7 @@ const Mongo = {
                   response.send({ status: 'error' });
                   Logger.err(f_err);
                 } else {
-                  response.send({ status: 'ok', data: f_res.data, _id: f_res._id, fullname: f_res.fullname });
+                  response.send({ status: 'ok', ...f_res });
                 }
               });
             }
@@ -144,8 +146,7 @@ const Mongo = {
       .map(async model => await Mongo.resolve(model, 'model')));
     found.data.annotations = await Promise.all(found.data.annotations
       .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
-    response.send({ status: 'ok', data: found.data, _id: found._id,
-        fullname: found.fullname, username: found.username, rank: found.status });
+    response.send({ status: 'ok', ...found });
   },
   validateLoginSession: async (request, response, next) => {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
