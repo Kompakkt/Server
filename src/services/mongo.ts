@@ -97,7 +97,6 @@ const Mongo = {
       case 1:
         // Account found
         // Update session ID
-        console.log(found);
         ldap.updateOne({ username: username },
           {
             $set:
