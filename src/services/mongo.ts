@@ -83,7 +83,7 @@ const Mongo = {
             status: user['UniColognePersonStatus'],
             mail: user['mail'],
             data: { compilations: [], annotations: [], models: [] },
-            role: ''
+            role: user['UniColognePersonStatus']
           }, (ins_err, ins_res) => {
             if (ins_err) {
               response.send({ status: 'error' });
@@ -97,6 +97,7 @@ const Mongo = {
       case 1:
         // Account found
         // Update session ID
+        console.log(found);
         ldap.updateOne({ username: username },
           {
             $set:
@@ -107,7 +108,11 @@ const Mongo = {
               surname: user['sn'],
               status: user['UniColognePersonStatus'],
               mail: user['mail'],
-              role: user['role'] || ''
+              role: (found['role'])
+                ? ((found['role'] === '')
+                  ? user['UniColognePersonStatus']
+                  : found['role'] )
+                : user['UniColognePersonStatus']
             }
           }, (up_err, _) => {
             if (up_err) {
