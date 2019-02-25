@@ -33,9 +33,7 @@ const LoadConfig = () => {
     },
     Uploads: {
       TempDirectory: 'temp',
-      UploadDirectory: 'uploads',
-      createSubfolders: true,
-      subfolderPath: 'models'
+      UploadDirectory: 'uploads'
     },
     Express: {
       Host: '127.0.0.1',

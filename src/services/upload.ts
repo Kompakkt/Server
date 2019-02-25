@@ -20,9 +20,6 @@ const Upload = {
   AddMetadata: (request, response) => {
     const tempPath = `${request['file'].path}`;
     let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
-    if (Configuration.Uploads.createSubfolders) {
-      newPath += `${Configuration.Uploads.subfolderPath}/`;
-    }
     newPath += `${request.headers['semirandomtoken']}/`;
     newPath += `${request.headers['metadatakey']}/`;
     // Filename gets a prefix of the metadata input field selected
@@ -48,9 +45,6 @@ const Upload = {
     // TODO: Checksum
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
     let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
-    if (Configuration.Uploads.createSubfolders) {
-      newPath += `${Configuration.Uploads.subfolderPath}/`;
-    }
     newPath += `${request.headers['semirandomtoken']}/`;
     newPath += `${request.headers['relpath']}`;
 
@@ -60,9 +54,7 @@ const Upload = {
   },
   UploadCancel: (request, response) => {
     const Token = request.body.uuid;
-    const path = Configuration.Uploads.createSubfolders
-      ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
-      : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
     Logger.info(`Cancelling upload request ${Token}`);
 
@@ -77,9 +69,7 @@ const Upload = {
     Logger.info(request.body);
     const Token = request.body.uuid;
     const Type = request.body.type;
-    const path = Configuration.Uploads.createSubfolders
-      ? `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Configuration.Uploads.subfolderPath}/${Token}`
-      : `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
 
     if (!pathExistsSync(path)) {
       response.json([]).end('Upload not finished');
@@ -109,7 +99,9 @@ const Upload = {
           const ResponseFiles = modelFiles.map(modelFile => {
             const result = { ...ResponseFile };
             result.file_format = extname(modelFile.path);
-            result.file_link = `${modelFile.path.substr(modelFile.path.indexOf('models/'))}`;
+            let _relativePath = modelFile.path.replace(RootDirectory, '');
+            _relativePath = (_relativePath.charAt(0) === '/') ? _relativePath.substr(1) : _relativePath;
+            result.file_link = `${_relativePath}`;
             result.file_name = `${basename(modelFile.path)}`;
             result.file_size = parseInt(`${modelFile.stats.size}`, 10);
             return result;
@@ -122,7 +114,7 @@ const Upload = {
           response.json(foundFiles);
         }
       } else {
-        const resultFiles = await foundFiles.map(file => file.path.substr(file.path.indexOf('models/')));
+        const resultFiles = await foundFiles.map(file => file.path.substr(file.path.indexOf('uploads/')));
         response.json(resultFiles);
       }
       response.end('Done!');

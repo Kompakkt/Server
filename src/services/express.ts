@@ -84,7 +84,7 @@ Server.use(corser.create({
     .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
 }));
 // Static
-Server.use('/models', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/${Conf.Uploads.subfolderPath}`));
+Server.use('/uploads', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/`));
 Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`));
 
 // Create preview directory and default preview file
