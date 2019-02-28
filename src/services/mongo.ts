@@ -80,7 +80,7 @@ const Mongo = {
             fullname: user['cn'],
             prename: user['givenName'],
             surname: user['sn'],
-            status: user['UniColognePersonStatus'],
+            rank: user['UniColognePersonStatus'],
             mail: user['mail'],
             data: { compilations: [], annotations: [], models: [] },
             role: user['UniColognePersonStatus']
@@ -105,7 +105,7 @@ const Mongo = {
               fullname: user['cn'],
               prename: user['givenName'],
               surname: user['sn'],
-              status: user['UniColognePersonStatus'],
+              rank: user['UniColognePersonStatus'],
               mail: user['mail'],
               role: (found['role'])
                 ? ((found['role'] === '')
