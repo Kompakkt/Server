@@ -265,6 +265,7 @@ const Mongo = {
 
     const addNestedInstitution = async (person) => {
       if (!person['person_institution']) return person;
+      if (!(person['person_institution'] instanceof Array)) return person;
       for (let i = 0; i < person['person_institution'].length; i++) {
         if (person['person_institution'][i]['value'] !== 'add_new_institution') continue;
         const institution = person['person_institution_data'][i];
