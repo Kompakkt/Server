@@ -54,7 +54,7 @@ const Mongo = {
   fixObjectId: async (request, _, next) => {
     if (request) {
       if (request.body && request.body['_id'] && ObjectId.isValid(request.body['_id'])) {
-        request.body['_id'] = ObjectId(request.body['_id']);
+        request.body['_id'] = new ObjectId(request.body['_id']);
       }
     }
     next();
@@ -193,7 +193,7 @@ const Mongo = {
       Logger.info(`Re-submitting DigitalObject ${resultObject['_id']}`);
       collection.deleteOne({ _id: resultObject['_id'] });
     } else {
-      resultObject['_id'] = ObjectId();
+      resultObject['_id'] = new ObjectId();
       Logger.info(`Generated DigitalObject ID ${resultObject['_id']}`);
     }
 
@@ -245,7 +245,7 @@ const Mongo = {
           return {
             '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
-                .updateOne({ _id: ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(() => {
+                .updateOne({ _id: new ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(() => {
                   return String(field['_id']);
                 }) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
@@ -263,6 +263,17 @@ const Mongo = {
       }
     };
 
+    const addNestedInstitution = async (person) => {
+      if (!person['person_institution']) return person;
+      for (let i = 0; i < person['person_institution'].length; i++) {
+        if (person['person_institution'][i]['value'] !== 'add_new_institution') continue;
+        const institution = person['person_institution_data'][i];
+        const newInst = await addAndGetId(institution, 'institution');
+        person['person_institution_data'][i] = newInst;
+      }
+      return person;
+    };
+
     /**
      * Use addAndGetId function on all Arrays containing
      * data that need to be added to collections
@@ -270,13 +281,7 @@ const Mongo = {
 
     resultObject['digobj_rightsowner_person'] = await Promise.all(
       resultObject['digobj_rightsowner_person'].map(async person => {
-        if (person['person_institution'][0]
-          && person['person_institution'][0]['value'] === 'add_new_institution') {
-          const institution = person['person_institution_data'].pop();
-          const newInst = await addAndGetId(institution, 'institution');
-          person['person_institution_data'][0] = newInst;
-        }
-        return addAndGetId(person, 'person');
+        return addAndGetId(await addNestedInstitution(person), 'person');
       }));
 
     resultObject['digobj_rightsowner_institution'] = await Promise.all(
@@ -288,7 +293,7 @@ const Mongo = {
         if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_person') {
           // New Rightsowner Person
-          const newRightsOwner = { ...resultObject['digobj_rightsowner_person'][0] };
+          let newRightsOwner = { ...resultObject['digobj_rightsowner_person'][0] };
           resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
         } else if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_institution') {
@@ -299,7 +304,7 @@ const Mongo = {
           // Existing Rightsowner Person or Institution
           const newRightsOwner = { ...resultObject['digobj_rightsowner'][i] };
           if (resultObject['digobj_rightsownerSelector'] === '1' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 1) {
-            resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
+            resultObject['digobj_rightsowner_person'][0] = await addAndGetId(await addNestedInstitution(newRightsOwner), 'person');
           } else if (resultObject['digobj_rightsownerSelector'] === '2' || parseInt(resultObject['digobj_rightsownerSelector'], 10) === 2) {
             resultObject['digobj_rightsowner_institution'][0] = await addAndGetId(newRightsOwner, 'institution');
           }
@@ -330,14 +335,7 @@ const Mongo = {
 
     resultObject['digobj_person'] = await Promise.all(
       resultObject['digobj_person'].map(async person => {
-        for (let i = 0; i < person['person_institution'].length; i++) {
-          if (person['person_institution'][i]['value'] === 'add_new_institution') {
-            const institution = person['person_institution_data'].pop();
-            const newInst = await addAndGetId(institution, 'institution');
-            person['person_institution_data'][0] = newInst;
-          }
-        }
-        return addAndGetId(person, 'person');
+        return addAndGetId(await addNestedInstitution(person), 'person');
       }));
 
     if (resultObject['digobj_person_existing'] instanceof Array) {
@@ -363,11 +361,11 @@ const Mongo = {
           const newPhyRightsOwnerPerson = {};
           newPhyRightsOwnerPerson['_id'] = phyObj['phyobj_rightsowner']['_id'];
           newPhyRightsOwnerPerson['person_role'] = 'RIGHTS_OWNER';
-          phyObj['phyobj_rightsowner_person'] = await addAndGetId(newPhyRightsOwnerPerson, 'person');
+          phyObj['phyobj_rightsowner_person'] = await addAndGetId(await addNestedInstitution(newPhyRightsOwnerPerson), 'person');
         } else if (phyObj['phyobj_rightsowner_person'].length > 0 && !phyObj['phyobj_rightsowner_person'][0]['_id']) {
           phyObj['phyobj_rightsowner_person'] = await Promise.all(
             phyObj['phyobj_rightsowner_person'].map(
-              phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'person')
+              async phyObjRightsOwner => await addAndGetId(await addNestedInstitution(phyObjRightsOwner), 'person')
             ));
         }
 
@@ -389,13 +387,7 @@ const Mongo = {
           phyObj['phyobj_person'] = await Promise.all(
             phyObj['phyobj_person'].map(
               async (phyObjPerson) => {
-                if (phyObjPerson['person_institution'] && phyObjPerson['person_institution'][0]
-                  && phyObjPerson['person_institution'][0]['value'] === 'add_new_institution') {
-                  const institution = phyObjPerson['person_institution_data'].pop();
-                  const newInst = await addAndGetId(institution, 'institution');
-                  phyObjPerson['person_institution_data'][0] = newInst;
-                }
-                return addAndGetId(phyObjPerson, 'person');
+                return addAndGetId(await addNestedInstitution(phyObjPerson), 'person');
               }));
         }
 
@@ -547,7 +539,7 @@ const Mongo = {
   updateModelSettings: async (request, response) => {
     const preview = request.body.preview;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
-      ObjectId(request.params.identifier) : request.params.identifier;
+      new ObjectId(request.params.identifier) : request.params.identifier;
     const collection = this.DBObjectsRepository.collection('model');
 
     // Base64 to Buffer to optimized PNG
@@ -595,7 +587,7 @@ const Mongo = {
     Logger.info(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
     const resolve_collection = this.DBObjectsRepository.collection(collection_name);
     const id = (obj['_id']) ? obj['_id'] : obj;
-    return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? ObjectId(id) : id })
+    return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? new ObjectId(id) : id })
       .then((resolve_result) => resolve_result);
   },
   /**
@@ -605,6 +597,14 @@ const Mongo = {
     const resolveNestedInst = async (obj) => {
       if (obj['person_institution_data']) {
         for (let j = 0; j < obj['person_institution_data'].length; j++) {
+          // TODO: Find out why institution is missing an _id
+          // Issue probably related to physical object
+          if (!obj['person_institution_data'][j]['_id']) {
+            Logger.err(`Nested institution is missing _id for some reason`);
+            Logger.err(obj['person_institution_data']);
+            Logger.err(digitalObject);
+            continue;
+          }
           obj['person_institution_data'][j] =
             await Mongo.resolve(obj['person_institution_data'][j]['_id'], 'institution');
         }
@@ -636,7 +636,7 @@ const Mongo = {
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
-      ObjectId(request.params.identifier) : request.params.identifier;
+      new ObjectId(request.params.identifier) : request.params.identifier;
     const password = (request.params.password) ? request.params.password : '';
 
     switch (RequestCollection) {
@@ -724,7 +724,7 @@ const Mongo = {
     const ldap = this.AccountsRepository.collection('ldap');
 
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
-      ObjectId(request.params.identifier) : request.params.identifier;
+      new ObjectId(request.params.identifier) : request.params.identifier;
 
     const delete_result = await collection.deleteOne({ '_id': identifier });
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
