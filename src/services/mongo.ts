@@ -67,7 +67,7 @@ const Mongo = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.find({ username: username }).toArray();
+    let found = await ldap.find({ username: username }).toArray();
     switch (found.length) {
       // TODO: Pack this into config somehow...
       case 0:
@@ -97,6 +97,7 @@ const Mongo = {
       case 1:
         // Account found
         // Update session ID
+        found = found[0];
         ldap.updateOne({ username: username },
           {
             $set:
