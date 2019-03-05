@@ -728,9 +728,24 @@ const Mongo = {
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
 
+    const find_result = await ldap.findOne({ sessionID: sessionID });
+
+    if ((!find_result.username || !request.body.username)
+        || (request.body.username !== find_result.username)) {
+      response.send({ status: 'error',
+        message: 'Input username does not match username with current sessionID' });
+      return;
+    }
+
+    // Flatten account.data so its an array of ObjectId.toString()
+    const UserRelatedObjects = Array.prototype.concat(...Object.values(find_result.data));
+    if (!UserRelatedObjects.find(obj => obj === identifier.toString())) {
+      response.send({ status: 'error',
+        message: 'Object with identifier does not belong to account with this sessionID' });
+      return;
+    }
     const delete_result = await collection.deleteOne({ '_id': identifier });
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
-      const find_result = await ldap.findOne({ sessionID: sessionID });
       switch (RequestCollection) {
         case 'compilation':
           find_result.data.compilations = find_result.data.compilations.filter(id => id !== identifier.toString());
