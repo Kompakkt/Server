@@ -205,3 +205,14 @@ dist/*
 
 # Ignore configuration file to prevent leakage of sensitive data
 **/config.json
+
+# Ignore uploaded files
+src/uploads
+src/uploads/*
+src/temp
+src/temp/*
+
+# Ignore JSCPD output
+.jscpd/
+.jscpd/*
+.flagged

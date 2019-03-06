@@ -21,13 +21,17 @@
   "dependencies": {
     "@types/cors": "^2.8.4",
     "@types/express": "^4.16.1",
+    "@types/fs-extra": "^5.0.5",
     "@types/imagemin": "^6.0.0",
-    "@types/klaw": "^2.1.1",
+    "@types/klaw": "^3.0.0",
+    "@types/mongodb": "^3.1.20",
     "@types/node": "^11.9.4",
+    "@types/socket.io": "^2.1.2",
     "body-parser": "^1.18.3",
     "compression": "^1.7.3",
     "cookie-parser": "^1.4.4",
     "corser": "^2.0.1",
+    "deepmerge": "^3.2.0",
     "express": "^4.16.4",
     "express-session": "^1.15.6",
     "fs-extra": "^7.0.1",
@@ -39,12 +43,10 @@
     "nodemon": "^1.18.10",
     "passport": "^0.4.0",
     "passport-ldapauth": "^2.1.2",
+    "socket.io": "^2.2.0",
     "ts-node": "^8.0.2",
     "tslint": "^5.12.1",
     "typescript": "^3.3.3",
-    "uuid": "^3.3.2",
-    "@types/socket.io": "^2.1.2",
-    "deepmerge": "^3.2.0",
-    "socket.io": "^2.2.0"
+    "uuid": "^3.3.2"
   }
 }
