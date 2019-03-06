@@ -38,20 +38,25 @@ const Upload = {
   },
   UploadRequest: (request, response) => {
     // TODO: Checksum
-    // TODO: Subdirectories based on request?
+    // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
-    let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
-    newPath += `${request.headers['semirandomtoken']}/`;
-    newPath += `${request.headers['relpath']}/`;
-    newPath += `${Date.now()}_${slugify(request['file'].originalname)}`;
+    const destPath = join(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
+      `${request.headers['filetype']}`, `${request.headers['semirandomtoken']}/`,
+      `${request.headers['relpath']}/`, `${Date.now()}_${slugify(request['file'].originalname)}`);
 
-    ensureDirSync(dirname(newPath));
-    moveSync(tempPath, newPath);
+    ensureDirSync(dirname(destPath));
+    moveSync(tempPath, destPath);
     response.end('Uploaded');
   },
   UploadCancel: (request, response) => {
     const Token = request.body.uuid;
-    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+    const Type = request.body.type;
+    if (!Token || !Type) {
+      Logger.error(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      response.send({ status: 'error' });
+      return;
+    }
+    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
 
     Logger.info(`Cancelling upload request ${Token}`);
 
@@ -66,7 +71,12 @@ const Upload = {
     Logger.info(request.body);
     const Token = request.body.uuid;
     const Type = request.body.type;
-    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Token}`;
+    if (!Token || !Type) {
+      Logger.error(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      response.send({ status: 'error' });
+      return;
+    }
+    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
 
     if (!pathExistsSync(path)) {
       response.json([]).end('Upload not finished');
@@ -110,7 +120,6 @@ const Upload = {
           result.file_format = extname(file.path);
           let _relativePath = file.path.replace(RootDirectory, '');
           _relativePath = (_relativePath.charAt(0) === '/') ? _relativePath.substr(1) : _relativePath;
-          console.log(_relativePath);
           result.file_link = `${_relativePath}`;
           result.file_name = `${basename(file.path)}`;
           result.file_size = parseInt(`${file.stats.size}`, 10);

@@ -81,7 +81,7 @@ Server.use(corser.create({
   /*origins: Conf.Express.OriginWhitelist,*/
   methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
   requestHeaders: corser.simpleRequestHeaders
-    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix'])
+    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix', 'filetype'])
 }));
 // Static
 Server.use('/uploads', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/`));
