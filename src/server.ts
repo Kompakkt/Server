@@ -1,7 +1,7 @@
-import { Logger } from './services/logger';
 import { Server, Express, WebSocket } from './services/express';
 import { Upload } from './services/upload';
 import { Mongo } from './services/mongo';
+import { Socket } from './services/socket';
 
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
@@ -53,10 +53,6 @@ Server.post('/login', Express.passport.authenticate('ldapauth', { session: true 
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
 
 // WebSocket
-WebSocket.on('connection', socket => {
-  Logger.info(`SocketIO connection ${socket.id}`);
-
-  socket.on('message', data => socket.emit('message', data));
-});
+WebSocket.on('connection', Socket._handler);
 
 Express.startListening();
