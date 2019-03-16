@@ -3,6 +3,8 @@ import { Upload } from './services/upload';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
 
+import { Logger } from './services/logger';
+
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);
@@ -54,5 +56,6 @@ Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: '
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
+Logger.info(`SocketIO`);
 
 Express.startListening();
