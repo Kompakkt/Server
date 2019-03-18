@@ -57,7 +57,7 @@ Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: '
 // TODO: Auslagern
 Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
   await Europeana.getRecordData(`${request.params.record}/${request.params.id}`)
-    .then(result => {
+    .then((result: any) => {
       try {
         const _relURL = result.data.object.europeanaAggregation.aggregatedCHO.toString().replace('/item/', '');
         const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
@@ -71,7 +71,8 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
         response.send({ status: 'error' });
       }
     })
-    .catch(() => {
+    .catch((e) => {
+      console.log(e);
       response.send({ status: 'error' });
     });
 });
