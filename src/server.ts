@@ -52,6 +52,7 @@ Server.post('/cancelmetadata', Mongo.validateLoginSession, Upload.Multer.single(
 // Authentication
 Server.post('/login', Express.passport.authenticate('ldapauth', { session: true }), Mongo.addToAccounts);
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
+Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
 // Europeana
 // TODO: Auslagern

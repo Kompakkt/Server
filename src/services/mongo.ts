@@ -62,6 +62,14 @@ const Mongo = {
   getUnusedObjectId: async (_, response) => {
     response.send(new ObjectId());
   },
+  invalidateSession: async (request, response) => {
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: '' } }, () => {
+      Logger.log('Logged out');
+      response.send({ status: 'ok', message: 'Logged out' });
+    });
+  },
   addToAccounts: async (request, response) => {
     const user = request.user;
     const username = request.body.username;
@@ -169,7 +177,7 @@ const Mongo = {
         break;
       default:
         // Multiple sessionID. Invalidate all
-        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: null } }, () => {
+        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: '' } }, () => {
           Logger.log('Invalidated multiple sessionIDs due to being the same');
           response.send({ message: 'Invalid session' });
         });
