@@ -7,10 +7,9 @@ import { Logger } from './logger';
 // editAnnotation
 // deleteAnnotation
 // changeRanking
-
 // lostConnection
 // changeRoom
-
+// myNewRoom
 
 
 // CHEATSHEET FOR SOCKET.IO
@@ -74,7 +73,7 @@ const Socket = {
       Logger.info(`'changeRanking' of Annotations from User ${socket.id} in Room '${data[0]}'` );
     });
 
-    
+
     // lostConnection
     socket.on('lostConnection', data => { // [this.annotationService.socketRoom, this.annotationService.annotations]
       // To Members of Room
@@ -95,13 +94,11 @@ const Socket = {
       // To Client (sender)
       socket.emit('myNewRoom', [data[0], data [1]]);
     });
-    // 
+    // To (members of) new room:
     socket.on('myNewRoom', data => { // 
-      // (To members of) new room:
       socket.join(data[0]);
       socket.to(data[0]).emit('newUser', [socket.id, data[1]]);
-      Logger.info(`client '${socket.id}' joins room: '${data[0]}'`);   
-      socket.emit('message', `JOINED ROOM '${data[0]}'!`); 
+      Logger.info(`client '${socket.id}' joins room: '${data[0]}'`);
     });
     
   }
