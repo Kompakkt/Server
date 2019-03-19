@@ -5,7 +5,8 @@ import { isMaster } from 'cluster';
 import * as merge from 'deepmerge';
 
 const LoadConfig = () => {
-  const DefaultConfiguration = {
+  // TODO: Configuration Interface
+  const DefaultConfiguration: any = {
     Mongo: {
       Databases: {
         ObjectsRepository: {

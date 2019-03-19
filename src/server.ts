@@ -1,5 +1,6 @@
 import { Server, Express, WebSocket } from './services/express';
 import { Upload } from './services/upload';
+import { Europeana } from './services/europeana';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
 
@@ -53,6 +54,30 @@ Server.post('/cancelmetadata', Mongo.validateLoginSession, Upload.Multer.single(
 // Authentication
 Server.post('/login', Express.passport.authenticate('ldapauth', { session: true }), Mongo.addToAccounts);
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
+
+// Europeana
+// TODO: Auslagern
+Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
+  await Europeana.getRecordData(`${request.params.record}/${request.params.id}`)
+    .then((result: any) => {
+      try {
+        const _relURL = result.data.object.europeanaAggregation.aggregatedCHO.toString().replace('/item/', '');
+        const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
+        const _type = result.data.object.type;
+        response.send(
+        { status: 'ok',
+          data: result.data.object,
+          fileUrl: _fullURL,
+          type: _type });
+      } catch (_) {
+        response.send({ status: 'error' });
+      }
+    })
+    .catch((e) => {
+      console.log(e);
+      response.send({ status: 'error' });
+    });
+});
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
