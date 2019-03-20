@@ -1,4 +1,4 @@
-import { MongoClient, ObjectId } from 'mongodb';
+import { MongoClient, ObjectId, InsertOneWriteOpResult, Collection } from 'mongodb';
 import { Configuration } from './configuration';
 
 import { RootDirectory } from '../environment';
@@ -145,6 +145,18 @@ const Mongo = {
         break;
     }
   },
+  insertCurrentUserData: async (request, identifier, collection) => {
+    const sessionID = request.sessionID;
+    const ldapCollection: Collection = this.AccountsRepository.collection('ldap');
+    const userData = await ldapCollection.findOne({ sessionID: sessionID });
+
+    userData.data[collection].push(identifier);
+
+    return ldapCollection.updateOne({ sessionID: sessionID }, {
+      $set: {
+        data: userData.data
+      }});
+  },
   getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
@@ -185,14 +197,79 @@ const Mongo = {
     }
   },
   submitService: async (request, response) => {
+    const digobjCollection: Collection = this.DBObjectsRepository.collection('digitalobject');
+    const modelCollection: Collection = this.DBObjectsRepository.collection('model');
+
     const service: string = request.params.service;
     if (!service) response.send({ status: 'error', message: 'Incorrect request' });
+
+    const mapTypes = (type: string) => {
+      type = type.toLowerCase();
+      switch (type) {
+        case 'sound': type = 'audio'; break;
+        case 'picture': type = 'image'; break;
+        case '3d': type = 'model'; break;
+      }
+      return type;
+    };
+
     switch (service) {
       case 'europeana':
-        response.send({ status: 'ok' });
+        // TODO: Put into Europeana service to make every service self sustained?
+        const resultObject = {
+          'digobj_type': mapTypes(request.body.type),
+          'digobj_title': request.body.title,
+          'digobj_description': request.body.description,
+          'digobj_licence': request.body.license,
+          'digobj_externalLink': [{
+            'externalLink_description': 'Europeana URL',
+            'externalLink_value': request.body.page
+          }]
+        };
+
+        digobjCollection.insertOne(resultObject).then((res: InsertOneWriteOpResult) => {
+          const modelObject = {
+            relatedDigitalObject: {
+              _id: res.ops[0]._id
+            },
+            name: resultObject.digobj_title,
+            ranking: 0,
+            files: null,
+            finished: true,
+            online: true,
+            isExternal: true,
+            externalService: 'europeana',
+            processed: {
+              low: resultObject.digobj_externalLink[0].externalLink_value,
+              medium: resultObject.digobj_externalLink[0].externalLink_value,
+              high: resultObject.digobj_externalLink[0].externalLink_value,
+              raw: resultObject.digobj_externalLink[0].externalLink_value
+            },
+            settings: {
+              preview: (request.body._previewUrl) ? request.body._previewUrl : '/previews/noimage.png'
+            }
+          };
+          modelCollection.insertOne(modelObject).then(_res => {
+            Mongo.insertCurrentUserData(request, _res.ops[0]._id, 'models').then(() => {
+              response.send({ status: 'ok', result: _res.ops[0] });
+              Logger.info('Added Europeana object', res.ops[0]._id);
+            }).catch(err => {
+              Logger.err(err);
+              response.send({ status: 'error', message: 'Failed adding finalized object to user' });
+            });
+          }).catch(err => {
+            Logger.err(err);
+            response.send({ status: 'error', message: 'Failed finalizing digitalobject' });
+          });
+        }).catch(err => {
+          Logger.err(err);
+          response.send({ status: 'error', message: `Couldn't add as digitalobject` });
+        });
+
+
         break;
       default:
-        response.send({ status: 'error', message: `Service ${service} not configured`});
+        response.send({ status: 'error', message: `Service ${service} not configured` });
         break;
     }
   },
@@ -634,9 +711,11 @@ const Mongo = {
       return obj;
     };
     const resolveTopLevel = async (obj, property, field) => {
-      for (let i = 0; i < obj[property].length; i++) {
-        obj[property][i] =
-          await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+      if (obj[property] && obj[property].length && obj[property] instanceof Array) {
+        for (let i = 0; i < obj[property].length; i++) {
+          obj[property][i] =
+            await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+        }
       }
     };
     const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
