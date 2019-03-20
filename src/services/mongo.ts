@@ -184,6 +184,18 @@ const Mongo = {
         break;
     }
   },
+  submitService: async (request, response) => {
+    const service: string = request.params.service;
+    if (!service) response.send({ status: 'error', message: 'Incorrect request' });
+    switch (service) {
+      case 'europeana':
+        response.send({ status: 'ok' });
+        break;
+      default:
+        response.send({ status: 'error', message: `Service ${service} not configured`});
+        break;
+    }
+  },
   /**
    * When the user submits the metadataform this function
    * adds the missing data to defined collections
