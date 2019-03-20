@@ -831,14 +831,16 @@ const Mongo = {
 
     if ((!find_result.username || !request.body.username)
         || (request.body.username !== find_result.username)) {
+      Logger.err(`Object removal failed due to username & session not matching`);
       response.send({ status: 'error',
         message: 'Input username does not match username with current sessionID' });
       return;
     }
 
     // Flatten account.data so its an array of ObjectId.toString()
-    const UserRelatedObjects = Array.prototype.concat(...Object.values(find_result.data));
+    const UserRelatedObjects = Array.prototype.concat(...Object.values(find_result.data)).map(id => id.toString());
     if (!UserRelatedObjects.find(obj => obj === identifier.toString())) {
+      Logger.err(`Object removal failed because Object does not belong to user`);
       response.send({ status: 'error',
         message: 'Object with identifier does not belong to account with this sessionID' });
       return;
