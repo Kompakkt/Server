@@ -4,8 +4,6 @@ import { Europeana } from './services/europeana';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
 
-import { Logger } from './services/logger';
-
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);
@@ -29,6 +27,7 @@ Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 Server.post('/api/v1/post/push/:collection', Mongo.validateLoginSession, Mongo.addObjectToCollection);
 // On user submit
 Server.post('/api/v1/post/submit', Mongo.validateLoginSession, Mongo.submit);
+Server.post('/api/v1/post/submit/:service', Mongo.validateLoginSession, Mongo.submitService);
 // On Screenshot update
 Server.post('/api/v1/post/settings/:identifier', Mongo.validateLoginSession, Mongo.updateModelSettings);
 // Remove document from collection
@@ -64,11 +63,13 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
       try {
         const _relURL = result.data.object.europeanaAggregation.aggregatedCHO.toString().replace('/item/', '');
         const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
+        const _fallbackURL = result.data.object.europeanaAggregation.edmPreview;
         const _type = result.data.object.type;
         response.send(
         { status: 'ok',
           data: result.data.object,
           fileUrl: _fullURL,
+          fallbackUrl: _fallbackURL,
           type: _type });
       } catch (_) {
         response.send({ status: 'error' });
@@ -82,6 +83,5 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
-Logger.info(`SocketIO`);
 
 Express.startListening();
