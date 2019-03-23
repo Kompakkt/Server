@@ -1,8 +1,10 @@
-import { readJsonSync } from 'fs-extra';
-import { Logger } from './logger';
-import { ConfigFile } from '../environment';
 import { isMaster } from 'cluster';
 import * as merge from 'deepmerge';
+import { readJsonSync } from 'fs-extra';
+
+import { ConfigFile } from '../environment';
+
+import { Logger } from './logger';
 
 const LoadConfig = () => {
   // TODO: Configuration Interface
@@ -19,22 +21,22 @@ const LoadConfig = () => {
             'tag',
             'physicalobject',
             'model',
-            'compilation'
-          ]
+            'compilation',
+          ],
         },
         Accounts: {
           Name: 'accounts',
           Collections: [
-            'ldap'
-          ]
-        }
+            'ldap',
+          ],
+        },
       },
       Port: 27017,
-      Hostname: 'localhost'
+      Hostname: 'localhost',
     },
     Uploads: {
       TempDirectory: 'temp',
-      UploadDirectory: 'uploads'
+      UploadDirectory: 'uploads',
     },
     Express: {
       Host: '127.0.0.1',
@@ -43,23 +45,23 @@ const LoadConfig = () => {
         'http://localhost:4200',
         'http://localhost:8080',
         'http://localhost:8080/upload',
-        'http://localhost:8080/uploadfinished'
+        'http://localhost:8080/uploadfinished',
       ],
       enableHTTPS: false,
       SSLPaths: {
         PrivateKey: '',
         Certificate: '',
-        Passphrase: ''
+        Passphrase: '',
       },
       PassportSecret: 'change me',
       LDAP: {
         DN: 'cn=admin,dc=example,dc=org',
         DNauthUID: true,
         Host: 'ldap://localhost',
-        searchBase: 'dc=example,dc=org'
+        searchBase: 'dc=example,dc=org',
       },
-      InsecureAdminAccounts: []
-    }
+      InsecureAdminAccounts: [],
+    },
   };
 
   Logger.info('Loading configuration');

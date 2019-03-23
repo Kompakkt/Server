@@ -1,16 +1,14 @@
-import { MongoClient, ObjectId, InsertOneWriteOpResult, Collection } from 'mongodb';
-import { Configuration } from './configuration';
-
-import { RootDirectory } from '../environment';
-import { Logger } from './logger';
-
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
+import { Collection, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
-// TODO: Use interfaces
+import { RootDirectory } from '../environment';
 import { Compilation } from '../interfaces/compilation.interface';
+
+import { Configuration } from './configuration';
+import { Logger } from './logger';
 // import { Model } from '../interfaces/model.interface';
 
 const Mongo = {
@@ -65,7 +63,7 @@ const Mongo = {
   invalidateSession: async (request, response) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: '' } }, () => {
+    ldap.updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
       Logger.log('Logged out');
       response.send({ status: 'ok', message: 'Logged out' });
     });
@@ -75,7 +73,7 @@ const Mongo = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    let found = await ldap.find({ username: username }).toArray();
+    let found = await ldap.find({ username }).toArray();
     switch (found.length) {
       // TODO: Pack this into config somehow...
       case 0:
@@ -83,15 +81,15 @@ const Mongo = {
         // Create new
         ldap.insertOne(
           {
-            username: username,
-            sessionID: sessionID,
+            username,
+            sessionID,
             fullname: user['cn'],
             prename: user['givenName'],
             surname: user['sn'],
             rank: user['UniColognePersonStatus'],
             mail: user['mail'],
             data: { compilations: [], annotations: [], models: [] },
-            role: user['UniColognePersonStatus']
+            role: user['UniColognePersonStatus'],
           }, (ins_err, ins_res) => {
             if (ins_err) {
               response.send({ status: 'error' });
@@ -106,11 +104,11 @@ const Mongo = {
         // Account found
         // Update session ID
         found = found[0];
-        ldap.updateOne({ username: username },
-          {
+        ldap.updateOne({ username },
+                       {
             $set:
             {
-              sessionID: sessionID,
+              sessionID,
               fullname: user['cn'],
               prename: user['givenName'],
               surname: user['sn'],
@@ -119,15 +117,15 @@ const Mongo = {
               role: (found['role'])
                 ? ((found['role'] === '')
                   ? user['UniColognePersonStatus']
-                  : found['role'] )
-                : user['UniColognePersonStatus']
-            }
-          }, (up_err, _) => {
+                  : found['role'])
+                : user['UniColognePersonStatus'],
+            },
+          },           (up_err, _) => {
             if (up_err) {
               response.send({ status: 'error' });
               Logger.err(up_err);
             } else {
-              ldap.findOne({ sessionID: sessionID, username: username }, (f_err, f_res) => {
+              ldap.findOne({ sessionID, username }, (f_err, f_res) => {
                 if (f_err) {
                   response.send({ status: 'error' });
                   Logger.err(f_err);
@@ -142,42 +140,41 @@ const Mongo = {
         // Too many Accounts
         Logger.warn('Multiple Accounts found for LDAP username ' + username);
         response.send({ status: 'error' });
-        break;
     }
   },
   insertCurrentUserData: async (request, identifier, collection) => {
     const sessionID = request.sessionID;
     const ldapCollection: Collection = this.AccountsRepository.collection('ldap');
-    const userData = await ldapCollection.findOne({ sessionID: sessionID });
+    const userData = await ldapCollection.findOne({ sessionID });
 
     userData.data[collection].push(identifier);
 
-    return ldapCollection.updateOne({ sessionID: sessionID }, {
+    return ldapCollection.updateOne({ sessionID }, {
       $set: {
-        data: userData.data
+        data: userData.data,
       }});
   },
   getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.findOne({ sessionID: sessionID });
+    const found = await ldap.findOne({ sessionID });
     if (!found || !found.data) {
       response.send({ status: 'ok' });
       return;
     }
     found.data.compilations = await Promise.all(found.data.compilations
-      .map(async compilation => await Mongo.resolve(compilation, 'compilation')));
+      .map(async compilation => Mongo.resolve(compilation, 'compilation')));
     found.data.models = await Promise.all(found.data.models
-      .map(async model => await Mongo.resolve(model, 'model')));
+      .map(async model => Mongo.resolve(model, 'model')));
     found.data.annotations = await Promise.all(found.data.annotations
-      .map(async annotation => await Mongo.resolve(annotation, 'annotation')));
+      .map(async annotation => Mongo.resolve(annotation, 'annotation')));
     response.send({ status: 'ok', ...found });
   },
   validateLoginSession: async (request, response, next) => {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
       request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.find({ sessionID: sessionID }).toArray();
+    const found = await ldap.find({ sessionID }).toArray();
     switch (found.length) {
       case 0:
         // Invalid sessionID
@@ -189,11 +186,10 @@ const Mongo = {
         break;
       default:
         // Multiple sessionID. Invalidate all
-        ldap.updateMany({ sessionID: sessionID }, { $set: { sessionID: '' } }, () => {
+        ldap.updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
           Logger.log('Invalidated multiple sessionIDs due to being the same');
           response.send({ message: 'Invalid session' });
         });
-        break;
     }
   },
   submitService: async (request, response) => {
@@ -208,7 +204,7 @@ const Mongo = {
       switch (type) {
         case 'sound': type = 'audio'; break;
         case 'picture': type = 'image'; break;
-        case '3d': type = 'model'; break;
+        case '3d': type = 'model';
       }
       return type;
     };
@@ -217,20 +213,20 @@ const Mongo = {
       case 'europeana':
         // TODO: Put into Europeana service to make every service self sustained?
         const resultObject = {
-          'digobj_type': mapTypes(request.body.type),
-          'digobj_title': request.body.title,
-          'digobj_description': request.body.description,
-          'digobj_licence': request.body.license,
-          'digobj_externalLink': [{
-            'externalLink_description': 'Europeana URL',
-            'externalLink_value': request.body.page
-          }]
+          digobj_type: mapTypes(request.body.type),
+          digobj_title: request.body.title,
+          digobj_description: request.body.description,
+          digobj_licence: request.body.license,
+          digobj_externalLink: [{
+            externalLink_description: 'Europeana URL',
+            externalLink_value: request.body.page,
+          }],
         };
 
         digobjCollection.insertOne(resultObject).then((res: InsertOneWriteOpResult) => {
           const modelObject = {
             relatedDigitalObject: {
-              _id: res.ops[0]._id
+              _id: res.ops[0]._id,
             },
             name: resultObject.digobj_title,
             ranking: 0,
@@ -243,11 +239,11 @@ const Mongo = {
               low: resultObject.digobj_externalLink[0].externalLink_value,
               medium: resultObject.digobj_externalLink[0].externalLink_value,
               high: resultObject.digobj_externalLink[0].externalLink_value,
-              raw: resultObject.digobj_externalLink[0].externalLink_value
+              raw: resultObject.digobj_externalLink[0].externalLink_value,
             },
             settings: {
-              preview: (request.body._previewUrl) ? request.body._previewUrl : '/previews/noimage.png'
-            }
+              preview: (request.body._previewUrl) ? request.body._previewUrl : '/previews/noimage.png',
+            },
           };
           modelCollection.insertOne(modelObject).then(_res => {
             Mongo.insertCurrentUserData(request, _res.ops[0]._id, 'models').then(() => {
@@ -266,11 +262,9 @@ const Mongo = {
           response.send({ status: 'error', message: `Couldn't add as digitalobject` });
         });
 
-
         break;
       default:
         response.send({ status: 'error', message: `Service ${service} not configured` });
-        break;
     }
   },
   /**
@@ -313,13 +307,13 @@ const Mongo = {
               for (let i = 0; i < field['institution_role'].length; i++) {
                 field['roles'].push({
                   role: field['institution_role'][i],
-                  relatedDigitalObject: resultObject['_id']
+                  relatedDigitalObject: resultObject['_id'],
                 });
               }
             } else {
               field['roles'].push({
                 role: field['institution_role'],
-                relatedDigitalObject: resultObject['_id']
+                relatedDigitalObject: resultObject['_id'],
               });
             }
           }
@@ -328,40 +322,40 @@ const Mongo = {
               for (let i = 0; i < field['person_role'].length; i++) {
                 field['roles'].push({
                   role: field['person_role'][i],
-                  relatedDigitalObject: resultObject['_id']
+                  relatedDigitalObject: resultObject['_id'],
                 });
               }
             } else {
               field['roles'].push({
                 role: field['person_role'],
-                relatedDigitalObject: resultObject['_id']
+                relatedDigitalObject: resultObject['_id'],
               });
             }
           }
           Logger.info(`${field['person_role']}, ${field['institution_role']}, ${field['roles']}`);
 
           return {
-            '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
+            _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
               await this.DBObjectsRepository.collection(add_to_coll)
                 .updateOne({ _id: new ObjectId(field['_id']) }, { $push: { roles: { $each: field['roles'] } } }).then(() => {
                   return String(field['_id']);
                 }) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                 return String(result.ops[0]['_id']);
-              })
+              }),
           };
         default:
           return {
-            '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
+            _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
               String(field['_id']) :
               await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
                 return String(result.ops[0]['_id']);
-              })
+              }),
           };
       }
     };
 
-    const addNestedInstitution = async (person) => {
+    const addNestedInstitution = async person => {
       if (!person['person_institution']) return person;
       if (!(person['person_institution'] instanceof Array)) return person;
       for (let i = 0; i < person['person_institution'].length; i++) {
@@ -392,7 +386,7 @@ const Mongo = {
         if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_person') {
           // New Rightsowner Person
-          let newRightsOwner = { ...resultObject['digobj_rightsowner_person'][0] };
+          const newRightsOwner = { ...resultObject['digobj_rightsowner_person'][0] };
           resultObject['digobj_rightsowner_person'][0] = await addAndGetId(newRightsOwner, 'person');
         } else if (resultObject['digobj_rightsowner'][i]['value']
           && resultObject['digobj_rightsowner'][i]['value'] === 'add_new_institution') {
@@ -464,7 +458,7 @@ const Mongo = {
         } else if (phyObj['phyobj_rightsowner_person'].length > 0 && !phyObj['phyobj_rightsowner_person'][0]['_id']) {
           phyObj['phyobj_rightsowner_person'] = await Promise.all(
             phyObj['phyobj_rightsowner_person'].map(
-              async phyObjRightsOwner => await addAndGetId(await addNestedInstitution(phyObjRightsOwner), 'person')
+              async phyObjRightsOwner => addAndGetId(await addNestedInstitution(phyObjRightsOwner), 'person'),
             ));
         }
 
@@ -477,7 +471,7 @@ const Mongo = {
         } else if (phyObj['phyobj_rightsowner_institution'].length > 0 && !phyObj['phyobj_rightsowner_institution'][0]['_id']) {
           phyObj['phyobj_rightsowner_institution'] = await Promise.all(
             phyObj['phyobj_rightsowner_institution'].map(
-              phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'institution')
+              phyObjRightsOwner => addAndGetId(phyObjRightsOwner, 'institution'),
             ));
         }
 
@@ -485,7 +479,7 @@ const Mongo = {
         if (phyObj['phyobj_person'] && !phyObj['phyobj_person']['_id']) {
           phyObj['phyobj_person'] = await Promise.all(
             phyObj['phyobj_person'].map(
-              async (phyObjPerson) => {
+              async phyObjPerson => {
                 return addAndGetId(await addNestedInstitution(phyObjPerson), 'person');
               }));
         }
@@ -512,7 +506,7 @@ const Mongo = {
         if (phyObj['phyobj_institution'] && !phyObj['phyobj_institution']['_id']) {
           phyObj['phyobj_institution'] = await Promise.all(
             phyObj['phyobj_institution'].map(
-              phyObjInstitution => addAndGetId(phyObjInstitution, 'institution')
+              phyObjInstitution => addAndGetId(phyObjInstitution, 'institution'),
             ));
         }
 
@@ -563,15 +557,15 @@ const Mongo = {
 
     const addAndGetId = async (field, add_to_coll) => {
       return {
-        '_id': (field['_id'] !== undefined && field['_id'].length > 0) ?
+        _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
           String(field['_id']) :
           await this.DBObjectsRepository.collection(add_to_coll).insertOne(field).then(result => {
             return String(result.ops[0]['_id']);
-          })
+          }),
       };
     };
 
-    const updateExisting = async (object) => {
+    const updateExisting = async object => {
       const found = await collection.findOne({ _id: object['_id'] });
       if (!found) {
         response.send({ status: 'error' });
@@ -608,13 +602,13 @@ const Mongo = {
         } else {
           // Insert new + LDAP
           collection.insertOne(request.body, async (_, db_result) => {
-            const userData = await ldap.findOne({ sessionID: sessionID });
+            const userData = await ldap.findOne({ sessionID });
             switch (RequestCollection) {
               case 'model': userData.data.models.push(`${db_result.ops[0]['_id']}`); break;
               case 'annotation': userData.data.annotations.push(`${db_result.ops[0]['_id']}`); break;
-              case 'compilation': userData.data.compilations.push(`${db_result.ops[0]['_id']}`); break;
+              case 'compilation': userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
             }
-            const result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: userData.data } });
+            const result = await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
             if (result.result.ok === 1) {
               response.send(db_result.ops[0]);
             } else {
@@ -632,7 +626,6 @@ const Mongo = {
             Logger.info(`Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
           }
         });
-        break;
     }
   },
   updateModelSettings: async (request, response) => {
@@ -652,8 +645,8 @@ const Mongo = {
           plugins: [pngquant.default({
             speed: 1,
             strip: true,
-            dithering: 1
-          })]
+            dithering: 1,
+          })],
         }).then(res => {
           ensureDirSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/`);
           writeFileSync(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${identifier}.png`, res);
@@ -669,14 +662,14 @@ const Mongo = {
 
     // Overwrite old settings
     const settings = { ...request.body, preview: finalImagePath };
-    const result = await collection.updateOne({ '_id': identifier },
-      { $set: { settings: settings } });
-    response.send((result.result.ok === 1) ? { status: 'ok', settings: settings } : { status: 'error' });
+    const result = await collection.updateOne({ _id: identifier },
+                                              { $set: { settings } });
+    response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
   isUserOwnerOfObject: async (request, identifier) => {
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.findOne({ sessionID: sessionID });
+    const found = await ldap.findOne({ sessionID });
     return JSON.stringify(found.data).indexOf(identifier) !== -1;
   },
   /**
@@ -686,14 +679,14 @@ const Mongo = {
     Logger.info(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
     const resolve_collection = this.DBObjectsRepository.collection(collection_name);
     const id = (obj['_id']) ? obj['_id'] : obj;
-    return await resolve_collection.findOne({ '_id': (ObjectId.isValid(id)) ? new ObjectId(id) : id })
-      .then((resolve_result) => resolve_result);
+    return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
+      .then(resolve_result => resolve_result);
   },
   /**
    * Heavy nested resolving for DigitalObject
    */
-  resolveDigitalObject: async (digitalObject) => {
-    const resolveNestedInst = async (obj) => {
+  resolveDigitalObject: async digitalObject => {
+    const resolveNestedInst = async obj => {
       if (obj['person_institution_data']) {
         for (let j = 0; j < obj['person_institution_data'].length; j++) {
           // TODO: Find out why institution is missing an _id
@@ -719,7 +712,7 @@ const Mongo = {
       }
     };
     const props = [['digobj_rightsowner_person', 'person'], ['contact_person', 'person'], ['digobj_person', 'person'],
-    ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
+                   ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
     for (let i = 0; i < props.length; i++) {
       await resolveTopLevel(digitalObject, props[i][0], props[i][1]);
     }
@@ -742,7 +735,7 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.findOne({ '_id': identifier }).then(async (result: Compilation) => {
+        collection.findOne({ _id: identifier }).then(async (result: Compilation) => {
           if (result) {
             if (result['password'] && result['password'].length > 0) {
               const _owner = await Mongo.isUserOwnerOfObject(request, identifier);
@@ -762,21 +755,20 @@ const Mongo = {
           } else {
             response.send({ status: 'ok' });
           }
-        }).catch((db_error) => {
+        }).catch(db_error => {
           Logger.err(db_error);
           response.send({ status: 'error' });
         });
         break;
       case 'digitalobject':
-        collection.findOne({ '_id': identifier }).then(async (result) => {
+        collection.findOne({ _id: identifier }).then(async result => {
           response.send((result) ? await Mongo.resolveDigitalObject(result) : { status: 'error' });
         });
         break;
       default:
-        collection.findOne({ '_id': identifier }, (_, result) => {
+        collection.findOne({ _id: identifier }, (_, result) => {
           response.send(result ? result : { status: 'ok' });
         });
-        break;
     }
   },
   getAllObjectsFromCollection: (request, response) => {
@@ -814,7 +806,6 @@ const Mongo = {
         collection.find({}).toArray((_, result) => {
           response.send(result);
         });
-        break;
     }
   },
   removeObjectFromCollection: async (request, response) => {
@@ -827,13 +818,13 @@ const Mongo = {
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
 
-    const find_result = await ldap.findOne({ sessionID: sessionID });
+    const find_result = await ldap.findOne({ sessionID });
 
     if ((!find_result.username || !request.body.username)
         || (request.body.username !== find_result.username)) {
       Logger.err(`Object removal failed due to username & session not matching`);
       response.send({ status: 'error',
-        message: 'Input username does not match username with current sessionID' });
+                      message: 'Input username does not match username with current sessionID' });
       return;
     }
 
@@ -842,10 +833,10 @@ const Mongo = {
     if (!UserRelatedObjects.find(obj => obj === identifier.toString())) {
       Logger.err(`Object removal failed because Object does not belong to user`);
       response.send({ status: 'error',
-        message: 'Object with identifier does not belong to account with this sessionID' });
+                      message: 'Object with identifier does not belong to account with this sessionID' });
       return;
     }
-    const delete_result = await collection.deleteOne({ '_id': identifier });
+    const delete_result = await collection.deleteOne({ _id: identifier });
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
       switch (RequestCollection) {
         case 'compilation':
@@ -857,9 +848,9 @@ const Mongo = {
         case 'annotation':
           find_result.data.annotations = find_result.data.annotations.filter(id => id !== identifier.toString());
           break;
-        default: break;
+        default:
       }
-      const update_result = await ldap.updateOne({ sessionID: sessionID }, { $set: { data: find_result.data } });
+      const update_result = await ldap.updateOne({ sessionID }, { $set: { data: find_result.data } });
       if (update_result.result.ok === 1) {
         Logger.info(`Deleted ${RequestCollection} ${request.params.identifier}`);
         response.send({ status: 'ok' });
@@ -880,7 +871,7 @@ const Mongo = {
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
     let allObjects = await collection.find({}).toArray();
 
-    const getNestedValues = (obj) => {
+    const getNestedValues =obj => {
       let result: string[] = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
@@ -899,7 +890,7 @@ const Mongo = {
       return result;
     };
 
-    const filterResults = (objs) => {
+    const filterResults =objs => {
       const result: any[] = [];
       for (let i = 0; i < objs.length; i++) {
         const asText = getNestedValues(objs[i]).join('').toLowerCase();
@@ -917,7 +908,7 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'digitalobject':
-        await Promise.all(allObjects.map(async digObj => await Mongo.resolveDigitalObject(digObj)));
+        await Promise.all(allObjects.map(async digObj => Mongo.resolveDigitalObject(digObj)));
         break;
       case 'model':
         allObjects = allObjects.filter(model =>
@@ -932,11 +923,10 @@ const Mongo = {
         }
         break;
       default:
-        break;
     }
 
     response.send(filterResults(allObjects));
-  }
+  },
 };
 
 Mongo.init();

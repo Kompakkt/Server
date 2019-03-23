@@ -1,16 +1,17 @@
-import { Configuration } from './configuration';
-import { RootDirectory } from '../environment';
-import { Logger } from './logger';
-
-import { ensureDirSync, moveSync, pathExistsSync, removeSync, move, statSync } from 'fs-extra';
-import { dirname, extname, basename, join } from 'path';
+import { ensureDirSync, move, moveSync, pathExistsSync, removeSync, statSync } from 'fs-extra';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
+import { basename, dirname, extname, join } from 'path';
 import slugify from 'slugify';
+
+import { RootDirectory } from '../environment';
+
+import { Configuration } from './configuration';
+import { Logger } from './logger';
 
 const Upload = {
   Multer: multer({
-    dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`
+    dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
   }),
   AddMetadata: (request, response) => {
     const tempPath = `${request['file'].path}`;
@@ -28,7 +29,7 @@ const Upload = {
         metadata_object: request.headers['metadatakey'],
         metadata_link: `models/${request.headers['semirandomtoken']}/${request.headers['metadatakey']}/${filename}`,
         metadata_format: `${extname(newPath)}`,
-        metadata_size: `${statSync(newPath).size} bytes`
+        metadata_size: `${statSync(newPath).size} bytes`,
       };
       response.end(JSON.stringify(responseObject));
     }).catch(() => response.end(`File already exists`));
@@ -41,8 +42,8 @@ const Upload = {
     // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
     const destPath = join(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
-      `${request.headers['filetype']}`, `${request.headers['semirandomtoken']}/`,
-      `${request.headers['relpath']}/`, `${Date.now()}_${slugify(request['file'].originalname)}`);
+                          `${request.headers['filetype']}`, `${request.headers['semirandomtoken']}/`,
+                          `${request.headers['relpath']}/`, `${Date.now()}_${slugify(request['file'].originalname)}`);
 
     ensureDirSync(dirname(destPath));
     moveSync(tempPath, destPath);
@@ -100,7 +101,7 @@ const Upload = {
       const filter: string[] = [];
       switch (Type) {
         case 'model': filter.push('.ply', '.obj', '.babylon'); break;
-        default: break;
+        default:
       }
 
       const filteredFiles = await foundFiles.filter(file => {
@@ -111,7 +112,7 @@ const Upload = {
         file_name: '',
         file_link: '',
         file_size: 0,
-        file_format: ''
+        file_format: '',
       };
 
       const prepareResponseFiles = (fileArray: ReadonlyArray<klawSync.Item>) => {
@@ -133,7 +134,7 @@ const Upload = {
       response.json(ResponseFiles);
     }
     response.end('Done!');
-  }
+  },
 };
 
 export { Upload };

@@ -1,28 +1,27 @@
-import * as express from 'express';
-import * as socketIo from 'socket.io';
-import { RootDirectory } from '../environment';
-import { Configuration as Conf } from './configuration';
 import * as bodyParser from 'body-parser';
+import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
 import * as corser from 'corser';
-import * as compression from 'compression';
-import * as zlib from 'zlib';
-
+import * as express from 'express';
+import * as expressSession from 'express-session';
 import { readFileSync } from 'fs';
-import { ensureDirSync, pathExistsSync, copySync } from 'fs-extra';
+import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
-
 import * as passport from 'passport';
 import * as LdapStrategy from 'passport-ldapauth';
-import * as expressSession from 'express-session';
+import * as socketIo from 'socket.io';
 import * as uuid from 'uuid';
+import * as zlib from 'zlib';
 
+import { RootDirectory } from '../environment';
+
+import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
 
 const Express: any = {
   server: express(),
-  passport: passport,
+  passport,
   createServer: () => {
     if (Conf.Express.enableHTTPS) {
       const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
@@ -46,10 +45,10 @@ const Express: any = {
         bindCredentials: `${request.body.password}`,
         searchBase: Conf.Express.LDAP.searchBase,
         searchFilter: `(uid=${request.body.username})`,
-        reconnect: true
-      }
+        reconnect: true,
+      },
     });
-  }
+  },
 };
 
 const Listener = Express.createServer();
@@ -72,7 +71,7 @@ Server.use(compression({
   level: 9,
   memLevel: 9,
   windowBits: 15,
-  chunkSize: 65536
+  chunkSize: 65536,
 }));
 // Enable CORS
 // TODO: Find out which routes need CORS
@@ -81,7 +80,7 @@ Server.use(corser.create({
   /*origins: Conf.Express.OriginWhitelist,*/
   methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
   requestHeaders: corser.simpleRequestHeaders
-    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix', 'filetype'])
+    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix', 'filetype']),
 }));
 // Static
 Server.use('/uploads', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/`));
@@ -91,7 +90,7 @@ Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDi
 ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
 if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
   copySync(`${RootDirectory}/assets/noimage.png`,
-    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
+           `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
 }
 
 // Passport
@@ -102,14 +101,14 @@ Express.passport.deserializeUser((id, done) => done(null, id));
 
 Server.use(Express.passport.initialize());
 Server.use(expressSession({
-  genid: () => uuid(),
+  genid: uuid,
   secret: Conf.Express.PassportSecret,
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: false,
-    sameSite: false
-  }
+    sameSite: false,
+  },
 }));
 Server.use(Express.passport.session());
 

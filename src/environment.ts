@@ -4,7 +4,7 @@ const Environment = {
   verbose: false,
   rootDirectory: `${__dirname}`,
   configFile: `${__dirname}/config.json`,
-  logLevel: LogLevel.All
+  logLevel: LogLevel.All,
 };
 
 const Verbose = Environment.verbose;

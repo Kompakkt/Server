@@ -1,32 +1,33 @@
-import { ensureFileSync, writeFileSync, statSync } from 'fs-extra';
-import { RootDirectory, Environment } from '../environment';
-import { LogLevel } from '../enums';
-import { inspect } from 'util';
+import { ensureFileSync, statSync, writeFileSync } from 'fs-extra';
 import { join } from 'path';
+import { inspect } from 'util';
+
+import { LogLevel } from '../enums';
+import { Environment, RootDirectory } from '../environment';
 
 const Logger = {
   path: join(RootDirectory, 'server.log'),
   stack: new Set([]),
   autosave: setInterval(() => Logger.writeToLog(), 30000),
-  info: (content) => {
+  info:content => {
     const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Info) console.log(message);
     Logger.shouldWrite();
   },
-  log: (content) => {
+  log:content => {
     const message = `[LOG|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Log) console.log(message);
     Logger.shouldWrite();
   },
-  warn: (content) => {
+  warn:content => {
     const message = `[WARN|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Warn) console.log(message);
     Logger.shouldWrite();
   },
-  err: (content) => {
+  err:content => {
     const message = `[ERR|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Error) console.log(message);
@@ -36,7 +37,7 @@ const Logger = {
     const now = new Date();
     return now.toISOString();
   },
-  prepareContent: (content) => {
+  prepareContent:content => {
     return (typeof (content) === 'object')
       ? `\n${inspect(content, { showHidden: false, depth: null })}`
       : content;
@@ -63,7 +64,7 @@ const Logger = {
         Logger.stack.clear();
       }
     }
-  }
+  },
 };
 
 process.on('exit', code => {

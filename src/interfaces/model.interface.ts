@@ -2,10 +2,10 @@ export interface Model {
     _id?: string;
     relatedDigitalObject?: any;
     name: string;
-    cameraPosition?: { dimension: string, value: number }[];
-    referencePoint?: { dimension: string, value: number }[];
+    cameraPosition?: Array<{ dimension: string; value: number }>;
+    referencePoint?: Array<{ dimension: string; value: number }>;
     ranking?: number;
-    files: Array<string>;
+    files: string[];
     finished: boolean;
     online: boolean;
     processed?: {

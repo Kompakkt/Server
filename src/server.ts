@@ -1,8 +1,8 @@
-import { Server, Express, WebSocket } from './services/express';
-import { Upload } from './services/upload';
 import { Europeana } from './services/europeana';
+import { Express, Server, WebSocket } from './services/express';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
+import { Upload } from './services/upload';
 
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
@@ -13,7 +13,7 @@ Server.use(Mongo.fixObjectId);
 // Find document by ID in collection
 // http://localhost:8080/api/v1/get/find/Person/5bbf023850c06f445ccab442
 Server.get(['/api/v1/get/find/:collection/:identifier', '/api/v1/get/find/:collection/:identifier/:password'],
-  Mongo.validateLoginSession, Mongo.getObjectFromCollection);
+           Mongo.validateLoginSession, Mongo.getObjectFromCollection);
 // Return all documents of a collection
 Server.get('/api/v1/get/findall/:collection', Mongo.validateLoginSession, Mongo.getAllObjectsFromCollection);
 // Return data linked to currently logged in LDAP Account
@@ -32,9 +32,9 @@ Server.post('/api/v1/post/submit/:service', Mongo.validateLoginSession, Mongo.su
 Server.post('/api/v1/post/settings/:identifier', Mongo.validateLoginSession, Mongo.updateModelSettings);
 // Remove document from collection
 Server.post('/api/v1/post/remove/:collection/:identifier',
-  Express.passport.authenticate('ldapauth', { session: false }),
-  Mongo.validateLoginSession,
-  Mongo.removeObjectFromCollection);
+            Express.passport.authenticate('ldapauth', { session: false }),
+            Mongo.validateLoginSession,
+            Mongo.removeObjectFromCollection);
 // Return search data
 Server.post('/api/v1/post/search/:collection', Mongo.validateLoginSession, Mongo.searchObjectWithFilter);
 
@@ -75,7 +75,7 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
         response.send({ status: 'error' });
       }
     })
-    .catch((e) => {
+    .catch(e => {
       console.log(e);
       response.send({ status: 'error' });
     });
