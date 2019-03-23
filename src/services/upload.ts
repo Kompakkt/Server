@@ -14,25 +14,29 @@ const Upload = {
     dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
   }),
   AddMetadata: (request, response) => {
+    const token = request.headers['semirandomtoken'];
+    const metaDataKey = request.headers['metadatakey'];
     const tempPath = `${request['file'].path}`;
     let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
-    newPath += `${request.headers['semirandomtoken']}/`;
-    newPath += `${request.headers['metadatakey']}/`;
+    newPath += `${token}/`;
+    newPath += `${metaDataKey}/`;
     // Filename gets a prefix of the metadata input field selected
     const filename = `${request.headers['prefix']}-${request['file'].originalname}`;
     newPath += filename;
 
     ensureDirSync(dirname(newPath));
-    move(tempPath, newPath).then(_ => {
-      const responseObject = {
-        metadata_file: filename,
-        metadata_object: request.headers['metadatakey'],
-        metadata_link: `models/${request.headers['semirandomtoken']}/${request.headers['metadatakey']}/${filename}`,
-        metadata_format: `${extname(newPath)}`,
-        metadata_size: `${statSync(newPath).size} bytes`,
-      };
-      response.end(JSON.stringify(responseObject));
-    }).catch(() => response.end(`File already exists`));
+    move(tempPath, newPath)
+      .then(_ => {
+        const responseObject = {
+          metadata_file: filename,
+          metadata_object: request.headers['metadatakey'],
+          metadata_link: `models/${token}/${metaDataKey}/${filename}`,
+          metadata_format: `${extname(newPath)}`,
+          metadata_size: `${statSync(newPath).size} bytes`,
+        };
+        response.end(JSON.stringify(responseObject));
+      })
+      .catch(() => response.end(`File already exists`));
   },
   CancelMetadata: () => {
     // TODO: Either remove on it's own via request or delete with the rest of the upload cancel
@@ -41,9 +45,13 @@ const Upload = {
     // TODO: Checksum
     // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
-    const destPath = join(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
-                          `${request.headers['filetype']}`, `${request.headers['semirandomtoken']}/`,
-                          `${request.headers['relpath']}/`, `${Date.now()}_${slugify(request['file'].originalname)}`);
+    const destPath =
+      join(
+        `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
+        `${request.headers['filetype']}`,
+        `${request.headers['semirandomtoken']}/`,
+        `${request.headers['relpath']}/`,
+        `${Date.now()}_${slugify(request['file'].originalname)}`);
 
     ensureDirSync(dirname(destPath));
     moveSync(tempPath, destPath);
@@ -80,21 +88,22 @@ const Upload = {
     const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
 
     if (!pathExistsSync(path)) {
-      response.json([]).end('Upload not finished');
+      response.json([])
+      .end('Upload not finished');
     } else {
       const found = klawSync(path);
       // Move all files to top level
       found.filter(file => !file.stats.isDirectory())
-      .forEach(file => {
-        const src = file.path;
-        const filename = basename(file.path);
-        const dest = join(path, filename);
-        moveSync(src, dest);
-      });
+        .forEach(file => {
+          const src = file.path;
+          const filename = basename(file.path);
+          const dest = join(path, filename);
+          moveSync(src, dest);
+        });
       // Remove subdirs
       found.filter(file => file.stats.isDirectory())
-      .sort((a, b) => a.path.length - b.path.length)
-      .forEach(directory => removeSync(directory.path));
+        .sort((a, b) => a.path.length - b.path.length)
+        .forEach(directory => removeSync(directory.path));
 
       const foundFiles = klawSync(path);
       // TODO: Add more filters
@@ -104,7 +113,7 @@ const Upload = {
         default:
       }
 
-      const filteredFiles = await foundFiles.filter(file => {
+      const filteredFiles = foundFiles.filter(file => {
         return filter.indexOf(extname(file.path)) !== -1;
       }); // .map(file => file.path.substr(file.path.indexOf('models/')));
 
@@ -120,12 +129,15 @@ const Upload = {
           const result = { ...ResponseFile };
           result.file_format = extname(file.path);
           let _relativePath = file.path.replace(RootDirectory, '');
-          _relativePath = (_relativePath.charAt(0) === '/') ? _relativePath.substr(1) : _relativePath;
+          _relativePath = (_relativePath.charAt(0) === '/')
+            ? _relativePath.substr(1) : _relativePath;
+
           result.file_link = `${_relativePath}`;
           result.file_name = `${basename(file.path)}`;
           result.file_size = parseInt(`${file.stats.size}`, 10);
           return result;
-        }).sort((a, b) => a.file_size - b.file_size);
+        })
+        .sort((a, b) => a.file_size - b.file_size);
       };
 
       const ResponseFiles = prepareResponseFiles((filteredFiles.length > 0)

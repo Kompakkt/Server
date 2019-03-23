@@ -1,10 +1,10 @@
-import { Model } from './model.interface';
+import { IModel } from './model.interface';
 
-export interface Compilation {
+export interface ICompilation {
     _id?: string;
     name?: string;
     description?: string;
     relatedOwner?: string;
     passcode?: string;
-    models: Model[];
+    models: IModel[];
 }

@@ -69,7 +69,7 @@ const LoadConfig = () => {
   try {
     Logger.info(`Config file path: ${ConfigFile}`);
 
-    const confObj = merge(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
+    const confObj = merge<any>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
 
     Logger.info('Configuration details: ');
     Logger.info(confObj);

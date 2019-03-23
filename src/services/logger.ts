@@ -5,29 +5,32 @@ import { inspect } from 'util';
 import { LogLevel } from '../enums';
 import { Environment, RootDirectory } from '../environment';
 
+const _autosaveInterval = 30000;
+const maxStackSize = 128;
+
 const Logger = {
   path: join(RootDirectory, 'server.log'),
   stack: new Set([]),
-  autosave: setInterval(() => Logger.writeToLog(), 30000),
-  info:content => {
+  autosave: setInterval(() => Logger.writeToLog(), _autosaveInterval),
+  info: content => {
     const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Info) console.log(message);
     Logger.shouldWrite();
   },
-  log:content => {
+  log: content => {
     const message = `[LOG|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Log) console.log(message);
     Logger.shouldWrite();
   },
-  warn:content => {
+  warn: content => {
     const message = `[WARN|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Warn) console.log(message);
     Logger.shouldWrite();
   },
-  err:content => {
+  err: content => {
     const message = `[ERR|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Error) console.log(message);
@@ -37,13 +40,13 @@ const Logger = {
     const now = new Date();
     return now.toISOString();
   },
-  prepareContent:content => {
+  prepareContent: content => {
     return (typeof (content) === 'object')
-      ? `\n${inspect(content, { showHidden: false, depth: null })}`
+      ? `\n${inspect(content, { showHidden: false, depth: undefined })}`
       : content;
   },
   shouldWrite: () => {
-    if (Logger.stack.size >= 128) {
+    if (Logger.stack.size >= maxStackSize) {
       Logger.writeToLog();
     }
   },
@@ -57,12 +60,11 @@ const Logger = {
     writeFileSync(Logger.path, lines, { flag: 'as' });
     const written = statSync(Logger.path).size - sizeBefore;
 
-    if (written > 0) {
-      console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
-      if (written === Buffer.byteLength(lines)) {
-        console.log(`Log looks like a success. Clearing log stack`);
-        Logger.stack.clear();
-      }
+    if (written <= 0) return;
+    console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
+    if (written === Buffer.byteLength(lines)) {
+      console.log(`Log looks like a success. Clearing log stack`);
+      Logger.stack.clear();
     }
   },
 };

@@ -32,13 +32,14 @@ const Express: any = {
         options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
       }
       return HTTPS.createServer(options, Express.server);
-    } else {
-      return HTTP.createServer(Express.server);
     }
+    return HTTP.createServer(Express.server);
   },
   getLDAPConfig: (request, callback) => {
-    const DN = (Conf.Express.LDAP.DNauthUID) ? `uid=${request.body.username},${Conf.Express.LDAP.DN}` : Conf.Express.LDAP.DN;
-    callback(null, {
+    const DN = (Conf.Express.LDAP.DNauthUID)
+      ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
+      : Conf.Express.LDAP.DN;
+    callback(undefined, {
       server: {
         url: Conf.Express.LDAP.Host,
         bindDN: DN,
@@ -80,24 +81,35 @@ Server.use(corser.create({
   /*origins: Conf.Express.OriginWhitelist,*/
   methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
   requestHeaders: corser.simpleRequestHeaders
-    .concat(['X-Requested-With', 'Access-Control-Allow-Origin', 'semirandomtoken', 'relPath', 'metadatakey', 'prefix', 'filetype']),
+    .concat([
+      'X-Requested-With',
+      'Access-Control-Allow-Origin',
+      'semirandomtoken',
+      'relPath',
+      'metadatakey',
+      'prefix',
+      'filetype']),
 }));
 // Static
-Server.use('/uploads', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/`));
-Server.use('/previews', express.static(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`));
+const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
+Server.use('/uploads', express.static(upDir));
+Server.use('/previews', express.static(`${upDir}/previews`));
 
 // Create preview directory and default preview file
 ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
 if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
-  copySync(`${RootDirectory}/assets/noimage.png`,
-           `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
+  copySync(
+    `${RootDirectory}/assets/noimage.png`,
+    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
 }
 
 // Passport
-Express.passport.use(new LdapStrategy(Express.getLDAPConfig, (user, done) => done(null, user)));
+Express.passport.use(new LdapStrategy(
+  Express.getLDAPConfig,
+  (user, done) => done(undefined, user)));
 
-Express.passport.serializeUser((user: any, done) => done(null, user.description));
-Express.passport.deserializeUser((id, done) => done(null, id));
+Express.passport.serializeUser((user: any, done) => done(undefined, user.description));
+Express.passport.deserializeUser((id, done) => done(undefined, id));
 
 Server.use(Express.passport.initialize());
 Server.use(expressSession({

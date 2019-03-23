@@ -1,4 +1,4 @@
-export interface Model {
+export interface IModel {
     _id?: string;
     relatedDigitalObject?: any;
     name: string;
