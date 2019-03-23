@@ -1,46 +1,77 @@
 {
-  "rulesDirectory": [],
+  "extends": "tslint:all",
+  "linterOptions": {
+    "exclude": [
+      "**/*.spec.ts",
+      "bin",
+      "dist",
+      "e2e/**/*.*",
+      "src/polyfills.ts",
+      "src/test.ts"
+    ]
+  },
   "rules": {
+    "arrow-parens": [
+      true,
+      "ban-single-arg-parens"
+    ],
     "arrow-return-shorthand": true,
     "callable-types": true,
     "class-name": true,
     "comment-format": [
       true,
-      "check-space"
+      "check-space",
+      {
+        "ignore-words": [
+          "TODO"
+        ]
+      }
     ],
-    "curly": [true, "ignore-same-line"],
-    "deprecation": {
-      "severity": "warn"
-    },
+    "completed-docs": false,
+    "curly": [
+      true,
+      "ignore-same-line"
+    ],
+    "deprecation": [
+      true,
+      {
+        "severity": "error"
+      }
+    ],
     "eofline": true,
+    "file-name-casing": false,
     "forin": true,
     "import-blacklist": [
       true,
       "rxjs/Rx"
     ],
     "import-spacing": true,
+    "increment-decrement": false,
     "indent": [
       true,
-      "spaces"
+      "spaces",
+      4
     ],
     "interface-over-type-literal": true,
     "label-position": true,
     "max-line-length": [
       true,
-      140
+      100
     ],
     "member-access": false,
     "member-ordering": [
       true,
       {
         "order": [
-          "static-field",
           "instance-field",
-          "static-method",
-          "instance-method"
+          "instance-method",
+          "static-field",
+          "static-method"
         ]
       }
     ],
+    "newline-before-return": false,
+    "no-any": false,
     "no-arg": true,
     "no-bitwise": true,
     "no-console": [
@@ -63,29 +94,40 @@
     ],
     "no-misused-new": true,
     "no-non-null-assertion": true,
+    "no-parameter-properties": false,
     "no-shadowed-variable": true,
     "no-string-literal": false,
     "no-string-throw": true,
-    "no-switch-case-fall-through": true,
+    "no-submodule-imports": false,
+    "no-switch-case-fall-through": false,
     "no-trailing-whitespace": true,
+    "no-unbound-method": false,
     "no-unnecessary-initializer": true,
+    "no-unsafe-any": false,
     "no-unused-expression": true,
     "no-use-before-declare": true,
     "no-var-keyword": true,
+    "no-void-expression": [
+      true,
+      "ignore-arrow-function-shorthand"
+    ],
     "object-literal-sort-keys": false,
     "one-line": [
       true,
-      "check-open-brace",
       "check-catch",
       "check-else",
+      "check-open-brace",
       "check-whitespace"
     ],
     "prefer-const": true,
+    "prefer-function-over-method": false,
+    "prefer-readonly": false,
     "quotemark": [
       true,
       "single"
     ],
     "radix": true,
+    "strict-boolean-expressions": false,
     "semicolon": [
       true,
       "always"
@@ -94,6 +136,7 @@
       true,
       "allow-null-check"
     ],
+    "typedef": false,
     "typedef-whitespace": [
       true,
       {
