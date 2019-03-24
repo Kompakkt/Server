@@ -831,12 +831,11 @@ const Mongo = {
 
               // Resolve models. forEach and map seem to be broken
               for (const compilation of compilations) {
-                // for (let i = 0; i < compilations.length; i++) {
-                for (let model of compilation.models) {
-                  // for (let j = 0; j < compilation.models.length; j++) {
-                  model = await Mongo.resolve(model._id, 'model');
+                const resolvedModels: any[] = [];
+                for (const model of compilation.models) {
+                  resolvedModels.push(await Mongo.resolve(model._id, 'model'));
                 }
-                compilation.models = compilation.models.filter(model =>
+                compilation.models = resolvedModels.filter(model =>
                   model && model.finished && model.online);
               }
 
