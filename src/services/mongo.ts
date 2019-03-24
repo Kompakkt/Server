@@ -831,48 +831,38 @@ const Mongo = {
         });
     }
   },
-  getAllObjectsFromCollection: (request, response) => {
+  getAllObjectsFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const collection: Collection = this.DBObjectsRepository.collection(RequestCollection);
+    const results = await collection.find({})
+      .toArray();
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.find({})
-          .toArray(async (_, resultCompilations) => {
-            if (resultCompilations) {
-              let compilations = resultCompilations;
-              compilations = compilations.filter(compilation =>
-                !compilation.password ||
-                (compilation.password && compilation.password.length === 0));
+        let compilations = results;
+        const isPasswordProtected = compilation =>
+          (!compilation.password || (compilation.password && compilation.password.length === 0));
+        compilations = compilations.filter(isPasswordProtected);
 
-              // Resolve models. forEach and map seem to be broken
-              for (const compilation of compilations) {
-                const resolvedModels: any[] = [];
-                for (const model of compilation.models) {
-                  resolvedModels.push(await Mongo.resolve(model._id, 'model'));
-                }
-                compilation.models = resolvedModels.filter(model =>
-                  model && model.finished && model.online);
-              }
+        // Resolve models. forEach and map seem to be broken
+        for (const compilation of compilations) {
+          const resolvedModels: any[] = [];
+          for (const model of compilation.models) {
+            resolvedModels.push(await Mongo.resolve(model._id, 'model'));
+          }
+          compilation.models = resolvedModels.filter(model =>
+            model && model.finished && model.online);
+        }
 
-              response.send(compilations);
-            } else {
-              response.send({ status: 'ok' });
-            }
-          });
+        response.send(compilations);
         break;
       case 'model':
-        collection.find({})
-          .toArray((_, result) => {
-            response.send(result.filter(model => model['finished'] && model['online']));
-          });
+        const finishedAndOnline = results.filter(model => model['finished'] && model['online']);
+        response.send(finishedAndOnline);
         break;
       default:
-        collection.find({})
-          .toArray((_, result) => {
-            response.send(result);
-          });
+        response.send(results);
     }
   },
   removeObjectFromCollection: async (request, response) => {
