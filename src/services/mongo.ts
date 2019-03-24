@@ -577,94 +577,60 @@ const Mongo = {
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
-    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const collection: Collection = this.DBObjectsRepository.collection(RequestCollection);
     const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
+    const ldap: Collection = this.AccountsRepository.collection('ldap');
 
-    const addAndGetId = async (field, add_to_coll) => {
-      return {
-        _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
-          String(field['_id']) :
-          await this.DBObjectsRepository.collection(add_to_coll)
-            .insertOne(field)
-            .then(result => {
-              return String(result.ops[0]['_id']);
-            }),
-      };
-    };
+    const resultObject = request.body;
 
-    const updateExisting = async object => {
-      const found = await collection.findOne({ _id: object['_id'] });
-      if (!found) {
-        response.send({ status: 'error' });
-        Logger.warn(`Tried to update non-existant object with id ${object['_id']}`);
-      }
-      collection.updateOne({ _id: object['_id'] }, { $set: object }, (up_error, _) => {
-        if (up_error) {
-          Logger.err(`Failed to update ${RequestCollection} instance`);
-          response.send({ status: 'error' });
-        } else {
-          Logger.info(`Updated ${object['_id']}`);
-          response.send({ status: 'ok' });
-        }
-      });
-    };
-
-    switch (RequestCollection) {
-      case 'compilation':
-      case 'model':
-      case 'annotation':
-        const resultObject = request.body;
-        if (resultObject['models']) {
-          /* Compilations should have all their models
-           * added to the model database and referenced by _id */
-          resultObject['models'] =
-            await Promise
-              .all(resultObject['models'].map(async model => addAndGetId(model, 'model')));
-        }
-        if (resultObject['settings']) {
-          /* Preview image URLs might have a corrupted address
-           * because of Kompakkt runnning in an iframe
-           * This removes the host address from the URL
-           * so images will load correctly */
-          resultObject['settings']['preview'] =
-            `/previews/${resultObject['settings']['preview']
-              .split('previews/')
-              .slice(-1)[0]}`;
-        }
-
-        if (resultObject['_id']) {
-          updateExisting(resultObject)
-            .catch(e => Logger.err(e));
-        } else {
-          // Insert new + LDAP
-          collection.insertOne(request.body, async (_, db_result) => {
-            const userData = await ldap.findOne({ sessionID });
-            switch (RequestCollection) {
-              case 'model': userData.data.models.push(`${db_result.ops[0]['_id']}`);
-              case 'annotation': userData.data.annotations.push(`${db_result.ops[0]['_id']}`);
-              case 'compilation': userData.data.compilations.push(`${db_result.ops[0]['_id']}`);
-              default:
-            }
-            const result = await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
-            if (result.result.ok === 1) {
-              response.send(db_result.ops[0]);
-            } else {
-              response.send({ status: 'error' });
-            }
-            Logger.info(`Success! Added new ${RequestCollection} ${db_result.ops[0]['_id']}`);
-          });
-        }
-        break;
-      default:
-        collection.insertOne(request.body, (_, result) => {
-          response.send(result.ops);
-
-          if (result.ops[0] && result.ops[0]['_id']) {
-            Logger.info(`Success! Added to ${RequestCollection} with ID ${result.ops[0]['_id']}`);
-          }
+    if (RequestCollection === 'compilation') {
+      // Compilations should have all their models referenced by _id
+      resultObject['models'] =
+        resultObject['models'].map(model => {
+          return { _id: new ObjectId(model['_id']) };
         });
+    } else if (RequestCollection === 'model') {
+      /* Preview image URLs might have a corrupted address
+       * because of Kompakkt runnning in an iframe
+       * This removes the host address from the URL
+       * so images will load correctly */
+      if (resultObject['settings'] && resultObject['settings']['preview']) {
+        resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview']
+        .split('previews/')
+        .slice(-1)[0]}`;
+      }
     }
+
+    const _id = ObjectId.isValid(resultObject['_id'])
+      ? new ObjectId(resultObject['_id'])
+      : new ObjectId();
+
+    const updateResult = await collection
+      .updateOne({ _id }, { $set: resultObject }, { upsert: true });
+
+    if (updateResult.result.ok !== 1) {
+      Logger.err(`Failed updating ${RequestCollection} ${_id}`);
+      response.send({ status: 'error' });
+      return;
+    }
+
+    const userData = await ldap.findOne({ sessionID });
+    const doesObjectExist = userData.data[`${RequestCollection}s`]
+      .find(obj => obj.toString() === _id.toString());
+
+    if (!doesObjectExist) {
+      userData.data[`${RequestCollection}s`].push(_id);
+      const ldapUpdateResult =
+        await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
+      if (ldapUpdateResult.result.ok !== 1) {
+        Logger.err(`Failed adding ${_id} to LDAP User ${RequestCollection}`);
+        response.send({ status: 'error' });
+        return;
+      }
+    }
+
+    response.send({ status: 'ok', ...resultObject });
+    Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
   },
   updateModelSettings: async (request, response) => {
     const preview = request.body.preview;
