@@ -221,10 +221,59 @@ const Mongo = {
       return type;
     };
 
+    // After adding a digitalobject inside of a model,
+    // attach data to the current user
+    const insertFinalModelToCurrentUser = (modelResult: InsertOneWriteOpResult) => {
+      Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'models')
+        .then(() => {
+          response.send({ status: 'ok', result: modelResult.ops[0] });
+          Logger.info('Added Europeana object', modelResult.ops[0]._id);
+        })
+        .catch(err => {
+          Logger.err(err);
+          response.send({ status: 'error', message: 'Failed adding finalized object to user' });
+        });
+    };
+
+    // After adding a digitalobject, add digitalobject
+    // to a model and push the model
+    const pushModel = (digobjResult: InsertOneWriteOpResult) => {
+      const resultObject = digobjResult.ops[0];
+      const modelObject = {
+        relatedDigitalObject: {
+          _id: resultObject._id,
+        },
+        name: resultObject.digobj_title,
+        ranking: 0,
+        files: undefined,
+        finished: true,
+        online: true,
+        isExternal: true,
+        externalService: service,
+        processed: {
+          low: resultObject.digobj_externalLink[0].externalLink_value,
+          medium: resultObject.digobj_externalLink[0].externalLink_value,
+          high: resultObject.digobj_externalLink[0].externalLink_value,
+          raw: resultObject.digobj_externalLink[0].externalLink_value,
+        },
+        settings: {
+          preview: (request.body._previewUrl)
+            ? request.body._previewUrl
+            : '/previews/noimage.png',
+        },
+      };
+      modelCollection.insertOne(modelObject)
+        .then(insertFinalModelToCurrentUser)
+        .catch(err => {
+          Logger.err(err);
+          response.send({ status: 'error', message: 'Failed finalizing digitalobject' });
+        });
+    };
+
     switch (service) {
       case 'europeana':
         // TODO: Put into Europeana service to make every service self sustained?
-        const resultObject = {
+        const EuropeanaObject = {
           digobj_type: mapTypes(request.body.type),
           digobj_title: request.body.title,
           digobj_description: request.body.description,
@@ -235,48 +284,8 @@ const Mongo = {
           }],
         };
 
-        digobjCollection.insertOne(resultObject)
-          .then((res: InsertOneWriteOpResult) => {
-            const modelObject = {
-              relatedDigitalObject: {
-                _id: res.ops[0]._id,
-              },
-              name: resultObject.digobj_title,
-              ranking: 0,
-              files: undefined,
-              finished: true,
-              online: true,
-              isExternal: true,
-              externalService: 'europeana',
-              processed: {
-                low: resultObject.digobj_externalLink[0].externalLink_value,
-                medium: resultObject.digobj_externalLink[0].externalLink_value,
-                high: resultObject.digobj_externalLink[0].externalLink_value,
-                raw: resultObject.digobj_externalLink[0].externalLink_value,
-              },
-              settings: {
-                preview: (request.body._previewUrl)
-                  ? request.body._previewUrl
-                  : '/previews/noimage.png',
-              },
-            };
-            modelCollection.insertOne(modelObject)
-              .then(_res => {
-                Mongo.insertCurrentUserData(request, _res.ops[0]._id, 'models')
-                  .then(() => {
-                    response.send({ status: 'ok', result: _res.ops[0] });
-                    Logger.info('Added Europeana object', res.ops[0]._id);
-                  })
-                  .catch(err => {
-                    Logger.err(err);
-                    response.send({ status: 'error', message: 'Failed adding finalized object to user' });
-                  });
-              })
-              .catch(err => {
-                Logger.err(err);
-                response.send({ status: 'error', message: 'Failed finalizing digitalobject' });
-              });
-          })
+        digobjCollection.insertOne(EuropeanaObject)
+          .then(pushModel)
           .catch(err => {
             Logger.err(err);
             response.send({ status: 'error', message: `Couldn't add as digitalobject` });
@@ -346,12 +355,12 @@ const Mongo = {
           .catch(e => Logger.err(e));
       }
       await this.DBObjectsRepository.collection(add_to_coll)
-          .updateOne(
-            { _id  },
-            { $set: field },
-            { upsert: true })
-          .then(() => Logger.info(`addAndGetId: ${_id}`))
-          .catch(e => Logger.err(e));
+        .updateOne(
+          { _id },
+          { $set: field },
+          { upsert: true })
+        .then(() => Logger.info(`addAndGetId: ${_id}`))
+        .catch(e => Logger.err(e));
       return { _id };
     };
 
@@ -553,15 +562,15 @@ const Mongo = {
 
     Logger.info(resultObject);
     collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, { upsert: true })
-    .then(() => Mongo.resolve(resultObject['_id'], 'digitalobject'))
-    .then(data => {
-      Logger.info(`Finished Object ${resultObject['_id']}`);
-      response.send({ status: 'ok', data });
-    })
-    .catch(e => {
-      Logger.err(e);
-      response.send({ status: 'error', message: 'Failed to add' });
-    });
+      .then(() => Mongo.resolve(resultObject['_id'], 'digitalobject'))
+      .then(data => {
+        Logger.info(`Finished Object ${resultObject['_id']}`);
+        response.send({ status: 'ok', data });
+      })
+      .catch(e => {
+        Logger.err(e);
+        response.send({ status: 'error', message: 'Failed to add' });
+      });
   },
   addObjectToCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
