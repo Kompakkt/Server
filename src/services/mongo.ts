@@ -764,16 +764,20 @@ const Mongo = {
     for (const prop of props) {
       await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
     }
-    const resolvedPhysicalObjects: any[] = [];
-    for (let phyObj of digitalObject['phyObjs']) {
-      phyObj = await Mongo.resolve(phyObj, 'physicalobject');
-      await resolveTopLevel(phyObj, 'phyobj_rightsowner_person', 'person');
-      await resolveTopLevel(phyObj, 'phyobj_rightsowner_institution', 'institution');
-      await resolveTopLevel(phyObj, 'phyobj_person', 'person');
-      await resolveTopLevel(phyObj, 'phyobj_institution', 'institution');
-      resolvedPhysicalObjects.push(phyObj);
+
+    if (digitalObject['phyObjs']) {
+      const resolvedPhysicalObjects: any[] = [];
+      for (let phyObj of digitalObject['phyObjs']) {
+        phyObj = await Mongo.resolve(phyObj, 'physicalobject');
+        await resolveTopLevel(phyObj, 'phyobj_rightsowner_person', 'person');
+        await resolveTopLevel(phyObj, 'phyobj_rightsowner_institution', 'institution');
+        await resolveTopLevel(phyObj, 'phyobj_person', 'person');
+        await resolveTopLevel(phyObj, 'phyobj_institution', 'institution');
+        resolvedPhysicalObjects.push(phyObj);
+      }
+      digitalObject['phyObjs'] = resolvedPhysicalObjects;
     }
-    digitalObject['phyObjs'] = resolvedPhysicalObjects;
+
     return digitalObject;
   },
   getObjectFromCollection: (request, response) => {
