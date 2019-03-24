@@ -334,18 +334,21 @@ const Mongo = {
       }
       Logger.info(`${field['person_role']}, ${field['institution_role']}, ${field['roles']}`);
       // By default, update/create the document
-      // but if its an existing person/institution, push roles
-      // TODO: Think about cases where person/institution would be updated otherwise
+      // but if its an existing person/institution
+      // fetch the object and update roles
       const isIdValid = ObjectId.isValid(field['_id']);
-      let updateQuery: any = { $set: field };
-      if (['person', 'institution'].includes(add_to_coll) && isIdValid) {
-        updateQuery = { $push: { roles: { $each: field['roles'] } } };
-      }
+      const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
       const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
+      if (isPersonOrInstitution && isIdValid) {
+        await this.DBObjectsRepository.collection(add_to_coll)
+          .findOne({ _id })
+          .then(res => field['roles'].concat(res['roles']))
+          .catch(e => Logger.err(e));
+      }
       await this.DBObjectsRepository.collection(add_to_coll)
           .updateOne(
             { _id  },
-            updateQuery,
+            { $set: field },
             { upsert: true })
           .then(() => Logger.info(`addAndGetId: ${_id}`))
           .catch(e => Logger.err(e));
