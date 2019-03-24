@@ -302,9 +302,8 @@ const Mongo = {
    */
   submit: async (request, response) => {
     Logger.info('Handling submit request');
-    Logger.info(request.body);
 
-    const collection = this.DBObjectsRepository.collection('digitalobject');
+    const collection: Collection = this.DBObjectsRepository.collection('digitalobject');
     const resultObject = { ...request.body };
 
     /**
@@ -596,8 +595,8 @@ const Mongo = {
        * so images will load correctly */
       if (resultObject['settings'] && resultObject['settings']['preview']) {
         resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview']
-        .split('previews/')
-        .slice(-1)[0]}`;
+          .split('previews/')
+          .slice(-1)[0]}`;
       }
     }
 
@@ -629,7 +628,8 @@ const Mongo = {
       }
     }
 
-    response.send({ status: 'ok', ...resultObject });
+    const resultId = (updateResult.upsertedId) ? updateResult.upsertedId._id : _id;
+    response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
   },
   updateModelSettings: async (request, response) => {
