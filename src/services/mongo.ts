@@ -302,9 +302,9 @@ const Mongo = {
      * Handle re-submit for changing a finished DigitalObject
      */
     const isResObjIdValid = ObjectId.isValid(resultObject['_id']);
-    Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
     resultObject['_id'] = isResObjIdValid
       ? new ObjectId(resultObject['_id']) : new ObjectId();
+    Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
 
     /**
      * Adds data {field} to a collection {collection}
@@ -549,14 +549,15 @@ const Mongo = {
     }
 
     Logger.info(resultObject);
-
-    collection.insertOne(resultObject, (db_error, db_result) => {
-      if (db_error) {
-        Logger.err(db_error);
-        response.send('Failed to add');
-      }
-      Logger.info(`Finished Object ${db_result.ops[0]['_id']}`);
-      response.send(db_result.ops[0]);
+    collection.updateOne({ _id: resultObject['_id'] }, { $set: resultObject }, { upsert: true })
+    .then(() => Mongo.resolve(resultObject['_id'], 'digitalobject'))
+    .then(data => {
+      Logger.info(`Finished Object ${resultObject['_id']}`);
+      response.send({ status: 'ok', data });
+    })
+    .catch(e => {
+      Logger.err(e);
+      response.send({ status: 'error', message: 'Failed to add' });
     });
   },
   addObjectToCollection: async (request, response) => {
