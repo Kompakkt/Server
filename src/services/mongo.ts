@@ -740,8 +740,8 @@ const Mongo = {
     const resolveTopLevel = async (obj, property, field) => {
       if (obj[property] && obj[property].length && obj[property] instanceof Array) {
         for (let i = 0; i < obj[property].length; i++) {
-          obj[property][i] =
-            await resolveNestedInst(await Mongo.resolve(obj[property][i], field));
+          const resolved = await Mongo.resolve(obj[property][i], field);
+          obj[property][i] = await resolveNestedInst(resolved);
         }
       }
     };
@@ -752,14 +752,16 @@ const Mongo = {
     for (const prop of props) {
       await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
     }
+    const resolvedPhysicalObjects: any[] = [];
     for (let phyObj of digitalObject['phyObjs']) {
-      // for (let i = 0; i < digitalObject['phyObjs'].length; i++) {
       phyObj = await Mongo.resolve(phyObj, 'physicalobject');
       await resolveTopLevel(phyObj, 'phyobj_rightsowner_person', 'person');
       await resolveTopLevel(phyObj, 'phyobj_rightsowner_institution', 'institution');
       await resolveTopLevel(phyObj, 'phyobj_person', 'person');
       await resolveTopLevel(phyObj, 'phyobj_institution', 'institution');
+      resolvedPhysicalObjects.push(phyObj);
     }
+    digitalObject['phyObjs'] = resolvedPhysicalObjects;
     return digitalObject;
   },
   getObjectFromCollection: (request, response) => {
