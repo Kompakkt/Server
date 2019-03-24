@@ -301,13 +301,10 @@ const Mongo = {
     /**
      * Handle re-submit for changing a finished DigitalObject
      */
-    if (resultObject['_id']) {
-      Logger.info(`Re-submitting DigitalObject ${resultObject['_id']}`);
-      collection.deleteOne({ _id: resultObject['_id'] });
-    } else {
-      resultObject['_id'] = new ObjectId();
-      Logger.info(`Generated DigitalObject ID ${resultObject['_id']}`);
-    }
+    const isResObjIdValid = ObjectId.isValid(resultObject['_id']);
+    Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
+    resultObject['_id'] = isResObjIdValid
+      ? new ObjectId(resultObject['_id']) : new ObjectId();
 
     /**
      * Adds data {field} to a collection {collection}
@@ -317,69 +314,42 @@ const Mongo = {
      * and instead return the existing {_id}
      */
     const addAndGetId = async (field, add_to_coll) => {
-      switch (add_to_coll) {
-        case 'person':
-        case 'institution':
-          // Add new roles to person or institution
-          field['roles'] = [];
-          if (field['institution_role']) {
-            if (field['institution_role'] instanceof Array) {
-              for (const role of field['institution_role']) {
-                field['roles'].push({
-                  role,
-                  relatedDigitalObject: resultObject['_id'],
-                });
-              }
-            } else {
-              field['roles'].push({
-                role: field['institution_role'],
-                relatedDigitalObject: resultObject['_id'],
-              });
-            }
+      // Add new roles to person or institution
+      field['roles'] = [];
+      for (const prop of ['institution_role', 'person_role']) {
+        if (!field[prop]) continue;
+        if (field[prop] instanceof Array) {
+          for (const role of field[prop]) {
+            field['roles'].push({
+              role,
+              relatedDigitalObject: resultObject['_id'],
+            });
           }
-          if (field['person_role']) {
-            if (field['person_role'] instanceof Array) {
-              for (const role of field['person_role']) {
-                field['roles'].push({
-                  role,
-                  relatedDigitalObject: resultObject['_id'],
-                });
-              }
-            } else {
-              field['roles'].push({
-                role: field['person_role'],
-                relatedDigitalObject: resultObject['_id'],
-              });
-            }
-          }
-          Logger.info(`${field['person_role']}, ${field['institution_role']}, ${field['roles']}`);
-
-          return {
-            _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
-              await this.DBObjectsRepository.collection(add_to_coll)
-                .updateOne(
-                  { _id: new ObjectId(field['_id']) },
-                  { $push: { roles: { $each: field['roles'] } } })
-                .then(() => {
-                  return String(field['_id']);
-                }) :
-              await this.DBObjectsRepository.collection(add_to_coll)
-                .insertOne(field)
-                .then(result => {
-                  return String(result.ops[0]['_id']);
-                }),
-          };
-        default:
-          return {
-            _id: (field['_id'] !== undefined && field['_id'].length > 0) ?
-              String(field['_id']) :
-              await this.DBObjectsRepository.collection(add_to_coll)
-                .insertOne(field)
-                .then(result => {
-                  return String(result.ops[0]['_id']);
-                }),
-          };
+        } else {
+          field['roles'].push({
+            role: field[prop],
+            relatedDigitalObject: resultObject['_id'],
+          });
+        }
       }
+      Logger.info(`${field['person_role']}, ${field['institution_role']}, ${field['roles']}`);
+      // By default, update/create the document
+      // but if its an existing person/institution, push roles
+      // TODO: Think about cases where person/institution would be updated otherwise
+      const isIdValid = ObjectId.isValid(field['_id']);
+      let updateQuery: any = { $set: field };
+      if (['person', 'institution'].includes(add_to_coll) && isIdValid) {
+        updateQuery = { $push: { roles: { $each: field['roles'] } } };
+      }
+      const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
+      await this.DBObjectsRepository.collection(add_to_coll)
+          .updateOne(
+            { _id  },
+            updateQuery,
+            { upsert: true })
+          .then(() => Logger.info(`addAndGetId: ${_id}`))
+          .catch(e => Logger.err(e));
+      return { _id };
     };
 
     const addNestedInstitution = async person => {
