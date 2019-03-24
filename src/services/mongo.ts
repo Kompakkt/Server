@@ -784,34 +784,33 @@ const Mongo = {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
-    const identifier = (ObjectId.isValid(request.params.identifier)) ?
+    const _id = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
     const password = (request.params.password) ? request.params.password : '';
 
     switch (RequestCollection) {
       case 'compilation':
-        collection.findOne({ _id: identifier })
-          .then(async (result: ICompilation) => {
-            if (result) {
-              if (result['password'] && result['password'].length > 0) {
-                const _owner = await Mongo.isUserOwnerOfObject(request, identifier);
-                if (!_owner) {
-                  if (result['password'] !== password
-                    || (password === '' && result['password'] !== '')) {
-                    response.send({ status: 'ok', message: 'Password protected compilation' });
-                    return;
-                  }
-                }
-              }
-
-              for (let i = 0; i < result.models.length; i++) {
-                result.models[i] = await Mongo.resolve(result.models[i]._id, 'model');
-              }
-
-              response.send(result);
-            } else {
-              response.send({ status: 'ok' });
+        collection.findOne({ _id })
+          .then(async (compilation: ICompilation) => {
+            if (!compilation) {
+              response.send({ status: 'error' });
+              return;
             }
+            const _pw = compilation['password'];
+            const isPasswordProtected = (_pw && _pw.length > 0);
+            const isUserOwner = await Mongo.isUserOwnerOfObject(request, _id);
+            const isPasswordCorrect = (_pw && _pw === password);
+
+            for (let i = 0; i < compilation.models.length; i++) {
+              compilation.models[i] = await Mongo.resolve(compilation.models[i]._id, 'model');
+            }
+
+            if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
+              response.send({ status: 'ok', ...compilation });
+              return;
+            }
+
+            response.send({ status: 'ok', message: 'Password protected compilation' });
           })
           .catch(db_error => {
             Logger.err(db_error);
@@ -819,13 +818,15 @@ const Mongo = {
           });
         break;
       case 'digitalobject':
-        collection.findOne({ _id: identifier })
+        collection.findOne({ _id })
           .then(async result => {
-            response.send((result) ? await Mongo.resolveDigitalObject(result) : { status: 'error' });
+            response.send((result)
+              ? { status: 'ok', ...await Mongo.resolveDigitalObject(result) }
+              : { status: 'error' });
           });
         break;
       default:
-        collection.findOne({ _id: identifier }, (_, result) => {
+        collection.findOne({ _id }, (_, result) => {
           response.send(result ? result : { status: 'ok' });
         });
     }
