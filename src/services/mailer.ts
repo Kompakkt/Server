@@ -1,4 +1,5 @@
 import * as nodemailer from 'nodemailer';
+
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 
@@ -25,7 +26,7 @@ const Mailer = {
       from: Configuration.Mailer.FromIdentity,
       to: Configuration.Mailer.ToIdentity,
       subject: request.body.subject,
-      text: request.body.mailbody
+      text: request.body.mailbody,
     };
 
     transporter.sendMail(mailOptions)
@@ -37,7 +38,7 @@ const Mailer = {
         Logger.err(`Failed sending mail:`, error);
         response.send({ status: 'error', message: 'Failed sending mail' });
       });
-  }
+  },
 };
 
 if (!Mailer.isConfigValid()) {

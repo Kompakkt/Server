@@ -1,8 +1,8 @@
 import { Europeana } from './services/europeana';
 import { Express, Server, WebSocket } from './services/express';
+import { Mailer } from './services/mailer';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
-import { Mailer } from './services/mailer';
 import { Upload } from './services/upload';
 
 // Check if MongoDB is connected

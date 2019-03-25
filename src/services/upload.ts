@@ -89,7 +89,7 @@ const Upload = {
 
     if (!pathExistsSync(path)) {
       response.json([])
-      .end('Upload not finished');
+        .end('Upload not finished');
     } else {
       const found = klawSync(path);
       // Move all files to top level
@@ -137,7 +137,7 @@ const Upload = {
           result.file_size = parseInt(`${file.stats.size}`, 10);
           return result;
         })
-        .sort((a, b) => a.file_size - b.file_size);
+          .sort((a, b) => a.file_size - b.file_size);
       };
 
       const ResponseFiles = prepareResponseFiles((filteredFiles.length > 0)
