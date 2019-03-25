@@ -2,6 +2,7 @@ import { Europeana } from './services/europeana';
 import { Express, Server, WebSocket } from './services/express';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
+import { Mailer } from './services/mailer';
 import { Upload } from './services/upload';
 
 // Check if MongoDB is connected
@@ -139,6 +140,9 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
       response.send({ status: 'error' });
     });
 });
+
+// Mailer
+Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);

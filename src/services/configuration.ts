@@ -60,8 +60,9 @@ const LoadConfig = () => {
         Host: 'ldap://localhost',
         searchBase: 'dc=example,dc=org',
       },
-      InsecureAdminAccounts: [],
+      InsecureAdminAccounts: []
     },
+    Mailer: {},
   };
 
   Logger.info('Loading configuration');
