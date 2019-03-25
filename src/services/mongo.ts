@@ -573,22 +573,90 @@ const Mongo = {
 
     const resultObject = request.body;
 
-    if (RequestCollection === 'compilation') {
-      // Compilations should have all their models referenced by _id
-      resultObject['models'] =
-        resultObject['models'].map(model => {
-          return { _id: new ObjectId(model['_id']) };
-        });
-    } else if (RequestCollection === 'model') {
-      /* Preview image URLs might have a corrupted address
-       * because of Kompakkt runnning in an iframe
-       * This removes the host address from the URL
-       * so images will load correctly */
-      if (resultObject['settings'] && resultObject['settings']['preview']) {
-        resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview']
-          .split('previews/')
-          .slice(-1)[0]}`;
-      }
+    switch (RequestCollection) {
+      case 'compilation':
+        // Compilations should have all their models referenced by _id
+        resultObject['models'] =
+          resultObject['models'].map(model => {
+            return { _id: new ObjectId(model['_id']) };
+          });
+        break;
+      case 'model':
+        /* Preview image URLs might have a corrupted address
+   * because of Kompakkt runnning in an iframe
+   * This removes the host address from the URL
+   * so images will load correctly */
+        if (resultObject['settings'] && resultObject['settings']['preview']) {
+          resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview']
+            .split('previews/')
+            .slice(-1)[0]}`;
+        }
+        break;
+      case 'annotation':
+        // Check if anything was missing for safety
+        const source = resultObject['target']['source'];
+        if (!source) {
+          response.send({ status: 'error', message: 'Missing source' });
+          return;
+        }
+
+        const relatedModelId: string = source['relatedModel'];
+        const relatedCompId: string = source['relatedCompilation'];
+        // Check if === undefined because otherwise this quits on empty string
+        if (relatedModelId === undefined || relatedCompId === undefined) {
+          response.send({ status: 'error', message: 'Related model or compilation undefined' });
+          return;
+        }
+
+        const isModel = ObjectId.isValid(relatedModelId);
+        const isCompilation = ObjectId.isValid(relatedCompId);
+
+        if (!isModel) {
+          response.send({ status: 'error', message: 'Invalid related model id' });
+          return;
+        }
+
+        const updateAnnotationList = async (id: string, add_to_coll: string) => {
+          const obj = await Mongo.resolve(id, add_to_coll);
+          // Create annotationList if missing
+          const annotationList: any[] = (obj['annotationList'])
+            ? obj['annotationList']
+            : [];
+
+          const doesAnnotationExist = annotationList
+            .find(annotation => annotation.toString() === resultObject['_id'].toString());
+          if (doesAnnotationExist) return true;
+
+          // Add annotation to list if it doesn't exist
+          const _newId = new ObjectId(resultObject['_id']);
+          annotationList.push(_newId);
+          const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
+          const listUpdateResult = await coll
+            .updateOne(
+              { _id: new ObjectId(id) },
+              { $set: { annotationList } });
+
+          if (listUpdateResult.result.ok !== 1) {
+            Logger.err(`Failed updating annotationList of ${add_to_coll} ${id}`);
+            response.send({ status: 'error' });
+            return false;
+          }
+          return true;
+        };
+
+        const success = (!isCompilation)
+          // Annotation is default annotation
+          ? await updateAnnotationList(relatedModelId, 'model')
+          // Annotation belongs to compilation
+          : await updateAnnotationList(relatedCompId, 'compilation');
+
+        if (!success) {
+          Logger.err(`Failed updating annotationList`);
+          response.send({ status: 'error' });
+          return;
+        }
+        break;
+      default:
     }
 
     const _id = ObjectId.isValid(resultObject['_id'])
