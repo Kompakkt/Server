@@ -59,7 +59,8 @@ const LoadConfig = () => {
         searchBase: 'dc=example,dc=org'
       },
       InsecureAdminAccounts: []
-    }
+    },
+    Mailer: {},
   };
 
   Logger.info('Loading configuration');

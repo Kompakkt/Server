@@ -3,6 +3,7 @@ import { Upload } from './services/upload';
 import { Europeana } from './services/europeana';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
+import { Mailer } from './services/mailer';
 
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
@@ -80,6 +81,9 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
       response.send({ status: 'error' });
     });
 });
+
+// Mailer
+Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
