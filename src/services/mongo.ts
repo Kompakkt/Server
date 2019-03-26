@@ -75,7 +75,7 @@ const Mongo = {
   },
   addToAccounts: async (request, response) => {
     const user = request.user;
-    const username = request.body.username;
+    const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
     let found = await ldap.find({ username })
