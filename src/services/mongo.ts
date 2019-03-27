@@ -50,6 +50,7 @@ const Mongo = {
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
+  getAccountsRepository: () => this.AccountsRepository,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware

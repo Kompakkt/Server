@@ -1,3 +1,4 @@
+import { Admin } from './services/admin';
 import { Europeana } from './services/europeana';
 import { Express, Server, WebSocket } from './services/express';
 import { Mailer } from './services/mailer';
@@ -110,6 +111,19 @@ Server.post(
 );
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
+
+// Admin requests
+Server.post(
+  '/admin/getldap',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Admin.getAllLDAPUsers);
+
+Server.post(
+  '/admin/promoteuser',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Admin.promoteUserToRole);
 
 // Europeana
 // TODO: Auslagern
