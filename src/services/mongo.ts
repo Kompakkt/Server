@@ -496,15 +496,14 @@ const Mongo = {
     /**
      * Cases where persons either exist or are added to the new rightsowner
      */
-    if (digobj_rightsowner_person[0] && digobj_rightsowner_person[0]['_id']) {
-      await handleRightsOwnerAndExisting(
-        contact_person_existing, contact_person, 'person',
-        digobj_rightsowner_person[0]['_id'], 'person_role', 'CONTACT_PERSON');
-
-      await handleRightsOwnerAndExisting(
-        digobj_person_existing, digobj_person, 'person',
-        digobj_rightsowner_person[0]['_id'], 'person_role');
-    }
+    const _tempId = (digobj_rightsowner_person[0] && digobj_rightsowner_person[0]['_id'])
+      ? digobj_rightsowner_person[0]['_id'] : '';
+    await handleRightsOwnerAndExisting(
+      contact_person_existing, contact_person, 'person',
+      _tempId, 'person_role', 'CONTACT_PERSON');
+    await handleRightsOwnerAndExisting(
+      digobj_person_existing, digobj_person, 'person',
+      _tempId, 'person_role');
 
     for (let i = 0; i < phyObjs.length; i++) {
       const phyObj: any[] = phyObjs[i];
