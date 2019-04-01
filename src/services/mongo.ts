@@ -575,6 +575,19 @@ const Mongo = {
     const ldap: Collection = this.AccountsRepository.collection('ldap');
 
     const resultObject = request.body;
+    const userData = await ldap.findOne({ sessionID });
+
+    const isValidObjectId = ObjectId.isValid(resultObject['_id']);
+    /* If the object already exists we need to
+     * check for owner and for admin status */
+    if (isValidObjectId) {
+      const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
+      const isAdmin = await Mongo.isUserAdmin(request);
+      if (!isOwner && !isAdmin) {
+        response.send({ status: 'error', message: 'Permission denied'});
+        return;
+      }
+    }
 
     switch (RequestCollection) {
       case 'compilation':
@@ -662,7 +675,7 @@ const Mongo = {
       default:
     }
 
-    const _id = ObjectId.isValid(resultObject['_id'])
+    const _id = isValidObjectId
       ? new ObjectId(resultObject['_id'])
       : new ObjectId();
 
@@ -675,7 +688,6 @@ const Mongo = {
       return;
     }
 
-    const userData = await ldap.findOne({ sessionID });
     const doesObjectExist = userData.data[`${RequestCollection}s`]
       .find(obj => obj.toString() === _id.toString());
 
@@ -740,11 +752,19 @@ const Mongo = {
     response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
   isUserOwnerOfObject: async (request, identifier) => {
+    const _id = ObjectId.isValid(identifier)
+      ? new ObjectId(identifier) : identifier;
     const sessionID = request.sessionID;
     const ldap = this.AccountsRepository.collection('ldap');
     const found = await ldap.findOne({ sessionID });
     return JSON.stringify(found.data)
-      .indexOf(identifier) !== -1;
+      .indexOf(_id) !== -1;
+  },
+  isUserAdmin: async request => {
+    const sessionID = request.sessionID;
+    const ldap = this.AccountsRepository.collection('ldap');
+    const found = await ldap.findOne({ sessionID });
+    return found.role === 'A';
   },
   /**
    * Simple resolving by collection name and Id
