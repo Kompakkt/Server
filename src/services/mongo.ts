@@ -250,8 +250,11 @@ const Mongo = {
         files: undefined,
         finished: true,
         online: true,
-        isExternal: true,
-        externalService: service,
+        mediaType: mapTypes(request.body.type),
+        dataSource: {
+          isExternal: true,
+          service,
+        },
         processed: {
           low: resultObject.digobj_externalLink[0].externalLink_value,
           medium: resultObject.digobj_externalLink[0].externalLink_value,
