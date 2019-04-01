@@ -44,7 +44,7 @@ const Admin = {
       response.send({ status: 'error', message: 'Updating user role failed' });
       return;
     }
-    response.send({ status: 'success', message: 'User role successfully updated'});
+    response.send({ status: 'ok', message: 'User role successfully updated'});
   },
 };
 
