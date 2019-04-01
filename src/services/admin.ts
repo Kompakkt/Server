@@ -9,7 +9,7 @@ const Admin = {
     const ldap: Collection = AccDB.collection('ldap');
     const found = await ldap.findOne({ username });
     if (!found || found.role !== 'A') {
-      response.send({ status: 'error', message: 'Could not verify your admin status'});
+      response.send({ status: 'error', message: 'Could not verify your admin status' });
       return;
     }
     next();
@@ -20,7 +20,7 @@ const Admin = {
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
     const allAccounts = await ldap.find({})
       .toArray();
-    const filteredAccounts =  allAccounts
+    const filteredAccounts = allAccounts
       .map(account => {
         for (const prop of filterProperties) {
           delete account[prop];
@@ -33,18 +33,24 @@ const Admin = {
     const identifier = request.body.identifier;
     const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier) : undefined;
     if (!_id) {
-      response.send({ status: 'error', message: 'Invalid identifier'});
+      response.send({ status: 'error', message: 'Invalid identifier' });
       return;
     }
     const role = request.body.role;
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('ldap');
-    const updateResult = await ldap.updateOne({ _id }, { $set: { role }});
-    if (updateResult.result.ok !== 1) {
-      response.send({ status: 'error', message: 'Updating user role failed' });
-      return;
+    switch (role) {
+      case 'S': case 'B': case 'U': case 'A':
+        const AccDB: Db = Mongo.getAccountsRepository();
+        const ldap: Collection = AccDB.collection('ldap');
+        const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
+        if (updateResult.result.ok !== 1) {
+          response.send({ status: 'error', message: 'Updating user role failed' });
+          return;
+        }
+        response.send({ status: 'ok', message: 'User role successfully updated' });
+        break;
+      default:
+        response.send({ status: 'error', message: 'Invalid role specified'});
     }
-    response.send({ status: 'ok', message: 'User role successfully updated'});
   },
 };
 
