@@ -616,8 +616,8 @@ const Mongo = {
           return;
         }
 
-        const relatedModelId: string = source['relatedModel'];
-        const relatedCompId: string = source['relatedCompilation'];
+        const relatedModelId: string | undefined = source['relatedModel'];
+        const relatedCompId: string | undefined = source['relatedCompilation'];
         // Check if === undefined because otherwise this quits on empty string
         if (relatedModelId === undefined || relatedCompId === undefined) {
           response.send({ status: 'error', message: 'Related model or compilation undefined' });
