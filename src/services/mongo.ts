@@ -387,19 +387,21 @@ const Mongo = {
     };
 
     // Always single
-    const digobj_rightsowner: any[] = resultObject['digobj_rightsowner'];
-    const digobj_rightsowner_person: any[] = resultObject['digobj_rightsowner_person'];
-    const digobj_rightsowner_institution: any[] = resultObject['digobj_rightsowner_institution'];
+    let digobj_rightsowner: any[] = resultObject['digobj_rightsowner'];
+    let digobj_rightsowner_person: any[] = resultObject['digobj_rightsowner_person'];
+    let digobj_rightsowner_institution: any[] = resultObject['digobj_rightsowner_institution'];
     // Can be multiple
-    const contact_person: any[] = resultObject['contact_person'];
-    const contact_person_existing: any[] = resultObject['contact_person_existing'];
-    const digobj_person: any[] = resultObject['digobj_person'];
-    const digobj_person_existing: any[] = resultObject['digobj_person_existing'];
+    let contact_person: any[] = resultObject['contact_person'];
+    let contact_person_existing: any[] = resultObject['contact_person_existing'];
+    let digobj_person: any[] = resultObject['digobj_person'];
+    let digobj_person_existing: any[] = resultObject['digobj_person_existing'];
     const digobj_tags: any[] = resultObject['digobj_tags'];
     const phyObjs: any[] = resultObject['phyObjs'];
 
+    //// FILTER FUNCTIONS ////
     const addToRightsOwnerFilter = (person: any) =>
       person['value'] && person['value'].indexOf('add_to_new_rightsowner') !== -1;
+    const filterObjectsWithoutID = (obj: any) => ObjectId.isValid(obj._id);
 
     const handleRightsOwnerBase = async (
       inArr: any[], existArrs: any[],
@@ -507,13 +509,13 @@ const Mongo = {
 
     for (let i = 0; i < phyObjs.length; i++) {
       const phyObj: any[] = phyObjs[i];
-      const phyobj_rightsowner: any[] = phyObj['phyobj_rightsowner'];
-      const phyobj_rightsowner_person: any[] = phyObj['phyobj_rightsowner_person'];
-      const phyobj_rightsowner_institution: any[] = phyObj['phyobj_rightsowner_institution'];
+      let phyobj_rightsowner: any[] = phyObj['phyobj_rightsowner'];
+      let phyobj_rightsowner_person: any[] = phyObj['phyobj_rightsowner_person'];
+      let phyobj_rightsowner_institution: any[] = phyObj['phyobj_rightsowner_institution'];
       const phyobj_person: any[] = phyObj['phyobj_person'];
-      const phyobj_person_existing: any[] = phyObj['phyobj_person_existing'];
+      let phyobj_person_existing: any[] = phyObj['phyobj_person_existing'];
       const phyobj_institution: any[] = phyObj['phyobj_institution'];
-      const phyobj_institution_existing: any[] = phyObj['phyobj_institution_existing'];
+      let phyobj_institution_existing: any[] = phyObj['phyobj_institution_existing'];
 
       await handleRightsOwnerBase(
         phyobj_rightsowner_person, [phyobj_person_existing],
@@ -539,6 +541,19 @@ const Mongo = {
           phyobj_rightsowner_institution[0]['_id'], 'institution_role');
       }
 
+      phyobj_rightsowner = Array.from(new Set(phyobj_rightsowner
+        .concat(phyobj_rightsowner_person)
+        .concat(phyobj_rightsowner_institution)))
+        .filter(filterObjectsWithoutID);
+      phyobj_person_existing = Array
+        .from(new Set(phyobj_person.concat(phyobj_person_existing)))
+        .filter(filterObjectsWithoutID);
+      phyobj_institution_existing = Array
+        .from(new Set(phyobj_institution.concat(phyobj_institution_existing)))
+        .filter(filterObjectsWithoutID);
+      phyobj_rightsowner_institution = phyobj_rightsowner_person =
+        phyobj_person_existing = phyobj_institution_existing = [];
+
       const finalPhy = {
         ...phyObj, phyobj_rightsowner, phyobj_rightsowner_person,
         phyobj_rightsowner_institution, phyobj_person, phyobj_person_existing,
@@ -547,11 +562,29 @@ const Mongo = {
       phyObjs[i] = await addAndGetId(finalPhy, 'physicalobject');
     }
 
-    // Re-assignment
+    /**
+     * Re-assignment:
+     * When editing a finished object we want to have all persons/institutions that have been added
+     * on the previous submit to be existing persons/institutions, otherwise they would fill up
+     * the metadata form in the frontend
+     * Also: remove everything without an _id (which is the remainings from tag-input)
+     */
+    digobj_person_existing = Array.from(new Set(digobj_person_existing.concat(digobj_person)))
+      .filter(filterObjectsWithoutID);
+    contact_person_existing = Array.from(new Set(contact_person_existing.concat(contact_person)))
+      .filter(filterObjectsWithoutID);
+    digobj_rightsowner = Array.from(new Set(digobj_rightsowner
+      .concat(digobj_rightsowner_person)
+      .concat(digobj_rightsowner_institution)))
+      .filter(filterObjectsWithoutID);
+    // Empty the arrays that contained newly created persons/institutions
+    digobj_rightsowner_institution = digobj_rightsowner_person =
+      contact_person = digobj_person = [];
+
     const finalObject = {
       ...resultObject, digobj_rightsowner_person, digobj_rightsowner_institution,
       contact_person, contact_person_existing, digobj_person_existing,
-      digobj_person, digobj_tags, phyObjs,
+      digobj_person, digobj_tags, phyObjs, digobj_rightsowner,
     };
 
     collection.updateOne({ _id: finalObject['_id'] }, { $set: finalObject }, { upsert: true })
