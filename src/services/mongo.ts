@@ -51,6 +51,7 @@ const Mongo = {
     }
   },
   getAccountsRepository: () => this.AccountsRepository,
+  getObjectsRepository: () => this.DBObjectsRepository,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware

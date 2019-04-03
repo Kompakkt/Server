@@ -2,6 +2,9 @@ import { Collection, Db, ObjectId } from 'mongodb';
 
 import { Mongo } from './mongo';
 
+const checkAndReturnObjectId = (id: ObjectId | string) =>
+  ObjectId.isValid(id) ? new ObjectId(id) : undefined;
+
 const Admin = {
   checkIsAdmin: async (request, response, next) => {
     const username = request.body.username;
@@ -30,8 +33,7 @@ const Admin = {
     response.send({ status: 'ok', users: filteredAccounts });
   },
   promoteUserToRole: async (request, response) => {
-    const identifier = request.body.identifier;
-    const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier) : undefined;
+    const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
       response.send({ status: 'error', message: 'Invalid identifier' });
       return;
@@ -49,8 +51,30 @@ const Admin = {
         response.send({ status: 'ok', message: 'User role successfully updated' });
         break;
       default:
-        response.send({ status: 'error', message: 'Invalid role specified'});
+        response.send({ status: 'error', message: 'Invalid role specified' });
     }
+  },
+  toggleObjectPublishedState: async (request, response) => {
+    const _id = checkAndReturnObjectId(request.body.identifier);
+    if (!_id) {
+      response.send({ status: 'error', message: 'Incorrect request parameters' });
+      return;
+    }
+    const ObjDB: Db = Mongo.getObjectsRepository();
+    const ModelCollection = ObjDB.collection('model');
+    const found = await ModelCollection.findOne({ _id });
+    if (!found) {
+      response.send({ status: 'error', message: 'No object with this identifier found' });
+      return;
+    }
+    const isModelOnline: boolean = found.online;
+    const updateResult = await ObjDB.collection('model')
+      .updateOne({ _id }, { $set: { online: !isModelOnline } });
+    if (updateResult.result.ok !== 1) {
+      response.send({ status: 'error', message: 'Failed updating published state' });
+      return;
+    }
+    response.send({ status: 'ok', ...await Mongo.resolve(_id, 'model') });
   },
 };
 

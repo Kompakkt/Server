@@ -125,6 +125,12 @@ Server.post(
   Admin.checkIsAdmin,
   Admin.promoteUserToRole);
 
+Server.post(
+  '/admin/togglepublished',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Admin.toggleObjectPublishedState);
+
 // Europeana
 // TODO: Auslagern
 Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
