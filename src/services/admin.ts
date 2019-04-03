@@ -8,9 +8,10 @@ const checkAndReturnObjectId = (id: ObjectId | string) =>
 const Admin = {
   checkIsAdmin: async (request, response, next) => {
     const username = request.body.username;
+    const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('ldap');
-    const found = await ldap.findOne({ username });
+    const found = await ldap.findOne({ username, sessionID });
     if (!found || found.role !== 'A') {
       response.send({ status: 'error', message: 'Could not verify your admin status' });
       return;
