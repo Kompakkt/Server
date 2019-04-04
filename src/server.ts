@@ -1,4 +1,5 @@
 import { Admin } from './services/admin';
+import { Cleaning } from './services/cleaning';
 import { Europeana } from './services/europeana';
 import { Express, Server, WebSocket } from './services/express';
 import { Mailer } from './services/mailer';
@@ -166,5 +167,12 @@ Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
+
+// Cleaning
+Server.post(
+  '/cleaning/deletenullrefs',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Cleaning.deleteNullRefs);
 
 Express.startListening();
