@@ -97,7 +97,7 @@ const Mongo = {
             surname: user['sn'],
             rank: user['UniColognePersonStatus'],
             mail: user['mail'],
-            data: { compilations: [], annotations: [], models: [] },
+            data: {},
             role: user['UniColognePersonStatus'],
           },
           (ins_err, ins_res) => {
@@ -172,12 +172,11 @@ const Mongo = {
       response.send({ status: 'ok' });
       return;
     }
-    found.data.compilations = await Promise.all(found.data.compilations
-      .map(async compilation => Mongo.resolve(compilation, 'compilation')));
-    found.data.models = await Promise.all(found.data.models
-      .map(async model => Mongo.resolve(model, 'model')));
-    found.data.annotations = await Promise.all(found.data.annotations
-      .map(async annotation => Mongo.resolve(annotation, 'annotation')));
+    for (const property in found.data) {
+      if (!found.data.hasOwnProperty(property)) continue;
+      found.data[property] = await Promise.all(
+        found.data[property].map(async obj => Mongo.resolve(obj, property)));
+    }
     response.send({ status: 'ok', ...found });
   },
   validateLoginSession: async (request, response, next) => {
@@ -729,11 +728,14 @@ const Mongo = {
       return;
     }
 
-    const doesObjectExist = userData.data[`${RequestCollection}s`]
+    userData.data[`${RequestCollection}`] = (userData.data[`${RequestCollection}`])
+     ? userData.data[`${RequestCollection}`]
+     : [];
+    const doesObjectExist = userData.data[`${RequestCollection}`]
       .find(obj => obj.toString() === _id.toString());
 
     if (!doesObjectExist) {
-      userData.data[`${RequestCollection}s`].push(_id);
+      userData.data[`${RequestCollection}`].push(_id);
       const ldapUpdateResult =
         await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
       if (ldapUpdateResult.result.ok !== 1) {
