@@ -320,6 +320,11 @@ const Mongo = {
       ? new ObjectId(resultObject['_id']) : new ObjectId();
     Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
 
+    //// FILTER FUNCTIONS ////
+    const addToRightsOwnerFilter = (person: any) =>
+      person['value'] && person['value'].indexOf('add_to_new_rightsowner') !== -1;
+    const filterObjectsWithoutID = (obj: any) => ObjectId.isValid(obj._id);
+
     /**
      * Adds data {field} to a collection {collection}
      * and returns the {_id} of the created object.
@@ -333,30 +338,34 @@ const Mongo = {
         field = await addNestedInstitution(field);
       }
       const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
+      const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
       const _digId = resultObject['_id'];
-      const doRolesExist = (field['roles'] !== undefined);
-      field['roles'] = doRolesExist ? field['roles'] : {};
-      field['roles'][_digId] = field['roles'][_digId]
-        ? field['roles'][_digId]
-        : [];
-      for (const prop of ['institution_role', 'person_role']) {
-        if (!field[prop]) continue;
-        // Add new roles to person or institution
-        field['roles'][_digId] = doRolesExist
-          ? flatten([field['roles'][_digId], field[prop]])
-          : flatten([field[prop]]);
+      if (isPersonOrInstitution) {
+        const doRolesExist = (field['roles'] !== undefined);
+        field['roles'] = doRolesExist ? field['roles'] : {};
+        field['roles'][_digId] = field['roles'][_digId]
+          ? field['roles'][_digId]
+          : [];
+        for (const prop of ['institution_role', 'person_role']) {
+          if (!field[prop]) continue;
+          // Add new roles to person or institution
+          field['roles'][_digId] = doRolesExist
+            ? flatten([field['roles'][_digId], field[prop]])
+            : flatten([field[prop]]);
+          field['roles'][_digId] = Array.from(new Set(field['roles'][_digId]));
+        }
       }
       // By default, update/create the document
       // but if its an existing person/institution
       // fetch the object and update roles
       const isIdValid = ObjectId.isValid(field['_id']);
-      const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
       const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
       if (isPersonOrInstitution && isIdValid) {
         const findResult = await coll.findOne({ _id });
         if (findResult) {
           field['roles'][_digId] =
             flatten([field['roles'][_digId], findResult['roles'][_digId]]);
+          field['roles'][_digId] = Array.from(new Set(field['roles'][_digId]));
         }
       }
 
@@ -387,6 +396,21 @@ const Mongo = {
       return person;
     };
 
+    const concatFix = (...arr: any[]) => {
+      let result: any[] = [].concat(arr[0]);
+      for (let i = 1; i < arr.length; i++) {
+        result = result.concat(arr[i]);
+      }
+      result = result.filter(filterObjectsWithoutID);
+      const final: any[] = [];
+      for (const res of result) {
+        const obj = { _id: new ObjectId(res._id) };
+        const filtered = final.filter(_obj => _obj._id.toString() === obj._id.toString());
+        if (filtered.length === 0) final.push(obj);
+      }
+      return final;
+    };
+
     // Always single
     let digobj_rightsowner: any[] = resultObject['digobj_rightsowner'];
     let digobj_rightsowner_person: any[] = resultObject['digobj_rightsowner_person'];
@@ -398,11 +422,6 @@ const Mongo = {
     let digobj_person_existing: any[] = resultObject['digobj_person_existing'];
     const digobj_tags: any[] = resultObject['digobj_tags'];
     const phyObjs: any[] = resultObject['phyObjs'];
-
-    //// FILTER FUNCTIONS ////
-    const addToRightsOwnerFilter = (person: any) =>
-      person['value'] && person['value'].indexOf('add_to_new_rightsowner') !== -1;
-    const filterObjectsWithoutID = (obj: any) => ObjectId.isValid(obj._id);
 
     const handleRightsOwnerBase = async (
       inArr: any[], existArrs: any[],
@@ -513,9 +532,9 @@ const Mongo = {
       let phyobj_rightsowner: any[] = phyObj['phyobj_rightsowner'];
       let phyobj_rightsowner_person: any[] = phyObj['phyobj_rightsowner_person'];
       let phyobj_rightsowner_institution: any[] = phyObj['phyobj_rightsowner_institution'];
-      const phyobj_person: any[] = phyObj['phyobj_person'];
+      let phyobj_person: any[] = phyObj['phyobj_person'];
       let phyobj_person_existing: any[] = phyObj['phyobj_person_existing'];
-      const phyobj_institution: any[] = phyObj['phyobj_institution'];
+      let phyobj_institution: any[] = phyObj['phyobj_institution'];
       let phyobj_institution_existing: any[] = phyObj['phyobj_institution_existing'];
 
       await handleRightsOwnerBase(
@@ -541,20 +560,12 @@ const Mongo = {
           phyobj_institution_existing, phyobj_institution, 'institution',
           phyobj_rightsowner_institution[0]['_id'], 'institution_role');
       }
-
-      phyobj_rightsowner = Array.from(new Set(phyobj_rightsowner
-        .concat(phyobj_rightsowner_person)
-        .concat(phyobj_rightsowner_institution)))
-        .filter(filterObjectsWithoutID);
-      phyobj_person_existing = Array
-        .from(new Set(phyobj_person.concat(phyobj_person_existing)))
-        .filter(filterObjectsWithoutID);
-      phyobj_institution_existing = Array
-        .from(new Set(phyobj_institution.concat(phyobj_institution_existing)))
-        .filter(filterObjectsWithoutID);
+      phyobj_rightsowner =
+        concatFix(phyobj_rightsowner, phyobj_rightsowner_institution, phyobj_rightsowner_person);
+      phyobj_person_existing = concatFix(phyobj_person_existing, phyobj_person);
+      phyobj_institution_existing = concatFix(phyobj_institution_existing, phyobj_institution);
       phyobj_rightsowner_institution = phyobj_rightsowner_person =
-        phyobj_person_existing = phyobj_institution_existing = [];
-
+        phyobj_person = phyobj_institution = [];
       const finalPhy = {
         ...phyObj, phyobj_rightsowner, phyobj_rightsowner_person,
         phyobj_rightsowner_institution, phyobj_person, phyobj_person_existing,
@@ -570,14 +581,11 @@ const Mongo = {
      * the metadata form in the frontend
      * Also: remove everything without an _id (which is the remainings from tag-input)
      */
-    digobj_person_existing = Array.from(new Set(digobj_person_existing.concat(digobj_person)))
-      .filter(filterObjectsWithoutID);
-    contact_person_existing = Array.from(new Set(contact_person_existing.concat(contact_person)))
-      .filter(filterObjectsWithoutID);
-    digobj_rightsowner = Array.from(new Set(digobj_rightsowner
-      .concat(digobj_rightsowner_person)
-      .concat(digobj_rightsowner_institution)))
-      .filter(filterObjectsWithoutID);
+    digobj_person_existing = concatFix(digobj_person_existing, digobj_person);
+    contact_person_existing = concatFix(contact_person_existing, contact_person);
+    digobj_rightsowner =
+      concatFix(digobj_rightsowner, digobj_rightsowner_institution, digobj_rightsowner_person);
+
     // Empty the arrays that contained newly created persons/institutions
     digobj_rightsowner_institution = digobj_rightsowner_person =
       contact_person = digobj_person = [];
@@ -616,9 +624,8 @@ const Mongo = {
      * check for owner and for admin status */
     if (isValidObjectId) {
       const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
-      const isAdmin = await Mongo.isUserAdmin(request);
-      if (!isOwner && !isAdmin) {
-        response.send({ status: 'error', message: 'Permission denied'});
+      if (!isOwner) {
+        response.send({ status: 'error', message: 'Permission denied' });
         return;
       }
     }
