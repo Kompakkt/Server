@@ -4,6 +4,50 @@ import { Logger } from './logger';
 import { Mongo } from './mongo';
 
 const Cleaning = {
+  deleteUnusedPersonsAndInstitutions: async (_, response) => {
+    const ObjDB: Db = Mongo.getObjectsRepository();
+    const personCollection = ObjDB.collection('person');
+    const instCollection = ObjDB.collection('institution');
+    const digobjCollection = ObjDB.collection('digitalobject');
+    const phyobjCollection = ObjDB.collection('physicalobject');
+    const allPersons = await personCollection.find({})
+      .toArray();
+    const allInstitutions = await instCollection.find({})
+      .toArray();
+    const allDigObjs = await digobjCollection.find({})
+      .toArray();
+    const allPhyObjs = await phyobjCollection.find({})
+      .toArray();
+
+    const total: any[] = [];
+
+    // TODO: Delete Tags
+
+    const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(allPhyObjs)}`;
+    for (const person of allPersons) {
+      const _id = person._id;
+      const index = fullJSON.indexOf(_id);
+      if (index !== -1) continue;
+      const deleteResult = await personCollection.deleteOne({ _id: person._id });
+      if (deleteResult.result.ok === 1) {
+        Logger.info(`Deleted unused person ${person}`);
+        total.push({ person, result: deleteResult.result });
+      }
+    }
+    for (const institution of allInstitutions) {
+      const _id = institution._id;
+      const index = fullJSON.indexOf(_id);
+      if (index !== -1) continue;
+      const deleteResult = await personCollection.deleteOne({ _id: institution._id });
+      if (deleteResult.result.ok === 1) {
+        Logger.info(`Deleted unused institution ${institution}`);
+        total.push({ institution, result: deleteResult.result });
+      }
+    }
+
+    Logger.log(`Deleted ${total.length} unused persons and/or institutions`);
+    response.send({ status: 'ok', total, amount: total.length });
+  },
   deleteNullRefs: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('ldap');

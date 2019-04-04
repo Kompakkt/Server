@@ -175,4 +175,10 @@ Server.post(
   Admin.checkIsAdmin,
   Cleaning.deleteNullRefs);
 
+Server.post(
+  '/cleaning/deleteunused',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Cleaning.deleteUnusedPersonsAndInstitutions);
+
 Express.startListening();
