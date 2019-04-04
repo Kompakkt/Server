@@ -13,8 +13,7 @@ const Admin = {
     const ldap: Collection = AccDB.collection('ldap');
     const found = await ldap.findOne({ username, sessionID });
     if (!found || found.role !== 'A') {
-      response.send({ status: 'error', message: 'Could not verify your admin status' });
-      return;
+      return response.send({ status: 'error', message: 'Could not verify your admin status' });
     }
     next();
   },
@@ -26,9 +25,7 @@ const Admin = {
       .toArray();
     const filteredAccounts = allAccounts
       .map(account => {
-        for (const prop of filterProperties) {
-          delete account[prop];
-        }
+        filterProperties.forEach(prop => account[prop] = undefined);
         return account;
       });
     response.send({ status: 'ok', users: filteredAccounts });
@@ -36,8 +33,7 @@ const Admin = {
   promoteUserToRole: async (request, response) => {
     const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
-      response.send({ status: 'error', message: 'Invalid identifier' });
-      return;
+      return response.send({ status: 'error', message: 'Invalid identifier' });
     }
     const role = request.body.role;
     switch (role) {
@@ -46,8 +42,7 @@ const Admin = {
         const ldap: Collection = AccDB.collection('ldap');
         const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1) {
-          response.send({ status: 'error', message: 'Updating user role failed' });
-          return;
+          return response.send({ status: 'error', message: 'Updating user role failed' });
         }
         response.send({ status: 'ok', message: 'User role successfully updated' });
         break;
@@ -58,22 +53,19 @@ const Admin = {
   toggleObjectPublishedState: async (request, response) => {
     const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
-      response.send({ status: 'error', message: 'Incorrect request parameters' });
-      return;
+      return response.send({ status: 'error', message: 'Incorrect request parameters' });
     }
     const ObjDB: Db = Mongo.getObjectsRepository();
     const ModelCollection = ObjDB.collection('model');
     const found = await ModelCollection.findOne({ _id });
     if (!found) {
-      response.send({ status: 'error', message: 'No object with this identifier found' });
-      return;
+      return response.send({ status: 'error', message: 'No object with this identifier found' });
     }
     const isModelOnline: boolean = found.online;
     const updateResult = await ObjDB.collection('model')
       .updateOne({ _id }, { $set: { online: !isModelOnline } });
     if (updateResult.result.ok !== 1) {
-      response.send({ status: 'error', message: 'Failed updating published state' });
-      return;
+      return response.send({ status: 'error', message: 'Failed updating published state' });
     }
     response.send({ status: 'ok', ...await Mongo.resolve(_id, 'model') });
   },
