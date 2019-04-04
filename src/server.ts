@@ -10,6 +10,22 @@ import { Upload } from './services/upload';
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);
+Server.use((request, response, next) => {
+  if (request.body && request.body.username) {
+    // LDAP doesn't care about e.g. whitespaces in usernames
+    // so we fix this here
+    const regex = new RegExp(/[a-z0-9]+/i);
+    const result = request.body.username.match(regex);
+    if (result[0]) {
+      request.body.username = result[0];
+      next();
+    } else {
+      response.send({ status: 'error', message: 'Cannot handle username' });
+    }
+  } else {
+    next();
+  }
+});
 
 // MongoDB REST API
 // GET
