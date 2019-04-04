@@ -835,13 +835,14 @@ const Mongo = {
       if (obj[property] && obj[property].length && obj[property] instanceof Array) {
         for (let i = 0; i < obj[property].length; i++) {
           const resolved = await Mongo.resolve(obj[property][i], field);
+          if (!resolved) continue;
           obj[property][i] = await resolveNestedInst(resolved);
         }
       }
     };
     const props = [
-      ['digobj_rightsowner_person'], ['contact_person'], ['digobj_person'],
-      ['digobj_rightsowner_institution', 'institution'], ['digobj_tags', 'tag']];
+      ['digobj_rightsowner'], ['digobj_person_existing'], ['contact_person_existing'],
+      ['digobj_rightsowner', 'institution'], ['digobj_tags', 'tag']];
 
     for (const prop of props) {
       await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
@@ -851,10 +852,12 @@ const Mongo = {
       const resolvedPhysicalObjects: any[] = [];
       for (let phyObj of digitalObject['phyObjs']) {
         phyObj = await Mongo.resolve(phyObj, 'physicalobject');
-        await resolveTopLevel(phyObj, 'phyobj_rightsowner_person', 'person');
-        await resolveTopLevel(phyObj, 'phyobj_rightsowner_institution', 'institution');
-        await resolveTopLevel(phyObj, 'phyobj_person', 'person');
-        await resolveTopLevel(phyObj, 'phyobj_institution', 'institution');
+        const phyProps = [
+          ['phyobj_rightsowner'], ['phyobj_rightsowner', 'institution'],
+          ['phyobj_person_existing'], ['phyobj_institution_existing', 'institution']];
+        for (const phyProp of phyProps) {
+          await resolveTopLevel(phyObj, phyProp[0], (phyProp[1]) ? phyProp[1] : 'person');
+        }
         resolvedPhysicalObjects.push(phyObj);
       }
       digitalObject['phyObjs'] = resolvedPhysicalObjects;
