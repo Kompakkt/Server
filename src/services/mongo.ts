@@ -158,6 +158,8 @@ const Mongo = {
     const ldapCollection: Collection = this.AccountsRepository.collection('ldap');
     const userData = await ldapCollection.findOne({ sessionID });
 
+    userData.data[collection] = (userData.data[collection])
+      ? userData.data[collection] : [];
     userData.data[collection].push(identifier);
 
     return ldapCollection.updateOne(
@@ -226,7 +228,7 @@ const Mongo = {
     // After adding a digitalobject inside of a model,
     // attach data to the current user
     const insertFinalModelToCurrentUser = (modelResult: InsertOneWriteOpResult) => {
-      Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'models')
+      Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'model')
         .then(() => {
           response.send({ status: 'ok', result: modelResult.ops[0] });
           Logger.info('Added Europeana object', modelResult.ops[0]._id);
@@ -996,21 +998,9 @@ const Mongo = {
     }
     const delete_result = await collection.deleteOne({ _id: identifier });
     if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
-      switch (RequestCollection) {
-        case 'compilation':
-          find_result.data.compilations =
-            find_result.data.compilations.filter(id => id !== identifier.toString());
-          break;
-        case 'model':
-          find_result.data.models =
-            find_result.data.models.filter(id => id !== identifier.toString());
-          break;
-        case 'annotation':
-          find_result.data.annotations =
-            find_result.data.annotations.filter(id => id !== identifier.toString());
-          break;
-        default:
-      }
+      find_result.data[RequestCollection] =
+        find_result.data[RequestCollection].filter(id => id !== identifier.toString());
+
       const update_result =
         await ldap.updateOne({ sessionID }, { $set: { data: find_result.data } });
 
