@@ -370,6 +370,10 @@ const Mongo = {
         }
       }
 
+      // Make sure there are no null roles
+      if (field['roles'] && field['roles'][_digId]) {
+        field['roles'][_digId] = field['roles'][_digId].filter(obj => obj);
+      }
       // We cannot update _id property when upserting
       // so we remove this beforehand
       // tslint:disable-next-line
