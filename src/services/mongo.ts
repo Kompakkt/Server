@@ -256,10 +256,10 @@ const Mongo = {
           service,
         },
         processed: {
-          low: resultObject.digobj_externalLink[0].externalLink_value,
-          medium: resultObject.digobj_externalLink[0].externalLink_value,
-          high: resultObject.digobj_externalLink[0].externalLink_value,
-          raw: resultObject.digobj_externalLink[0].externalLink_value,
+          low: request.body._fileUrl,
+          medium: request.body._fileUrl,
+          high: request.body._fileUrl,
+          raw: request.body._fileUrl,
         },
         settings: {
           preview: (request.body._previewUrl)
