@@ -321,6 +321,9 @@ const Mongo = {
       ? new ObjectId(resultObject['_id']) : new ObjectId();
     Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
 
+    // We overwrite this in the phyobj loop so we can
+    let currentPhyObjId = '';
+
     //// FILTER FUNCTIONS ////
     const addToRightsOwnerFilter = (person: any) =>
       person['value'] && person['value'].indexOf('add_to_new_rightsowner') !== -1;
@@ -340,7 +343,7 @@ const Mongo = {
       }
       const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
       const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
-      const _digId = resultObject['_id'];
+      const _digId = (currentPhyObjId !== '') ? currentPhyObjId : resultObject['_id'];
       if (isPersonOrInstitution) {
         const doRolesExist = (field['roles'] !== undefined);
         field['roles'] = doRolesExist ? field['roles'] : {};
@@ -541,6 +544,10 @@ const Mongo = {
       let phyobj_person_existing: any[] = phyObj['phyobj_person_existing'];
       let phyobj_institution: any[] = phyObj['phyobj_institution'];
       let phyobj_institution_existing: any[] = phyObj['phyobj_institution_existing'];
+
+      const isPhyObjIdValid = ObjectId.isValid(phyObj['_id']);
+      phyObj['_id'] = isPhyObjIdValid ? new ObjectId(phyObj['_id']) : new ObjectId();
+      currentPhyObjId = phyObj['_id'];
 
       await handleRightsOwnerBase(
         phyobj_rightsowner_person, [phyobj_person_existing],
