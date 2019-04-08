@@ -38,7 +38,7 @@ const Cleaning = {
       const _id = institution._id;
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
-      const deleteResult = await personCollection.deleteOne({ _id: institution._id });
+      const deleteResult = await instCollection.deleteOne({ _id: institution._id });
       if (deleteResult.result.ok === 1) {
         Logger.info(`Deleted unused institution ${institution}`);
         total.push({ institution, result: deleteResult.result });
