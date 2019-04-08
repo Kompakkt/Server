@@ -336,7 +336,7 @@ const Mongo = {
      * will assume the object already exists in the collection
      * and instead return the existing {_id}
      */
-    const addAndGetId = async (in_field, add_to_coll) => {
+    const addAndGetId = async (in_field, add_to_coll, new_roles?) => {
       let field = in_field;
       if (add_to_coll === 'person') {
         field = await addNestedInstitution(field);
@@ -344,31 +344,32 @@ const Mongo = {
       const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
       const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
       const _digId = (currentPhyObjId !== '') ? currentPhyObjId : resultObject['_id'];
+      // By default, update/create the document
+      // but if its an existing person/institution
+      // fetch the object and update roles
+      const isIdValid = ObjectId.isValid(field['_id']);
+      const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
+      if (isIdValid) {
+        const findResult = await coll.findOne({ _id });
+        field = (findResult) ? findResult : field;
+      }
       if (isPersonOrInstitution) {
         const doRolesExist = (field['roles'] !== undefined);
+
         field['roles'] = doRolesExist ? field['roles'] : {};
         field['roles'][_digId] = field['roles'][_digId]
           ? field['roles'][_digId]
           : [];
+
         for (const prop of ['institution_role', 'person_role']) {
           if (!field[prop]) continue;
           // Add new roles to person or institution
           field['roles'][_digId] = doRolesExist
             ? flatten([field['roles'][_digId], field[prop]])
             : flatten([field[prop]]);
-          field['roles'][_digId] = Array.from(new Set(field['roles'][_digId]));
-        }
-      }
-      // By default, update/create the document
-      // but if its an existing person/institution
-      // fetch the object and update roles
-      const isIdValid = ObjectId.isValid(field['_id']);
-      const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
-      if (isPersonOrInstitution && isIdValid) {
-        const findResult = await coll.findOne({ _id });
-        if (findResult) {
-          field['roles'][_digId] =
-            flatten([field['roles'][_digId], findResult['roles'][_digId]]);
+          if (new_roles) {
+            field['roles'][_digId] = field['roles'][_digId].concat(new_roles);
+          }
           field['roles'][_digId] = Array.from(new Set(field['roles'][_digId]));
         }
       }
@@ -443,8 +444,8 @@ const Mongo = {
             ? filtered[0][roleProperty] : fixedRoles;
           toConcat.push(roles);
         }
-        inArr[x][roleProperty] = flatten([inArr[x][roleProperty], toConcat]);
-        inArr[x] = await addAndGetId(inArr[x], add_to_coll);
+        const newRoles = flatten([inArr[x][roleProperty], toConcat]);
+        inArr[x] = await addAndGetId(inArr[x], add_to_coll, newRoles);
       }
     };
 
@@ -505,7 +506,8 @@ const Mongo = {
         newObj['_id'] = ObjectId.isValid(obj['_id'])
           ? new ObjectId(obj['_id'])
           : new ObjectId(idIfSame);
-        outArr.push(await addAndGetId(newObj, add_to_coll));
+        const newRoles = newObj[roleProperty];
+        outArr.push(await addAndGetId(newObj, add_to_coll, newRoles));
       }
     };
 
@@ -572,6 +574,14 @@ const Mongo = {
           phyobj_institution_existing, phyobj_institution, 'institution',
           phyobj_rightsowner_institution[0]['_id'], 'institution_role');
       }
+
+      await handleRightsOwnerAndExisting(
+        phyobj_person_existing, phyobj_person, 'person',
+        '', 'person_role');
+      await handleRightsOwnerAndExisting(
+        phyobj_institution_existing, phyobj_institution, 'institution',
+        '', 'institution_role');
+
       phyobj_rightsowner =
         concatFix(phyobj_rightsowner, phyobj_rightsowner_institution, phyobj_rightsowner_person);
       phyobj_person_existing = concatFix(phyobj_person_existing, phyobj_person);
@@ -742,8 +752,8 @@ const Mongo = {
     }
 
     userData.data[`${RequestCollection}`] = (userData.data[`${RequestCollection}`])
-     ? userData.data[`${RequestCollection}`]
-     : [];
+      ? userData.data[`${RequestCollection}`]
+      : [];
     const doesObjectExist = userData.data[`${RequestCollection}`]
       .find(obj => obj.toString() === _id.toString());
 
