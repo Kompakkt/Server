@@ -363,14 +363,13 @@ const Mongo = {
 
         for (const prop of ['institution_role', 'person_role']) {
           if (!field[prop]) continue;
+          field[prop] = (new_roles) ? new_roles : field[prop];
           // Add new roles to person or institution
           field['roles'][_digId] = doRolesExist
             ? flatten([field['roles'][_digId], field[prop]])
             : flatten([field[prop]]);
-          if (new_roles) {
-            field['roles'][_digId] = field['roles'][_digId].concat(new_roles);
-          }
           field['roles'][_digId] = Array.from(new Set(field['roles'][_digId]));
+          field[prop] = [];
         }
       }
 
