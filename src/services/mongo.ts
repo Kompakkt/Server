@@ -845,6 +845,7 @@ const Mongo = {
    * Heavy nested resolving for DigitalObject
    */
   resolveDigitalObject: async digitalObject => {
+    let currentId = digitalObject._id;
     const resolveNestedInst = async obj => {
       if (obj['person_institution_data']) {
         for (let j = 0; j < obj['person_institution_data'].length; j++) {
@@ -868,6 +869,11 @@ const Mongo = {
           const resolved = await Mongo.resolve(obj[property][i], field);
           if (!resolved) continue;
           obj[property][i] = await resolveNestedInst(resolved);
+          if (obj[property][i]['roles'] && obj[property][i]['roles'][currentId]) {
+            const old = obj[property][i]['roles'][currentId];
+            obj[property][i]['roles'] = {};
+            obj[property][i]['roles'][currentId] = old;
+          }
         }
       }
     };
@@ -882,6 +888,7 @@ const Mongo = {
     if (digitalObject['phyObjs']) {
       const resolvedPhysicalObjects: any[] = [];
       for (let phyObj of digitalObject['phyObjs']) {
+        currentId = phyObj._id;
         phyObj = await Mongo.resolve(phyObj, 'physicalobject');
         const phyProps = [
           ['phyobj_rightsowner'], ['phyobj_rightsowner', 'institution'],
