@@ -12,7 +12,8 @@ const Mailer = {
       && Configuration.Mailer.ToIdentity;
   },
   sendMail: async (request, response) => {
-    if (!request.body) {
+
+    if (!request.body || !Configuration.Mailer.Target[request.body.target]) {
       response.send({ status: 'error' });
       return false;
     }
@@ -23,8 +24,8 @@ const Mailer = {
     });
 
     const mailOptions = {
-      from: Configuration.Mailer.FromIdentity,
-      to: Configuration.Mailer.ToIdentity,
+      from: Configuration.Mailer.Target[request.body.target],
+      to: Configuration.Mailer.Target[request.body.target],
       subject: request.body.subject,
       text: request.body.mailbody,
     };
