@@ -351,7 +351,9 @@ const Mongo = {
       const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
       if (isIdValid) {
         const findResult = await coll.findOne({ _id });
-        field = (findResult) ? findResult : field;
+        if (findResult) {
+          field = {...findResult, ...field};
+        }
       }
       if (isPersonOrInstitution) {
         const doRolesExist = (field['roles'] !== undefined);
