@@ -502,9 +502,8 @@ const Mongo = {
       for (const obj of inArr) {
         const newObj = {};
         newObj[roleProperty] = (role) ? role : obj[roleProperty];
-        newObj['_id'] = ObjectId.isValid(obj['_id'])
-          ? new ObjectId(obj['_id'])
-          : new ObjectId(idIfSame);
+        newObj['_id'] = ObjectId.isValid(obj['_id']) ? new ObjectId(obj['_id'])
+          : (ObjectId.isValid(idIfSame) ? new ObjectId(idIfSame) : new ObjectId());
         const newRoles = newObj[roleProperty];
         outArr.push(await addAndGetId(newObj, add_to_coll, newRoles));
       }
