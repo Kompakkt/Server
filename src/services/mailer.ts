@@ -8,8 +8,7 @@ const Mailer = {
     return Configuration.Mailer
       && Configuration.Mailer.Host
       && Configuration.Mailer.Port
-      && Configuration.Mailer.FromIdentity
-      && Configuration.Mailer.ToIdentity;
+      && Configuration.Mailer.Target;
   },
   sendMail: async (request, response) => {
 
@@ -47,9 +46,7 @@ if (!Mailer.isConfigValid()) {
     Missing or incomplete nodemailer configuration
     Host: ${Configuration.Mailer.Host}
     Port: ${Configuration.Mailer.Port}
-    Identity from: ${Configuration.Mailer.FromIdentity}
-    Identity to: ${Configuration.Mailer.ToIdentity}`);
-  process.exit(0);
+    Target from: ${Configuration.Mailer.Target}`);
 }
 
 export { Mailer };
