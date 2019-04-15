@@ -91,11 +91,13 @@ Server.post(
 // Publish or unpublish a model
 Server.post(
   '/api/v1/post/publish',
-  (request, response, next) => {
-    const isOwner = Mongo.isUserOwnerOfObject(request, request.body.identifier);
-    if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model'});
-    next();
-  },
+  Mongo.validateLoginSession,
+  (request, response, next) => Mongo.isUserOwnerOfObject(request, request.body.identifier)
+    .then(isOwner => {
+      if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model' });
+      next();
+    })
+    .catch(() => response.send({ status: 'error', message: 'Not owner of model' })),
   Admin.toggleObjectPublishedState);
 
 // Upload API
