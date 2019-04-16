@@ -1,3 +1,4 @@
+import { WebSocket } from './express';
 import { Logger } from './logger';
 
 // message
@@ -31,7 +32,7 @@ const Socket = {
       // join room
       socket.join(data[0]);
       // Emit annotations of newUser to all online members of joined room
-      socket.to(data[0])
+      WebSocket.to(data[0])
         .emit('newUser', [socket.id, data[1]]);
       Logger.info(`client '${socket.id}' joins to room: '${data[0]}'`);
     });
@@ -39,7 +40,7 @@ const Socket = {
     // onlineCollaborator
     socket.on('onlineCollaborators', data => {  // [newUser, annotations]
       // Emit to newUser of the room your 'onlineCollaborator' annotations
-      socket.to(data[0])
+      WebSocket.to(data[0])
         .emit('onlineCollaborators', [socket.id, data[1]]);
       Logger.info(`client '${socket.id}' sends annotations to new Collaborator '${data[0]}'`);
     });
