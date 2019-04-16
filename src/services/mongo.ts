@@ -1050,8 +1050,8 @@ const Mongo = {
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
-    const found = await collection.find({});
-    let allObjects = found.toArray();
+    let allObjects = await collection.find({})
+      .toArray();
 
     const getNestedValues = obj => {
       let result: string[] = [];
