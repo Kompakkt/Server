@@ -950,6 +950,13 @@ const Mongo = {
               compilation.models[i] = await Mongo.resolve(compilation.models[i]._id, 'model');
             }
 
+            if (compilation.annotationList) {
+              for (let i = 0; i < compilation.annotationList.length; i++) {
+                compilation.annotationList[i] =
+                  await Mongo.resolve(compilation.annotationList[i], 'annotation');
+              }
+            }
+
             if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
               response.send({ status: 'ok', ...compilation });
               return;
@@ -960,6 +967,18 @@ const Mongo = {
           .catch(db_error => {
             Logger.err(db_error);
             response.send({ status: 'error' });
+          });
+        break;
+      case 'model':
+        collection.findOne({ _id })
+          .then(async (model: any) => {
+            if (model.annotationList) {
+              for (let i = 0; i < model.annotationList.length; i++) {
+                model.annotationList[i] =
+                  await Mongo.resolve(model.annotationList[i], 'annotation');
+              }
+            }
+            response.send({ status: 'ok', ...model });
           });
         break;
       case 'digitalobject':
