@@ -654,6 +654,13 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'compilation':
+        resultObject['annotationList'] = (resultObject['annotationList'])
+          ? resultObject['annotationList'] : [];
+        resultObject['relatedOwner'] = {
+          _id: userData._id,
+          username: userData.username,
+          fullname: userData.fullname,
+        };
         // Compilations should have all their models referenced by _id
         resultObject['models'] =
           resultObject['models'].map(model => {
