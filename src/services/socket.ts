@@ -1,108 +1,143 @@
+import { Socket } from 'socket.io';
+
 import { WebSocket } from './express';
 import { Logger } from './logger';
 
-// message
-// newUser
-// onlineCollaborators
-// createAnnotation
-// editAnnotation
-// deleteAnnotation
-// changeRanking
-// lostConnection
-// changeRoom
-// myNewRoom
+interface IAnnotation {
+  annotation: any;
+  user: IUser;
+}
 
-// CHEATSHEET FOR SOCKET.IO
-// https://gist.github.com/alexpchin/3f257d0bb813e2c8c476
+interface IMessage {
+  message: string;
+  user: IUser;
+}
+
+interface IUser {
+  _id: string;
+  socketId: string;
+  username: string;
+  fullname: string;
+  room: string;
+}
+
+interface IUserInfo {
+  user: IUser;
+  annotations: any[];
+}
+
+interface IChangeRoom {
+  newRoom: string;
+  annotations: any[];
+}
+
+interface IChangeRanking {
+  user: IUser;
+  oldRanking: any[];
+  newRanking: any[];
+}
+
+interface IRoomData {
+  requester: IUserInfo;
+  recipient: string;
+  info: IUserInfo;
+}
+
+// For mapping socket.id to a roomname
+const Users: {
+  [key: string]: IUser;
+} = {};
 
 const Socket = {
 
-  _handler: socket => {
+  _handler: (socket: Socket) => {
     Logger.info(`SocketIO connection ${socket.id}`);
 
-    // message
-    socket.on('message', data => {
-      socket.to(data[0])
-        .emit('message', data);
-      Logger.info(`'message': ${data} of User ${socket.id} in Room  '${data[0]}'`);
+    // SocketIO Internals
+    Users[socket.id] = {
+      room: 'none',
+      fullname: 'none',
+      username: 'none',
+      socketId: 'none',
+      _id: 'none',
+    };
+
+    socket.on('disconnect', () => {
+      WebSocket.to(Users[socket.id].room)
+        .emit('lostConnection', { user: Users[socket.id], annotations: [] });
     });
 
-    // newUser
-    socket.on('newUser', data => {      // data => [room , annotations]
-      // join room
-      socket.join(data[0]);
-      // Emit annotations of newUser to all online members of joined room
-      WebSocket.to(data[0])
-        .emit('newUser', [socket.id, data[1]]);
-      Logger.info(`client '${socket.id}' joins to room: '${data[0]}'`);
+    // Custom Events
+    socket.on('message', (data: IMessage) => {
+      socket.to(Users[socket.id].room)
+        .emit('message', { ...data, user: Users[socket.id] });
     });
 
-    // onlineCollaborator
-    socket.on('onlineCollaborators', data => {  // [newUser, annotations]
-      // Emit to newUser of the room your 'onlineCollaborator' annotations
-      WebSocket.to(data[0])
-        .emit('onlineCollaborators', [socket.id, data[1]]);
-      Logger.info(`client '${socket.id}' sends annotations to new Collaborator '${data[0]}'`);
+    socket.on('newUser', (data: IUserInfo) => {
+      const newUser: IUser = {
+        socketId: socket.id,
+        fullname: data.user.fullname,
+        username: data.user.username,
+        room: data.user.room,
+        _id: data.user._id,
+      };
+      const emitUser: IUserInfo = {
+        user: newUser,
+        annotations: data.annotations,
+      };
+      Users[socket.id] = newUser;
+      socket.join(data.user.room);
+      WebSocket.to(data.user.room)
+        .emit('newUser', emitUser);
     });
 
-    // createAnnotation
-    socket.on('createAnnotation', data => {
-      socket.to(data[0])
-        .emit('createAnnotation', [socket.id, data[1]]);
-      Logger.info(`'createAnnotation' ${data[1]._id} of User ${socket.id} in Room '${data[0]}'`);
+    socket.on('roomDataRequest', (data: IRoomData) => {
+      data.requester.user.socketId = socket.id;
+      socket.to(data.recipient)
+        .emit('roomDataRequest', data);
     });
 
-    // editAnnotation
-    socket.on('editAnnotation', data => {
-      socket.to(data[0])
-        .emit('editAnnotation', [socket.id, data[1]]);
-      Logger.info(`'editAnnotation' ${data[1]._id}  of User ${socket.id} in Room '${data[0]}'`);
+    socket.on('roomDataAnswer', (data: IRoomData) => {
+      data.info.user.socketId = socket.id;
+      socket.to(data.requester.user.socketId)
+        .emit('roomDataAnswer', data);
     });
 
-    // deleteAnnotation
-    socket.on('deleteAnnotation', data => {
-      socket.to(data[0])
-        .emit('deleteAnnotation', [socket.id, data[1]]);
-      Logger.info(`'deleteAnnotation' ${data[1]._id} of User ${socket.id} in Room '${data[0]}'`);
+    socket.on('createAnnotation', (data: IAnnotation) => {
+      console.log(data);
+      socket.to(Users[socket.id].room)
+        .emit('createAnnotation', { ...data, user: Users[socket.id] });
     });
 
-    // changeRanking
-    socket.on('changeRanking', data => {
-      socket.to(data[0])
-        .emit('changeRanking', [socket.id, data[1], data[2]]);
-      Logger.info(`'changeRanking' of Annotations from User ${socket.id} in Room '${data[0]}'`);
+    socket.on('editAnnotation', (data: IAnnotation) => {
+      socket.to(Users[socket.id].room)
+        .emit('editAnnotation', { ...data, user: Users[socket.id] });
     });
 
-    // lostConnection
-    // [this.annotationService.socketRoom, this.annotationService.annotations]
-    socket.on('lostConnection', data => {
-      // To Members of Room
-      socket.to(data[0])
-        .emit('lostConnection', [socket.id, data[1]]);
-      // To Client (sender)
-      socket.emit('logout', socket.id);
-      Logger.info(`User '${socket.id}' disconnected from Socket.IO.`);
+    socket.on('deleteAnnotation', (data: IAnnotation) => {
+      socket.to(Users[socket.id].room)
+        .emit('deleteAnnotation', { ...data, user: Users[socket.id] });
     });
 
-    // changeRoom
-    socket.on('changeRoom', data => { //  [oldSocketRoom, newSocketRoom, annotations]
-      Logger.info(`User ${socket.id} 'changeRoom' from Room '${data[0]}' to Room '${data[1]}'`);
-      // (To members of) old room:
-      socket.to(data[0])
-        .emit('changeRoom', [socket.id, data[2]]);
-      socket.leave(data[0]);
-      Logger.info(`client '${socket.id}' leafs room: '${data[0]}'`);
-      // To Client (sender)
-      socket.emit('myNewRoom', [data[0], data[1]]);
-    });
-    // To (members of) new room:
-    socket.on('myNewRoom', data => { //
-      socket.join(data[0]);
-      socket.to(data[0])
-        .emit('newUser', [socket.id, data[1]]);
-      Logger.info(`client '${socket.id}' joins room: '${data[0]}'`);
+    socket.on('changeRanking', (data: IChangeRanking) => {
+      socket.to(Users[socket.id].room)
+        .emit('changeRanking', { ...data, user: Users[socket.id]});
     });
 
+    socket.on('changeRoom', (data: IChangeRoom) => {
+      const emitData: IUserInfo = {
+        user: Users[socket.id],
+        annotations: data.annotations,
+      };
+      socket.to(Users[socket.id].room)
+        .emit('changeRoom', emitData);
+      socket.leave(Users[socket.id].room);
+    });
+
+    socket.on('logout', (data: IUserInfo) => {
+      socket.to(Users[socket.id].room)
+        .emit('lostConnection', { ...data, user: Users[socket.id] });
+    });
   },
 };
 
