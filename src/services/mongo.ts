@@ -775,10 +775,10 @@ const Mongo = {
     userData.data[`${RequestCollection}`] = (userData.data[`${RequestCollection}`])
       ? userData.data[`${RequestCollection}`]
       : [];
-    const doesObjectExist = userData.data[`${RequestCollection}`]
+    const isUserAlreadyOwner = userData.data[`${RequestCollection}`]
       .find(obj => obj.toString() === _id.toString());
 
-    if (!doesObjectExist) {
+    if (!isUserAlreadyOwner) {
       userData.data[`${RequestCollection}`].push(_id);
       const ldapUpdateResult =
         await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
