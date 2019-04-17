@@ -702,6 +702,15 @@ const Mongo = {
           return;
         }
 
+        if (isModel && !isCompilation) {
+          const isOwner =
+            await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
+          if (!isOwner) {
+            response.send({ status: 'error', message: 'Permission denied' });
+            return;
+          }
+        }
+
         const updateAnnotationList = async (id: string, add_to_coll: string) => {
           const obj = await Mongo.resolve(id, add_to_coll);
           // Create annotationList if missing
