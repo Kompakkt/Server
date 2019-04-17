@@ -705,32 +705,36 @@ const Mongo = {
 
         if (isModel && !isCompilation) {
           const isOwner =
-            await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
+            await Mongo.isUserOwnerOfObject(request, relatedModelId);
           if (!isOwner) {
             response.send({ status: 'error', message: 'Permission denied' });
             return;
           }
         }
 
+        // Update data inside of annotation
+        resultObject['generated'] = (resultObject['generated'])
+          ? resultObject['generated'] : new Date().toISOString();
+        resultObject['lastModifiedBy'] = new Date().toISOString();
+
         const updateAnnotationList = async (id: string, add_to_coll: string) => {
           const obj = await Mongo.resolve(id, add_to_coll);
           // Create annotationList if missing
-          const annotationList: any[] = (obj['annotationList'])
-            ? obj['annotationList']
-            : [];
+          obj['annotationList'] = (obj['annotationList'])
+            ? obj['annotationList'] : [];
 
-          const doesAnnotationExist = annotationList
+          const doesAnnotationExist = obj['annotationList']
             .find(annotation => annotation.toString() === resultObject['_id'].toString());
           if (doesAnnotationExist) return true;
 
           // Add annotation to list if it doesn't exist
           const _newId = new ObjectId(resultObject['_id']);
-          annotationList.push(_newId);
+          obj['annotationList'].push(_newId);
           const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
           const listUpdateResult = await coll
             .updateOne(
               { _id: new ObjectId(id) },
-              { $set: { annotationList } });
+              { $set: { annotationList: obj['annotationList'] } });
 
           if (listUpdateResult.result.ok !== 1) {
             Logger.err(`Failed updating annotationList of ${add_to_coll} ${id}`);
