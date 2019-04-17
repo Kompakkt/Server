@@ -352,7 +352,7 @@ const Mongo = {
       if (isIdValid) {
         const findResult = await coll.findOne({ _id });
         if (findResult) {
-          field = {...findResult, ...field};
+          field = { ...findResult, ...field };
         }
       }
       if (isPersonOrInstitution) {
@@ -642,9 +642,10 @@ const Mongo = {
     const userData = await ldap.findOne({ sessionID });
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
+    const doesObjectExist = await Mongo.resolve(resultObject['_id'], RequestCollection);
     /* If the object already exists we need to
      * check for owner and for admin status */
-    if (isValidObjectId) {
+    if (isValidObjectId && doesObjectExist) {
       const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
       if (!isOwner) {
         response.send({ status: 'error', message: 'Permission denied' });
