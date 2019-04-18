@@ -10,6 +10,7 @@ import { ICompilation } from '../interfaces/compilation.interface';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
+import { Utility } from './utility';
 // import { Model } from '../interfaces/model.interface';
 
 const MongoConf = Configuration.Mongo;
@@ -188,6 +189,14 @@ const Mongo = {
       found.data[property] = await Promise.all(
         found.data[property].map(async obj => Mongo.resolve(obj, property)));
     }
+    // Add model owners to models
+    if (found.data.model && found.data.model.length > 0) {
+      for (const model of found.data.model) {
+        model['relatedModelOwners'] =
+          await Utility.findAllModelOwners(model['_id']);
+      }
+    }
+
     response.send({ status: 'ok', ...found });
   },
   validateLoginSession: async (request, response, next) => {
