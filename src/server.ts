@@ -215,4 +215,9 @@ Server.get(
   Mongo.validateLoginSession,
   Utility.findAllModelOwners);
 
+Server.get(
+  '/utility/countmodeluses/:identifier',
+  Mongo.validateLoginSession,
+  Utility.countModelUses);
+
 Express.startListening();

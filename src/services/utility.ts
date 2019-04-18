@@ -25,7 +25,25 @@ const Utility = {
         }));
     response.send({ status: 'ok', accounts });
   },
+  countModelUses: async (request, response) => {
+    const modelId = request.params.identifier;
+    if (!ObjectId.isValid(modelId)) {
+      response.send({ status: 'error', message: 'Invalid model _id '});
+      return;
+    }
 
+    const ObjDB: Db = await Mongo.getObjectsRepository();
+    const compilations = (await ObjDB.collection('compilation')
+      .find({})
+      .toArray())
+      .filter(comp => {
+        const Models = JSON.stringify(comp.models);
+        return Models.indexOf(modelId) !== -1;
+      });
+    const occurences = compilations.length;
+
+    response.send({ status: 'ok', occurences, compilations });
+  },
 };
 
 export { Utility };
