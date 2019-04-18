@@ -123,6 +123,10 @@ const Utility = {
         }
         break;
       case 'remove':
+        const modelUses = (await Utility.findAllModelOwners(modelId)).length;
+        if (modelUses === 1) {
+          return response.send({ status: 'error', message: 'Cannot remove last owner'});
+        }
         account.data.model = account.data.model
           .filter(model => model.toString() !== modelId.toString());
         break;
