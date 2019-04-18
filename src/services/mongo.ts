@@ -188,11 +188,12 @@ const Mongo = {
       if (!found.data.hasOwnProperty(property)) continue;
       found.data[property] = await Promise.all(
         found.data[property].map(async obj => Mongo.resolve(obj, property)));
+      // Filter possible null's
+      found.data[property] = found.data[property].filter(obj => obj);
     }
     // Add model owners to models
     if (found.data.model && found.data.model.length > 0) {
       for (const model of found.data.model) {
-        if (!model && !model['_id']) continue;
         model['relatedModelOwners'] =
           await Utility.findAllModelOwners(model['_id']);
       }
