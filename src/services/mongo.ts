@@ -192,6 +192,7 @@ const Mongo = {
     // Add model owners to models
     if (found.data.model && found.data.model.length > 0) {
       for (const model of found.data.model) {
+        if (!model['_id']) return model['_id'];
         model['relatedModelOwners'] =
           await Utility.findAllModelOwners(model['_id']);
       }
