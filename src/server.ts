@@ -220,4 +220,9 @@ Server.get(
   Mongo.validateLoginSession,
   Utility.countModelUses);
 
+Server.post(
+  '/utility/moveannotations/:identifier',
+  Mongo.validateLoginSession,
+  Utility.addAnnotationsToAnnotationList);
+
 Express.startListening();
