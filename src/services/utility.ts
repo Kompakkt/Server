@@ -85,6 +85,57 @@ const Utility = {
     }
     response.send({ status: 'ok', ...await Mongo.resolve(compId, 'compilation') });
   },
+  applyActionToModelOwner: async (request, response) => {
+    const command = request.body.command;
+    if (!['add', 'remove'].includes(command)) {
+      response.send({ status: 'error', message: 'Invalid command. Use "add" or "remove"' });
+      return;
+    }
+    const ownerId = request.body.ownerId;
+    if (!ownerId || !ObjectId.isValid(ownerId)) {
+      response.send({ status: 'error', message: 'Invalid LDAP identifier' });
+      return;
+    }
+    const modelId = request.body.modelId;
+    if (!modelId || !ObjectId.isValid(modelId)
+      || await Mongo.resolve(modelId, 'model') === undefined) {
+      response.send({ status: 'error', message: 'Invalid model identifier' });
+      return;
+    }
+    const AccDB: Db = Mongo.getAccountsRepository();
+    const ldap = await AccDB.collection('ldap');
+    const account = await ldap.findOne({ _id: new ObjectId(ownerId) });
+    if (!account) {
+      response.send({ status: 'error', message: 'Invalid LDAP identifier' });
+      return;
+    }
+
+    account.data.model = (account.data.model) ? account.data.model : [];
+
+    switch (command) {
+      case 'add':
+        if (!account.data.model.find(obj => obj.toString() === modelId.toString())) {
+          account.data.model.push(new ObjectId(modelId));
+        }
+        break;
+      case 'remove':
+        account.data.model = account.data.model
+          .filter(model => model.toString() !== modelId.toString());
+        break;
+      default:
+    }
+
+    const updateResult = await ldap.updateOne(
+      { _id: new ObjectId(ownerId) },
+      { $set: { data: account.data } });
+
+    if (updateResult.result.ok !== 1) {
+      response.send({ status: 'error', message: 'Failed updating model array' });
+      return;
+    }
+
+    response.send({ status: 'ok' });
+  },
 };
 
 export { Utility };

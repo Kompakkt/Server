@@ -225,4 +225,9 @@ Server.post(
   Mongo.validateLoginSession,
   Utility.addAnnotationsToAnnotationList);
 
+Server.post(
+  '/utility/applyactiontomodelowner',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Utility.applyActionToModelOwner);
+
 Express.startListening();
