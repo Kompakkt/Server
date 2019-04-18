@@ -3,13 +3,16 @@ import { Collection, Db, ObjectId } from 'mongodb';
 import { Mongo } from './mongo';
 
 const Utility = {
-  findAllModelOwners: async (request, response) => {
+  findAllModelOwnersRequest: async (request, response) => {
     const modelId = request.params.identifier;
     if (!ObjectId.isValid(modelId)) {
       response.send({ status: 'error', message: 'Invalid model _id ' });
       return;
     }
-
+    const accounts = await Utility.findAllModelOwners(modelId);
+    response.send({ status: 'ok', accounts });
+  },
+  findAllModelOwners: async (modelId: string) => {
     const AccDB: Db = await Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('ldap');
     const accounts = (await ldap.find({})
@@ -23,7 +26,7 @@ const Utility = {
         username: userData.username,
         _id: userData._id,
       }));
-    response.send({ status: 'ok', accounts });
+    return accounts;
   },
   countModelUses: async (request, response) => {
     const modelId = request.params.identifier;

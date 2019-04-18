@@ -213,7 +213,7 @@ Server.post(
 Server.get(
   '/utility/findmodelowners/:identifier',
   Mongo.validateLoginSession,
-  Utility.findAllModelOwners);
+  Utility.findAllModelOwnersRequest);
 
 Server.get(
   '/utility/countmodeluses/:identifier',
