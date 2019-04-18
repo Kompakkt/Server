@@ -642,7 +642,9 @@ const Mongo = {
     const userData = await ldap.findOne({ sessionID });
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
-    const doesObjectExist = await Mongo.resolve(resultObject['_id'], RequestCollection);
+    const doesObjectExist = (resultObject && resultObject['_id'])
+      ? await Mongo.resolve(resultObject['_id'], RequestCollection)
+      : false;
     /* If the object already exists we need to
      * check for owner and for admin status */
     if (isValidObjectId && doesObjectExist) {
