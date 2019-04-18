@@ -6,6 +6,7 @@ import { Mailer } from './services/mailer';
 import { Mongo } from './services/mongo';
 import { Socket } from './services/socket';
 import { Upload } from './services/upload';
+import { Utility } from './services/utility';
 
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
@@ -207,5 +208,11 @@ Server.post(
   Express.passport.authenticate('ldapauth', { session: false }),
   Admin.checkIsAdmin,
   Cleaning.deleteUnusedPersonsAndInstitutions);
+
+// Utility
+Server.get(
+  '/utility/findmodelowners/:identifier',
+  Mongo.validateLoginSession,
+  Utility.findAllModelOwners);
 
 Express.startListening();
