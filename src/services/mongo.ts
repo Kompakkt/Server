@@ -158,13 +158,22 @@ const Mongo = {
     const ldapCollection: Collection = this.AccountsRepository.collection('ldap');
     const userData = await ldapCollection.findOne({ sessionID });
 
+    if (!ObjectId.isValid(identifier)) return false;
+
     userData.data[collection] = (userData.data[collection])
       ? userData.data[collection] : [];
-    userData.data[collection].push(identifier);
 
-    return ldapCollection.updateOne(
-      { sessionID },
-      { $set: { data: userData.data } });
+    const doesExist = userData.data[collection]
+      .find(obj => obj.toString() === identifier.toString());
+
+    if (doesExist) return true;
+
+    userData.data[collection].push(new ObjectId(identifier));
+    const updateResult = await ldapCollection.updateOne(
+      { sessionID }, { $set: { data: userData.data } });
+
+    if (updateResult.result.ok !== 1) return false;
+    return true;
   },
   getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
@@ -642,11 +651,8 @@ const Mongo = {
     const userData = await ldap.findOne({ sessionID });
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
-    const doesObjectExist = (resultObject && resultObject['_id'])
-      ? await Mongo.resolve(resultObject['_id'], RequestCollection)
-      : false;
-    /* If the object already exists we need to
-     * check for owner and for admin status */
+    const doesObjectExist = await Mongo.resolve(resultObject, RequestCollection);
+    // If the object already exists we need to check for owner status
     if (isValidObjectId && doesObjectExist) {
       const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
       if (!isOwner) {
@@ -774,22 +780,7 @@ const Mongo = {
       return;
     }
 
-    userData.data[`${RequestCollection}`] = (userData.data[`${RequestCollection}`])
-      ? userData.data[`${RequestCollection}`]
-      : [];
-    const isUserAlreadyOwner = userData.data[`${RequestCollection}`]
-      .find(obj => obj.toString() === _id.toString());
-
-    if (!isUserAlreadyOwner) {
-      userData.data[`${RequestCollection}`].push(_id);
-      const ldapUpdateResult =
-        await ldap.updateOne({ sessionID }, { $set: { data: userData.data } });
-      if (ldapUpdateResult.result.ok !== 1) {
-        Logger.err(`Failed adding ${_id} to LDAP User ${RequestCollection}`);
-        response.send({ status: 'error' });
-        return;
-      }
-    }
+    await Mongo.insertCurrentUserData(request, _id, RequestCollection);
 
     const resultId = (updateResult.upsertedId) ? updateResult.upsertedId._id : _id;
     response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });
@@ -859,9 +850,10 @@ const Mongo = {
    * Simple resolving by collection name and Id
    */
   resolve: async (obj, collection_name) => {
-    Logger.info(`Resolving ${collection_name} ${(obj['_id']) ? obj['_id'] : obj}`);
-    const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+    if (!obj) return undefined;
     const id = (obj['_id']) ? obj['_id'] : obj;
+    Logger.info(`Resolving ${collection_name} ${id}`);
+    const resolve_collection = this.DBObjectsRepository.collection(collection_name);
     return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
       .then(resolve_result => resolve_result);
   },
