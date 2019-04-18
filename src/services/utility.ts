@@ -19,7 +19,7 @@ const Utility = {
       .toArray())
       .filter(userData => {
         const Models = JSON.stringify(userData.data.model);
-        return Models.indexOf(modelId) !== -1;
+        return (Models) ? Models.indexOf(modelId) !== -1 : false;
       })
       .map(userData => ({
         fullname: userData.fullname,
