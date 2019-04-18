@@ -30,6 +30,17 @@ const Mailer = {
       text: request.body.mailbody,
     };
 
+    const MailCount = await Mailer.countUserMails(request, request.body.target);
+    // TODO: configurable limits
+    switch (request.body.target) {
+      case 'bugreport':
+        break;
+      default:
+        if (MailCount < 3) break;
+        response.send({ status: 'error', message: 'Limit for this category reached' });
+        return;
+    }
+
     transporter.sendMail(mailOptions)
       .then(success => {
         Logger.info(`Nodemailer sent mail:`, success);
@@ -66,6 +77,16 @@ const Mailer = {
     } else {
       Logger.info(`Added user to DB ${document}`);
     }
+  },
+  countUserMails: async (request, destination) => {
+    const AccDb: Db = await Mongo.getAccountsRepository();
+    const ldap = AccDb.collection('ldap');
+    const user = await ldap.findOne({ sessionID: request.sessionID });
+    const collection = AccDb.collection(destination);
+    const entries = (await collection.find({})
+      .toArray())
+      .filter(entry => entry.user._id.toString() === user._id.toString());
+    return entries.length;
   },
 };
 
