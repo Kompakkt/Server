@@ -91,26 +91,27 @@ const Utility = {
   applyActionToModelOwner: async (request, response) => {
     const command = request.body.command;
     if (!['add', 'remove'].includes(command)) {
-      response.send({ status: 'error', message: 'Invalid command. Use "add" or "remove"' });
-      return;
+      return response.send({ status: 'error', message: 'Invalid command. Use "add" or "remove"' });
     }
+    const ownerUsername = request.body.ownerUsername;
     const ownerId = request.body.ownerId;
-    if (!ownerId || !ObjectId.isValid(ownerId)) {
-      response.send({ status: 'error', message: 'Invalid LDAP identifier' });
-      return;
+    if (!ownerId && !ownerUsername) {
+      return response.send({ status: 'error', message: 'No owner _id or username given' });
+    }
+    if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId)) {
+      return response.send({ status: 'error', message: 'Incorrect owner _id given' });
     }
     const modelId = request.body.modelId;
     if (!modelId || !ObjectId.isValid(modelId)
       || await Mongo.resolve(modelId, 'model') === undefined) {
-      response.send({ status: 'error', message: 'Invalid model identifier' });
-      return;
+      return response.send({ status: 'error', message: 'Invalid model identifier' });
     }
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap = await AccDB.collection('ldap');
-    const account = await ldap.findOne({ _id: new ObjectId(ownerId) });
+    const findUserQuery = (ownerId) ? { _id: new ObjectId(ownerId) } : { username: ownerUsername };
+    const account = await ldap.findOne(findUserQuery);
     if (!account) {
-      response.send({ status: 'error', message: 'Invalid LDAP identifier' });
-      return;
+      return response.send({ status: 'error', message: 'Incorrect owner _id or username given' });
     }
 
     account.data.model = (account.data.model) ? account.data.model : [];
@@ -129,12 +130,11 @@ const Utility = {
     }
 
     const updateResult = await ldap.updateOne(
-      { _id: new ObjectId(ownerId) },
+      findUserQuery,
       { $set: { data: account.data } });
 
     if (updateResult.result.ok !== 1) {
-      response.send({ status: 'error', message: 'Failed updating model array' });
-      return;
+      return response.send({ status: 'error', message: 'Failed updating model array' });
     }
 
     response.send({ status: 'ok' });
