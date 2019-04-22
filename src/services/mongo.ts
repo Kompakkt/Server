@@ -734,7 +734,7 @@ const Mongo = {
         // Update data inside of annotation
         resultObject['generated'] = (resultObject['generated'])
           ? resultObject['generated'] : new Date().toISOString();
-        resultObject['lastModifiedBy'] = new Date().toISOString();
+        resultObject['lastModificationDate'] = new Date().toISOString();
 
         const updateAnnotationList = async (id: string, add_to_coll: string) => {
           const obj = await Mongo.resolve(id, add_to_coll);
