@@ -193,6 +193,12 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
 // Mailer
 Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 
+Server.post(
+  '/mailer/getmailentries',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Mailer.getMailRelatedDatabaseEntries);
+
 // WebSocket
 WebSocket.on('connection', Socket._handler);
 

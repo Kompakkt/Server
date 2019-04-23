@@ -88,6 +88,18 @@ const Mailer = {
       .filter(entry => entry.user._id.toString() === user._id.toString());
     return entries.length;
   },
+  getMailRelatedDatabaseEntries: async (_, response) => {
+    const AccDb: Db = await Mongo.getAccountsRepository();
+    const targets = Object.keys(Configuration.Mailer.Target);
+    const Response: any = {};
+    for (const target of targets) {
+      const coll = AccDb.collection(target);
+      const all = await coll.find({})
+        .toArray();
+      Response[target] = all;
+    }
+    response.send({ status: 'ok', ...Response });
+  },
 };
 
 if (!Mailer.isConfigValid()) {
