@@ -1,5 +1,5 @@
 import * as nodemailer from 'nodemailer';
-import { Db } from 'mongodb';
+import { Db, ObjectId } from 'mongodb';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -99,6 +99,30 @@ const Mailer = {
       Response[target] = all;
     }
     response.send({ status: 'ok', ...Response });
+  },
+  toggleMailAnswered: async (request, response) => {
+    const target = request.params.target;
+    const identifier = request.params.identifier;
+    if (!Object.keys(Configuration.Mailer.Target)
+      .includes(target)) {
+      return response.send({ status: 'error', message: 'Invalid target'});
+    }
+    if (!ObjectId.isValid(identifier)) {
+      return response.send({ status: 'error', message: 'Invalid mail identifier'});
+    }
+    const _id = new ObjectId(identifier);
+    const AccDB: Db = await Mongo.getAccountsRepository();
+    const targetColl = AccDB.collection(target);
+    const oldEntry = await targetColl.findOne({ _id });
+    if (!oldEntry || oldEntry.answered === undefined) {
+      return response.send({ status: 'error', message: 'Invalid mail entry in database'});
+    }
+    const isAnswered = oldEntry.answered;
+    const updateResult = await targetColl.updateOne({ _id }, { $set: { answered: !isAnswered }});
+    if (updateResult.result.ok !== 1) {
+      return response.send({ status: 'error', message: 'Failed updating entry'});
+    }
+    response.send({ status: 'ok', ...await targetColl.findOne({ _id }) });
   },
 };
 

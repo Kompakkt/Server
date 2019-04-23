@@ -199,6 +199,12 @@ Server.post(
   Admin.checkIsAdmin,
   Mailer.getMailRelatedDatabaseEntries);
 
+Server.post(
+  '/mailer/toggleanswered/:target/:identifier',
+  Express.passport.authenticate('ldapauth', { session: false }),
+  Admin.checkIsAdmin,
+  Mailer.toggleMailAnswered);
+
 // WebSocket
 WebSocket.on('connection', Socket._handler);
 
