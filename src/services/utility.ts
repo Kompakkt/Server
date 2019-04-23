@@ -53,9 +53,6 @@ const Utility = {
       response.send({ status: 'error', message: 'No annotation array sent' });
       return;
     }
-    const validAnnotations = annotations
-      .filter(ann => ObjectId.isValid(ann))
-      .filter(async ann => await Mongo.resolve(ann, 'annotation') !== undefined);
 
     const compId = request.params.identifier;
     if (!compId || !ObjectId.isValid(compId)
@@ -72,10 +69,29 @@ const Utility = {
       return;
     }
 
+    const resolvedAnnotations = await Promise.all(annotations
+      .filter(ann => ObjectId.isValid(ann))
+      .map(ann => Mongo.resolve(ann, 'annotation')));
+    const validAnnotations = resolvedAnnotations
+      .filter(ann => ann !== undefined && ann)
+      .map(ann => {
+        ann['_id'] = new ObjectId();
+        ann['target']['source']['relatedCompilation'] = request.params.identifier;
+        ann['lastModificationDate'] = new Date().toISOString();
+        return ann;
+      });
+    const AnnColl = ObjDB.collection('annotation');
+    const insertResult = await AnnColl.insertMany(validAnnotations);
+    if (insertResult.result.ok !== 1) {
+      response.send({ status: 'error', message: 'Failed inserting Annotations' });
+      return;
+    }
+
     compilation['annotationList'] = (compilation['annotationList'])
       ? compilation['annotationList'] : [];
     compilation['annotationList'] = Array.from(new Set(
-      compilation['annotationList'].concat(validAnnotations).map(ann => new ObjectId(ann))
+      compilation['annotationList'].concat(validAnnotations)
+        .map(ann => new ObjectId(ann['_id'])),
     ));
 
     const updateResult = await CompColl
@@ -86,6 +102,9 @@ const Utility = {
       response.send({ status: 'error', message: 'Failed updating annotationList' });
       return;
     }
+
+    // Add Annotations to LDAP user
+    validAnnotations.forEach(ann => Mongo.insertCurrentUserData(request, ann['_id'], 'annotation'));
     response.send({ status: 'ok', ...await Mongo.resolve(compId, 'compilation') });
   },
   applyActionToModelOwner: async (request, response) => {
@@ -125,7 +144,7 @@ const Utility = {
       case 'remove':
         const modelUses = (await Utility.findAllModelOwners(modelId)).length;
         if (modelUses === 1) {
-          return response.send({ status: 'error', message: 'Cannot remove last owner'});
+          return response.send({ status: 'error', message: 'Cannot remove last owner' });
         }
         account.data.model = account.data.model
           .filter(model => model.toString() !== modelId.toString());
