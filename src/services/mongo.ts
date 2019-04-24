@@ -700,6 +700,12 @@ const Mongo = {
         break;
       case 'annotation':
         // Check if anything was missing for safety
+        if (!resultObject || resultObject['target'] || resultObject['target']['source']) {
+          return response.send({
+            status: 'error', message: 'Invalid annotation',
+            invalidObject: resultObject,
+          });
+        }
         const source = resultObject['target']['source'];
         if (!source) {
           response.send({ status: 'error', message: 'Missing source' });
