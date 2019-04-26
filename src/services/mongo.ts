@@ -3,18 +3,28 @@ import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
-import { Collection, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
+import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation } from '../interfaces/compilation.interface';
+import { ICompilation, ILDAPData, IModel, IMetaDataDigitalObject } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Utility } from './utility';
-// import { Model } from '../interfaces/model.interface';
 
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
+
+const ldap = (): Collection<ILDAPData> =>
+  Mongo.getAccountsRepository()
+    .collection('ldap');
+const getCurrentUserBySession = async (sessionID: string) =>
+  ldap()
+    .findOne({ sessionID });
+const getAllUsers = async () =>
+  ldap()
+    .find({})
+    .toArray();
 
 const Mongo = {
   Client: undefined,
@@ -51,8 +61,8 @@ const Mongo = {
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
-  getAccountsRepository: () => this.AccountsRepository,
-  getObjectsRepository: () => this.DBObjectsRepository,
+  getAccountsRepository: (): Db => this.AccountsRepository,
+  getObjectsRepository: (): Db => this.DBObjectsRepository,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -70,8 +80,7 @@ const Mongo = {
   },
   invalidateSession: async (request, response) => {
     const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
-    ldap.updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
+    ldap().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
       Logger.log('Logged out');
       response.send({ status: 'ok', message: 'Logged out' });
     });
@@ -80,16 +89,14 @@ const Mongo = {
     const user = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
-    let found = await ldap.find({ username })
-      .toArray();
+    const found = await getAllUsers();
 
     switch (found.length) {
       // TODO: Pack this into config somehow...
       case 0:
         // No Account with this LDAP username
         // Create new
-        ldap.insertOne(
+        ldap().insertOne(
           {
             username,
             sessionID,
@@ -114,8 +121,8 @@ const Mongo = {
       case 1:
         // Account found
         // Update session ID
-        found = found[0];
-        ldap.updateOne(
+        const self = found[0];
+        ldap().updateOne(
           { username },
           {
             $set: {
@@ -125,10 +132,10 @@ const Mongo = {
               surname: user['sn'],
               rank: user['UniColognePersonStatus'],
               mail: user['mail'],
-              role: (found['role'])
-                ? ((found['role'] === '')
+              role: (self['role'])
+                ? ((self['role'] === '')
                   ? user['UniColognePersonStatus']
-                  : found['role'])
+                  : self['role'])
                 : user['UniColognePersonStatus'],
             },
           },
@@ -137,7 +144,7 @@ const Mongo = {
               response.send({ status: 'error' });
               Logger.err(up_err);
             } else {
-              ldap.findOne({ sessionID, username }, (f_err, f_res) => {
+              ldap().findOne({ sessionID, username }, (f_err, f_res) => {
                 if (f_err) {
                   response.send({ status: 'error' });
                   Logger.err(f_err);
@@ -156,21 +163,21 @@ const Mongo = {
   },
   insertCurrentUserData: async (request, identifier, collection) => {
     const sessionID = request.sessionID;
-    const ldapCollection: Collection = this.AccountsRepository.collection('ldap');
-    const userData = await ldapCollection.findOne({ sessionID });
+    const userData = await getCurrentUserBySession(sessionID);
 
-    if (!ObjectId.isValid(identifier)) return false;
+    if (!ObjectId.isValid(identifier) || !userData) return false;
 
     userData.data[collection] = (userData.data[collection])
       ? userData.data[collection] : [];
 
     const doesExist = userData.data[collection]
-      .find(obj => obj.toString() === identifier.toString());
+      .filter(obj => obj)
+      .find((obj: any) => obj.toString() === identifier.toString());
 
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await ldapCollection.updateOne(
+    const updateResult = await ldap().updateOne(
       { sessionID }, { $set: { data: userData.data } });
 
     if (updateResult.result.ok !== 1) return false;
@@ -178,36 +185,34 @@ const Mongo = {
   },
   getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.findOne({ sessionID });
-    if (!found || !found.data) {
+    const userData = await getCurrentUserBySession(sessionID);
+    if (!userData || !userData.data) {
       response.send({ status: 'ok' });
       return;
     }
-    for (const property in found.data) {
-      if (!found.data.hasOwnProperty(property)) continue;
-      found.data[property] = await Promise.all(
-        found.data[property].map(async obj => Mongo.resolve(obj, property)));
+    for (const property in userData.data) {
+      if (!userData.data.hasOwnProperty(property)) continue;
+      userData.data[property] = await Promise.all(
+        userData.data[property].map(async obj => Mongo.resolve(obj, property)));
       // Filter possible null's
-      found.data[property] = found.data[property].filter(obj => obj);
+      userData.data[property] = userData.data[property].filter(obj => obj);
     }
     // Add model owners to models
-    if (found.data.model && found.data.model.length > 0) {
-      for (const model of found.data.model) {
+    if (userData.data.model && userData.data.model.length > 0) {
+      for (const model of userData.data.model) {
+        if (!model) continue;
         model['relatedModelOwners'] =
           await Utility.findAllModelOwners(model['_id']);
       }
     }
 
-    response.send({ status: 'ok', ...found });
+    response.send({ status: 'ok', ...userData });
   },
   validateLoginSession: async (request, response, next) => {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
       request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
 
-    const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.find({ sessionID })
-      .toArray();
+    const found = await getAllUsers();
 
     switch (found.length) {
       case 0:
@@ -220,15 +225,17 @@ const Mongo = {
         break;
       default:
         // Multiple sessionID. Invalidate all
-        ldap.updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
+        ldap().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
           Logger.log('Invalidated multiple sessionIDs due to being the same');
           response.send({ message: 'Invalid session' });
         });
     }
   },
   submitService: async (request, response) => {
-    const digobjCollection: Collection = this.DBObjectsRepository.collection('digitalobject');
-    const modelCollection: Collection = this.DBObjectsRepository.collection('model');
+    const digobjCollection: Collection<IMetaDataDigitalObject> =
+      this.DBObjectsRepository.collection('digitalobject');
+    const modelCollection: Collection<IModel> =
+      this.DBObjectsRepository.collection('model');
 
     const service: string = request.params.service;
     if (!service) response.send({ status: 'error', message: 'Incorrect request' });
@@ -264,12 +271,13 @@ const Mongo = {
     const pushModel = (digobjResult: InsertOneWriteOpResult) => {
       const resultObject = digobjResult.ops[0];
       const modelObject = {
+        annotationList: [],
         relatedDigitalObject: {
           _id: resultObject._id,
         },
         name: resultObject.digobj_title,
         ranking: 0,
-        files: undefined,
+        files: [],
         finished: true,
         online: true,
         mediaType: mapTypes(request.body.type),
@@ -300,7 +308,8 @@ const Mongo = {
     switch (service) {
       case 'europeana':
         // TODO: Put into Europeana service to make every service self sustained?
-        const EuropeanaObject = {
+        const EuropeanaObject: IMetaDataDigitalObject = {
+          _id: new ObjectId(),
           digobj_type: mapTypes(request.body.type),
           digobj_title: request.body.title,
           digobj_description: request.body.description,
@@ -309,6 +318,25 @@ const Mongo = {
             externalLink_description: 'Europeana URL',
             externalLink_value: request.body.page,
           }],
+          digobj_externalIdentifier: [],
+          digobj_discipline: [],
+          digobj_creation: [],
+          digobj_dimensions: [],
+          digobj_files: [],
+          digobj_objecttype: '',
+          digobj_person: [],
+          digobj_rightsowner: [],
+          digobj_statement: '',
+          digobj_tags: [],
+          digobj_metadata_files: [],
+          digobj_person_existing: [],
+          digobj_rightsowner_institution: [],
+          digobj_rightsowner_person: [],
+          digobj_rightsownerSelector: 1,
+          digobj_person_existing_role: [],
+          contact_person: [],
+          contact_person_existing: [],
+          phyObjs: [],
         };
 
         digobjCollection.insertOne(EuropeanaObject)
@@ -656,10 +684,13 @@ const Mongo = {
 
     const collection: Collection = this.DBObjectsRepository.collection(RequestCollection);
     const sessionID = request.sessionID;
-    const ldap: Collection = this.AccountsRepository.collection('ldap');
 
     const resultObject = request.body;
-    const userData = await ldap.findOne({ sessionID });
+    const userData = await getCurrentUserBySession(sessionID);
+    if (!userData) {
+      response.send({ status: 'error', message: 'Cannot fetch current user from database' });
+      return;
+    }
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
     const doesObjectExist = await Mongo.resolve(resultObject, RequestCollection);
@@ -851,17 +882,13 @@ const Mongo = {
   isUserOwnerOfObject: async (request, identifier) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier) : identifier;
-    const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.findOne({ sessionID });
-    return JSON.stringify(found.data)
+    const userData = await getCurrentUserBySession(request.sessionID);
+    return JSON.stringify((userData) ? userData.data : '')
       .indexOf(_id) !== -1;
   },
-  isUserAdmin: async request => {
-    const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
-    const found = await ldap.findOne({ sessionID });
-    return found.role === 'A';
+  isUserAdmin: async (request): Promise<boolean> => {
+    const userData = await getCurrentUserBySession(request.sessionID);
+    return (userData) ? userData.role === 'A' : false;
   },
   /**
    * Simple resolving by collection name and Id
@@ -958,7 +985,9 @@ const Mongo = {
             const isPasswordCorrect = (_pw && _pw === password);
 
             for (let i = 0; i < compilation.models.length; i++) {
-              compilation.models[i] = await Mongo.resolve(compilation.models[i]._id, 'model');
+              const model = compilation.models[i];
+              if (!model) continue;
+              compilation.models[i] = await Mongo.resolve(model._id, 'model');
             }
 
             if (compilation.annotationList) {
@@ -1045,14 +1074,13 @@ const Mongo = {
 
     const collection = this.DBObjectsRepository.collection(RequestCollection);
     const sessionID = request.sessionID;
-    const ldap = this.AccountsRepository.collection('ldap');
 
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
 
-    const find_result = await ldap.findOne({ sessionID });
+    const find_result = await getCurrentUserBySession(sessionID);
 
-    if ((!find_result.username || !request.body.username)
+    if (!find_result || (!find_result.username || !request.body.username)
       || (request.body.username !== find_result.username)) {
       Logger.err(`Object removal failed due to username & session not matching`);
       response.send({
@@ -1081,7 +1109,7 @@ const Mongo = {
         find_result.data[RequestCollection].filter(id => id !== identifier.toString());
 
       const update_result =
-        await ldap.updateOne({ sessionID }, { $set: { data: find_result.data } });
+        await ldap().updateOne({ sessionID }, { $set: { data: find_result.data } });
 
       if (update_result.result.ok === 1) {
         Logger.info(`Deleted ${RequestCollection} ${request.params.identifier}`);
