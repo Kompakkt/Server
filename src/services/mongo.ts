@@ -756,6 +756,12 @@ const Mongo = {
       }
     }
 
+    const _id = isValidObjectId
+      ? new ObjectId(resultObject._id)
+      : new ObjectId();
+
+    resultObject._id = _id
+
     if (isCompilation(resultObject)) {
       resultObject.annotationList = (resultObject.annotationList)
         ? resultObject.annotationList : [];
