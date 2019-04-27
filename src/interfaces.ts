@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 
 // Metadata related
-interface IUnresolvedObject {
+export interface IUnresolvedObject {
   _id: string | ObjectId;
 }
 
@@ -264,7 +264,7 @@ export interface ICompilation {
   name: string;
   description: string;
   relatedOwner?: IRelatedOwner;
-  passcode?: string;
+  password?: string;
   models: Array<IModel | null | IUnresolvedObject>;
   annotationList: Array<IAnnotation | null | ObjectId>;
 }
