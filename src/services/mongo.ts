@@ -1,3 +1,4 @@
+/* tslint:disable:max-line-length */
 import * as flatten from 'flatten';
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
@@ -6,11 +7,13 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, ILDAPData, IModel, IMetaDataDigitalObject } from '../interfaces';
+import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
+import { isAnnotation, isCompilation, isModel } from './typeguards';
 import { Utility } from './utility';
+/* tslint:enable:max-line-length */
 
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
@@ -98,6 +101,7 @@ const Mongo = {
         // Create new
         ldap().insertOne(
           {
+            _id: new ObjectId(),
             username,
             sessionID,
             fullname: user['cn'],
@@ -270,7 +274,8 @@ const Mongo = {
     // to a model and push the model
     const pushModel = (digobjResult: InsertOneWriteOpResult) => {
       const resultObject = digobjResult.ops[0];
-      const modelObject = {
+      const modelObject: IModel = {
+        _id: new ObjectId(),
         annotationList: [],
         relatedDigitalObject: {
           _id: resultObject._id,
@@ -358,16 +363,17 @@ const Mongo = {
   submit: async (request, response) => {
     Logger.info('Handling submit request');
 
-    const collection: Collection = this.DBObjectsRepository.collection('digitalobject');
-    const resultObject = { ...request.body };
+    const collection: Collection<IMetaDataDigitalObject> =
+      this.DBObjectsRepository.collection('digitalobject');
+    const resultObject: IMetaDataDigitalObject = { ...request.body };
 
     /**
      * Handle re-submit for changing a finished DigitalObject
      */
-    const isResObjIdValid = ObjectId.isValid(resultObject['_id']);
-    resultObject['_id'] = isResObjIdValid
-      ? new ObjectId(resultObject['_id']) : new ObjectId();
-    Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject['_id']}`);
+    const isResObjIdValid = ObjectId.isValid(resultObject._id);
+    resultObject._id = isResObjIdValid
+      ? new ObjectId(resultObject._id) : new ObjectId();
+    Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${resultObject._id}`);
 
     // We overwrite this in the phyobj loop so we can
     let currentPhyObjId = '';
@@ -391,7 +397,8 @@ const Mongo = {
       }
       const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
       const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
-      const _digId = (currentPhyObjId !== '') ? currentPhyObjId : resultObject['_id'];
+      const _digId = ((currentPhyObjId !== '') ? currentPhyObjId : resultObject._id)
+        .toString();
       // By default, update/create the document
       // but if its an existing person/institution
       // fetch the object and update roles
@@ -693,7 +700,7 @@ const Mongo = {
     }
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
-    const doesObjectExist = await Mongo.resolve(resultObject, RequestCollection);
+    const doesObjectExist: any | null = await Mongo.resolve(resultObject, RequestCollection);
     // If the object already exists we need to check for owner status
     if (isValidObjectId && doesObjectExist) {
       const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
@@ -703,120 +710,117 @@ const Mongo = {
       }
     }
 
-    switch (RequestCollection) {
-      case 'compilation':
-        resultObject['annotationList'] = (resultObject['annotationList'])
-          ? resultObject['annotationList'] : [];
-        resultObject['relatedOwner'] = {
-          _id: userData._id,
-          username: userData.username,
-          fullname: userData.fullname,
-        };
-        // Compilations should have all their models referenced by _id
-        resultObject['models'] =
-          resultObject['models'].map(model => {
-            return { _id: new ObjectId(model['_id']) };
-          });
-        break;
-      case 'model':
-        /* Preview image URLs might have a corrupted address
-   * because of Kompakkt runnning in an iframe
-   * This removes the host address from the URL
-   * so images will load correctly */
-        if (resultObject['settings'] && resultObject['settings']['preview']) {
-          resultObject['settings']['preview'] = `/previews/${resultObject['settings']['preview']
-            .split('previews/')
-            .slice(-1)[0]}`;
-        }
-        break;
-      case 'annotation':
-        // Check if anything was missing for safety
-        if (!resultObject || !resultObject['target'] || !resultObject['target']['source']) {
-          return response.send({
-            status: 'error', message: 'Invalid annotation',
-            invalidObject: resultObject,
-          });
-        }
-        const source = resultObject['target']['source'];
-        if (!source) {
-          response.send({ status: 'error', message: 'Missing source' });
+    if (isCompilation(resultObject)) {
+      resultObject.annotationList = (resultObject.annotationList)
+        ? resultObject.annotationList : [];
+      resultObject.relatedOwner = {
+        _id: userData._id,
+        username: userData.username,
+        fullname: userData.fullname,
+      };
+      // Compilations should have all their models referenced by _id
+      resultObject.models =
+        resultObject.models
+          .filter(model => model)
+          .map((model: IModel) => ({ _id: new ObjectId(model['_id']) }));
+    } else if (isModel(resultObject)) {
+      /* Preview image URLs might have a corrupted address
+       * because of Kompakkt runnning in an iframe
+       * This removes the host address from the URL
+       * so images will load correctly */
+      if (resultObject.settings && resultObject.settings.preview) {
+        resultObject.settings.preview = `/previews/${resultObject.settings.preview
+          .split('previews/')
+          .slice(-1)[0]}`;
+      }
+    } else if (isAnnotation(resultObject)) {
+      // Check if anything was missing for safety
+      if (!resultObject || !resultObject.target || !resultObject.target.source) {
+        return response.send({
+          status: 'error', message: 'Invalid annotation',
+          invalidObject: resultObject,
+        });
+      }
+      const source = resultObject.target.source;
+      if (!source) {
+        response.send({ status: 'error', message: 'Missing source' });
+        return;
+      }
+
+      const relatedModelId: string | undefined = source.relatedModel;
+      const relatedCompId: string | undefined = source.relatedCompilation;
+      // Check if === undefined because otherwise this quits on empty string
+      if (relatedModelId === undefined || relatedCompId === undefined) {
+        response.send({ status: 'error', message: 'Related model or compilation undefined' });
+        return;
+      }
+
+      const validModel = ObjectId.isValid(relatedModelId);
+      const validCompilation = ObjectId.isValid(relatedCompId);
+
+      if (!validModel) {
+        response.send({ status: 'error', message: 'Invalid related model id' });
+        return;
+      }
+
+      if (validModel && !validCompilation) {
+        const isOwner =
+          await Mongo.isUserOwnerOfObject(request, relatedModelId);
+        if (!isOwner) {
+          response.send({ status: 'error', message: 'Permission denied' });
           return;
         }
+      }
 
-        const relatedModelId: string | undefined = source['relatedModel'];
-        const relatedCompId: string | undefined = source['relatedCompilation'];
-        // Check if === undefined because otherwise this quits on empty string
-        if (relatedModelId === undefined || relatedCompId === undefined) {
-          response.send({ status: 'error', message: 'Related model or compilation undefined' });
-          return;
-        }
+      // Update data inside of annotation
+      resultObject.generated = (resultObject.generated)
+        ? resultObject.generated : new Date().toISOString();
+      resultObject.lastModificationDate = new Date().toISOString();
 
-        const isModel = ObjectId.isValid(relatedModelId);
-        const isCompilation = ObjectId.isValid(relatedCompId);
+      const updateAnnotationList = async (id: string, add_to_coll: string) => {
+        const obj: IModel | ICompilation = await Mongo.resolve(id, add_to_coll);
+        // Create annotationList if missing
+        obj.annotationList = (obj.annotationList)
+          ? obj.annotationList : [];
 
-        if (!isModel) {
-          response.send({ status: 'error', message: 'Invalid related model id' });
-          return;
-        }
+        const doesAnnotationExist = obj.annotationList
+          .filter(annotation => annotation)
+          .find((annotation: IAnnotation) =>
+            annotation.toString() === resultObject._id.toString());
+        if (doesAnnotationExist) return true;
 
-        if (isModel && !isCompilation) {
-          const isOwner =
-            await Mongo.isUserOwnerOfObject(request, relatedModelId);
-          if (!isOwner) {
-            response.send({ status: 'error', message: 'Permission denied' });
-            return;
-          }
-        }
+        // Add annotation to list if it doesn't exist
+        const _newId = new ObjectId(resultObject._id);
+        obj.annotationList.push(_newId);
+        const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
+        const listUpdateResult = await coll
+          .updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { annotationList: obj.annotationList } });
 
-        // Update data inside of annotation
-        resultObject['generated'] = (resultObject['generated'])
-          ? resultObject['generated'] : new Date().toISOString();
-        resultObject['lastModificationDate'] = new Date().toISOString();
-
-        const updateAnnotationList = async (id: string, add_to_coll: string) => {
-          const obj = await Mongo.resolve(id, add_to_coll);
-          // Create annotationList if missing
-          obj['annotationList'] = (obj['annotationList'])
-            ? obj['annotationList'] : [];
-
-          const doesAnnotationExist = obj['annotationList']
-            .find(annotation => annotation.toString() === resultObject['_id'].toString());
-          if (doesAnnotationExist) return true;
-
-          // Add annotation to list if it doesn't exist
-          const _newId = new ObjectId(resultObject['_id']);
-          obj['annotationList'].push(_newId);
-          const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
-          const listUpdateResult = await coll
-            .updateOne(
-              { _id: new ObjectId(id) },
-              { $set: { annotationList: obj['annotationList'] } });
-
-          if (listUpdateResult.result.ok !== 1) {
-            Logger.err(`Failed updating annotationList of ${add_to_coll} ${id}`);
-            response.send({ status: 'error' });
-            return false;
-          }
-          return true;
-        };
-
-        const success = (!isCompilation)
-          // Annotation is default annotation
-          ? await updateAnnotationList(relatedModelId, 'model')
-          // Annotation belongs to compilation
-          : await updateAnnotationList(relatedCompId, 'compilation');
-
-        if (!success) {
-          Logger.err(`Failed updating annotationList`);
+        if (listUpdateResult.result.ok !== 1) {
+          Logger.err(`Failed updating annotationList of ${add_to_coll} ${id}`);
           response.send({ status: 'error' });
-          return;
+          return false;
         }
-        break;
-      default:
+        return true;
+      };
+
+      const success = (!validCompilation)
+        // Annotation is default annotation
+        ? await updateAnnotationList(relatedModelId, 'model')
+        // Annotation belongs to compilation
+        : await updateAnnotationList(relatedCompId, 'compilation');
+
+      if (!success) {
+        Logger.err(`Failed updating annotationList`);
+        response.send({ status: 'error' });
+        return;
+      }
     }
 
     const _id = isValidObjectId
-      ? new ObjectId(resultObject['_id'])
+      ? new ObjectId(resultObject._id)
       : new ObjectId();
 
     const updateResult = await collection
