@@ -25,10 +25,6 @@ const ldap = (): Collection<ILDAPData> =>
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
     .findOne({ sessionID });
-const getAllUsers = async () =>
-  ldap()
-    .find({})
-    .toArray();
 const getAllItemsOfCollection = async (collection: string) =>
   Mongo.getObjectsRepository()
     .collection(collection)
@@ -137,80 +133,67 @@ const Mongo = {
     const user = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
-    const found = await getAllUsers();
+    const userData = await getCurrentUserBySession(sessionID);
 
-    switch (found.length) {
-      // TODO: Pack this into config somehow...
-      case 0:
-        // No Account with this LDAP username
-        // Create new
-        ldap()
-          .insertOne(
-            {
-              _id: new ObjectId(),
-              username,
+    if (!userData) {
+      ldap()
+        .insertOne(
+          {
+            _id: new ObjectId(),
+            username,
+            sessionID,
+            fullname: user['cn'],
+            prename: user['givenName'],
+            surname: user['sn'],
+            rank: user['UniColognePersonStatus'],
+            mail: user['mail'],
+            data: {},
+            role: user['UniColognePersonStatus'],
+          },
+          (ins_err, ins_res) => {
+            if (ins_err) {
+              response.send({ status: 'error' });
+              Logger.err(ins_res);
+            } else {
+              Logger.info(ins_res.ops);
+              response.send({ status: 'ok', ...ins_res.ops[0] });
+            }
+          });
+    } else {
+      ldap()
+        .updateOne(
+          { username },
+          {
+            $set: {
               sessionID,
               fullname: user['cn'],
               prename: user['givenName'],
               surname: user['sn'],
               rank: user['UniColognePersonStatus'],
               mail: user['mail'],
-              data: {},
-              role: user['UniColognePersonStatus'],
+              role: (userData['role'])
+                ? ((userData['role'] === '')
+                  ? user['UniColognePersonStatus']
+                  : userData['role'])
+                : user['UniColognePersonStatus'],
             },
-            (ins_err, ins_res) => {
-              if (ins_err) {
-                response.send({ status: 'error' });
-                Logger.err(ins_res);
-              } else {
-                Logger.info(ins_res.ops);
-                response.send({ status: 'ok', ...ins_res.ops[0] });
-              }
-            });
-        break;
-      case 1:
-        // Account found
-        // Update session ID
-        const self = found[0];
-        ldap()
-          .updateOne(
-            { username },
-            {
-              $set: {
-                sessionID,
-                fullname: user['cn'],
-                prename: user['givenName'],
-                surname: user['sn'],
-                rank: user['UniColognePersonStatus'],
-                mail: user['mail'],
-                role: (self['role'])
-                  ? ((self['role'] === '')
-                    ? user['UniColognePersonStatus']
-                    : self['role'])
-                  : user['UniColognePersonStatus'],
-              },
-            },
-            (up_err, _) => {
-              if (up_err) {
-                response.send({ status: 'error' });
-                Logger.err(up_err);
-              } else {
-                ldap()
-                  .findOne({ sessionID, username }, (f_err, f_res) => {
-                    if (f_err) {
-                      response.send({ status: 'error' });
-                      Logger.err(f_err);
-                    } else {
-                      response.send({ status: 'ok', ...f_res });
-                    }
-                  });
-              }
-            });
-        break;
-      default:
-        // Too many Accounts
-        Logger.warn(`Multiple Accounts found for LDAP username ${username}`);
-        response.send({ status: 'error' });
+          },
+          (up_err, _) => {
+            if (up_err) {
+              response.send({ status: 'error' });
+              Logger.err(up_err);
+            } else {
+              ldap()
+                .findOne({ sessionID, username }, (f_err, f_res) => {
+                  if (f_err) {
+                    response.send({ status: 'error' });
+                    Logger.err(f_err);
+                  } else {
+                    response.send({ status: 'ok', ...f_res });
+                  }
+                });
+            }
+          });
     }
   },
   insertCurrentUserData: async (request, identifier, collection) => {
