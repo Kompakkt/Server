@@ -265,25 +265,11 @@ const Mongo = {
     const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
       request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
 
-    const found = await getAllUsers();
-
-    switch (found.length) {
-      case 0:
-        // Invalid sessionID
-        response.send({ message: 'Invalid session' });
-        break;
-      case 1:
-        // Valid sessionID
-        next();
-        break;
-      default:
-        // Multiple sessionID. Invalidate all
-        ldap()
-          .updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
-            Logger.log('Invalidated multiple sessionIDs due to being the same');
-            response.send({ message: 'Invalid session' });
-          });
+    const userData = await getCurrentUserBySession(sessionID);
+    if (!userData) {
+      return response.send({ status: 'error', message: 'Invalid session' });
     }
+    next();
   },
   submitService: async (request, response) => {
     const digobjCollection: Collection<IMetaDataDigitalObject> =
