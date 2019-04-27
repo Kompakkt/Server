@@ -25,6 +25,9 @@ const ldap = (): Collection<ILDAPData> =>
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
     .findOne({ sessionID });
+const getUserByUsername = async (username: string) =>
+  ldap()
+    .findOne({ username });
 const getAllItemsOfCollection = async (collection: string) =>
   Mongo.getObjectsRepository()
     .collection(collection)
@@ -133,7 +136,7 @@ const Mongo = {
     const user = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
-    const userData = await getCurrentUserBySession(sessionID);
+    const userData = await getUserByUsername(username);
 
     if (!userData) {
       ldap()
