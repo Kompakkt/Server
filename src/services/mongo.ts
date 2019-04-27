@@ -202,8 +202,8 @@ const Mongo = {
     const sessionID = request.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData || !userData.data) {
-      response.send({ status: 'ok' });
-      return;
+      return response
+        .send({ status: 'error', message: 'User not found by sessionID. Try relogging' });
     }
     for (const property in userData.data) {
       if (!userData.data.hasOwnProperty(property)) continue;
