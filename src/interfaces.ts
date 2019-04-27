@@ -222,7 +222,7 @@ export interface IModel {
   files: IFile[] | null;
   finished: boolean;
   ranking?: number;
-  relatedDigitalObject?: any;
+  relatedDigitalObject?: IUnresolvedObject | IMetaDataDigitalObject;
   relatedModelOwners?: IRelatedOwner[];
   online: boolean;
   isExternal?: boolean;

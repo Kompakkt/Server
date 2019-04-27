@@ -1,7 +1,7 @@
 import { ICompilation, IMetaDataDigitalObject, IMetaDataPerson, IModel } from '../interfaces';
 
 import { Mongo } from './mongo';
-import { isPerson } from './typeguards';
+import { isPerson, isDigitalObject } from './typeguards';
 
 // TODO: Dynamic Resolving Depth
 
@@ -73,7 +73,7 @@ export const resolveModel = async (model: IModel) => {
     }
     model.annotationList = model.annotationList.filter(_ => _);
   }
-  if (model.relatedDigitalObject) {
+  if (model.relatedDigitalObject && !isDigitalObject(model.relatedDigitalObject)) {
     model.relatedDigitalObject = await Mongo.resolve(model.relatedDigitalObject, 'digitalobject');
   }
   return model;
