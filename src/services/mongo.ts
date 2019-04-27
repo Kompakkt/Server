@@ -57,16 +57,20 @@ const saveBase64toImage = async (base64input: string, subfolder: string, identif
             `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/${saveId}.png`,
             res);
 
-          finalImagePath = `/previews/${subfolder}/${saveId}.png`;
+          finalImagePath = `previews/${subfolder}/${saveId}.png`;
         })
         .catch(e => Logger.err(e));
     } else {
-      finalImagePath = `/previews/${base64input.split('previews/')[1]}`;
+      finalImagePath = `previews/${base64input.split('previews/')[1]}`;
     }
   } catch (e) {
     Logger.err(e);
+    return finalImagePath;
   }
-  return finalImagePath;
+  const https = Configuration.Express.enableHTTPS ? 'https' : 'http';
+  const pubip = Configuration.Express.PublicIP;
+  const port = Configuration.Express.Port;
+  return `${https}://${pubip}:${port}/${finalImagePath}`;
 };
 
 const Mongo = {
@@ -781,9 +785,8 @@ const Mongo = {
        * This removes the host address from the URL
        * so images will load correctly */
       if (resultObject.settings && resultObject.settings.preview) {
-        resultObject.settings.preview = `/previews/${resultObject.settings.preview
-          .split('previews/')
-          .slice(-1)[0]}`;
+        resultObject.settings.preview = await saveBase64toImage(
+          resultObject.settings.preview, 'model', resultObject._id);
       }
     } else if (isAnnotation(resultObject)) {
       // Check if anything was missing for safety
@@ -798,6 +801,13 @@ const Mongo = {
         response.send({ status: 'error', message: 'Missing source' });
         return;
       }
+      if (!resultObject.body || !resultObject.body.content
+        || !resultObject.body.content.relatedPerspective) {
+        return response
+          .send({ status: 'error', message: 'Missing body.content.relatedPerspective' });
+      }
+      resultObject.body.content.relatedPerspective.preview = await saveBase64toImage(
+        resultObject.body.content.relatedPerspective.preview, 'annotation', resultObject._id);
 
       const relatedModelId: string | undefined = source.relatedModel;
       const relatedCompId: string | undefined = source.relatedCompilation;
@@ -870,10 +880,6 @@ const Mongo = {
         return;
       }
     }
-
-    const _id = isValidObjectId
-      ? new ObjectId(resultObject._id)
-      : new ObjectId();
 
     const updateResult = await collection
       .updateOne({ _id }, { $set: resultObject }, { upsert: true });

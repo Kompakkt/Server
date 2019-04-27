@@ -40,6 +40,7 @@ const LoadConfig = () => {
     },
     Express: {
       Host: '127.0.0.1',
+      PublicIP: 'localhost',
       Port: 8080,
       OriginWhitelist: [
         'http://localhost:4200',
