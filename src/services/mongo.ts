@@ -35,6 +35,40 @@ const getAllItemsOfCollection = async (collection: string) =>
     .find({})
     .toArray();
 
+const saveBase64toImage = async (base64input: string, subfolder: string, identifier: string | ObjectId) => {
+  const saveId = identifier.toString();
+  let finalImagePath = '';
+  // TODO: Solve without try-catch block
+  // TODO: Convert to progressive JPEG?
+  try {
+    if (base64input.indexOf('data:image') !== -1) {
+      const replaced = base64input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
+      const tempBuff = Buffer.from(replaced, 'base64');
+      await imagemin.buffer(tempBuff, {
+        plugins: [pngquant.default({
+          speed: 1,
+          strip: true,
+          dithering: 1,
+        })],
+      })
+        .then(res => {
+          ensureDirSync(`${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`);
+          writeFileSync(
+            `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/${saveId}.png`,
+            res);
+
+          finalImagePath = `/previews/${subfolder}/${saveId}.png`;
+        })
+        .catch(e => Logger.err(e));
+    } else {
+      finalImagePath = `/previews/${base64input.split('previews/')[1]}`;
+    }
+  } catch (e) {
+    Logger.err(e);
+  }
+  return finalImagePath;
+};
+
 const Mongo = {
   Client: undefined,
   Connection: undefined,
@@ -854,38 +888,13 @@ const Mongo = {
     const preview = request.body.preview;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
-    const collection = this.DBObjectsRepository.collection('model');
+    const collection: Collection = this.DBObjectsRepository.collection('model');
+    const subfolder = 'model';
 
-    // Base64 to Buffer to optimized PNG
-    // TODO: Convert to progressive JPEG?
-    // TODO: Real Error handling?
-    let finalImagePath = '';
-    try {
-      if (preview.indexOf('data:image') !== -1) {
-        const replaced = preview.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
-        const tempBuff = Buffer.from(replaced, 'base64');
-        await imagemin.buffer(tempBuff, {
-          plugins: [pngquant.default({
-            speed: 1,
-            strip: true,
-            dithering: 1,
-          })],
-        })
-          .then(res => {
-            ensureDirSync(`${RootDirectory}/${UploadConf.UploadDirectory}/previews/`);
-            writeFileSync(
-              `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${identifier}.png`,
-              res);
-
-            finalImagePath = `/previews/${identifier}.png`;
-          })
-          .catch(e => Logger.err(e));
-      } else {
-        finalImagePath = `/previews/${preview.split('previews/')[1]}`;
-      }
-    } catch (e) {
-      Logger.err(e);
-      response.send({ status: 'error' });
+    const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
+    if (finalImagePath === '') {
+      return response
+        .send({ status: 'error', message: 'Failed saving preview image'});
     }
 
     // Overwrite old settings
