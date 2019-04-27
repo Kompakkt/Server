@@ -20,7 +20,7 @@ const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
 
 const ldap = (): Collection<ILDAPData> =>
-  Mongo.getAccountsRepository()
+  getAccountsRepository()
     .collection('ldap');
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
@@ -29,12 +29,13 @@ const getUserByUsername = async (username: string) =>
   ldap()
     .findOne({ username });
 const getAllItemsOfCollection = async (collection: string) =>
-  Mongo.getObjectsRepository()
+  getObjectsRepository()
     .collection(collection)
     .find({})
     .toArray();
 
-const saveBase64toImage = async (base64input: string, subfolder: string, identifier: string | ObjectId) => {
+const saveBase64toImage = async (
+  base64input: string, subfolder: string, identifier: string | ObjectId) => {
   const saveId = identifier.toString();
   let finalImagePath = '';
   // TODO: Solve without try-catch block
@@ -72,34 +73,26 @@ const saveBase64toImage = async (base64input: string, subfolder: string, identif
   return `${https}://${pubip}:${port}/${finalImagePath}`;
 };
 
-const Mongo = {
-  Client: undefined,
-  Connection: undefined,
-  DBObjectsRepository: undefined,
-  AccountsRepository: undefined,
-  init: async () => {
-    const MongoURL = `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
-    this.Client = new MongoClient(MongoURL, {
-      useNewUrlParser: true,
-      reconnectTries: Number.POSITIVE_INFINITY,
-      reconnectInterval: 1000,
-    });
-    await this.Client.connect(async (error, client) => {
-      if (error) {
-        Logger.err(`Couldn't connect to MongoDB. Make sure it is running and check your configuration`);
-        process.exit(1);
-      }
-      this.Connection = client;
-      this.DBObjectsRepository = await this.Client.db(MongoConf.Databases.ObjectsRepository.Name);
-      this.AccountsRepository = await this.Client.db(MongoConf.Databases.Accounts.Name);
-      MongoConf.Databases.ObjectsRepository.Collections.forEach(collection => {
-        this.DBObjectsRepository.createCollection(collection.toLowerCase());
-      });
-    });
+const MongoURL = `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
+const Client = new MongoClient(MongoURL, {
+  useNewUrlParser: true,
+  reconnectTries: Number.POSITIVE_INFINITY,
+  reconnectInterval: 1000,
+});
+const getAccountsRepository = (): Db => Client.db(MongoConf.Databases.Accounts.Name);
+const getObjectsRepository = (): Db => Client.db(MongoConf.Databases.ObjectsRepository.Name);
 
+const Mongo = {
+  init: async () => {
+    await Client.connect(async (error, _) => {
+      if (!error) return;
+      Logger.err(
+        `Couldn't connect to MongoDB. Make sure it is running and check your configuration`);
+      process.exit(1);
+    });
   },
   isMongoDBConnected: async (_, response, next) => {
-    const isConnected = await this.Client.isConnected();
+    const isConnected = await Client.isConnected();
     if (isConnected) {
       next();
     } else {
@@ -107,8 +100,7 @@ const Mongo = {
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
-  getAccountsRepository: (): Db => this.AccountsRepository,
-  getObjectsRepository: (): Db => this.DBObjectsRepository,
+  getAccountsRepository, getObjectsRepository,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -259,9 +251,11 @@ const Mongo = {
   },
   submitService: async (request, response) => {
     const digobjCollection: Collection<IMetaDataDigitalObject> =
-      this.DBObjectsRepository.collection('digitalobject');
+      getObjectsRepository()
+        .collection('digitalobject');
     const modelCollection: Collection<IModel> =
-      this.DBObjectsRepository.collection('model');
+      getObjectsRepository()
+        .collection('model');
 
     const service: string = request.params.service;
     if (!service) response.send({ status: 'error', message: 'Incorrect request' });
@@ -386,7 +380,8 @@ const Mongo = {
     Logger.info('Handling submit request');
 
     const collection: Collection<IMetaDataDigitalObject> =
-      this.DBObjectsRepository.collection('digitalobject');
+      getObjectsRepository()
+        .collection('digitalobject');
     const resultObject: IMetaDataDigitalObject = { ...request.body };
 
     /**
@@ -417,7 +412,8 @@ const Mongo = {
       if (add_to_coll === 'person') {
         field = await addNestedInstitution(field);
       }
-      const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
+      const coll: Collection = getObjectsRepository()
+        .collection(add_to_coll);
       const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
       const _digId = ((currentPhyObjId !== '') ? currentPhyObjId : resultObject._id)
         .toString();
@@ -711,7 +707,8 @@ const Mongo = {
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
-    const collection: Collection = this.DBObjectsRepository.collection(RequestCollection);
+    const collection: Collection = getObjectsRepository()
+      .collection(RequestCollection);
     const sessionID = request.sessionID;
 
     const resultObject = request.body;
@@ -736,7 +733,7 @@ const Mongo = {
       ? new ObjectId(resultObject._id)
       : new ObjectId();
 
-    resultObject._id = _id
+    resultObject._id = _id;
 
     if (isCompilation(resultObject)) {
       resultObject.annotationList = (resultObject.annotationList)
@@ -826,7 +823,8 @@ const Mongo = {
         // Add annotation to list if it doesn't exist
         const _newId = new ObjectId(resultObject._id);
         obj.annotationList.push(_newId);
-        const coll: Collection = this.DBObjectsRepository.collection(add_to_coll);
+        const coll: Collection = getObjectsRepository()
+          .collection(add_to_coll);
         const listUpdateResult = await coll
           .updateOne(
             { _id: new ObjectId(id) },
@@ -872,13 +870,14 @@ const Mongo = {
     const preview = request.body.preview;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
-    const collection: Collection = this.DBObjectsRepository.collection('model');
+    const collection: Collection = getObjectsRepository()
+      .collection('model');
     const subfolder = 'model';
 
     const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
     if (finalImagePath === '') {
       return response
-        .send({ status: 'error', message: 'Failed saving preview image'});
+        .send({ status: 'error', message: 'Failed saving preview image' });
     }
 
     // Overwrite old settings
@@ -902,11 +901,13 @@ const Mongo = {
   /**
    * Simple resolving by collection name and Id
    */
-  resolve: async (obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
+  resolve: async (
+    obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
     if (!obj) return undefined;
     const id = (obj['_id']) ? obj['_id'] : obj;
     Logger.info(`Resolving ${collection_name} ${id}`);
-    const resolve_collection: Collection = this.DBObjectsRepository.collection(collection_name);
+    const resolve_collection: Collection = getObjectsRepository()
+      .collection(collection_name);
     return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
       .then(resolve_result => {
         if (depth && depth === 0) return resolve_result;
@@ -963,7 +964,7 @@ const Mongo = {
 
     if (results.length > 0 && isCompilation(results[0])) {
       const isPasswordProtected = compilation =>
-          (!compilation.password || (compilation.password && compilation.password.length === 0));
+        (!compilation.password || (compilation.password && compilation.password.length === 0));
       results = results.filter(isPasswordProtected);
     }
 
@@ -972,7 +973,8 @@ const Mongo = {
   removeObjectFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const collection = this.DBObjectsRepository.collection(RequestCollection);
+    const collection = getObjectsRepository()
+      .collection(RequestCollection);
     const sessionID = request.sessionID;
 
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
