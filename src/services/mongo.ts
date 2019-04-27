@@ -7,10 +7,11 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPerson, IModel } from '../interfaces';
+import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
+import { resolveCompilation, resolveDigitalObject, resolveModel } from './resolving-strategies';
 import { isAnnotation, isCompilation, isDigitalObject, isModel } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
@@ -711,7 +712,7 @@ const Mongo = {
     }
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
-    const doesObjectExist: any | null = await Mongo.resolve(resultObject, RequestCollection);
+    const doesObjectExist: any | null = await Mongo.resolve(resultObject, RequestCollection, 0);
     // If the object already exists we need to check for owner status
     if (isValidObjectId && doesObjectExist) {
       const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
@@ -789,7 +790,7 @@ const Mongo = {
       resultObject.lastModificationDate = new Date().toISOString();
 
       const updateAnnotationList = async (id: string, add_to_coll: string) => {
-        const obj: IModel | ICompilation = await Mongo.resolve(id, add_to_coll);
+        const obj: IModel | ICompilation = await Mongo.resolve(id, add_to_coll, 0);
         // Create annotationList if missing
         obj.annotationList = (obj.annotationList)
           ? obj.annotationList : [];
@@ -908,77 +909,26 @@ const Mongo = {
   /**
    * Simple resolving by collection name and Id
    */
-  resolve: async (obj, collection_name): Promise<any | null | undefined> => {
+  resolve: async (obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
     if (!obj) return undefined;
     const id = (obj['_id']) ? obj['_id'] : obj;
     Logger.info(`Resolving ${collection_name} ${id}`);
     const resolve_collection: Collection = this.DBObjectsRepository.collection(collection_name);
     return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
-      .then(resolve_result => resolve_result);
-  },
-  /**
-   * Heavy nested resolving for DigitalObject
-   */
-  resolveDigitalObject: async (digitalObject: IMetaDataDigitalObject) => {
-    // TODO: Use Typeguards
-    let currentId = digitalObject._id.toString();
-    const resolveNestedInst = async (obj: IMetaDataPerson) => {
-      if (obj.person_institution_data) {
-        for (let j = 0; j < obj.person_institution_data.length; j++) {
-          // TODO: Find out why institution is missing an _id
-          // Issue probably related to physical object
-          if (!obj.person_institution_data[j]['_id']) {
-            Logger.err(`Nested institution is missing _id for some reason`);
-            Logger.err(obj.person_institution_data);
-            Logger.err(digitalObject);
-            continue;
-          }
-          obj.person_institution_data[j] =
-            await Mongo.resolve(obj.person_institution_data[j]['_id'], 'institution');
-        }
-      }
-      return obj;
-    };
-    const resolveTopLevel = async (obj, property, field) => {
-      if (obj[property] && obj[property].length && obj[property] instanceof Array) {
-        for (let i = 0; i < obj[property].length; i++) {
-          const resolved = await Mongo.resolve(obj[property][i], field);
-          if (!resolved) continue;
-          obj[property][i] = await resolveNestedInst(resolved);
-          if (obj[property][i]['roles'] && obj[property][i]['roles'][currentId]) {
-            const old = obj[property][i]['roles'][currentId];
-            obj[property][i]['roles'] = {};
-            obj[property][i]['roles'][currentId] = old;
-          }
-        }
-      }
-    };
-    const props = [
-      ['digobj_rightsowner'], ['digobj_person_existing'], ['contact_person_existing'],
-      ['digobj_rightsowner', 'institution'], ['digobj_tags', 'tag']];
+      .then(resolve_result => {
+        if (depth && depth === 0) return resolve_result;
 
-    for (const prop of props) {
-      await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
-    }
-
-    if (digitalObject.phyObjs) {
-      const resolvedPhysicalObjects: any[] = [];
-      for (let phyObj of digitalObject.phyObjs) {
-        if (!phyObj) continue;
-        currentId = phyObj._id.toString();
-        phyObj = await Mongo.resolve(phyObj, 'physicalobject');
-        const phyProps = [
-          ['phyobj_rightsowner'], ['phyobj_rightsowner', 'institution'],
-          ['phyobj_person_existing'], ['phyobj_institution_existing', 'institution']];
-        for (const phyProp of phyProps) {
-          await resolveTopLevel(phyObj, phyProp[0], (phyProp[1]) ? phyProp[1] : 'person');
+        if (isDigitalObject(resolve_result)) {
+          return resolveDigitalObject(resolve_result);
         }
-        resolvedPhysicalObjects.push(phyObj);
-      }
-      digitalObject.phyObjs = resolvedPhysicalObjects;
-    }
-
-    return digitalObject;
+        if (isModel(resolve_result)) {
+          return resolveModel(resolve_result);
+        }
+        if (isCompilation(resolve_result)) {
+          return resolveCompilation(resolve_result);
+        }
+        return resolve_result;
+      });
   },
   getObjectFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
@@ -999,73 +949,32 @@ const Mongo = {
       const isUserOwner = await Mongo.isUserOwnerOfObject(request, _id);
       const isPasswordCorrect = (_pw && _pw === password);
 
-      for (let i = 0; i < compilation.models.length; i++) {
-        const model = compilation.models[i];
-        if (!model) continue;
-        compilation.models[i] = await Mongo.resolve(model._id, 'model');
-        compilation.models = compilation.models.filter(_ => _);
-      }
-
-      if (compilation.annotationList) {
-        for (let i = 0; i < compilation.annotationList.length; i++) {
-          compilation.annotationList[i] =
-            await Mongo.resolve(compilation.annotationList[i], 'annotation');
-        }
-        compilation.annotationList = compilation.annotationList.filter(_ => _);
-      }
-
       if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
         response.send({ status: 'ok', ...compilation });
         return;
       }
 
       response.send({ status: 'ok', message: 'Password protected compilation' });
-    } else if (isModel(object)) {
-      const model = object;
-      if (model.annotationList) {
-        for (let i = 0; i < model.annotationList.length; i++) {
-          model.annotationList[i] =
-            await Mongo.resolve(model.annotationList[i], 'annotation');
-        }
-      }
-      response.send({ status: 'ok', ...model });
-    } else if (isDigitalObject(object)) {
-      response.send({ status: 'ok', ...await Mongo.resolveDigitalObject(object) });
     } else {
       response.send({ status: 'ok', ...object });
     }
   },
   getAllObjectsFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
-    const results = await getAllItemsOfCollection(RequestCollection);
+    let results = await getAllItemsOfCollection(RequestCollection);
 
-    switch (RequestCollection) {
-      case 'compilation':
-        let compilations: ICompilation[] = results;
-        const isPasswordProtected = compilation =>
-          (!compilation.password || (compilation.password && compilation.password.length === 0));
-        compilations = compilations.filter(isPasswordProtected);
-
-        // Resolve models. forEach and map seem to be broken
-        for (const compilation of compilations) {
-          const resolvedModels: any[] = [];
-          for (const model of compilation.models) {
-            if (!model) continue;
-            resolvedModels.push(await Mongo.resolve(model._id, 'model'));
-          }
-          compilation.models = resolvedModels.filter(model =>
-            model && model.finished && model.online);
-        }
-
-        response.send(compilations);
-        break;
-      case 'model':
-        const models: IModel[] = results.filter(_ => _);
-        response.send(models.filter(model => model['finished'] && model['online']));
-        break;
-      default:
-        response.send(results);
+    for (let i = 0; i < results.length; i++) {
+      results[i] = await Mongo.resolve(results[i], RequestCollection);
     }
+    results = results.filter(_ => _);
+
+    if (results.length > 0 && isCompilation(results[0])) {
+      const isPasswordProtected = compilation =>
+          (!compilation.password || (compilation.password && compilation.password.length === 0));
+      results = results.filter(isPasswordProtected);
+    }
+
+    response.send(results);
   },
   removeObjectFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
@@ -1168,7 +1077,7 @@ const Mongo = {
 
     switch (RequestCollection) {
       case 'digitalobject':
-        await Promise.all(allObjects.map(async digObj => Mongo.resolveDigitalObject(digObj)));
+        await Promise.all(allObjects.map(async digObj => Mongo.resolve(digObj, 'digitalobject')));
         break;
       case 'model':
         allObjects = allObjects.filter(model =>
@@ -1178,7 +1087,7 @@ const Mongo = {
           if (obj.relatedDigitalObject['_id']) {
             const tempDigObj =
               await Mongo.resolve(obj.relatedDigitalObject, 'digitalobject');
-            obj.relatedDigitalObject = await Mongo.resolveDigitalObject(tempDigObj);
+            obj.relatedDigitalObject = await Mongo.resolve(tempDigObj, 'digitalobject');
             obj.settings.preview = '';
           }
         }
