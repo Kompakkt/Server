@@ -71,6 +71,7 @@ export const resolveModel = async (model: IModel) => {
       if (!annotation) continue;
       model.annotationList[i] = await Mongo.resolve(annotation, 'annotation');
     }
+    model.annotationList = model.annotationList.filter(_ => _);
   }
   if (model.relatedDigitalObject) {
     model.relatedDigitalObject = await Mongo.resolve(model.relatedDigitalObject, 'digitalobject');
