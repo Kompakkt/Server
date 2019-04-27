@@ -1,6 +1,10 @@
 import { ObjectId } from 'mongodb';
 
 // Metadata related
+interface IUnresolvedObject {
+  _id: string | ObjectId;
+}
+
 interface IMetaDataExternalLink {
   externalLink_description: string;
   externalLink_value: string;
@@ -119,7 +123,7 @@ export interface ILoginData {
 }
 
 export interface ILDAPData {
-  _id?: string;
+  _id: string | ObjectId;
   username: string;
   sessionID: string;
   fullname: string;
@@ -212,13 +216,14 @@ export interface IFile {
 }
 
 export interface IModel {
-  _id?: string;
-  annotationList: Array<IAnnotation | null>;
+  _id: string | ObjectId;
+  annotationList: Array<IAnnotation | null | ObjectId>;
   name: string;
   files: IFile[] | null;
   finished: boolean;
   ranking?: number;
   relatedDigitalObject?: any;
+  relatedModelOwners?: IRelatedOwner[];
   online: boolean;
   isExternal?: boolean;
   externalService?: string;
@@ -248,14 +253,20 @@ export interface IModel {
   };
 }
 
+interface IRelatedOwner {
+  _id: string | ObjectId;
+  username: string;
+  fullname: string;
+}
+
 export interface ICompilation {
-  _id?: string;
-  name?: string;
-  description?: string;
-  relatedOwner?: string;
+  _id: string | ObjectId;
+  name: string;
+  description: string;
+  relatedOwner?: IRelatedOwner;
   passcode?: string;
-  models: Array<IModel | null>;
-  annotationList: Array<IAnnotation | null>;
+  models: Array<IModel | null | IUnresolvedObject>;
+  annotationList: Array<IAnnotation | null | ObjectId>;
 }
 
 // Socket related
