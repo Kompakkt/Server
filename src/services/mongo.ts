@@ -7,11 +7,11 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
+import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPerson, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { isAnnotation, isCompilation, isModel } from './typeguards';
+import { isAnnotation, isCompilation, isDigitalObject, isModel } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
 
@@ -26,6 +26,11 @@ const getCurrentUserBySession = async (sessionID: string) =>
     .findOne({ sessionID });
 const getAllUsers = async () =>
   ldap()
+    .find({})
+    .toArray();
+const getAllItemsOfCollection = async (collection: string) =>
+  Mongo.getObjectsRepository()
+    .collection(collection)
     .find({})
     .toArray();
 
@@ -83,10 +88,11 @@ const Mongo = {
   },
   invalidateSession: async (request, response) => {
     const sessionID = request.sessionID;
-    ldap().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
-      Logger.log('Logged out');
-      response.send({ status: 'ok', message: 'Logged out' });
-    });
+    ldap()
+      .updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
+        Logger.log('Logged out');
+        response.send({ status: 'ok', message: 'Logged out' });
+      });
   },
   addToAccounts: async (request, response) => {
     const user = request.user;
@@ -99,65 +105,68 @@ const Mongo = {
       case 0:
         // No Account with this LDAP username
         // Create new
-        ldap().insertOne(
-          {
-            _id: new ObjectId(),
-            username,
-            sessionID,
-            fullname: user['cn'],
-            prename: user['givenName'],
-            surname: user['sn'],
-            rank: user['UniColognePersonStatus'],
-            mail: user['mail'],
-            data: {},
-            role: user['UniColognePersonStatus'],
-          },
-          (ins_err, ins_res) => {
-            if (ins_err) {
-              response.send({ status: 'error' });
-              Logger.err(ins_res);
-            } else {
-              Logger.info(ins_res.ops);
-              response.send({ status: 'ok', ...ins_res.ops[0] });
-            }
-          });
-        break;
-      case 1:
-        // Account found
-        // Update session ID
-        const self = found[0];
-        ldap().updateOne(
-          { username },
-          {
-            $set: {
+        ldap()
+          .insertOne(
+            {
+              _id: new ObjectId(),
+              username,
               sessionID,
               fullname: user['cn'],
               prename: user['givenName'],
               surname: user['sn'],
               rank: user['UniColognePersonStatus'],
               mail: user['mail'],
-              role: (self['role'])
-                ? ((self['role'] === '')
-                  ? user['UniColognePersonStatus']
-                  : self['role'])
-                : user['UniColognePersonStatus'],
+              data: {},
+              role: user['UniColognePersonStatus'],
             },
-          },
-          (up_err, _) => {
-            if (up_err) {
-              response.send({ status: 'error' });
-              Logger.err(up_err);
-            } else {
-              ldap().findOne({ sessionID, username }, (f_err, f_res) => {
-                if (f_err) {
-                  response.send({ status: 'error' });
-                  Logger.err(f_err);
-                } else {
-                  response.send({ status: 'ok', ...f_res });
-                }
-              });
-            }
-          });
+            (ins_err, ins_res) => {
+              if (ins_err) {
+                response.send({ status: 'error' });
+                Logger.err(ins_res);
+              } else {
+                Logger.info(ins_res.ops);
+                response.send({ status: 'ok', ...ins_res.ops[0] });
+              }
+            });
+        break;
+      case 1:
+        // Account found
+        // Update session ID
+        const self = found[0];
+        ldap()
+          .updateOne(
+            { username },
+            {
+              $set: {
+                sessionID,
+                fullname: user['cn'],
+                prename: user['givenName'],
+                surname: user['sn'],
+                rank: user['UniColognePersonStatus'],
+                mail: user['mail'],
+                role: (self['role'])
+                  ? ((self['role'] === '')
+                    ? user['UniColognePersonStatus']
+                    : self['role'])
+                  : user['UniColognePersonStatus'],
+              },
+            },
+            (up_err, _) => {
+              if (up_err) {
+                response.send({ status: 'error' });
+                Logger.err(up_err);
+              } else {
+                ldap()
+                  .findOne({ sessionID, username }, (f_err, f_res) => {
+                    if (f_err) {
+                      response.send({ status: 'error' });
+                      Logger.err(f_err);
+                    } else {
+                      response.send({ status: 'ok', ...f_res });
+                    }
+                  });
+              }
+            });
         break;
       default:
         // Too many Accounts
@@ -181,8 +190,9 @@ const Mongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await ldap().updateOne(
-      { sessionID }, { $set: { data: userData.data } });
+    const updateResult = await ldap()
+      .updateOne(
+        { sessionID }, { $set: { data: userData.data } });
 
     if (updateResult.result.ok !== 1) return false;
     return true;
@@ -229,10 +239,11 @@ const Mongo = {
         break;
       default:
         // Multiple sessionID. Invalidate all
-        ldap().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
-          Logger.log('Invalidated multiple sessionIDs due to being the same');
-          response.send({ message: 'Invalid session' });
-        });
+        ldap()
+          .updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
+            Logger.log('Invalidated multiple sessionIDs due to being the same');
+            response.send({ message: 'Invalid session' });
+          });
     }
   },
   submitService: async (request, response) => {
@@ -897,32 +908,33 @@ const Mongo = {
   /**
    * Simple resolving by collection name and Id
    */
-  resolve: async (obj, collection_name) => {
+  resolve: async (obj, collection_name): Promise<any | null | undefined> => {
     if (!obj) return undefined;
     const id = (obj['_id']) ? obj['_id'] : obj;
     Logger.info(`Resolving ${collection_name} ${id}`);
-    const resolve_collection = this.DBObjectsRepository.collection(collection_name);
+    const resolve_collection: Collection = this.DBObjectsRepository.collection(collection_name);
     return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
       .then(resolve_result => resolve_result);
   },
   /**
    * Heavy nested resolving for DigitalObject
    */
-  resolveDigitalObject: async digitalObject => {
-    let currentId = digitalObject._id;
-    const resolveNestedInst = async obj => {
-      if (obj['person_institution_data']) {
-        for (let j = 0; j < obj['person_institution_data'].length; j++) {
+  resolveDigitalObject: async (digitalObject: IMetaDataDigitalObject) => {
+    // TODO: Use Typeguards
+    let currentId = digitalObject._id.toString();
+    const resolveNestedInst = async (obj: IMetaDataPerson) => {
+      if (obj.person_institution_data) {
+        for (let j = 0; j < obj.person_institution_data.length; j++) {
           // TODO: Find out why institution is missing an _id
           // Issue probably related to physical object
-          if (!obj['person_institution_data'][j]['_id']) {
+          if (!obj.person_institution_data[j]['_id']) {
             Logger.err(`Nested institution is missing _id for some reason`);
-            Logger.err(obj['person_institution_data']);
+            Logger.err(obj.person_institution_data);
             Logger.err(digitalObject);
             continue;
           }
-          obj['person_institution_data'][j] =
-            await Mongo.resolve(obj['person_institution_data'][j]['_id'], 'institution');
+          obj.person_institution_data[j] =
+            await Mongo.resolve(obj.person_institution_data[j]['_id'], 'institution');
         }
       }
       return obj;
@@ -949,10 +961,11 @@ const Mongo = {
       await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
     }
 
-    if (digitalObject['phyObjs']) {
+    if (digitalObject.phyObjs) {
       const resolvedPhysicalObjects: any[] = [];
-      for (let phyObj of digitalObject['phyObjs']) {
-        currentId = phyObj._id;
+      for (let phyObj of digitalObject.phyObjs) {
+        if (!phyObj) continue;
+        currentId = phyObj._id.toString();
         phyObj = await Mongo.resolve(phyObj, 'physicalobject');
         const phyProps = [
           ['phyobj_rightsowner'], ['phyobj_rightsowner', 'institution'],
@@ -962,93 +975,73 @@ const Mongo = {
         }
         resolvedPhysicalObjects.push(phyObj);
       }
-      digitalObject['phyObjs'] = resolvedPhysicalObjects;
+      digitalObject.phyObjs = resolvedPhysicalObjects;
     }
 
     return digitalObject;
   },
-  getObjectFromCollection: (request, response) => {
+  getObjectFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const collection = this.DBObjectsRepository.collection(RequestCollection);
     const _id = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
     const password = (request.params.password) ? request.params.password : '';
+    const object = await Mongo.resolve(_id, RequestCollection);
+    if (!object) {
+      return response
+        .send({ status: 'error', message: `No ${RequestCollection} found with given identifier` });
+    }
 
-    switch (RequestCollection) {
-      case 'compilation':
-        collection.findOne({ _id })
-          .then(async (compilation: ICompilation) => {
-            if (!compilation) {
-              response.send({ status: 'error' });
-              return;
-            }
-            const _pw = compilation['password'];
-            const isPasswordProtected = (_pw && _pw.length > 0);
-            const isUserOwner = await Mongo.isUserOwnerOfObject(request, _id);
-            const isPasswordCorrect = (_pw && _pw === password);
+    if (isCompilation(object)) {
+      const compilation = object;
+      const _pw = compilation.password;
+      const isPasswordProtected = (_pw && _pw.length > 0);
+      const isUserOwner = await Mongo.isUserOwnerOfObject(request, _id);
+      const isPasswordCorrect = (_pw && _pw === password);
 
-            for (let i = 0; i < compilation.models.length; i++) {
-              const model = compilation.models[i];
-              if (!model) continue;
-              compilation.models[i] = await Mongo.resolve(model._id, 'model');
-            }
+      for (let i = 0; i < compilation.models.length; i++) {
+        const model = compilation.models[i];
+        if (!model) continue;
+        compilation.models[i] = await Mongo.resolve(model._id, 'model');
+        compilation.models = compilation.models.filter(_ => _);
+      }
 
-            if (compilation.annotationList) {
-              for (let i = 0; i < compilation.annotationList.length; i++) {
-                compilation.annotationList[i] =
-                  await Mongo.resolve(compilation.annotationList[i], 'annotation');
-              }
-            }
+      if (compilation.annotationList) {
+        for (let i = 0; i < compilation.annotationList.length; i++) {
+          compilation.annotationList[i] =
+            await Mongo.resolve(compilation.annotationList[i], 'annotation');
+        }
+        compilation.annotationList = compilation.annotationList.filter(_ => _);
+      }
 
-            if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
-              response.send({ status: 'ok', ...compilation });
-              return;
-            }
+      if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
+        response.send({ status: 'ok', ...compilation });
+        return;
+      }
 
-            response.send({ status: 'ok', message: 'Password protected compilation' });
-          })
-          .catch(db_error => {
-            Logger.err(db_error);
-            response.send({ status: 'error' });
-          });
-        break;
-      case 'model':
-        collection.findOne({ _id })
-          .then(async (model: any) => {
-            if (model.annotationList) {
-              for (let i = 0; i < model.annotationList.length; i++) {
-                model.annotationList[i] =
-                  await Mongo.resolve(model.annotationList[i], 'annotation');
-              }
-            }
-            response.send({ status: 'ok', ...model });
-          });
-        break;
-      case 'digitalobject':
-        collection.findOne({ _id })
-          .then(async result => {
-            response.send((result)
-              ? { status: 'ok', ...await Mongo.resolveDigitalObject(result) }
-              : { status: 'error' });
-          });
-        break;
-      default:
-        collection.findOne({ _id }, (_, result) => {
-          response.send(result ? result : { status: 'ok' });
-        });
+      response.send({ status: 'ok', message: 'Password protected compilation' });
+    } else if (isModel(object)) {
+      const model = object;
+      if (model.annotationList) {
+        for (let i = 0; i < model.annotationList.length; i++) {
+          model.annotationList[i] =
+            await Mongo.resolve(model.annotationList[i], 'annotation');
+        }
+      }
+      response.send({ status: 'ok', ...model });
+    } else if (isDigitalObject(object)) {
+      response.send({ status: 'ok', ...await Mongo.resolveDigitalObject(object) });
+    } else {
+      response.send({ status: 'ok', ...object });
     }
   },
   getAllObjectsFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
-
-    const collection: Collection = this.DBObjectsRepository.collection(RequestCollection);
-    const results = await collection.find({})
-      .toArray();
+    const results = await getAllItemsOfCollection(RequestCollection);
 
     switch (RequestCollection) {
       case 'compilation':
-        let compilations = results;
+        let compilations: ICompilation[] = results;
         const isPasswordProtected = compilation =>
           (!compilation.password || (compilation.password && compilation.password.length === 0));
         compilations = compilations.filter(isPasswordProtected);
@@ -1057,6 +1050,7 @@ const Mongo = {
         for (const compilation of compilations) {
           const resolvedModels: any[] = [];
           for (const model of compilation.models) {
+            if (!model) continue;
             resolvedModels.push(await Mongo.resolve(model._id, 'model'));
           }
           compilation.models = resolvedModels.filter(model =>
@@ -1066,8 +1060,8 @@ const Mongo = {
         response.send(compilations);
         break;
       case 'model':
-        const finishedAndOnline = results.filter(model => model['finished'] && model['online']);
-        response.send(finishedAndOnline);
+        const models: IModel[] = results.filter(_ => _);
+        response.send(models.filter(model => model['finished'] && model['online']));
         break;
       default:
         response.send(results);
@@ -1113,7 +1107,8 @@ const Mongo = {
         find_result.data[RequestCollection].filter(id => id !== identifier.toString());
 
       const update_result =
-        await ldap().updateOne({ sessionID }, { $set: { data: find_result.data } });
+        await ldap()
+          .updateOne({ sessionID }, { $set: { data: find_result.data } });
 
       if (update_result.result.ok === 1) {
         Logger.info(`Deleted ${RequestCollection} ${request.params.identifier}`);
@@ -1131,10 +1126,8 @@ const Mongo = {
   searchObjectWithFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const collection = this.DBObjectsRepository.collection(RequestCollection);
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
-    let allObjects = await collection.find({})
-      .toArray();
+    let allObjects = await getAllItemsOfCollection(RequestCollection);
 
     const getNestedValues = obj => {
       let result: string[] = [];
