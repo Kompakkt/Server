@@ -80,6 +80,7 @@ Server.post(
 Server.post(
   '/api/v1/post/remove/:collection/:identifier',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Mongo.validateLoginSession,
   Mongo.removeObjectFromCollection,
 );
@@ -145,18 +146,21 @@ Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 Server.post(
   '/admin/getldap',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.getAllLDAPUsers);
 
 Server.post(
   '/admin/promoteuser',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.promoteUserToRole);
 
 Server.post(
   '/admin/togglepublished',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.toggleObjectPublishedState);
 
@@ -196,12 +200,14 @@ Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 Server.post(
   '/mailer/getmailentries',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Mailer.getMailRelatedDatabaseEntries);
 
 Server.post(
   '/mailer/toggleanswered/:target/:identifier',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Mailer.toggleMailAnswered);
 
@@ -212,12 +218,14 @@ WebSocket.on('connection', Socket._handler);
 Server.post(
   '/cleaning/deletenullrefs',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Cleaning.deleteNullRefs);
 
 Server.post(
   '/cleaning/deleteunused',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Cleaning.deleteUnusedPersonsAndInstitutions);
 
@@ -240,6 +248,7 @@ Server.post(
 Server.post(
   '/utility/applyactiontomodelowner',
   Express.passport.authenticate('ldapauth', { session: false }),
+  Mongo.updateSessionId,
   Utility.applyActionToModelOwner);
 
 Express.startListening();

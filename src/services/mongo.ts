@@ -124,6 +124,35 @@ const Mongo = {
         response.send({ status: 'ok', message: 'Logged out' });
       });
   },
+  updateSessionId: async (request, response, next) => {
+    const user = request.user;
+    const username = request.body.username.toLowerCase();
+    const sessionID = request.sessionID;
+    const userData = await getUserByUsername(username) || {};
+
+    const updateResult = await ldap()
+      .updateOne({ username }, {
+        $set: {
+          username,
+          sessionID,
+          fullname: user['cn'],
+          prename: user['givenName'],
+          surname: user['sn'],
+          rank: user['UniColognePersonStatus'],
+          mail: user['mail'],
+          role: (userData['role'])
+            ? ((userData['role'] === '')
+              ? user['UniColognePersonStatus']
+              : userData['role'])
+            : user['UniColognePersonStatus'],
+        },
+      });
+
+    if (updateResult.result.ok !== 1) {
+      return response.send({ status: 'error', message: 'Failed updating user in database' });
+    }
+    next();
+  },
   addToAccounts: async (request, response) => {
     const user = request.user;
     const username = request.body.username.toLowerCase();
