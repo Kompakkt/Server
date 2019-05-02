@@ -817,7 +817,8 @@ const Mongo = {
         const doesAnnotationExist = obj.annotationList
           .filter(annotation => annotation)
           .find((annotation: IAnnotation) =>
-            annotation.toString() === resultObject._id.toString());
+            (annotation._id) ? annotation._id.toString() === resultObject._id.toString()
+              : annotation.toString() === resultObject._id.toString());
         if (doesAnnotationExist) return true;
 
         // Add annotation to list if it doesn't exist
