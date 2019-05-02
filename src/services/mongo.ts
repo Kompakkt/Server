@@ -1018,7 +1018,7 @@ const Mongo = {
       return;
     }
     const delete_result = await collection.deleteOne({ _id: identifier });
-    if (delete_result.result.ok === 1 && delete_result.result.n === 1) {
+    if (delete_result.result.ok === 1) {
       find_result.data[RequestCollection] =
         find_result.data[RequestCollection].filter(id => id !== identifier.toString());
 
