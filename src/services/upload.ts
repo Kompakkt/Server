@@ -2,7 +2,6 @@ import { ensureDirSync, move, moveSync, pathExistsSync, removeSync, statSync } f
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
-import slugify from 'slugify';
 
 import { RootDirectory } from '../environment';
 
@@ -50,8 +49,7 @@ const Upload = {
         `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
         `${request.headers['filetype']}`,
         `${request.headers['semirandomtoken']}/`,
-        `${request.headers['relpath']}/`,
-        `${Date.now()}_${slugify(request['file'].originalname)}`);
+        `${request.headers['relpath']}/`);
 
     ensureDirSync(dirname(destPath));
     moveSync(tempPath, destPath);
@@ -91,6 +89,8 @@ const Upload = {
       response.json([])
         .end('Upload not finished');
     } else {
+      /* We cannot move files to top dir cause this
+       * might break model materials :C
       const found = klawSync(path);
       // Move all files to top level
       found.filter(file => !file.stats.isDirectory())
@@ -103,13 +103,13 @@ const Upload = {
       // Remove subdirs
       found.filter(file => file.stats.isDirectory())
         .sort((a, b) => a.path.length - b.path.length)
-        .forEach(directory => removeSync(directory.path));
+        .forEach(directory => removeSync(directory.path));*/
 
       const foundFiles = klawSync(path);
       // TODO: Add more filters
       const filter: string[] = [];
       switch (Type) {
-        case 'model': filter.push('.ply', '.obj', '.babylon'); break;
+        case 'model': filter.push('.ply', '.obj', '.babylon', '.gltf'); break;
         default:
       }
 
