@@ -813,6 +813,9 @@ const Mongo = {
         // Create annotationList if missing
         obj.annotationList = (obj.annotationList)
           ? obj.annotationList : [];
+        // Filter null
+        obj.annotationList = obj.annotationList
+          .filter(annotation => annotation);
 
         const doesAnnotationExist = obj.annotationList
           .filter(annotation => annotation)
@@ -824,6 +827,14 @@ const Mongo = {
         // Add annotation to list if it doesn't exist
         const _newId = new ObjectId(resultObject._id);
         obj.annotationList.push(_newId);
+
+        // We resolved the compilation earlier, so now we have to replace
+        // the resolved annotations with their ObjectId again
+        obj.annotationList = obj.annotationList
+          .map((annotation: IAnnotation) =>
+            (annotation._id) ? new ObjectId(annotation._id) : annotation);
+
+        // Finally we update the annotationList in the compilation
         const coll: Collection = getObjectsRepository()
           .collection(add_to_coll);
         const listUpdateResult = await coll
