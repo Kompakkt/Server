@@ -1,5 +1,7 @@
 import { Collection, Db, ObjectId } from 'mongodb';
 
+import { ILDAPData, IModel } from '../interfaces';
+
 import { Mongo } from './mongo';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
@@ -10,7 +12,7 @@ const Admin = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('ldap');
+    const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
     const found = await ldap.findOne({ username, sessionID });
     if (!found || found.role !== 'A') {
       return response.send({ status: 'error', message: 'Could not verify your admin status' });
@@ -19,15 +21,25 @@ const Admin = {
   },
   getAllLDAPUsers: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('ldap');
+    const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
     const allAccounts = await ldap.find({})
       .toArray();
-    const filteredAccounts = allAccounts
+    const filteredAccounts = await Promise.all(allAccounts
       .map(account => {
         filterProperties.forEach(prop => account[prop] = undefined);
         return account;
-      });
+      })
+      .map(async account => {
+        for (const coll in account.data) {
+          if (!account.data.hasOwnProperty(coll)) continue;
+          for (let i = 0; i < account.data[coll].length; i++) {
+            const obj = account.data[coll][i];
+            account.data[coll][i] = await Mongo.resolve(obj, coll);
+          }
+        }
+        return account;
+      }));
     response.send({ status: 'ok', users: filteredAccounts });
   },
   promoteUserToRole: async (request, response) => {
@@ -39,7 +51,7 @@ const Admin = {
     switch (role) {
       case 'S': case 'B': case 'U': case 'A':
         const AccDB: Db = Mongo.getAccountsRepository();
-        const ldap: Collection = AccDB.collection('ldap');
+        const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
         const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1) {
           return response.send({ status: 'error', message: 'Updating user role failed' });
@@ -56,7 +68,7 @@ const Admin = {
       return response.send({ status: 'error', message: 'Incorrect request parameters' });
     }
     const ObjDB: Db = Mongo.getObjectsRepository();
-    const ModelCollection = ObjDB.collection('model');
+    const ModelCollection: Collection<IModel> = ObjDB.collection('model');
     const found = await ModelCollection.findOne({ _id });
     if (!found) {
       return response.send({ status: 'error', message: 'No object with this identifier found' });
