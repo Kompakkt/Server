@@ -2,6 +2,7 @@ import { ensureDirSync, move, moveSync, pathExistsSync, removeSync, statSync } f
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
+import slugify from 'slugify';
 
 import { RootDirectory } from '../environment';
 
@@ -44,12 +45,15 @@ const Upload = {
     // TODO: Checksum
     // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
+    const folderOrFilePath = (request.headers['relpath'].length > 0)
+      ? request.headers['relpath']
+      : slugify(request['file'].originalname);
     const destPath =
       join(
         `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
         `${request.headers['filetype']}`,
         `${request.headers['semirandomtoken']}/`,
-        `${request.headers['relpath']}/`);
+        `${folderOrFilePath}/`);
 
     ensureDirSync(dirname(destPath));
     moveSync(tempPath, destPath);
