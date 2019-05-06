@@ -27,6 +27,8 @@ export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject
         if (!resolved) continue;
         if (isPerson(resolved)) {
           obj[property][i] = await resolvePerson(resolved);
+        } else {
+          obj[property][i] = resolved;
         }
         if (obj[property][i]['roles'] && obj[property][i]['roles'][currentId]) {
           const old = obj[property][i]['roles'][currentId];
@@ -36,9 +38,11 @@ export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject
       }
     }
   };
+
+  let selector = digitalObject.digobj_rightsownerSelector;
   const props = [
-    ['digobj_rightsowner'], ['digobj_person_existing'], ['contact_person_existing'],
-    ['digobj_rightsowner', 'institution'], ['digobj_tags', 'tag']];
+    ['digobj_rightsowner', (selector === 2) ? 'institution' : 'person'],
+    ['digobj_person_existing'], ['contact_person_existing'], ['digobj_tags', 'tag']];
 
   for (const prop of props) {
     await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
@@ -50,8 +54,10 @@ export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject
       if (!phyObj) continue;
       currentId = phyObj._id.toString();
       phyObj = await Mongo.resolve(phyObj, 'physicalobject');
+      if (!phyObj) continue;
+      selector = phyObj.phyobj_rightsownerSelector;
       const phyProps = [
-        ['phyobj_rightsowner'], ['phyobj_rightsowner', 'institution'],
+        ['phyobj_rightsowner', (selector === 2) ? 'institution' : 'person'],
         ['phyobj_person_existing'], ['phyobj_institution_existing', 'institution']];
       for (const phyProp of phyProps) {
         await resolveTopLevel(phyObj, phyProp[0], (phyProp[1]) ? phyProp[1] : 'person');
