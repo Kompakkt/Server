@@ -39,7 +39,7 @@ const Express: any = {
 
 const Listener = Express.createServer();
 const WebSocket = socketIo(Listener);
-const Server = Express.server;
+const Server: express.Application = Express.server;
 
 Express.startListening = () => {
   Listener.listen(Conf.Express.Port, Conf.Express.Host);

@@ -12,9 +12,11 @@ import { Utility } from './services/utility';
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);
 Server.use((request, response, next) => {
-  if (request.body && request.body.username) {
-    // LDAP doesn't care about e.g. whitespaces in usernames
-    // so we fix this here
+  if (request.method === 'POST') {
+    request.body = (request.body) ? request.body : {};
+    request.body.username = (request.body.username) ? request.body.username : 'demo';
+    request.body.password = (request.body.password) ? request.body.password : 'demo';
+
     const regex = new RegExp(/[a-z0-9]+/i);
     const result = request.body.username.match(regex);
     if (result[0]) {
