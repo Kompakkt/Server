@@ -124,6 +124,7 @@ export interface ILoginData {
 
 export interface ILDAPData {
   _id: string | ObjectId;
+  createdAt?: number;
   username: string;
   sessionID: string;
   fullname: string;

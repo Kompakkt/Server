@@ -21,7 +21,7 @@ const UploadConf = Configuration.Uploads;
 
 const ldap = (): Collection<ILDAPData> =>
   getAccountsRepository()
-    .collection('ldap');
+    .collection('local');
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
     .findOne({ sessionID });
@@ -164,15 +164,16 @@ const Mongo = {
         .insertOne(
           {
             _id: new ObjectId(),
+            createdAt: Date.now(),
             username,
             sessionID,
-            fullname: user['cn'],
-            prename: user['givenName'],
-            surname: user['sn'],
-            rank: user['UniColognePersonStatus'],
-            mail: user['mail'],
+            fullname: user.username,
+            prename: user.username,
+            surname: user.username,
+            rank: 'U',
+            mail: `${username}@demo.de`,
             data: {},
-            role: user['UniColognePersonStatus'],
+            role: 'U',
           },
           (ins_err, ins_res) => {
             if (ins_err) {
@@ -187,21 +188,7 @@ const Mongo = {
       ldap()
         .updateOne(
           { username },
-          {
-            $set: {
-              sessionID,
-              fullname: user['cn'],
-              prename: user['givenName'],
-              surname: user['sn'],
-              rank: user['UniColognePersonStatus'],
-              mail: user['mail'],
-              role: (userData['role'])
-                ? ((userData['role'] === '')
-                  ? user['UniColognePersonStatus']
-                  : userData['role'])
-                : user['UniColognePersonStatus'],
-            },
-          },
+          { $set: { sessionID } },
           (up_err, _) => {
             if (up_err) {
               response.send({ status: 'error' });

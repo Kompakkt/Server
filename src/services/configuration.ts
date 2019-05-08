@@ -12,7 +12,7 @@ const LoadConfig = () => {
     Mongo: {
       Databases: {
         ObjectsRepository: {
-          Name: 'objectsrepository',
+          Name: 'obdemo',
           Collections: [
             'person',
             'institution',
@@ -25,9 +25,9 @@ const LoadConfig = () => {
           ],
         },
         Accounts: {
-          Name: 'accounts',
+          Name: 'obdemoaccounts',
           Collections: [
-            'ldap',
+            'local',
           ],
         },
       },

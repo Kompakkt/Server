@@ -9,7 +9,7 @@ import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
 import * as passport from 'passport';
-import * as LdapStrategy from 'passport-ldapauth';
+import * as LocalStrategy from 'passport-local';
 import * as socketIo from 'socket.io';
 import * as uuid from 'uuid';
 import * as zlib from 'zlib';
@@ -34,21 +34,6 @@ const Express: any = {
       return HTTPS.createServer(options, Express.server);
     }
     return HTTP.createServer(Express.server);
-  },
-  getLDAPConfig: (request, callback) => {
-    const DN = (Conf.Express.LDAP.DNauthUID)
-      ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
-      : Conf.Express.LDAP.DN;
-    callback(undefined, {
-      server: {
-        url: Conf.Express.LDAP.Host,
-        bindDN: DN,
-        bindCredentials: `${request.body.password}`,
-        searchBase: Conf.Express.LDAP.searchBase,
-        searchFilter: `(uid=${request.body.username})`,
-        reconnect: true,
-      },
-    });
   },
 };
 
@@ -104,11 +89,10 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
 }
 
 // Passport
-Express.passport.use(new LdapStrategy(
-  Express.getLDAPConfig,
-  (user, done) => done(undefined, user)));
+Express.passport.use(new LocalStrategy(
+  (username, password, done) => done(null, { username, password })));
 
-Express.passport.serializeUser((user: any, done) => done(undefined, user.description));
+Express.passport.serializeUser((user: any, done) => done(undefined, user.username));
 Express.passport.deserializeUser((id, done) => done(undefined, id));
 
 Server.use(Express.passport.initialize());
