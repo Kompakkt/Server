@@ -81,10 +81,7 @@ Server.post(
 // Remove document from collection
 Server.post(
   '/api/v1/post/remove/:collection/:identifier',
-  Express.passport.authenticate('local', { session: false }),
-  Mongo.updateSessionId,
-  Mongo.validateLoginSession,
-  Mongo.removeObjectFromCollection,
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
 );
 // Return search data
 Server.post(
@@ -95,35 +92,25 @@ Server.post(
 // Publish or unpublish a model
 Server.post(
   '/api/v1/post/publish',
-  Mongo.validateLoginSession,
-  (request, response, next) => Mongo.isUserOwnerOfObject(request, request.body.identifier)
-    .then(isOwner => {
-      if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model' });
-      next();
-    })
-    .catch(() => response.send({ status: 'error', message: 'Not owner of model' })),
-  Admin.toggleObjectPublishedState);
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
+);
 
 // Upload API
 // Upload a file to the server
 Server.post(
   '/upload',
-  Mongo.validateLoginSession,
-  Upload.Multer.single('file'),
-  Upload.UploadRequest,
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
 );
 // User signals that all necessary files are uploaded
 // TODO: Post Upload Cleanup
 Server.post(
   '/uploadfinished',
-  Mongo.validateLoginSession,
-  Upload.UploadFinish,
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
 );
 // User signals that upload was cancelled
 Server.post(
   '/uploadcancel',
-  Mongo.validateLoginSession,
-  Upload.UploadCancel,
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
 );
 // Metadata
 Server.post(
@@ -154,17 +141,13 @@ Server.post(
 
 Server.post(
   '/admin/promoteuser',
-  Express.passport.authenticate('local', { session: false }),
-  Mongo.updateSessionId,
-  Admin.checkIsAdmin,
-  Admin.promoteUserToRole);
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
+);
 
 Server.post(
   '/admin/togglepublished',
-  Express.passport.authenticate('local', { session: false }),
-  Mongo.updateSessionId,
-  Admin.checkIsAdmin,
-  Admin.toggleObjectPublishedState);
+  (_, response) => response.send({ status: 'error', message: 'Not available in demo'}),
+);
 
 // Europeana
 // TODO: Auslagern
