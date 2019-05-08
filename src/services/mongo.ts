@@ -723,6 +723,15 @@ const Mongo = {
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
+    // Creating Models & Annotations is unavailable on demo
+    switch (RequestCollection) {
+      case 'model':
+      case 'annotation':
+        return response
+          .send({ status: 'error', message: 'Not available in demo'});
+      default:
+    }
+
     const collection: Collection = getObjectsRepository()
       .collection(RequestCollection);
     const sessionID = request.sessionID;
