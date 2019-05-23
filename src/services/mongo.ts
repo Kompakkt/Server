@@ -130,21 +130,30 @@ const Mongo = {
     const sessionID = request.sessionID;
     const userData = await getUserByUsername(username) || {};
 
+    const models: ObjectId[] = (await getAllItemsOfCollection('model'))
+      .map((model: IModel) => new ObjectId(model._id));
+    const compilations: ObjectId[] = (await getAllItemsOfCollection('compilation'))
+      .map((compilation: ICompilation) => new ObjectId(compilation._id));
+
     const updateResult = await ldap()
       .updateOne({ username }, {
         $set: {
           username,
           sessionID,
-          fullname: user['cn'],
-          prename: user['givenName'],
-          surname: user['sn'],
-          rank: user['UniColognePersonStatus'],
-          mail: user['mail'],
+          fullname: user.username,
+          prename: user.username,
+          surname: user.username,
+          rank: 'U',
+          mail: `${username}@demo.de`,
+          data: {
+            model: models,
+            compilation: compilations,
+          },
           role: (userData['role'])
             ? ((userData['role'] === '')
-              ? user['UniColognePersonStatus']
+              ? 'U'
               : userData['role'])
-            : user['UniColognePersonStatus'],
+            : 'U',
         },
       });
 
@@ -159,6 +168,11 @@ const Mongo = {
     const sessionID = request.sessionID;
     const userData = await getUserByUsername(username);
 
+    const models: ObjectId[] = (await getAllItemsOfCollection('model'))
+      .map((model: IModel) => new ObjectId(model._id));
+    const compilations: ObjectId[] = (await getAllItemsOfCollection('compilation'))
+      .map((compilation: ICompilation) => new ObjectId(compilation._id));
+
     if (!userData) {
       ldap()
         .insertOne(
@@ -172,7 +186,10 @@ const Mongo = {
             surname: user.username,
             rank: 'U',
             mail: `${username}@demo.de`,
-            data: {},
+            data: {
+              model: models,
+              compilation: compilations,
+            },
             role: 'U',
           },
           (ins_err, ins_res) => {
