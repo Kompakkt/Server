@@ -1,4 +1,5 @@
 /* tslint:disable:max-line-length */
+import { Response } from 'express';
 import * as flatten from 'flatten';
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
@@ -7,11 +8,12 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
+import { ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { resolveCompilation, resolveDigitalObject, resolveModel } from './resolving-strategies';
+import { saveAnnotation, saveCompilation, saveModel } from './saving-strategies';
 import { isAnnotation, isCompilation, isDigitalObject, isModel } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
@@ -100,7 +102,7 @@ const Mongo = {
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
-  getAccountsRepository, getObjectsRepository,
+  getAccountsRepository, getObjectsRepository, saveBase64toImage,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -731,177 +733,64 @@ const Mongo = {
         response.send({ status: 'error', message: 'Failed to add' });
       });
   },
-  addObjectToCollection: async (request, response) => {
+  addObjectToCollection: async (request, response: Response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
     const collection: Collection = getObjectsRepository()
       .collection(RequestCollection);
-    const sessionID = request.sessionID;
 
-    const resultObject = request.body;
-    const userData = await getCurrentUserBySession(sessionID);
+    let resultObject = request.body;
+    const userData = await getCurrentUserBySession(request.sessionID);
     if (!userData) {
-      response.send({ status: 'error', message: 'Cannot fetch current user from database' });
-      return;
+      return response
+        .send({ status: 'error', message: 'Cannot fetch current user from database' });
     }
 
     const isValidObjectId = ObjectId.isValid(resultObject['_id']);
-    const doesObjectExist: any | null = await Mongo.resolve(resultObject, RequestCollection, 0);
+    // tslint:disable-next-line:triple-equals
+    const doesObjectExist = (await Mongo.resolve(resultObject, RequestCollection, 0)) != undefined;
     // If the object already exists we need to check for owner status
-    if (isValidObjectId && doesObjectExist) {
-      const isOwner = await Mongo.isUserOwnerOfObject(request, resultObject['_id']);
-      if (!isOwner) {
-        response.send({ status: 'error', message: 'Permission denied' });
-        return;
+    // We skip this for annotations, since annotation ranking can be changed by owner
+    // We check this in the saving strategy instead
+    if (isValidObjectId && doesObjectExist && !isAnnotation(resultObject)) {
+      if (!await Mongo.isUserOwnerOfObject(request, resultObject['_id'])) {
+        return response.send({ status: 'error', message: 'Permission denied' });
       }
     }
 
     const _id = isValidObjectId
       ? new ObjectId(resultObject._id)
       : new ObjectId();
-
     resultObject._id = _id;
 
     if (isCompilation(resultObject)) {
-      resultObject.annotationList = (resultObject.annotationList)
-        ? resultObject.annotationList : [];
-      resultObject.relatedOwner = {
-        _id: userData._id,
-        username: userData.username,
-        fullname: userData.fullname,
-      };
-      // Compilations should have all their models referenced by _id
-      resultObject.models =
-        resultObject.models
-          .filter(model => model)
-          .map((model: IModel) => ({ _id: new ObjectId(model['_id']) }));
+      await saveCompilation(resultObject, userData)
+        .then(compilation => resultObject = compilation)
+        .catch(rejected => response.send(rejected));
     } else if (isModel(resultObject)) {
-      /* Preview image URLs might have a corrupted address
-       * because of Kompakkt runnning in an iframe
-       * This removes the host address from the URL
-       * so images will load correctly */
-      if (resultObject.settings && resultObject.settings.preview) {
-        resultObject.settings.preview = await saveBase64toImage(
-          resultObject.settings.preview, 'model', resultObject._id);
-      }
+      await saveModel(resultObject, userData)
+        .then(model => resultObject = model)
+        .catch(rejected => response.send(rejected));
     } else if (isAnnotation(resultObject)) {
-      // Check if anything was missing for safety
-      if (!resultObject || !resultObject.target || !resultObject.target.source) {
-        return response.send({
-          status: 'error', message: 'Invalid annotation',
-          invalidObject: resultObject,
-        });
-      }
-      const source = resultObject.target.source;
-      if (!source) {
-        response.send({ status: 'error', message: 'Missing source' });
-        return;
-      }
-      if (!resultObject.body || !resultObject.body.content
-        || !resultObject.body.content.relatedPerspective) {
-        return response
-          .send({ status: 'error', message: 'Missing body.content.relatedPerspective' });
-      }
-      resultObject.body.content.relatedPerspective.preview = await saveBase64toImage(
-        resultObject.body.content.relatedPerspective.preview, 'annotation', resultObject._id);
-
-      const relatedModelId: string | undefined = source.relatedModel;
-      const relatedCompId: string | undefined = source.relatedCompilation;
-      // Check if === undefined because otherwise this quits on empty string
-      if (relatedModelId === undefined || relatedCompId === undefined) {
-        response.send({ status: 'error', message: 'Related model or compilation undefined' });
-        return;
-      }
-
-      const validModel = ObjectId.isValid(relatedModelId);
-      const validCompilation = ObjectId.isValid(relatedCompId);
-
-      if (!validModel) {
-        response.send({ status: 'error', message: 'Invalid related model id' });
-        return;
-      }
-
-      if (validModel && !validCompilation) {
-        const isOwner =
-          await Mongo.isUserOwnerOfObject(request, relatedModelId);
-        if (!isOwner) {
-          response.send({ status: 'error', message: 'Permission denied' });
-          return;
-        }
-      }
-
-      // Update data inside of annotation
-      resultObject.generated = (resultObject.generated)
-        ? resultObject.generated : new Date().toISOString();
-      resultObject.lastModificationDate = new Date().toISOString();
-
-      const updateAnnotationList = async (id: string, add_to_coll: string) => {
-        const obj: IModel | ICompilation = await Mongo.resolve(id, add_to_coll, 0);
-        // Create annotationList if missing
-        obj.annotationList = (obj.annotationList)
-          ? obj.annotationList : [];
-        // Filter null
-        obj.annotationList = obj.annotationList
-          .filter(annotation => annotation);
-
-        const doesAnnotationExist = obj.annotationList
-          .filter(annotation => annotation)
-          .find((annotation: IAnnotation) =>
-            (annotation._id) ? annotation._id.toString() === resultObject._id.toString()
-              : annotation.toString() === resultObject._id.toString());
-        if (doesAnnotationExist) return true;
-
-        // Add annotation to list if it doesn't exist
-        const _newId = new ObjectId(resultObject._id);
-        obj.annotationList.push(_newId);
-
-        // We resolved the compilation earlier, so now we have to replace
-        // the resolved annotations with their ObjectId again
-        obj.annotationList = obj.annotationList
-          .map((annotation: IAnnotation) =>
-            (annotation._id) ? new ObjectId(annotation._id) : annotation);
-
-        // Finally we update the annotationList in the compilation
-        const coll: Collection = getObjectsRepository()
-          .collection(add_to_coll);
-        const listUpdateResult = await coll
-          .updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { annotationList: obj.annotationList } });
-
-        if (listUpdateResult.result.ok !== 1) {
-          Logger.err(`Failed updating annotationList of ${add_to_coll} ${id}`);
-          response.send({ status: 'error' });
-          return false;
-        }
-        return true;
-      };
-
-      const success = (!validCompilation)
-        // Annotation is default annotation
-        ? await updateAnnotationList(relatedModelId, 'model')
-        // Annotation belongs to compilation
-        : await updateAnnotationList(relatedCompId, 'compilation');
-
-      if (!success) {
-        Logger.err(`Failed updating annotationList`);
-        response.send({ status: 'error' });
-        return;
-      }
+      await saveAnnotation(resultObject, userData, doesObjectExist)
+        .then(annotation => resultObject = annotation)
+        .catch(rejected => response.send(rejected));
+    } else {
+      await Mongo.insertCurrentUserData(request, _id, RequestCollection);
     }
+
+    // We already got rejected. Don't update resultObject in DB
+    if (response.headersSent) return;
 
     const updateResult = await collection
       .updateOne({ _id }, { $set: resultObject }, { upsert: true });
 
     if (updateResult.result.ok !== 1) {
       Logger.err(`Failed updating ${RequestCollection} ${_id}`);
-      response.send({ status: 'error' });
-      return;
+      return response.send({ status: 'error' });
     }
-
-    await Mongo.insertCurrentUserData(request, _id, RequestCollection);
 
     const resultId = (updateResult.upsertedId) ? updateResult.upsertedId._id : _id;
     response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });

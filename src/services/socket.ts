@@ -104,7 +104,6 @@ const Socket = {
     });
 
     socket.on('createAnnotation', (data: IAnnotation) => {
-      console.log(data);
       socket.to(Users[socket.id].room)
         .emit('createAnnotation', { ...data, user: Users[socket.id] });
     });
