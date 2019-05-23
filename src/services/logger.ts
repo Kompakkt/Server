@@ -1,4 +1,3 @@
-import { ensureFileSync, statSync, writeFileSync } from 'fs-extra';
 import { join } from 'path';
 import { inspect } from 'util';
 
@@ -51,21 +50,7 @@ const Logger = {
     }
   },
   writeToLog: () => {
-    ensureFileSync(Logger.path);
-    let lines = '';
-    Logger.stack.forEach(line => {
-      lines += `${line}\n`;
-    });
-    const sizeBefore = statSync(Logger.path).size;
-    writeFileSync(Logger.path, lines, { flag: 'as' });
-    const written = statSync(Logger.path).size - sizeBefore;
-
-    if (written <= 0) return;
-    console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
-    if (written === Buffer.byteLength(lines)) {
-      console.log(`Log looks like a success. Clearing log stack`);
-      Logger.stack.clear();
-    }
+    Logger.stack.clear();
   },
 };
 
