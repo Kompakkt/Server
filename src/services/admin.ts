@@ -37,6 +37,8 @@ const Admin = {
             const obj = account.data[coll][i];
             account.data[coll][i] = await Mongo.resolve(obj, coll);
           }
+          // Filter null objects
+          account.data[coll] = account.data[coll].filter(obj => obj);
         }
         return account;
       }));
