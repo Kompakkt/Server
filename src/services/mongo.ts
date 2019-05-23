@@ -945,11 +945,13 @@ const Mongo = {
   resolve: async (
     obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
     if (!obj) return undefined;
-    const id = (obj['_id']) ? obj['_id'] : obj;
-    Logger.info(`Resolving ${collection_name} ${id}`);
+    const parsedId = (obj['_id']) ? obj['_id'] : obj;
+    if (!ObjectId.isValid(parsedId)) return;
+    const _id = new ObjectId(parsedId);
+    Logger.info(`Resolving ${collection_name} ${_id}`);
     const resolve_collection: Collection = getObjectsRepository()
       .collection(collection_name);
-    return resolve_collection.findOne({ _id: (ObjectId.isValid(id)) ? new ObjectId(id) : id })
+    return resolve_collection.findOne({ $or: [ { _id }, { _id: _id.toString() } ] })
       .then(resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
