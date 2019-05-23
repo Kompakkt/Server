@@ -14,7 +14,7 @@ const Utility = {
   },
   findAllModelOwners: async (modelId: string) => {
     const AccDB: Db = await Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('ldap');
+    const ldap: Collection = AccDB.collection('local');
     const accounts = (await ldap.find({})
       .toArray())
       .filter(userData => {
@@ -126,7 +126,7 @@ const Utility = {
       return response.send({ status: 'error', message: 'Invalid model identifier' });
     }
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap = await AccDB.collection('ldap');
+    const ldap = await AccDB.collection('local');
     const findUserQuery = (ownerId) ? { _id: new ObjectId(ownerId) } : { username: ownerUsername };
     const account = await ldap.findOne(findUserQuery);
     if (!account) {

@@ -50,7 +50,7 @@ const Cleaning = {
   },
   deleteNullRefs: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('ldap');
+    const ldap: Collection = AccDB.collection('local');
     const allUsers = await ldap.find({})
       .toArray();
 

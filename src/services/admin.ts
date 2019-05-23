@@ -12,7 +12,7 @@ const Admin = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
+    const ldap: Collection<ILDAPData> = AccDB.collection('local');
     const found = await ldap.findOne({ username, sessionID });
     if (!found || found.role !== 'A') {
       return response.send({ status: 'error', message: 'Could not verify your admin status' });
@@ -21,7 +21,7 @@ const Admin = {
   },
   getAllLDAPUsers: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
+    const ldap: Collection<ILDAPData> = AccDB.collection('local');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
     const allAccounts = await ldap.find({})
       .toArray();
@@ -53,7 +53,7 @@ const Admin = {
     switch (role) {
       case 'S': case 'B': case 'U': case 'A':
         const AccDB: Db = Mongo.getAccountsRepository();
-        const ldap: Collection<ILDAPData> = AccDB.collection('ldap');
+        const ldap: Collection<ILDAPData> = AccDB.collection('local');
         const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1) {
           return response.send({ status: 'error', message: 'Updating user role failed' });
