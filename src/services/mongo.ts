@@ -309,7 +309,7 @@ const Mongo = {
       Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'model')
         .then(() => {
           response.send({ status: 'ok', result: modelResult.ops[0] });
-          Logger.info('Added Europeana object', modelResult.ops[0]._id);
+          Logger.info(`Added Europeana object ${modelResult.ops[0]._id}`);
         })
         .catch(err => {
           Logger.err(err);
