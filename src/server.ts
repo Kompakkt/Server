@@ -79,7 +79,7 @@ Server.post(
 // Remove document from collection
 Server.post(
   '/api/v1/post/remove/:collection/:identifier',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Mongo.validateLoginSession,
   Mongo.removeObjectFromCollection,
@@ -136,7 +136,7 @@ Server.post(
 // Authentication
 Server.post(
   '/login',
-  Express.passport.authenticate('ldapauth', { session: true }),
+  Express.authenticate({ session: true }),
   Mongo.addToAccounts,
 );
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
@@ -145,21 +145,21 @@ Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 // Admin requests
 Server.post(
   '/admin/getldap',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.getAllLDAPUsers);
 
 Server.post(
   '/admin/promoteuser',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.promoteUserToRole);
 
 Server.post(
   '/admin/togglepublished',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.toggleObjectPublishedState);
@@ -199,14 +199,14 @@ Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
 
 Server.post(
   '/mailer/getmailentries',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Mailer.getMailRelatedDatabaseEntries);
 
 Server.post(
   '/mailer/toggleanswered/:target/:identifier',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Mailer.toggleMailAnswered);
@@ -217,14 +217,14 @@ WebSocket.on('connection', Socket._handler);
 // Cleaning
 Server.post(
   '/cleaning/deletenullrefs',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Cleaning.deleteNullRefs);
 
 Server.post(
   '/cleaning/deleteunused',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Cleaning.deleteUnusedPersonsAndInstitutions);
@@ -247,7 +247,7 @@ Server.post(
 
 Server.post(
   '/utility/applyactiontomodelowner',
-  Express.passport.authenticate('ldapauth', { session: false }),
+  Express.authenticate(),
   Mongo.updateSessionId,
   Utility.applyActionToModelOwner);
 

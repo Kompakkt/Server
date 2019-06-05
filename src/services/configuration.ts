@@ -55,6 +55,7 @@ const LoadConfig = () => {
         Passphrase: '',
       },
       PassportSecret: 'change me',
+      PassportStrategy: 'ldapauth',
       LDAP: {
         DN: 'cn=admin,dc=example,dc=org',
         DNauthUID: true,

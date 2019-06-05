@@ -10,6 +10,7 @@ import * as HTTP from 'http';
 import * as HTTPS from 'https';
 import * as passport from 'passport';
 import * as LdapStrategy from 'passport-ldapauth';
+import * as LocalStrategy from 'passport-local';
 import * as socketIo from 'socket.io';
 import * as uuid from 'uuid';
 import * as zlib from 'zlib';
@@ -19,47 +20,50 @@ import { RootDirectory } from '../environment';
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
 
-const Express: any = {
-  server: express(),
-  passport,
-  createServer: () => {
-    if (Conf.Express.enableHTTPS) {
-      const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
-      const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
+const Server = express();
+const createServer = () => {
+  if (Conf.Express.enableHTTPS) {
+    const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
+    const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
-      const options = { key: privateKey, cert: certificate };
-      if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
-        options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
-      }
-      return HTTPS.createServer(options, Express.server);
+    const options = { key: privateKey, cert: certificate };
+    if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
+      options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
     }
-    return HTTP.createServer(Express.server);
-  },
-  getLDAPConfig: (request, callback) => {
-    const DN = (Conf.Express.LDAP.DNauthUID)
-      ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
-      : Conf.Express.LDAP.DN;
-    callback(undefined, {
-      server: {
-        url: Conf.Express.LDAP.Host,
-        bindDN: DN,
-        bindCredentials: `${request.body.password}`,
-        searchBase: Conf.Express.LDAP.searchBase,
-        searchFilter: `(uid=${request.body.username})`,
-        reconnect: true,
-      },
-    });
-  },
+    return HTTPS.createServer(options, Server);
+  }
+  return HTTP.createServer(Server);
 };
 
-const Listener = Express.createServer();
-const WebSocket = socketIo(Listener);
-const Server = Express.server;
+const getLDAPConfig = (request, callback) => {
+  const DN = (Conf.Express.LDAP.DNauthUID)
+    ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
+    : Conf.Express.LDAP.DN;
+  callback(undefined, {
+    server: {
+      url: Conf.Express.LDAP.Host,
+      bindDN: DN,
+      bindCredentials: `${request.body.password}`,
+      searchBase: Conf.Express.LDAP.searchBase,
+      searchFilter: `(uid=${request.body.username})`,
+      reconnect: true,
+    },
+  });
+};
 
-Express.startListening = () => {
+const startListening = () => {
   Listener.listen(Conf.Express.Port, Conf.Express.Host);
   Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
 };
+
+const authenticate = (options: { session: boolean }
+    = { session: false }) => {
+    const strat = (Conf.Express.PassportStrategy) ? Conf.Express.PassportStrategy : 'ldapauth';
+    return passport.authenticate(strat, { session: options.session });
+  };
+
+const Listener = createServer();
+const WebSocket = socketIo(Listener);
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
@@ -104,14 +108,17 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
 }
 
 // Passport
-Express.passport.use(new LdapStrategy(
-  Express.getLDAPConfig,
-  (user, done) => done(undefined, user)));
+passport.use(new LdapStrategy(
+  getLDAPConfig, (user, done) => done(undefined, user)));
+passport.use(new LocalStrategy((username, password, done) => {
+  console.log(username, password);
+  return done(null, { username, description: 'hello' });
+}));
 
-Express.passport.serializeUser((user: any, done) => done(undefined, user.description));
-Express.passport.deserializeUser((id, done) => done(undefined, id));
+passport.serializeUser((user: any, done) => done(undefined, user.description));
+passport.deserializeUser((id, done) => done(undefined, id));
 
-Server.use(Express.passport.initialize());
+Server.use(passport.initialize());
 Server.use(expressSession({
   genid: uuid,
   secret: Conf.Express.PassportSecret,
@@ -122,6 +129,10 @@ Server.use(expressSession({
     sameSite: false,
   },
 }));
-Server.use(Express.passport.session());
+Server.use(passport.session());
+
+const Express = {
+  Server, passport, createServer, getLDAPConfig, startListening, authenticate,
+};
 
 export { Express, Server, WebSocket };
