@@ -2,6 +2,7 @@ import * as bodyParser from 'body-parser';
 import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
 import * as corser from 'corser';
+import * as crypto from 'crypto';
 import * as express from 'express';
 import * as expressSession from 'express-session';
 import { readFileSync } from 'fs';
@@ -16,9 +17,10 @@ import * as uuid from 'uuid';
 import * as zlib from 'zlib';
 
 import { RootDirectory } from '../environment';
-
+import { ILDAPData } from '../interfaces';
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
+import { Mongo } from './mongo';
 
 const Server = express();
 const createServer = () => {
@@ -109,14 +111,102 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
 
 // Passport
 passport.use(new LdapStrategy(
-  getLDAPConfig, (user, done) => done(undefined, user)));
+  getLDAPConfig, (user, done) => {
+    const adjustedUser = {
+      fullname: user['cn'],
+      prename: user['givenName'],
+      surname: user['sn'],
+      rank: user['UniColognePersonStatus'],
+      mail: user['mail'],
+      role: user['UniColognePersonStatus'],
+    };
+    done(undefined, adjustedUser);
+  }));
+
 passport.use(new LocalStrategy((username, password, done) => {
+  const coll = Mongo
+    .getAccountsRepository()
+    .collection(Conf.Express.PassportCollection);
+  coll.findOne({ username }, async (err, user) => {
+    if (err) return done(err);
+    if (!user) return done(undefined, false);
+    if (!await verifyUser(username, password)) return done(undefined, false);
+    return done(undefined, user);
+  });
   console.log(username, password);
-  return done(null, { username, description: 'hello' });
 }));
 
-passport.serializeUser((user: any, done) => done(undefined, user.description));
+passport.serializeUser((user: any, done) => {
+  const serialValue = Object
+    .keys(user)
+    .reduce((acc, val) => acc + val + user[val], '');
+  done(undefined, serialValue);
+});
 passport.deserializeUser((id, done) => done(undefined, id));
+
+// Local Auth Registration, Salting and Verification
+const generateSalt = (length = 16) => {
+  return crypto.randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
+};
+const sha512 = (password, salt) => {
+  const hash = crypto.createHmac('sha512', salt);
+  hash.update(password);
+  const passwordHash = hash.digest('hex');
+  return { salt, passwordHash };
+};
+const saltHashPassword = password => {
+  return sha512(password, generateSalt(16));
+};
+
+const registerUser = async (request, response) => {
+  if (Conf.Express.PassportCollection !== 'local') {
+    return response
+      .send({ status: 'error', message: 'Local authentication not configured' });
+  }
+  const coll = Mongo
+    .getAccountsRepository()
+    .collection(Conf.Express.PassportCollection);
+
+  const isUser = (obj: any): obj is ILDAPData => {
+    const person = obj as ILDAPData;
+    return person && person.fullname !== undefined && person.prename !== undefined
+      && person.surname !== undefined && person.mail !== undefined
+      && person.username !== undefined && person['password'] !== undefined;
+  };
+
+  // First user gets admin
+  const isFirstUser = (await coll.findOne({})) === null;
+  const rank = (isFirstUser) ? 'A' : 'S';
+  const role = rank;
+
+  const user = request.body;
+  const adjustedUser = { ...user, role, rank, password: saltHashPassword(user.password) };
+  const userExists = (await coll.findOne({ username: user.username })) !== null;
+  if (userExists) {
+    return response.send({ status: 'error', message: 'User already exists' });
+  }
+  if (isUser(adjustedUser)) {
+    coll.insertOne(adjustedUser)
+      .then(() => response.send({ status: 'ok', message: 'Registered' }))
+      .catch(() => response.send({ status: 'error', message: 'Failed inserting user' }));
+  } else {
+    response.send({ status: 'error', message: 'Incomplete user data'});
+  }
+};
+
+const verifyUser = async (username, password) => {
+  const coll = Mongo
+    .getAccountsRepository()
+    .collection(Conf.Express.PassportCollection);
+  const userInDB = await coll.findOne({ username });
+  if (!userInDB) return false;
+  const salt = userInDB.password.salt;
+  const hash = userInDB.password.passwordHash;
+  const newHash = sha512(password, salt).passwordHash;
+  return newHash === hash;
+};
 
 Server.use(passport.initialize());
 Server.use(expressSession({
@@ -132,7 +222,7 @@ Server.use(expressSession({
 Server.use(passport.session());
 
 const Express = {
-  Server, passport, createServer, getLDAPConfig, startListening, authenticate,
+  Server, passport, createServer, getLDAPConfig, startListening, authenticate, registerUser
 };
 
 export { Express, Server, WebSocket };

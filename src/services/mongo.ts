@@ -23,7 +23,7 @@ const UploadConf = Configuration.Uploads;
 
 const ldap = (): Collection<ILDAPData> =>
   getAccountsRepository()
-    .collection('ldap');
+    .collection(Configuration.Express.PassportCollection);
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
     .findOne({ sessionID });
@@ -135,18 +135,12 @@ const Mongo = {
     const updateResult = await ldap()
       .updateOne({ username }, {
         $set: {
-          username,
-          sessionID,
-          fullname: user['cn'],
-          prename: user['givenName'],
-          surname: user['sn'],
-          rank: user['UniColognePersonStatus'],
-          mail: user['mail'],
+          username, sessionID, ...user,
           role: (userData['role'])
-            ? ((userData['role'] === '')
-              ? user['UniColognePersonStatus']
-              : userData['role'])
-            : user['UniColognePersonStatus'],
+                ? ((userData['role'] === '')
+                  ? user['role']
+                  : userData['role'])
+                : user['role'],
         },
       });
 
@@ -166,15 +160,8 @@ const Mongo = {
         .insertOne(
           {
             _id: new ObjectId(),
-            username,
-            sessionID,
-            fullname: user['cn'],
-            prename: user['givenName'],
-            surname: user['sn'],
-            rank: user['UniColognePersonStatus'],
-            mail: user['mail'],
-            data: {},
-            role: user['UniColognePersonStatus'],
+            username, sessionID,
+            ...user, data: {},
           },
           (ins_err, ins_res) => {
             if (ins_err) {
@@ -191,17 +178,12 @@ const Mongo = {
           { username },
           {
             $set: {
-              sessionID,
-              fullname: user['cn'],
-              prename: user['givenName'],
-              surname: user['sn'],
-              rank: user['UniColognePersonStatus'],
-              mail: user['mail'],
+              sessionID, ...user,
               role: (userData['role'])
                 ? ((userData['role'] === '')
-                  ? user['UniColognePersonStatus']
+                  ? user['role']
                   : userData['role'])
-                : user['UniColognePersonStatus'],
+                : user['role'],
             },
           },
           (up_err, _) => {

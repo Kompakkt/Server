@@ -144,6 +144,9 @@ Server.post(
   Express.authenticate({ session: true }),
   Mongo.addToAccounts,
 );
+Server.post(
+  '/register',
+  Express.registerUser);
 Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
