@@ -8,29 +8,30 @@ import { Environment, RootDirectory } from '../environment';
 const _autosaveInterval = 30000;
 const maxStackSize = 128;
 
+const stack: Set<string> = new Set([]);
+
 const Logger = {
-  path: join(RootDirectory, 'server.log'),
-  stack: new Set([]),
+  path: join(RootDirectory, 'server.log'), stack,
   autosave: setInterval(() => Logger.writeToLog(), _autosaveInterval),
-  info: content => {
+  info: (...content) => {
     const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Info) console.log(message);
     Logger.shouldWrite();
   },
-  log: content => {
+  log: (...content) => {
     const message = `[LOG|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Log) console.log(message);
     Logger.shouldWrite();
   },
-  warn: content => {
+  warn: (...content) => {
     const message = `[WARN|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Warn) console.log(message);
     Logger.shouldWrite();
   },
-  err: content => {
+  err: (...content) => {
     const message = `[ERR|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Error) console.log(message);
@@ -40,10 +41,14 @@ const Logger = {
     const now = new Date();
     return now.toISOString();
   },
-  prepareContent: content => {
-    return (typeof (content) === 'object')
-      ? `\n${inspect(content, { showHidden: false, depth: undefined })}`
-      : content;
+  prepareContent: (content: any[]) => {
+    let result = '';
+    for (const element of content) {
+      result += (typeof (element) === 'object')
+      ? `\n${inspect(element, { showHidden: false, depth: undefined })}`
+      : element;
+    }
+    return result;
   },
   shouldWrite: () => {
     if (Logger.stack.size >= maxStackSize) {
