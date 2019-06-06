@@ -88,7 +88,12 @@ Server.post(
 Server.post(
   '/api/v1/post/search/:collection',
   Mongo.validateLoginSession,
-  Mongo.searchObjectWithFilter,
+  Mongo.searchByTextFilter,
+);
+Server.post(
+  '/api/v1/post/searchobject/:collection',
+  Mongo.validateLoginSession,
+  Mongo.searchByObjectFilter,
 );
 // Publish or unpublish a model
 Server.post(
