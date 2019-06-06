@@ -63,7 +63,7 @@ const Upload = {
     const Token = request.body.uuid;
     const Type = request.body.type;
     if (!Token || !Type) {
-      Logger.error(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      Logger.err(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
       response.send({ status: 'error' });
       return;
     }
@@ -83,7 +83,7 @@ const Upload = {
     const Token = request.body.uuid;
     const Type = request.body.type;
     if (!Token || !Type) {
-      Logger.error(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      Logger.err(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
       response.send({ status: 'error' });
       return;
     }

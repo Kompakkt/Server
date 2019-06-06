@@ -309,7 +309,7 @@ const Mongo = {
       Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'model')
         .then(() => {
           response.send({ status: 'ok', result: modelResult.ops[0] });
-          Logger.info('Added Europeana object', modelResult.ops[0]._id);
+          Logger.info(`Added Europeana object ${modelResult.ops[0]._id}`);
         })
         .catch(err => {
           Logger.err(err);
@@ -959,7 +959,62 @@ const Mongo = {
       response.send({ status: 'error' });
     }
   },
-  searchObjectWithFilter: async (request, response) => {
+  searchByObjectFilter: async (request, response) => {
+    const RequestCollection = request.params.collection.toLowerCase();
+    const body: any = (request.body) ? request.body : {};
+    const filter: any = (body.filter) ? body.filter : {};
+
+    const doesObjectPropertyMatch = (obj, propName, _filter = filter) => {
+      if (obj[propName] === null || obj[propName] === undefined) return false;
+      switch (typeof (obj[propName])) {
+        case 'string':
+          if (obj[propName].indexOf(_filter[propName]) === -1) return false;
+          break;
+        case 'object':
+          switch (typeof (_filter[propName])) {
+            case 'string':
+              // Case: search for string inside of object
+              if (JSON
+                .stringify(obj[propName])
+                .indexOf(_filter[propName]) === -1) return false;
+              break;
+            case 'object':
+              // Case: recursive search inside of object + array of objects
+              for (const prop in _filter[propName]) {
+                if (Array.isArray(obj[propName])) {
+                  let resultInArray = false;
+                  for (const innerObj of obj[propName]) {
+                    if (doesObjectPropertyMatch(innerObj, prop, _filter[propName])) resultInArray = true;
+                  }
+                  if (!resultInArray) return false;
+                } else {
+                  if (!doesObjectPropertyMatch(obj[propName], prop, _filter[propName])) return false;
+                }
+              }
+              break;
+            default:
+              if (obj[propName] !== _filter[propName]) return false;
+          }
+          break;
+        default:
+          if (obj[propName] !== _filter[propName]) return false;
+      }
+      return true;
+    };
+
+    let allObjects = await getAllItemsOfCollection(RequestCollection);
+    allObjects = await Promise.all(allObjects.map(obj => Mongo.resolve(obj, RequestCollection)));
+    allObjects = allObjects.filter(obj => {
+      for (const prop in filter) {
+        if (!filter.hasOwnProperty(prop)) continue;
+        if (!doesObjectPropertyMatch(obj, prop)) return false;
+      }
+      return true;
+    });
+
+    response.send(allObjects);
+  },
+  searchByTextFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
