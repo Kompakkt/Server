@@ -53,11 +53,11 @@ const Upload = {
         `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
         `${request.headers['filetype']}`,
         `${request.headers['semirandomtoken']}/`,
-        `${folderOrFilePath}/`);
+        `${folderOrFilePath}`);
 
     ensureDirSync(dirname(destPath));
     moveSync(tempPath, destPath);
-    response.end('Uploaded');
+    response.send({ status: 'ok', message: 'Uploaded' });
   },
   UploadCancel: (request, response) => {
     const Token = request.body.uuid;
@@ -91,7 +91,7 @@ const Upload = {
 
     if (!pathExistsSync(path)) {
       response.json([])
-        .end('Upload not finished');
+        .send('Upload not finished');
     } else {
       /* We cannot move files to top dir cause this
        * might break model materials :C
@@ -149,7 +149,7 @@ const Upload = {
       Logger.info(ResponseFiles);
       response.json(ResponseFiles);
     }
-    response.end('Done!');
+    response.send('Done!');
   },
 };
 
