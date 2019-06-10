@@ -27,7 +27,7 @@ const LoadConfig = () => {
         Accounts: {
           Name: 'accounts',
           Collections: [
-            'ldap',
+            'users',
           ],
         },
       },

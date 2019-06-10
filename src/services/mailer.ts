@@ -59,7 +59,7 @@ const Mailer = {
       .includes(target)) return;
 
     const AccDb: Db = await Mongo.getAccountsRepository();
-    const ldap = AccDb.collection('ldap');
+    const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(target);
 
@@ -80,7 +80,7 @@ const Mailer = {
   },
   countUserMails: async (request, destination) => {
     const AccDb: Db = await Mongo.getAccountsRepository();
-    const ldap = AccDb.collection('ldap');
+    const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(destination);
     const entries = (await collection.find({})
