@@ -23,7 +23,7 @@ const UploadConf = Configuration.Uploads;
 
 const ldap = (): Collection<ILDAPData> =>
   getAccountsRepository()
-    .collection(Configuration.Express.PassportCollection);
+    .collection('users');
 const getCurrentUserBySession = async (sessionID: string) =>
   ldap()
     .findOne({ sessionID });
@@ -155,13 +155,18 @@ const Mongo = {
     const sessionID = request.sessionID;
     const userData = await getUserByUsername(username);
 
+    // Users returned by local strategy might have _id field
+    // _id is immutable in MongoDB, so we can't update the field
+    // tslint:disable-next-line:no-dynamic-delete
+    delete user['_id'];
+
     if (!userData) {
       ldap()
         .insertOne(
           {
-            _id: new ObjectId(),
+            ...user, _id: new ObjectId(),
             username, sessionID,
-            ...user, data: {},
+            data: {},
           },
           (ins_err, ins_res) => {
             if (ins_err) {
@@ -169,7 +174,8 @@ const Mongo = {
               Logger.err(ins_res);
             } else {
               Logger.info(ins_res.ops);
-              response.send({ status: 'ok', ...ins_res.ops[0] });
+              const resultUser = ins_res.ops[0];
+              response.send({ status: 'ok', ...resultUser });
             }
           });
     } else {
@@ -178,7 +184,7 @@ const Mongo = {
           { username },
           {
             $set: {
-              sessionID, ...user,
+              ...user, sessionID,
               role: (userData['role'])
                 ? ((userData['role'] === '')
                   ? user['role']
@@ -193,8 +199,8 @@ const Mongo = {
             } else {
               ldap()
                 .findOne({ sessionID, username }, (f_err, f_res) => {
-                  if (f_err) {
-                    response.send({ status: 'error' });
+                  if (f_err || !f_res) {
+                    response.send({ status: 'error', message: 'Updated user not found' });
                     Logger.err(f_err);
                   } else {
                     response.send({ status: 'ok', ...f_res });
@@ -230,23 +236,25 @@ const Mongo = {
   getCurrentUserData: async (request, response) => {
     const sessionID = request.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
-    if (!userData || !userData.data) {
+    if (!userData) {
       return response
         .send({ status: 'error', message: 'User not found by sessionID. Try relogging' });
     }
-    for (const property in userData.data) {
-      if (!userData.data.hasOwnProperty(property)) continue;
-      userData.data[property] = await Promise.all(
-        userData.data[property].map(async obj => Mongo.resolve(obj, property)));
-      // Filter possible null's
-      userData.data[property] = userData.data[property].filter(obj => obj);
-    }
-    // Add model owners to models
-    if (userData.data.model && userData.data.model.length > 0) {
-      for (const model of userData.data.model) {
-        if (!model) continue;
-        model['relatedModelOwners'] =
-          await Utility.findAllModelOwners(model['_id']);
+    if (userData.data) {
+      for (const property in userData.data) {
+        if (!userData.data.hasOwnProperty(property)) continue;
+        userData.data[property] = await Promise.all(
+          userData.data[property].map(async obj => Mongo.resolve(obj, property)));
+        // Filter possible null's
+        userData.data[property] = userData.data[property].filter(obj => obj);
+      }
+      // Add model owners to models
+      if (userData.data.model && userData.data.model.length > 0) {
+        for (const model of userData.data.model) {
+          if (!model) continue;
+          model['relatedModelOwners'] =
+            await Utility.findAllModelOwners(model['_id']);
+        }
       }
     }
 

@@ -58,9 +58,10 @@ const startListening = () => {
   Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
 };
 
-const authenticate = (options: { session: boolean }
+const authenticate = (options: { session: boolean; strategy?: string }
     = { session: false }) => {
-    const strat = (Conf.Express.PassportStrategy) ? Conf.Express.PassportStrategy : 'ldapauth';
+    const strat = (options.strategy) ? options.strategy :
+      (Conf.Express.PassportDefaultStrategy) ? Conf.Express.PassportDefaultStrategy : 'ldapauth';
     return passport.authenticate(strat, { session: options.session });
   };
 
@@ -126,14 +127,13 @@ passport.use(new LdapStrategy(
 passport.use(new LocalStrategy((username, password, done) => {
   const coll = Mongo
     .getAccountsRepository()
-    .collection(Conf.Express.PassportCollection);
+    .collection('users');
   coll.findOne({ username }, async (err, user) => {
     if (err) return done(err);
     if (!user) return done(undefined, false);
     if (!await verifyUser(username, password)) return done(undefined, false);
     return done(undefined, user);
   });
-  console.log(username, password);
 }));
 
 passport.serializeUser((user: any, done) => {
@@ -161,13 +161,12 @@ const saltHashPassword = password => {
 };
 
 const registerUser = async (request, response) => {
-  if (Conf.Express.PassportCollection !== 'local') {
-    return response
-      .send({ status: 'error', message: 'Local authentication not configured' });
-  }
   const coll = Mongo
     .getAccountsRepository()
-    .collection(Conf.Express.PassportCollection);
+    .collection('users');
+  const passwords = Mongo
+    .getAccountsRepository()
+    .collection('passwords');
 
   const isUser = (obj: any): obj is ILDAPData => {
     const person = obj as ILDAPData;
@@ -182,12 +181,19 @@ const registerUser = async (request, response) => {
   const role = rank;
 
   const user = request.body;
-  const adjustedUser = { ...user, role, rank, password: saltHashPassword(user.password) };
+  const adjustedUser = { ...user, role, rank, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) {
     return response.send({ status: 'error', message: 'User already exists' });
   }
   if (isUser(adjustedUser)) {
+    delete adjustedUser['password'];
+    await passwords.updateOne(
+      { username: user.username },
+      { $set: { username: user.username, password: saltHashPassword(user.password) } },
+      { upsert: true })
+      .then()
+      .catch();
     coll.insertOne(adjustedUser)
       .then(() => response.send({ status: 'ok', message: 'Registered' }))
       .catch(() => response.send({ status: 'error', message: 'Failed inserting user' }));
@@ -199,11 +205,16 @@ const registerUser = async (request, response) => {
 const verifyUser = async (username, password) => {
   const coll = Mongo
     .getAccountsRepository()
-    .collection(Conf.Express.PassportCollection);
+    .collection('users');
+  const passwords = Mongo
+    .getAccountsRepository()
+    .collection('passwords');
   const userInDB = await coll.findOne({ username });
   if (!userInDB) return false;
-  const salt = userInDB.password.salt;
-  const hash = userInDB.password.passwordHash;
+  const pwOfUser = await passwords.findOne({ username });
+  if (!pwOfUser) return false;
+  const salt = pwOfUser.password.salt;
+  const hash = pwOfUser.password.passwordHash;
   const newHash = sha512(password, salt).passwordHash;
   return newHash === hash;
 };
@@ -222,7 +233,7 @@ Server.use(expressSession({
 Server.use(passport.session());
 
 const Express = {
-  Server, passport, createServer, getLDAPConfig, startListening, authenticate, registerUser
+  Server, passport, createServer, getLDAPConfig, startListening, authenticate, registerUser,
 };
 
 export { Express, Server, WebSocket };

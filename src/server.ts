@@ -138,12 +138,24 @@ Server.post(
   Upload.Multer.single('file'), Upload.CancelMetadata,
 );
 
-// Authentication
+// General authentication route
 Server.post(
   '/login',
   Express.authenticate({ session: true }),
   Mongo.addToAccounts,
 );
+// Specific strategy routes
+Server.post(
+  '/login/local',
+  Express.authenticate({ session: true, strategy: 'local' }),
+  Mongo.addToAccounts,
+);
+Server.post(
+  '/login/ldap',
+  Express.authenticate({ session: true, strategy: 'ldapauth' }),
+  Mongo.addToAccounts,
+);
+// Authentication
 Server.post(
   '/register',
   Express.registerUser);
