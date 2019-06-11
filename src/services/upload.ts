@@ -72,10 +72,10 @@ const Upload = {
     Logger.info(`Cancelling upload request ${Token}`);
 
     if (!pathExistsSync(path)) {
-      response.json({ message: 'Path with this token does not exist' });
+      response.send({ status: 'error', message: 'Path with this token does not exist' });
     } else {
       removeSync(path);
-      response.json({ message: 'Successfully cancelled upload' });
+      response.send({ status: 'ok', message: 'Successfully cancelled upload' });
     }
   },
   UploadFinish: async (request, response) => {
@@ -84,14 +84,13 @@ const Upload = {
     const Type = request.body.type;
     if (!Token || !Type) {
       Logger.err(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
-      response.send({ status: 'error' });
+      response.send({ status: 'error', message: 'Missing type or token' });
       return;
     }
     const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
 
     if (!pathExistsSync(path)) {
-      response.json([])
-        .send('Upload not finished');
+      response.send({ status: 'error', message: 'Filepath not found'});
     } else {
       /* We cannot move files to top dir cause this
        * might break model materials :C
@@ -147,9 +146,8 @@ const Upload = {
       const ResponseFiles = prepareResponseFiles((filteredFiles.length > 0)
         ? filteredFiles : foundFiles);
       Logger.info(ResponseFiles);
-      response.json(ResponseFiles);
+      response.send({ status: 'ok', files: ResponseFiles });
     }
-    response.send('Done!');
   },
 };
 
