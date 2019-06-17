@@ -93,6 +93,11 @@ const LoadConfig = () => {
 
     const confObj = merge<IConfiguration>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
 
+    if (confObj.Uploads.TempDirectory.includes('../') ||
+    confObj.Uploads.UploadDirectory.includes('../')) {
+      throw new Error('Upload path contains ../, but traversing up is not supported');
+    }
+
     Logger.info('Configuration details: ');
     Logger.info(confObj);
 
@@ -100,6 +105,7 @@ const LoadConfig = () => {
 
   } catch (error) {
     if (isMaster) {
+      Logger.err(error);
       if (error.code === 'ENOENT') {
         Logger.err('Config file not found. Falling back to default configuration');
       } else {
