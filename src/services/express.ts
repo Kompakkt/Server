@@ -37,20 +37,32 @@ const createServer = () => {
   return HTTP.createServer(Server);
 };
 
-const getLDAPConfig = (request, callback) => {
-  const DN = (Conf.Express.LDAP.DNauthUID)
-    ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
-    : Conf.Express.LDAP.DN;
-  callback(undefined, {
-    server: {
-      url: Conf.Express.LDAP.Host,
-      bindDN: DN,
-      bindCredentials: `${request.body.password}`,
-      searchBase: Conf.Express.LDAP.searchBase,
-      searchFilter: `(uid=${request.body.username})`,
-      reconnect: true,
-    },
-  });
+const getLDAPConfig: LdapStrategy.OptionsFunction = (_request, callback) => {
+  if (!Conf.Express.LDAP) {
+    Logger.warn('LDAP not configured but strategy was called');
+    callback('LDAP not configured', {
+      server: {
+        url: '',
+        searchBase: '',
+        searchFilter: '',
+      },
+    });
+  } else {
+    const request = _request as express.Request;
+    const DN = (Conf.Express.LDAP.DNauthUID)
+      ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
+      : Conf.Express.LDAP.DN;
+    callback(undefined, {
+      server: {
+        url: Conf.Express.LDAP.Host,
+        bindDN: DN,
+        bindCredentials: `${request.body.password}`,
+        searchBase: Conf.Express.LDAP.searchBase,
+        searchFilter: `(uid=${request.body.username})`,
+        reconnect: true,
+      },
+    });
+  }
 };
 
 const startListening = () => {
@@ -108,7 +120,7 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
 
 // Passport
 passport.use(new LdapStrategy(
-  getLDAPConfig, (user, done) => {
+  getLDAPConfig, (user, done): LdapStrategy.VerifyCallback => {
     const adjustedUser = {
       fullname: user['cn'],
       prename: user['givenName'],
@@ -117,7 +129,7 @@ passport.use(new LdapStrategy(
       mail: user['mail'],
       role: user['UniColognePersonStatus'],
     };
-    done(undefined, adjustedUser);
+    return done(undefined, adjustedUser);
   }));
 
 passport.use(new LocalStrategy((username, password, done) => {
@@ -194,7 +206,7 @@ const registerUser = async (request, response) => {
       .then(() => response.send({ status: 'ok', message: 'Registered' }))
       .catch(() => response.send({ status: 'error', message: 'Failed inserting user' }));
   } else {
-    response.send({ status: 'error', message: 'Incomplete user data'});
+    response.send({ status: 'error', message: 'Incomplete user data' });
   }
 };
 

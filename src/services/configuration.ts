@@ -6,31 +6,58 @@ import { ConfigFile } from '../environment';
 
 import { Logger } from './logger';
 
+interface IConfiguration {
+  Mongo: {
+    RepositoryDB: string;
+    AccountsDB: string;
+    Port: number;
+    Hostname: string;
+  };
+  Uploads: {
+    TempDirectory: string;
+    UploadDirectory: string;
+  };
+  Express: {
+    Host: string;
+    PublicIP: string;
+    Port: number;
+    OriginWhitelist: string[];
+    enableHTTPS: boolean;
+    SSLPaths: {
+      PrivateKey: string;
+      Certificate: string;
+      Passphrase: string;
+    };
+    PassportSecret: string;
+    LDAP?: {
+      DN: string;
+      DNauthUID: boolean;
+      Host: string;
+      searchBase: string;
+    };
+  };
+  Services?: {
+    Europeana?: {
+      apiKey: string;
+      endpoint: string;
+    };
+  };
+  Mailer: {
+    Host?: string;
+    Port?: number;
+    Target?: {
+      contact: string;
+      upload: string;
+      bugreport: string;
+    };
+  };
+}
+
 const LoadConfig = () => {
-  // TODO: Configuration Interface
-  const DefaultConfiguration: any = {
+  const DefaultConfiguration: IConfiguration = {
     Mongo: {
-      Databases: {
-        ObjectsRepository: {
-          Name: 'objectsrepository',
-          Collections: [
-            'person',
-            'institution',
-            'digitalobject',
-            'annotation',
-            'tag',
-            'physicalobject',
-            'model',
-            'compilation',
-          ],
-        },
-        Accounts: {
-          Name: 'accounts',
-          Collections: [
-            'users',
-          ],
-        },
-      },
+      RepositoryDB: 'objectsrepository',
+      AccountsDB: 'accounts',
       Port: 27017,
       Hostname: 'localhost',
     },
@@ -55,14 +82,6 @@ const LoadConfig = () => {
         Passphrase: '',
       },
       PassportSecret: 'change me',
-      PassportDefaultStrategy: 'ldapauth',
-      LDAP: {
-        DN: 'cn=admin,dc=example,dc=org',
-        DNauthUID: true,
-        Host: 'ldap://localhost',
-        searchBase: 'dc=example,dc=org',
-      },
-      InsecureAdminAccounts: [],
     },
     Mailer: {},
   };
@@ -72,7 +91,7 @@ const LoadConfig = () => {
   try {
     Logger.info(`Config file path: ${ConfigFile}`);
 
-    const confObj = merge<any>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
+    const confObj = merge<IConfiguration>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
 
     Logger.info('Configuration details: ');
     Logger.info(confObj);
@@ -86,6 +105,7 @@ const LoadConfig = () => {
       } else {
         Logger.err('Failed loading configuration file. Falling back to default configuration');
       }
+      Logger.log(DefaultConfiguration);
     }
     return DefaultConfiguration;
   }

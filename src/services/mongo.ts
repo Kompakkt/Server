@@ -80,8 +80,8 @@ const Client = new MongoClient(MongoURL, {
   reconnectTries: Number.POSITIVE_INFINITY,
   reconnectInterval: 1000,
 });
-const getAccountsRepository = (): Db => Client.db(MongoConf.Databases.Accounts.Name);
-const getObjectsRepository = (): Db => Client.db(MongoConf.Databases.ObjectsRepository.Name);
+const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
+const getObjectsRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
 const Mongo = {
   init: async () => {

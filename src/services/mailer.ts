@@ -13,9 +13,9 @@ const Mailer = {
       && Configuration.Mailer.Target;
   },
   sendMail: async (request, response) => {
-    if (!request.body || !Configuration.Mailer.Target[request.body.target]) {
-      response.send({ status: 'error' });
-      return false;
+    if (!request.body || !Configuration.Mailer.Target
+      || !Configuration.Mailer.Target[request.body.target]) {
+      return response.send({ status: 'error' });
     }
 
     const transporter = nodemailer.createTransport({
@@ -37,8 +37,8 @@ const Mailer = {
         break;
       default:
         if (MailCount < 3) break;
-        response.send({ status: 'error', message: 'Limit for this category reached' });
-        return;
+        return response
+          .send({ status: 'error', message: 'Limit for this category reached' });
     }
 
     transporter.sendMail(mailOptions)
@@ -55,7 +55,8 @@ const Mailer = {
   },
   addUserToDatabase: async (request, mailSent) => {
     const target = request.body.target;
-    if (!Object.keys(Configuration.Mailer.Target)
+    if (!Configuration.Mailer.Target || !Object
+      .keys(Configuration.Mailer.Target)
       .includes(target)) return;
 
     const AccDb: Db = await Mongo.getAccountsRepository();
@@ -90,6 +91,10 @@ const Mailer = {
   },
   getMailRelatedDatabaseEntries: async (_, response) => {
     const AccDb: Db = await Mongo.getAccountsRepository();
+    if (!Configuration.Mailer.Target) {
+      return response
+        .send({ status: 'error', message: 'Mailing service not configured' });
+    }
     const targets = Object.keys(Configuration.Mailer.Target);
     const Response: any = {};
     for (const target of targets) {
@@ -103,24 +108,28 @@ const Mailer = {
   toggleMailAnswered: async (request, response) => {
     const target = request.params.target;
     const identifier = request.params.identifier;
+    if (!Configuration.Mailer.Target) {
+      return response
+        .send({ status: 'error', message: 'Mailing service not configured' });
+    }
     if (!Object.keys(Configuration.Mailer.Target)
       .includes(target)) {
-      return response.send({ status: 'error', message: 'Invalid target'});
+      return response.send({ status: 'error', message: 'Invalid target' });
     }
     if (!ObjectId.isValid(identifier)) {
-      return response.send({ status: 'error', message: 'Invalid mail identifier'});
+      return response.send({ status: 'error', message: 'Invalid mail identifier' });
     }
     const _id = new ObjectId(identifier);
     const AccDB: Db = await Mongo.getAccountsRepository();
     const targetColl = AccDB.collection(target);
     const oldEntry = await targetColl.findOne({ _id });
     if (!oldEntry || oldEntry.answered === undefined) {
-      return response.send({ status: 'error', message: 'Invalid mail entry in database'});
+      return response.send({ status: 'error', message: 'Invalid mail entry in database' });
     }
     const isAnswered = oldEntry.answered;
-    const updateResult = await targetColl.updateOne({ _id }, { $set: { answered: !isAnswered }});
+    const updateResult = await targetColl.updateOne({ _id }, { $set: { answered: !isAnswered } });
     if (updateResult.result.ok !== 1) {
-      return response.send({ status: 'error', message: 'Failed updating entry'});
+      return response.send({ status: 'error', message: 'Failed updating entry' });
     }
     response.send({ status: 'ok', ...await targetColl.findOne({ _id }) });
   },
