@@ -58,12 +58,8 @@ const startListening = () => {
   Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
 };
 
-const authenticate = (options: { session: boolean; strategy?: string }
-    = { session: false }) => {
-    const strat = (options.strategy) ? options.strategy :
-      (Conf.Express.PassportDefaultStrategy) ? Conf.Express.PassportDefaultStrategy : 'ldapauth';
-    return passport.authenticate(strat, { session: options.session });
-  };
+const authenticate = (options: { session: boolean } = { session: false }) =>
+  passport.authenticate(['local', 'ldapauth'], { session: options.session });
 
 const Listener = createServer();
 const WebSocket = socketIo(Listener);

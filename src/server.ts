@@ -140,19 +140,8 @@ Server.post(
 
 // General authentication route
 Server.post(
-  '/login',
+  ['/login', '/login/*'],
   Express.authenticate({ session: true }),
-  Mongo.addToAccounts,
-);
-// Specific strategy routes
-Server.post(
-  '/login/local',
-  Express.authenticate({ session: true, strategy: 'local' }),
-  Mongo.addToAccounts,
-);
-Server.post(
-  '/login/ldap',
-  Express.authenticate({ session: true, strategy: 'ldapauth' }),
   Mongo.addToAccounts,
 );
 // Authentication
