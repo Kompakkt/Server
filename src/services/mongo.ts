@@ -85,15 +85,21 @@ const getObjectsRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
 const Mongo = {
   init: async () => {
-    await Client.connect(async (error, _) => {
-      if (!error) return;
-      Logger.err(
-        `Couldn't connect to MongoDB. Make sure it is running and check your configuration`);
-      process.exit(1);
+    return new Promise<void>((resolve, reject) => {
+      Client.connect((error, _) => {
+        if (!error) {
+          resolve();
+        } else {
+          reject();
+          Logger.err(`Couldn't connect to MongoDB.
+            Make sure it is running and check your configuration`);
+          process.exit(1);
+        }
+      });
     });
   },
   isMongoDBConnected: async (_, response, next) => {
-    const isConnected = await Client.isConnected();
+    const isConnected = Client.isConnected();
     if (isConnected) {
       next();
     } else {
@@ -260,8 +266,10 @@ const Mongo = {
     response.send({ status: 'ok', ...userData });
   },
   validateLoginSession: async (request, response, next) => {
-    const sessionID = request.sessionID = (request.cookies['connect.sid']) ?
-      request.cookies['connect.sid'].substr(2, 36) : request.sessionID;
+    let cookieSID = request.cookies['connect.sid'];
+    cookieSID = cookieSID.substring(cookieSID.indexOf(':') + 1, cookieSID.indexOf('.'));
+    const sessionID = request.sessionID = (cookieSID) ?
+      cookieSID : request.sessionID;
 
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) {
@@ -393,30 +401,14 @@ const Mongo = {
     }
   },
   /**
+   * DEPRECATED: Redirects to correct function though!
    * When the user submits the metadataform this function
    * adds the missing data to defined collections
    */
   submit: async (request, response) => {
     Logger.info('Handling submit request');
-
     request.params.collection = 'digitalobject';
-    Mongo.addObjectToCollection(request, response);
-
-    /*const collection: Collection<IMetaDataDigitalObject> =
-      getObjectsRepository()
-        .collection('digitalobject');
-    const resultObject: IMetaDataDigitalObject = { ...request.body };
-
-    collection.updateOne({ _id: finalObject['_id'] }, { $set: finalObject }, { upsert: true })
-      .then(() => Mongo.resolve(finalObject['_id'], 'digitalobject'))
-      .then(data => {
-        Logger.info(`Finished Object ${finalObject['_id']}`);
-        response.send({ status: 'ok', data });
-      })
-      .catch(e => {
-        Logger.err(e);
-        response.send({ status: 'error', message: 'Failed to add' });
-      });*/
+    await Mongo.addObjectToCollection(request, response);
   },
   addObjectToCollection: async (request, response: Response) => {
     const RequestCollection = request.params.collection.toLowerCase();
@@ -464,9 +456,10 @@ const Mongo = {
         .catch(rejected => response.send(rejected));
     } else if (isDigitalObject(resultObject)) {
       await saveDigitalObject(resultObject)
-        .then(digitalobject => {
+        .then(async digitalobject => {
           resultObject = digitalobject;
-          Mongo.insertCurrentUserData(request, resultObject._id, 'digitalobject');
+          await Mongo
+            .insertCurrentUserData(request, resultObject._id, 'digitalobject');
         })
         .catch(rejected => response.send(rejected));
     } else {
@@ -474,7 +467,7 @@ const Mongo = {
     }
 
     // We already got rejected. Don't update resultObject in DB
-    if (response.headersSent) return;
+    if (response.headersSent) return undefined;
 
     const updateResult = await collection
       .updateOne({ _id }, { $set: resultObject }, { upsert: true });
@@ -527,7 +520,7 @@ const Mongo = {
     obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
     if (!obj) return undefined;
     const parsedId = (obj['_id']) ? obj['_id'] : obj;
-    if (!ObjectId.isValid(parsedId)) return;
+    if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
     Logger.info(`Resolving ${collection_name} ${_id}`);
     const resolve_collection: Collection = getObjectsRepository()
@@ -569,7 +562,7 @@ const Mongo = {
 
       if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
         response.send({ status: 'ok', ...compilation });
-        return;
+        return undefined;
       }
 
       response.send({ status: 'ok', message: 'Password protected compilation' });
@@ -676,11 +669,15 @@ const Mongo = {
                 if (Array.isArray(obj[propName])) {
                   let resultInArray = false;
                   for (const innerObj of obj[propName]) {
-                    if (doesObjectPropertyMatch(innerObj, prop, _filter[propName])) resultInArray = true;
+                    if (doesObjectPropertyMatch(innerObj, prop, _filter[propName])) {
+                      resultInArray = true;
+                    }
                   }
                   if (!resultInArray) return false;
                 } else {
-                  if (!doesObjectPropertyMatch(obj[propName], prop, _filter[propName])) return false;
+                  if (!doesObjectPropertyMatch(obj[propName], prop, _filter[propName])) {
+                    return false;
+                  }
                 }
               }
               break;

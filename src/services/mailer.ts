@@ -1,9 +1,11 @@
-import * as nodemailer from 'nodemailer';
 import { Db, ObjectId } from 'mongodb';
+import * as nodemailer from 'nodemailer';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
+
+const MAIL_LIMIT = 3;
 
 const Mailer = {
   isConfigValid: () => {
@@ -36,22 +38,26 @@ const Mailer = {
       case 'bugreport':
         break;
       default:
-        if (MailCount < 3) break;
+        if (MailCount < MAIL_LIMIT) break;
         return response
           .send({ status: 'error', message: 'Limit for this category reached' });
     }
 
-    transporter.sendMail(mailOptions)
+    let result = true;
+    await transporter.sendMail(mailOptions)
       .then(success => {
         Logger.info(`Nodemailer sent mail:`, success);
-        Mailer.addUserToDatabase(request, true);
         response.send({ status: 'ok', message: 'Mail has been sent' });
       })
       .catch(error => {
+        result = false;
         Logger.err(`Failed sending mail:`, error);
-        Mailer.addUserToDatabase(request, false);
         response.send({ status: 'error', message: 'Failed sending mail' });
       });
+
+    Mailer
+      .addUserToDatabase(request, result)
+      .catch(() => { });
   },
   addUserToDatabase: async (request, mailSent) => {
     const target = request.body.target;
@@ -59,7 +65,7 @@ const Mailer = {
       .keys(Configuration.Mailer.Target)
       .includes(target)) return;
 
-    const AccDb: Db = await Mongo.getAccountsRepository();
+    const AccDb: Db = Mongo.getAccountsRepository();
     const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(target);
@@ -80,7 +86,7 @@ const Mailer = {
     }
   },
   countUserMails: async (request, destination) => {
-    const AccDb: Db = await Mongo.getAccountsRepository();
+    const AccDb: Db = Mongo.getAccountsRepository();
     const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(destination);
@@ -90,7 +96,7 @@ const Mailer = {
     return entries.length;
   },
   getMailRelatedDatabaseEntries: async (_, response) => {
-    const AccDb: Db = await Mongo.getAccountsRepository();
+    const AccDb: Db = Mongo.getAccountsRepository();
     if (!Configuration.Mailer.Target) {
       return response
         .send({ status: 'error', message: 'Mailing service not configured' });
@@ -120,7 +126,7 @@ const Mailer = {
       return response.send({ status: 'error', message: 'Invalid mail identifier' });
     }
     const _id = new ObjectId(identifier);
-    const AccDB: Db = await Mongo.getAccountsRepository();
+    const AccDB: Db = Mongo.getAccountsRepository();
     const targetColl = AccDB.collection(target);
     const oldEntry = await targetColl.findOne({ _id });
     if (!oldEntry || oldEntry.answered === undefined) {

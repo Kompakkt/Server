@@ -13,7 +13,7 @@ const Utility = {
     response.send({ status: 'ok', accounts });
   },
   findAllModelOwners: async (modelId: string) => {
-    const AccDB: Db = await Mongo.getAccountsRepository();
+    const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('users');
     const accounts = (await ldap.find({})
       .toArray())
@@ -35,7 +35,7 @@ const Utility = {
       return;
     }
 
-    const ObjDB: Db = await Mongo.getObjectsRepository();
+    const ObjDB: Db = Mongo.getObjectsRepository();
     const compilations = (await ObjDB.collection('compilation')
       .find({})
       .toArray())
@@ -61,7 +61,7 @@ const Utility = {
       return;
     }
 
-    const ObjDB: Db = await Mongo.getObjectsRepository();
+    const ObjDB: Db = Mongo.getObjectsRepository();
     const CompColl = ObjDB.collection('compilation');
     const compilation = await CompColl.findOne({ _id: new ObjectId(compId) });
     if (!compilation) {
@@ -126,7 +126,7 @@ const Utility = {
       return response.send({ status: 'error', message: 'Invalid model identifier' });
     }
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap = await AccDB.collection('users');
+    const ldap = AccDB.collection('users');
     const findUserQuery = (ownerId) ? { _id: new ObjectId(ownerId) } : { username: ownerUsername };
     const account = await ldap.findOne(findUserQuery);
     if (!account) {

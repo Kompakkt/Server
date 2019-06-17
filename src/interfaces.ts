@@ -1,5 +1,11 @@
 import { ObjectId } from 'mongodb';
 
+/* Workaround for
+ * TSLint: Expression is always true */
+export interface IInvalid {
+  [key: string]: any | undefined;
+}
+
 // Metadata related
 export interface IUnresolvedObject {
   _id: string | ObjectId;

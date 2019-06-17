@@ -123,9 +123,7 @@ const Upload = {
                   .join('\n');
                 return content;
               })
-              .then(content => {
-                writeFile(item.path, content);
-              })
+              .then(content => writeFile(item.path, content))
               .catch(err => Logger.err(err))));
 
         // TODO: Add more filters
@@ -166,6 +164,10 @@ const Upload = {
           ? filteredFiles : foundFiles);
         Logger.info(ResponseFiles);
         response.send({ status: 'ok', files: ResponseFiles });
+      })
+      .catch(err => {
+        Logger.err(err);
+        response.send({ status: 'error', message: 'Unknown error'});
       });
   },
 };

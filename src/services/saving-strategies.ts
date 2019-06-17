@@ -1,6 +1,7 @@
 import * as flatten from 'flatten';
 import { Collection, ObjectId } from 'mongodb';
 
+// tslint:disable-next-line:max-line-length
 import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPhysicalObject, IModel } from '../interfaces';
 
 import { Logger } from './logger';
@@ -52,7 +53,8 @@ const saveCompilation = async (compilation: ICompilation, userData: ILDAPData) =
   return compilation;
 };
 
-const saveAnnotation = async (annotation: IAnnotation, userData: ILDAPData, doesObjectExist: boolean) => {
+const saveAnnotation = async (
+  annotation: IAnnotation, userData: ILDAPData, doesObjectExist: boolean) => {
   return new Promise<IAnnotation>(async (resolve, reject) => {
     // If the Annotation already exists, check for owner
     const isAnnotationOwner = (doesObjectExist)
@@ -76,8 +78,9 @@ const saveAnnotation = async (annotation: IAnnotation, userData: ILDAPData, does
     annotation.body.content.relatedPerspective.preview = await Mongo.saveBase64toImage(
       annotation.body.content.relatedPerspective.preview, 'annotation', annotation._id);
 
-    const relatedModelId: string | undefined = source.relatedModel;
-    const relatedCompId: string | undefined = source.relatedCompilation;
+    // Assume invalid data
+    const relatedModelId = source.relatedModel as string | undefined;
+    const relatedCompId = source.relatedCompilation;
     // Check if === undefined because otherwise this quits on empty string
     if (relatedModelId === undefined || relatedCompId === undefined) {
       return reject({ status: 'error', message: 'Related model or compilation undefined' });

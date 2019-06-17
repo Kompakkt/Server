@@ -12,12 +12,12 @@ import * as HTTPS from 'https';
 import * as passport from 'passport';
 import * as LdapStrategy from 'passport-ldapauth';
 import * as LocalStrategy from 'passport-local';
-import * as socketIo from 'socket.io';
-import * as uuid from 'uuid';
-import * as zlib from 'zlib';
+import * as SocketIo from 'socket.io';
+import { constants } from 'zlib';
 
 import { RootDirectory } from '../environment';
-import { ILDAPData } from '../interfaces';
+import { IInvalid, ILDAPData } from '../interfaces';
+
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
@@ -74,7 +74,7 @@ const authenticate = (options: { session: boolean } = { session: false }) =>
   passport.authenticate(['local', 'ldapauth'], { session: options.session });
 
 const Listener = createServer();
-const WebSocket = socketIo(Listener);
+const WebSocket = SocketIo(Listener);
 
 // ExpressJS Middleware
 // This turns request.body from application/json requests into readable JSON
@@ -83,7 +83,7 @@ Server.use(bodyParser.json({ limit: '50mb' }));
 Server.use(cookieParser());
 // Gzipping Middleware
 Server.use(compression({
-  strategy: zlib.Z_FILTERED,
+  strategy: constants.Z_FILTERED,
   level: 9,
   memLevel: 9,
   windowBits: 15,
@@ -147,13 +147,15 @@ passport.use(new LocalStrategy((username, password, done) => {
 passport.serializeUser((user: any, done) => {
   const serialValue = Object
     .keys(user)
-    .reduce((acc, val) => acc + val + user[val], '');
+    .reduce((acc, val) => `${acc}${val}${user[val]}`, '')
+    .replace(/[.]*[_]*[-]*/g, '');
   done(undefined, serialValue);
 });
 passport.deserializeUser((id, done) => done(undefined, id));
 
 // Local Auth Registration, Salting and Verification
 const generateSalt = (length = 16) => {
+  // tslint:disable-next-line
   return crypto.randomBytes(Math.ceil(length / 2))
     .toString('hex')
     .slice(0, length);
@@ -164,8 +166,9 @@ const sha512 = (password, salt) => {
   const passwordHash = hash.digest('hex');
   return { salt, passwordHash };
 };
+const SALT_LENGTH = 16;
 const saltHashPassword = password => {
-  return sha512(password, generateSalt(16));
+  return sha512(password, generateSalt(SALT_LENGTH));
 };
 
 const registerUser = async (request, response) => {
@@ -177,7 +180,7 @@ const registerUser = async (request, response) => {
     .collection('passwords');
 
   const isUser = (obj: any): obj is ILDAPData => {
-    const person = obj as ILDAPData;
+    const person = obj as ILDAPData | IInvalid;
     return person && person.fullname !== undefined && person.prename !== undefined
       && person.surname !== undefined && person.mail !== undefined
       && person.username !== undefined && person['password'] !== undefined;
@@ -195,6 +198,7 @@ const registerUser = async (request, response) => {
     return response.send({ status: 'error', message: 'User already exists' });
   }
   if (isUser(adjustedUser)) {
+    // tslint:disable-next-line
     delete adjustedUser['password'];
     await passwords.updateOne(
       { username: user.username },
@@ -228,8 +232,14 @@ const verifyUser = async (username, password) => {
 };
 
 Server.use(passport.initialize());
+
+const UUID_LENGTH = 64;
+const genid = () => crypto
+  .randomBytes(UUID_LENGTH)
+  .toString('hex');
+
 Server.use(expressSession({
-  genid: uuid,
+  genid,
   secret: Conf.Express.PassportSecret,
   resave: false,
   saveUninitialized: false,
