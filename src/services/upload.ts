@@ -1,4 +1,4 @@
-import { ensureDir, move, pathExists, readFile, removeSync, statSync, writeFile } from 'fs-extra';
+import { ensureDir, move, pathExists, removeSync, statSync } from 'fs-extra';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
@@ -108,7 +108,7 @@ const Upload = {
         /* Babylon seems to have trouble displaying
          * OBJs with Specular materials, so we fix this*/
 
-        await Promise.all(foundFiles
+        /*await Promise.all(foundFiles
           .filter(file => extname(file.path)
             .includes('.mtl'))
           .map(item =>
@@ -124,7 +124,7 @@ const Upload = {
                 return content;
               })
               .then(content => writeFile(item.path, content))
-              .catch(err => Logger.err(err))));
+              .catch(err => Logger.err(err))));*/
 
         // TODO: Add more filters
         const filter: string[] = [];
