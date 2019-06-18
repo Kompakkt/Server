@@ -266,8 +266,13 @@ const Mongo = {
     response.send({ status: 'ok', ...userData });
   },
   validateLoginSession: async (request, response, next) => {
-    let cookieSID = request.cookies['connect.sid'];
-    cookieSID = cookieSID.substring(cookieSID.indexOf(':') + 1, cookieSID.indexOf('.'));
+    let cookieSID: string | undefined;
+    if (request.cookies['connect.sid']) {
+      cookieSID = request.cookies['connect.sid'] as string;
+      const startIndex = cookieSID.indexOf(':') + 1;
+      const endIndex = cookieSID.indexOf('.');
+      cookieSID = cookieSID.substring(startIndex, endIndex);
+    }
     const sessionID = request.sessionID = (cookieSID) ?
       cookieSID : request.sessionID;
 
