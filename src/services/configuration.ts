@@ -1,5 +1,5 @@
 import { isMaster } from 'cluster';
-import * as merge from 'deepmerge';
+import merge from 'deepmerge';
 import { readJsonSync } from 'fs-extra';
 
 import { ConfigFile } from '../environment';

@@ -1,4 +1,5 @@
 /* tslint:disable:max-line-length */
+import { Request, Response, NextFunction } from 'express';
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
@@ -6,7 +7,7 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
+import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel, ISessionRequest } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -82,7 +83,37 @@ const Client = new MongoClient(MongoURL, {
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getObjectsRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
-const Mongo = {
+interface IMongo {
+  // (request: Request, response: Response, next: NextFunction): any;
+  // (request: Request, response: Response): any;
+  init(): Promise<void>;
+  isMongoDBConnected(_: Request, response: Response, next: NextFunction): Promise<void>;
+  getAccountsRepository(): Db;
+  getObjectsRepository(): Db;
+  saveBase64toImage(base64input: string, subfolder: string, identifier: string | ObjectId): Promise<string>;
+  fixObjectId(request: Request, _: Response, next: NextFunction): Promise<any>;
+  getUnusedObjectId(_: Request, response: Response): Promise<any>;
+  invalidateSession(request: Request, response: Response): Promise<any>;
+  updateSessionId(request: Request, response: Response, next: NextFunction): Promise<any>;
+  addToAccounts(request: Request, response: Response): Promise<any>;
+  insertCurrentUserData(request: Request | ILDAPData, identifier: string | ObjectId, collection: string): Promise<any>;
+  getCurrentUserData(request: Request, response: Response): Promise<any>;
+  validateLoginSession(request: Request, response: Response, next: NextFunction): Promise<any>;
+  submitService(request: Request, response: Response): Promise<any>;
+  submit(request: Request, response: Response): Promise<any>;
+  addObjectToCollection(request: Request, response: Response): Promise<any>;
+  updateModelSettings(request: Request, response: Response): Promise<any>;
+  isUserOwnerOfObject(request: Request | ILDAPData, identifier: string | ObjectId): Promise<any>;
+  isUserAdmin(request: Request): Promise<boolean>;
+  resolve(obj: any, collection_name: string, depth?: number): Promise<any | null | undefined>;
+  getObjectFromCollection(request: Request, response: Response): Promise<any>;
+  getAllObjectsFromCollection(request: Request, response: Response): Promise<any>;
+  removeObjectFromCollection(request: Request, response: Response): Promise<any>;
+  searchByObjectFilter(request: Request, response: Response): Promise<any>;
+  searchByTextFilter(request: Request, response: Response): Promise<any>;
+}
+
+const Mongo: IMongo = {
   init: async () => {
     return new Promise<void>((resolve, reject) => {
       Client.connect((error, _) => {
@@ -123,7 +154,7 @@ const Mongo = {
     response.send(new ObjectId());
   },
   invalidateSession: async (request, response) => {
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
     ldap()
       .updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
         Logger.log('Logged out');
@@ -133,7 +164,7 @@ const Mongo = {
   updateSessionId: async (request, response, next) => {
     const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
     const userData = await getUserByUsername(username);
 
     const updateResult = await ldap()
@@ -151,12 +182,12 @@ const Mongo = {
     if (updateResult.result.ok !== 1) {
       return response.send({ status: 'error', message: 'Failed updating user in database' });
     }
-    next();
+    return next();
   },
   addToAccounts: async (request, response) => {
     const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
     const userData = await getUserByUsername(username);
 
     // Users returned by local strategy might have _id field
@@ -214,7 +245,7 @@ const Mongo = {
     }
   },
   insertCurrentUserData: async (request, identifier: string | ObjectId, collection: string) => {
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
     const userData = await getCurrentUserBySession(sessionID);
 
     if (!ObjectId.isValid(identifier) || !userData) return false;
@@ -237,7 +268,7 @@ const Mongo = {
     return true;
   },
   getCurrentUserData: async (request, response) => {
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) {
       return response
@@ -262,7 +293,7 @@ const Mongo = {
       }
     }
 
-    response.send({ status: 'ok', ...userData });
+    return response.send({ status: 'ok', ...userData });
   },
   validateLoginSession: async (request, response, next) => {
     let cookieSID: string | undefined;
@@ -272,14 +303,14 @@ const Mongo = {
       const endIndex = cookieSID.indexOf('.');
       cookieSID = cookieSID.substring(startIndex, endIndex);
     }
-    const sessionID = request.sessionID = (cookieSID) ?
-      cookieSID : request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID = (cookieSID) ?
+      cookieSID : (request as ISessionRequest).sessionID;
 
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) {
       return response.send({ status: 'error', message: 'Invalid session' });
     }
-    next();
+    return next();
   },
   submitService: async (request, response) => {
     const digobjCollection: Collection<IMetaDataDigitalObject> =
@@ -423,7 +454,7 @@ const Mongo = {
       .collection(RequestCollection);
 
     let resultObject = request.body;
-    const userData = await getCurrentUserBySession(request.sessionID);
+    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
     if (!userData) {
       return response
         .send({ status: 'error', message: 'Cannot fetch current user from database' });
@@ -482,8 +513,8 @@ const Mongo = {
     }
 
     const resultId = (updateResult.upsertedId) ? updateResult.upsertedId._id : _id;
-    response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
+    return response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });
   },
   updateModelSettings: async (request, response) => {
     const preview = request.body.preview;
@@ -504,17 +535,17 @@ const Mongo = {
     const result = await collection.updateOne(
       { _id: identifier },
       { $set: { settings } });
-    response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
+    return response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
   isUserOwnerOfObject: async (request, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier) : identifier;
-    const userData = await getCurrentUserBySession(request.sessionID);
+    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
     return JSON.stringify((userData) ? userData.data : '')
       .indexOf(_id.toString()) !== -1;
   },
   isUserAdmin: async (request): Promise<boolean> => {
-    const userData = await getCurrentUserBySession(request.sessionID);
+    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
     return (userData) ? userData.role === 'A' : false;
   },
   /**
@@ -569,10 +600,9 @@ const Mongo = {
         return undefined;
       }
 
-      response.send({ status: 'ok', message: 'Password protected compilation' });
-    } else {
-      response.send({ status: 'ok', ...object });
+      return response.send({ status: 'ok', message: 'Password protected compilation' });
     }
+    return response.send({ status: 'ok', ...object });
   },
   getAllObjectsFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
@@ -596,7 +626,7 @@ const Mongo = {
 
     const collection = getObjectsRepository()
       .collection(RequestCollection);
-    const sessionID = request.sessionID;
+    const sessionID = (request as ISessionRequest).sessionID;
 
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
@@ -710,7 +740,9 @@ const Mongo = {
   searchByTextFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
+    const filter = (request.body.filter)
+      ? request.body.filter.map((_: any) => _.toLowerCase())
+      : [''];
     let allObjects = await getAllItemsOfCollection(RequestCollection);
 
     const getNestedValues = (obj: any) => {

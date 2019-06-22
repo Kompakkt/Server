@@ -1,18 +1,18 @@
 import * as bodyParser from 'body-parser';
-import * as compression from 'compression';
-import * as cookieParser from 'cookie-parser';
-import * as corser from 'corser';
-import * as crypto from 'crypto';
-import * as express from 'express';
-import * as expressSession from 'express-session';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import { BinaryLike, createHmac, randomBytes } from 'crypto';
+import express from 'express';
+import expressSession from 'express-session';
 import { readFileSync } from 'fs';
 import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
 import * as HTTP from 'http';
 import * as HTTPS from 'https';
-import * as passport from 'passport';
-import * as LdapStrategy from 'passport-ldapauth';
-import * as LocalStrategy from 'passport-local';
-import * as SocketIo from 'socket.io';
+import passport from 'passport';
+import LdapStrategy from 'passport-ldapauth';
+import { Strategy as LocalStrategy } from 'passport-local';
+import SocketIo from 'socket.io';
 import { constants } from 'zlib';
 
 import { RootDirectory } from '../environment';
@@ -30,7 +30,7 @@ const createServer = () => {
 
     const options = { key: privateKey, cert: certificate };
     if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
-      options['passphrase'] = Conf.Express.SSLPaths.Passphrase;
+      (options as any)['passphrase'] = Conf.Express.SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
   }
@@ -77,6 +77,22 @@ const Listener = createServer();
 const WebSocket = SocketIo(Listener);
 
 // ExpressJS Middleware
+// Enable CORS
+// TODO: Find out which routes need CORS
+Server.use('*', cors({
+  origin: true,
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE'.split(','),
+  allowedHeaders: [
+    'X-Requested-With',
+    'Access-Control-Allow-Origin',
+    'content-type',
+    'semirandomtoken',
+    'relPath',
+    'metadatakey',
+    'prefix',
+    'filetype'],
+}));
 // This turns request.body from application/json requests into readable JSON
 Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
@@ -88,22 +104,6 @@ Server.use(compression({
   memLevel: 9,
   windowBits: 15,
   chunkSize: 65536,
-}));
-// Enable CORS
-// TODO: Find out which routes need CORS
-Server.use(corser.create({
-  supportsCredentials: true,
-  /*origins: Conf.Express.OriginWhitelist,*/
-  methods: corser.simpleMethods.concat(['PUT', 'OPTIONS']),
-  requestHeaders: corser.simpleRequestHeaders
-    .concat([
-      'X-Requested-With',
-      'Access-Control-Allow-Origin',
-      'semirandomtoken',
-      'relPath',
-      'metadatakey',
-      'prefix',
-      'filetype']),
 }));
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
@@ -120,7 +120,7 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
 
 // Passport
 passport.use(new LdapStrategy(
-  getLDAPConfig, (user, done): LdapStrategy.VerifyCallback => {
+  getLDAPConfig, (user: any, done: any): LdapStrategy.VerifyCallback => {
     const adjustedUser = {
       fullname: user['cn'],
       prename: user['givenName'],
@@ -132,7 +132,7 @@ passport.use(new LdapStrategy(
     return done(undefined, adjustedUser);
   }));
 
-passport.use(new LocalStrategy((username, password, done) => {
+passport.use(new LocalStrategy((username: string, password: string, done: any) => {
   const coll = Mongo
     .getAccountsRepository()
     .collection('users');
@@ -156,22 +156,22 @@ passport.deserializeUser((id, done) => done(undefined, id));
 // Local Auth Registration, Salting and Verification
 const generateSalt = (length = 16) => {
   // tslint:disable-next-line
-  return crypto.randomBytes(Math.ceil(length / 2))
+  return randomBytes(Math.ceil(length / 2))
     .toString('hex')
     .slice(0, length);
 };
-const sha512 = (password, salt) => {
-  const hash = crypto.createHmac('sha512', salt);
+const sha512 = (password: string, salt: BinaryLike) => {
+  const hash = createHmac('sha512', salt);
   hash.update(password);
   const passwordHash = hash.digest('hex');
   return { salt, passwordHash };
 };
 const SALT_LENGTH = 16;
-const saltHashPassword = password => {
+const saltHashPassword = (password: string) => {
   return sha512(password, generateSalt(SALT_LENGTH));
 };
 
-const registerUser = async (request, response) => {
+const registerUser = async (request: express.Request, response: express.Response): Promise<any> => {
   const coll = Mongo
     .getAccountsRepository()
     .collection('users');
@@ -183,7 +183,7 @@ const registerUser = async (request, response) => {
     const person = obj as ILDAPData | IInvalid;
     return person && person.fullname !== undefined && person.prename !== undefined
       && person.surname !== undefined && person.mail !== undefined
-      && person.username !== undefined && person['password'] !== undefined;
+      && person.username !== undefined && (person as any)['password'] !== undefined;
   };
 
   // First user gets admin
@@ -191,7 +191,7 @@ const registerUser = async (request, response) => {
   const rank = (isFirstUser) ? 'A' : 'S';
   const role = rank;
 
-  const user = request.body;
+  const user = (request.body as any) as { username: string; password: string; };
   const adjustedUser = { ...user, role, rank, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) {
@@ -214,7 +214,7 @@ const registerUser = async (request, response) => {
   }
 };
 
-const verifyUser = async (username, password) => {
+const verifyUser = async (username: string, password: string) => {
   const coll = Mongo
     .getAccountsRepository()
     .collection('users');
@@ -234,9 +234,9 @@ const verifyUser = async (username, password) => {
 Server.use(passport.initialize());
 
 const UUID_LENGTH = 64;
-const genid = () => crypto
-  .randomBytes(UUID_LENGTH)
-  .toString('hex');
+const genid = () =>
+  randomBytes(UUID_LENGTH)
+    .toString('hex');
 
 Server.use(expressSession({
   genid,

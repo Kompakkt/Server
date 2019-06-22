@@ -1,4 +1,4 @@
-import * as flatten from 'flatten';
+import flatten from 'flatten';
 import { Collection, ObjectId } from 'mongodb';
 
 // tslint:disable-next-line:max-line-length
@@ -186,6 +186,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
    * will assume the object already exists in the collection
    * and instead return the existing {_id}
    */
+  // TODO: Roles interface?
   const addAndGetId = async (in_field: any, add_to_coll: string, new_roles?: any) => {
     let field = in_field;
     if (add_to_coll === 'person') {
@@ -230,7 +231,8 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
 
     // Make sure there are no null roles
     if (field['roles'] && field['roles'][_digId]) {
-      field['roles'][_digId] = field['roles'][_digId].filter(obj => obj);
+      field['roles'][_digId] = field['roles'][_digId]
+        .filter((obj: any) => obj);
     }
     // We cannot update _id property when upserting
     // so we remove this beforehand

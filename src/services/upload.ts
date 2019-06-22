@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ensureDir, move, pathExists, removeSync, statSync } from 'fs-extra';
-import * as klawSync from 'klaw-sync';
-import * as multer from 'multer';
+import klawSync from 'klaw-sync';
+import multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
 import slugify from 'slugify';
 
