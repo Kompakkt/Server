@@ -2,10 +2,11 @@ import * as flatten from 'flatten';
 import { Collection, ObjectId } from 'mongodb';
 
 // tslint:disable-next-line:max-line-length
-import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPhysicalObject, IModel } from '../interfaces';
+import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPhysicalObject,  IModel } from '../interfaces';
 
 import { Logger } from './logger';
 import { Mongo } from './mongo';
+import { isAnnotation } from './typeguards';
 
 const updateAnnotationList =
   async (modelOrCompId: string, add_to_coll: string, annotationId: string) => {
@@ -17,10 +18,10 @@ const updateAnnotationList =
     obj.annotationList = obj.annotationList
       .filter(_annotation => _annotation);
 
-    const doesAnnotationExist = obj.annotationList
-      .filter(_annotation => _annotation)
-      .find((_annotation: IAnnotation) =>
-        (_annotation._id) ? _annotation._id.toString() === annotationId
+    const doesAnnotationExist =
+      (obj.annotationList.filter(_annotation => _annotation) as Array<IAnnotation | ObjectId>)
+        .find(_annotation => (isAnnotation(_annotation))
+          ? _annotation._id.toString() === annotationId
           : _annotation.toString() === annotationId);
 
     // Add annotation to list if it doesn't exist
@@ -28,9 +29,10 @@ const updateAnnotationList =
 
     // We resolved the compilation earlier, so now we have to replace
     // the resolved annotations with their ObjectId again
-    obj.annotationList = obj.annotationList
-      .map((_annotation: IAnnotation) =>
-        (_annotation._id) ? new ObjectId(_annotation._id) : _annotation);
+    obj.annotationList = (obj.annotationList as Array<IAnnotation | ObjectId>)
+      .map(_annotation => (isAnnotation(_annotation))
+        ? new ObjectId(_annotation._id)
+        : _annotation);
 
     return obj;
   };
@@ -45,9 +47,8 @@ const saveCompilation = async (compilation: ICompilation, userData: ILDAPData) =
   };
   // Compilations should have all their models referenced by _id
   compilation.models =
-    compilation.models
-      .filter(model => model)
-      .map((model: IModel) => ({ _id: new ObjectId(model['_id']) }));
+    (compilation.models.filter(model => model) as IModel[])
+      .map(model => ({ _id: new ObjectId(model['_id']) }));
 
   await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
   return compilation;
@@ -185,7 +186,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
    * will assume the object already exists in the collection
    * and instead return the existing {_id}
    */
-  const addAndGetId = async (in_field, add_to_coll, new_roles?) => {
+  const addAndGetId = async (in_field: any, add_to_coll: string, new_roles?: any) => {
     let field = in_field;
     if (add_to_coll === 'person') {
       field = await addNestedInstitution(field);
@@ -246,7 +247,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
     return { _id: resultId };
   };
 
-  const addNestedInstitution = async person => {
+  const addNestedInstitution = async (person: any) => {
     if (!person['person_institution']) return person;
     if (!(person['person_institution'] instanceof Array)) return person;
     for (let i = 0; i < person['person_institution'].length; i++) {
@@ -354,7 +355,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
     roleProperty: string,
     role?: string) => {
     for (const obj of inArr) {
-      const newObj = {};
+      const newObj: any = {};
       newObj[roleProperty] = (role) ? role : obj[roleProperty];
       newObj['_id'] = ObjectId.isValid(obj['_id']) ? new ObjectId(obj['_id'])
         : (ObjectId.isValid(idIfSame) ? new ObjectId(idIfSame) : new ObjectId());

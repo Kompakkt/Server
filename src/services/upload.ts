@@ -1,3 +1,4 @@
+import { Request, Response } from 'express';
 import { ensureDir, move, pathExists, removeSync, statSync } from 'fs-extra';
 import * as klawSync from 'klaw-sync';
 import * as multer from 'multer';
@@ -9,7 +10,16 @@ import { RootDirectory } from '../environment';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 
-const Upload = {
+interface IUpload {
+  Multer: multer.Instance;
+  AddMetadata(request: Request, response: Response): void;
+  CancelMetadata(request: Request, response: Response): void;
+  UploadRequest(request: Request, response: Response): void;
+  UploadCancel(request: Request, response: Response): void;
+  UploadFinish(request: Request, response: Response): void;
+}
+
+const Upload: IUpload = {
   Multer: multer({
     dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
   }),
@@ -49,9 +59,10 @@ const Upload = {
     // TODO: Checksum
     // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
-    const folderOrFilePath = (request.headers['relpath'].length > 0)
-      ? request.headers['relpath']
-      : slugify(request['file'].originalname);
+    const relPath = request.headers['relpath'];
+    const folderOrFilePath =
+      (relPath && relPath.length > 0)
+      ? relPath : slugify(request['file'].originalname);
     const destPath =
       join(
         `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,

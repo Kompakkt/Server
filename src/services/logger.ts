@@ -10,7 +10,21 @@ const maxStackSize = 128;
 
 const stack: Set<string> = new Set([]);
 
-const Logger = {
+interface ILogger {
+  stack: Set<string>;
+  path: string;
+  autosave: any;
+  info(...content: any[]): any;
+  log(...content: any[]): any;
+  warn(...content: any[]): any;
+  err(...content: any[]): any;
+  getDate(): any;
+  prepareContent(...content: any[]): any;
+  shouldWrite(): any;
+  writeToLog(): any;
+}
+
+const Logger: ILogger = {
   path: join(RootDirectory, 'server.log'), stack,
   autosave: setInterval(() => Logger.writeToLog(), _autosaveInterval),
   info: (...content) => {
@@ -41,7 +55,7 @@ const Logger = {
     const now = new Date();
     return now.toISOString();
   },
-  prepareContent: (content: any[]) => {
+  prepareContent: (...content) => {
     let result = '';
     for (const element of content) {
       result += (typeof (element) === 'object')
@@ -58,7 +72,7 @@ const Logger = {
   writeToLog: () => {
     ensureFileSync(Logger.path);
     let lines = '';
-    Logger.stack.forEach(line => {
+    Logger.stack.forEach((line: string) => {
       lines += `${line}\n`;
     });
     const sizeBefore = statSync(Logger.path).size;

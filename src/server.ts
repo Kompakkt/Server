@@ -100,7 +100,7 @@ Server.post(
   '/api/v1/post/publish',
   Mongo.validateLoginSession,
   (request, response, next) => Mongo.isUserOwnerOfObject(request, request.body.identifier)
-    .then(isOwner => {
+    .then((isOwner): any => {
       if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model' });
       next();
     })

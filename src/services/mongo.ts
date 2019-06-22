@@ -1,5 +1,4 @@
 /* tslint:disable:max-line-length */
-import { Response } from 'express';
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
@@ -7,7 +6,7 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
+import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -132,20 +131,20 @@ const Mongo = {
       });
   },
   updateSessionId: async (request, response, next) => {
-    const user = request.user;
+    const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
-    const userData = await getUserByUsername(username) || {};
+    const userData = await getUserByUsername(username);
 
     const updateResult = await ldap()
       .updateOne({ username }, {
         $set: {
           username, sessionID, ...user,
-          role: (userData['role'])
-                ? ((userData['role'] === '')
-                  ? user['role']
-                  : userData['role'])
-                : user['role'],
+          role: (userData && userData.role)
+            ? ((userData.role === '')
+              ? user.role
+              : userData.role)
+            : user.role,
         },
       });
 
@@ -155,14 +154,13 @@ const Mongo = {
     next();
   },
   addToAccounts: async (request, response) => {
-    const user = request.user;
+    const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
     const userData = await getUserByUsername(username);
 
     // Users returned by local strategy might have _id field
     // _id is immutable in MongoDB, so we can't update the field
-    // tslint:disable-next-line:no-dynamic-delete
     delete user['_id'];
 
     if (!userData) {
@@ -190,11 +188,11 @@ const Mongo = {
           {
             $set: {
               ...user, sessionID,
-              role: (userData['role'])
-                ? ((userData['role'] === '')
-                  ? user['role']
-                  : userData['role'])
-                : user['role'],
+              role: (userData.role)
+                ? ((userData.role === '')
+                  ? user.role
+                  : userData.role)
+                : user.role,
             },
           },
           (up_err, _) => {
@@ -215,7 +213,7 @@ const Mongo = {
           });
     }
   },
-  insertCurrentUserData: async (request, identifier, collection) => {
+  insertCurrentUserData: async (request, identifier: string | ObjectId, collection: string) => {
     const sessionID = request.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
 
@@ -257,8 +255,9 @@ const Mongo = {
       if (userData.data.model && userData.data.model.length > 0) {
         for (const model of userData.data.model) {
           if (!model) continue;
-          model['relatedModelOwners'] =
-            await Utility.findAllModelOwners(model['_id']);
+          if (!isModel(model)) continue;
+          model.relatedModelOwners =
+            await Utility.findAllModelOwners(model._id.toString());
         }
       }
     }
@@ -415,7 +414,7 @@ const Mongo = {
     request.params.collection = 'digitalobject';
     await Mongo.addObjectToCollection(request, response);
   },
-  addObjectToCollection: async (request, response: Response) => {
+  addObjectToCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
@@ -507,12 +506,12 @@ const Mongo = {
       { $set: { settings } });
     response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
-  isUserOwnerOfObject: async (request, identifier) => {
+  isUserOwnerOfObject: async (request, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier) : identifier;
     const userData = await getCurrentUserBySession(request.sessionID);
     return JSON.stringify((userData) ? userData.data : '')
-      .indexOf(_id) !== -1;
+      .indexOf(_id.toString()) !== -1;
   },
   isUserAdmin: async (request): Promise<boolean> => {
     const userData = await getCurrentUserBySession(request.sessionID);
@@ -530,7 +529,7 @@ const Mongo = {
     Logger.info(`Resolving ${collection_name} ${_id}`);
     const resolve_collection: Collection = getObjectsRepository()
       .collection(collection_name);
-    return resolve_collection.findOne({ $or: [ { _id }, { _id: _id.toString() } ] })
+    return resolve_collection.findOne({ $or: [{ _id }, { _id: _id.toString() }] })
       .then(resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
@@ -585,7 +584,7 @@ const Mongo = {
     results = results.filter(_ => _);
 
     if (results.length > 0 && isCompilation(results[0])) {
-      const isPasswordProtected = compilation =>
+      const isPasswordProtected = (compilation: ICompilation) =>
         (!compilation.password || (compilation.password && compilation.password.length === 0));
       results = results.filter(isPasswordProtected);
     }
@@ -654,7 +653,7 @@ const Mongo = {
     const body: any = (request.body) ? request.body : {};
     const filter: any = (body.filter) ? body.filter : {};
 
-    const doesObjectPropertyMatch = (obj, propName, _filter = filter) => {
+    const doesObjectPropertyMatch = (obj: any, propName: string, _filter = filter) => {
       if (obj[propName] === null || obj[propName] === undefined) return false;
       switch (typeof (obj[propName])) {
         case 'string':
@@ -714,7 +713,7 @@ const Mongo = {
     const filter = (request.body.filter) ? request.body.filter.map(_ => _.toLowerCase()) : [''];
     let allObjects = await getAllItemsOfCollection(RequestCollection);
 
-    const getNestedValues = obj => {
+    const getNestedValues = (obj: any) => {
       let result: string[] = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
@@ -733,7 +732,7 @@ const Mongo = {
       return result;
     };
 
-    const filterResults = objs => {
+    const filterResults = (objs: any[]) => {
       const result: any[] = [];
       for (const obj of objs) {
         const asText = getNestedValues(obj)

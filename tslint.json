@@ -85,6 +85,7 @@
     "no-construct": true,
     "no-debugger": true,
     "no-duplicate-super": true,
+    "no-dynamic-delete": false,
     "no-empty": false,
     "no-empty-interface": true,
     "no-eval": true,

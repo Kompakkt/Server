@@ -1,9 +1,14 @@
+import { Request } from 'express';
 import { ObjectId } from 'mongodb';
 
 /* Workaround for
  * TSLint: Expression is always true */
 export interface IInvalid {
   [key: string]: any | undefined;
+}
+
+export interface ISessionRequest extends Request {
+  sessionID: string;
 }
 
 // Metadata related

@@ -1,5 +1,8 @@
+import { Response } from 'express';
 import { Db, ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
+
+import { ISessionRequest } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -14,9 +17,9 @@ const Mailer = {
       && Configuration.Mailer.Port
       && Configuration.Mailer.Target;
   },
-  sendMail: async (request, response) => {
+  sendMail: async (request: ISessionRequest, response: Response): Promise<any> => {
     if (!request.body || !Configuration.Mailer.Target
-      || !Configuration.Mailer.Target[request.body.target]) {
+      || !(Configuration.Mailer.Target as any)[request.body.target]) {
       return response.send({ status: 'error' });
     }
 
@@ -26,8 +29,8 @@ const Mailer = {
     });
 
     const mailOptions = {
-      from: Configuration.Mailer.Target[request.body.target],
-      to: Configuration.Mailer.Target[request.body.target],
+      from: (Configuration.Mailer.Target as any)[request.body.target],
+      to: (Configuration.Mailer.Target as any)[request.body.target],
       subject: request.body.subject,
       text: request.body.mailbody,
     };
@@ -59,7 +62,7 @@ const Mailer = {
       .addUserToDatabase(request, result)
       .catch(() => { });
   },
-  addUserToDatabase: async (request, mailSent) => {
+  addUserToDatabase: async (request: ISessionRequest, mailSent: boolean) => {
     const target = request.body.target;
     if (!Configuration.Mailer.Target || !Object
       .keys(Configuration.Mailer.Target)
@@ -85,7 +88,7 @@ const Mailer = {
       Logger.info(`Added user to DB ${document}`);
     }
   },
-  countUserMails: async (request, destination) => {
+  countUserMails: async (request: ISessionRequest, destination: string) => {
     const AccDb: Db = Mongo.getAccountsRepository();
     const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
@@ -95,23 +98,23 @@ const Mailer = {
       .filter(entry => entry.user._id.toString() === user._id.toString());
     return entries.length;
   },
-  getMailRelatedDatabaseEntries: async (_, response) => {
+  getMailRelatedDatabaseEntries: async (_: ISessionRequest, response: Response): Promise<any> => {
     const AccDb: Db = Mongo.getAccountsRepository();
     if (!Configuration.Mailer.Target) {
       return response
         .send({ status: 'error', message: 'Mailing service not configured' });
     }
     const targets = Object.keys(Configuration.Mailer.Target);
-    const Response: any = {};
+    const _res: any = {};
     for (const target of targets) {
       const coll = AccDb.collection(target);
       const all = await coll.find({})
         .toArray();
-      Response[target] = all;
+      _res[target] = all;
     }
-    response.send({ status: 'ok', ...Response });
+    response.send({ status: 'ok', ..._res });
   },
-  toggleMailAnswered: async (request, response) => {
+  toggleMailAnswered: async (request: ISessionRequest, response: Response): Promise<any> => {
     const target = request.params.target;
     const identifier = request.params.identifier;
     if (!Configuration.Mailer.Target) {

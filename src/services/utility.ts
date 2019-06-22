@@ -1,8 +1,20 @@
-import { Collection, Db, ObjectId } from 'mongodb';
+import { Response } from 'express';
+import { ObjectId } from 'mongodb';
+
+import { IAnnotation, ICompilation, ILDAPData, IModel, ISessionRequest } from '../interfaces';
 
 import { Mongo } from './mongo';
+import { isAnnotation } from './typeguards';
 
-const Utility = {
+interface IUtility {
+  findAllModelOwnersRequest(request: ISessionRequest, response: Response): Promise<any>;
+  findAllModelOwners(modelId: string): Promise<any>;
+  countModelUses(request: ISessionRequest, response: Response): Promise<any>;
+  addAnnotationsToAnnotationList(request: ISessionRequest, response: Response): Promise<any>;
+  applyActionToModelOwner(request: ISessionRequest, response: Response): any;
+}
+
+const Utility: IUtility = {
   findAllModelOwnersRequest: async (request, response) => {
     const modelId = request.params.identifier;
     if (!ObjectId.isValid(modelId)) {
@@ -13,8 +25,8 @@ const Utility = {
     response.send({ status: 'ok', accounts });
   },
   findAllModelOwners: async (modelId: string) => {
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('users');
+    const AccDB = Mongo.getAccountsRepository();
+    const ldap = AccDB.collection<ILDAPData>('users');
     const accounts = (await ldap.find({})
       .toArray())
       .filter(userData => {
@@ -35,8 +47,8 @@ const Utility = {
       return;
     }
 
-    const ObjDB: Db = Mongo.getObjectsRepository();
-    const compilations = (await ObjDB.collection('compilation')
+    const ObjDB = Mongo.getObjectsRepository();
+    const compilations = (await ObjDB.collection<ICompilation>('compilation')
       .find({})
       .toArray())
       .filter(comp => {
@@ -61,8 +73,8 @@ const Utility = {
       return;
     }
 
-    const ObjDB: Db = Mongo.getObjectsRepository();
-    const CompColl = ObjDB.collection('compilation');
+    const ObjDB = Mongo.getObjectsRepository();
+    const CompColl = ObjDB.collection<ICompilation>('compilation');
     const compilation = await CompColl.findOne({ _id: new ObjectId(compId) });
     if (!compilation) {
       response.send({ status: 'error', message: 'Compilation not found' });
@@ -80,18 +92,19 @@ const Utility = {
         ann['lastModificationDate'] = new Date().toISOString();
         return ann;
       });
-    const AnnColl = ObjDB.collection('annotation');
+    const AnnColl = ObjDB.collection<IAnnotation>('annotation');
     const insertResult = await AnnColl.insertMany(validAnnotations);
     if (insertResult.result.ok !== 1) {
       response.send({ status: 'error', message: 'Failed inserting Annotations' });
       return;
     }
 
-    compilation['annotationList'] = (compilation['annotationList'])
-      ? compilation['annotationList'] : [];
-    compilation['annotationList'] = Array.from(new Set(
-      compilation['annotationList'].concat(validAnnotations)
-        .map(ann => new ObjectId(ann['_id'])),
+    compilation.annotationList = (compilation.annotationList)
+      ? compilation.annotationList : [];
+    compilation.annotationList = Array.from(new Set(
+      (compilation.annotationList.filter(ann => ann) as Array<IAnnotation | ObjectId>)
+        .concat(validAnnotations)
+        .map(ann => isAnnotation(ann) ? new ObjectId(ann['_id']) : new ObjectId(ann)),
     ));
 
     const updateResult = await CompColl
@@ -125,8 +138,8 @@ const Utility = {
       || await Mongo.resolve(modelId, 'model') === undefined) {
       return response.send({ status: 'error', message: 'Invalid model identifier' });
     }
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap = AccDB.collection('users');
+    const AccDB = Mongo.getAccountsRepository();
+    const ldap = AccDB.collection<ILDAPData>('users');
     const findUserQuery = (ownerId) ? { _id: new ObjectId(ownerId) } : { username: ownerUsername };
     const account = await ldap.findOne(findUserQuery);
     if (!account) {
@@ -134,10 +147,12 @@ const Utility = {
     }
 
     account.data.model = (account.data.model) ? account.data.model : [];
+    account.data.model = account.data.model.filter(model => model);
 
     switch (command) {
       case 'add':
-        if (!account.data.model.find(obj => obj.toString() === modelId.toString())) {
+        if (!(account.data.model as IModel[])
+          .find(obj => obj.toString() === modelId.toString())) {
           account.data.model.push(new ObjectId(modelId));
         }
         break;
@@ -146,7 +161,7 @@ const Utility = {
         if (modelUses === 1) {
           return response.send({ status: 'error', message: 'Cannot remove last owner' });
         }
-        account.data.model = account.data.model
+        account.data.model = (account.data.model as IModel[])
           .filter(model => model.toString() !== modelId.toString());
         break;
       default:
@@ -160,7 +175,7 @@ const Utility = {
       return response.send({ status: 'error', message: 'Failed updating model array' });
     }
 
-    response.send({ status: 'ok' });
+    return response.send({ status: 'ok' });
   },
 };
 

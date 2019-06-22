@@ -22,7 +22,7 @@ const resolvePerson = async (person: IMetaDataPerson) => {
 export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject) => {
   // TODO: Use Typeguards
   let currentId = digitalObject._id.toString();
-  const resolveTopLevel = async (obj, property, field) => {
+  const resolveTopLevel = async (obj: any, property: string, field: string) => {
     if (obj[property] && obj[property].length && obj[property] instanceof Array) {
       for (let i = 0; i < obj[property].length; i++) {
         const resolved = await Mongo.resolve(obj[property][i], field);

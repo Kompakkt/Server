@@ -7,15 +7,17 @@
         "node_modules/*"
       ]
     },
+    "module": "esnext",
     "moduleResolution": "node",
     "target": "es6",
     "module": "commonjs",
     "sourceMap": true,
     "outDir": "./dist/",
-    "noImplicitAny": false,
-    "strictNullChecks": true,
+    "strict": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noImplicitAny": false,
     "lib": ["es6","dom"]
   },
   "include": [

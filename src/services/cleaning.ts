@@ -1,10 +1,13 @@
+import { Response } from 'express';
 import { Collection, Db } from 'mongodb';
+
+import { ISessionRequest } from '../interfaces';
 
 import { Logger } from './logger';
 import { Mongo } from './mongo';
 
 const Cleaning = {
-  deleteUnusedPersonsAndInstitutions: async (_, response) => {
+  deleteUnusedPersonsAndInstitutions: async (_: ISessionRequest, response: Response) => {
     const ObjDB: Db = Mongo.getObjectsRepository();
     const personCollection = ObjDB.collection('person');
     const instCollection = ObjDB.collection('institution');
@@ -48,7 +51,7 @@ const Cleaning = {
     Logger.log(`Deleted ${total.length} unused persons and/or institutions`);
     response.send({ status: 'ok', total, amount: total.length });
   },
-  deleteNullRefs: async (_, response) => {
+  deleteNullRefs: async (_: ISessionRequest, response: Response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('users');
     const allUsers = await ldap.find({})
