@@ -1,5 +1,5 @@
 import { isMaster } from 'cluster';
-import merge from 'deepmerge';
+import deepmerge from 'deepmerge';
 import { readJsonSync } from 'fs-extra';
 
 import { ConfigFile } from '../environment';
@@ -91,7 +91,7 @@ const LoadConfig = () => {
   try {
     Logger.info(`Config file path: ${ConfigFile}`);
 
-    const confObj = merge<IConfiguration>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
+    const confObj = deepmerge<IConfiguration>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
 
     if (confObj.Uploads.TempDirectory.includes('../') ||
     confObj.Uploads.UploadDirectory.includes('../')) {

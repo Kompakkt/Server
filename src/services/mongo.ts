@@ -1,5 +1,5 @@
 /* tslint:disable:max-line-length */
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
@@ -7,7 +7,7 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel, ISessionRequest } from '../interfaces';
+import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -23,9 +23,11 @@ const UploadConf = Configuration.Uploads;
 const ldap = (): Collection<ILDAPData> =>
   getAccountsRepository()
     .collection('users');
-const getCurrentUserBySession = async (sessionID: string) =>
-  ldap()
+const getCurrentUserBySession = async (sessionID: string | undefined) => {
+  if (!sessionID) return null;
+  return ldap()
     .findOne({ sessionID });
+};
 const getUserByUsername = async (username: string) =>
   ldap()
     .findOne({ username });
@@ -84,22 +86,24 @@ const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getObjectsRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
 interface IMongo {
-  // (request: Request, response: Response, next: NextFunction): any;
-  // (request: Request, response: Response): any;
   init(): Promise<void>;
-  isMongoDBConnected(_: Request, response: Response, next: NextFunction): Promise<void>;
+  isMongoDBConnected(_: Request, response: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
   getObjectsRepository(): Db;
-  saveBase64toImage(base64input: string, subfolder: string, identifier: string | ObjectId): Promise<string>;
-  fixObjectId(request: Request, _: Response, next: NextFunction): Promise<any>;
-  getUnusedObjectId(_: Request, response: Response): Promise<any>;
-  invalidateSession(request: Request, response: Response): Promise<any>;
+  saveBase64toImage(
+    base64input: string, subfolder: string,
+    identifier: string | ObjectId): Promise<string>;
+  fixObjectId(request: Request, _: Response, next: NextFunction): void;
+  getUnusedObjectId(_: Request, response: Response): void;
+  invalidateSession(request: Request, response: Response): void;
   updateSessionId(request: Request, response: Response, next: NextFunction): Promise<any>;
-  addToAccounts(request: Request, response: Response): Promise<any>;
-  insertCurrentUserData(request: Request | ILDAPData, identifier: string | ObjectId, collection: string): Promise<any>;
+  addToAccounts(request: Request, response: Response): any;
+  insertCurrentUserData(
+    request: Request | ILDAPData,
+    identifier: string | ObjectId, collection: string): Promise<any>;
   getCurrentUserData(request: Request, response: Response): Promise<any>;
   validateLoginSession(request: Request, response: Response, next: NextFunction): Promise<any>;
-  submitService(request: Request, response: Response): Promise<any>;
+  submitService(request: Request, response: Response): void;
   submit(request: Request, response: Response): Promise<any>;
   addObjectToCollection(request: Request, response: Response): Promise<any>;
   updateModelSettings(request: Request, response: Response): Promise<any>;
@@ -108,7 +112,7 @@ interface IMongo {
   resolve(obj: any, collection_name: string, depth?: number): Promise<any | null | undefined>;
   getObjectFromCollection(request: Request, response: Response): Promise<any>;
   getAllObjectsFromCollection(request: Request, response: Response): Promise<any>;
-  removeObjectFromCollection(request: Request, response: Response): Promise<any>;
+  removeObjectFromCollection(request: Request, response: Response): any;
   searchByObjectFilter(request: Request, response: Response): Promise<any>;
   searchByTextFilter(request: Request, response: Response): Promise<any>;
 }
@@ -128,7 +132,7 @@ const Mongo: IMongo = {
       });
     });
   },
-  isMongoDBConnected: async (_, response, next) => {
+  isMongoDBConnected: (_, response, next) => {
     const isConnected = Client.isConnected();
     if (isConnected) {
       next();
@@ -142,7 +146,7 @@ const Mongo: IMongo = {
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
    */
-  fixObjectId: async (request, _, next) => {
+  fixObjectId: (request, _, next) => {
     if (request) {
       if (request.body && request.body['_id'] && ObjectId.isValid(request.body['_id'])) {
         request.body['_id'] = new ObjectId(request.body['_id']);
@@ -150,11 +154,11 @@ const Mongo: IMongo = {
     }
     next();
   },
-  getUnusedObjectId: async (_, response) => {
+  getUnusedObjectId: (_, response) => {
     response.send(new ObjectId());
   },
-  invalidateSession: async (request, response) => {
-    const sessionID = (request as ISessionRequest).sessionID;
+  invalidateSession: (request, response) => {
+    const sessionID = request.sessionID;
     ldap()
       .updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
         Logger.log('Logged out');
@@ -164,7 +168,7 @@ const Mongo: IMongo = {
   updateSessionId: async (request, response, next) => {
     const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
-    const sessionID = (request as ISessionRequest).sessionID;
+    const sessionID = request.sessionID;
     const userData = await getUserByUsername(username);
 
     const updateResult = await ldap()
@@ -187,8 +191,13 @@ const Mongo: IMongo = {
   addToAccounts: async (request, response) => {
     const user: ILDAPData = request.user;
     const username = request.body.username.toLowerCase();
-    const sessionID = (request as ISessionRequest).sessionID;
+    const sessionID = (request.sessionID) ? request.sessionID : null;
     const userData = await getUserByUsername(username);
+
+    if (!sessionID) {
+      response.send({ status: 'error', message: 'Failed adding sessionID' });
+      return;
+    }
 
     // Users returned by local strategy might have _id field
     // _id is immutable in MongoDB, so we can't update the field
@@ -245,7 +254,7 @@ const Mongo: IMongo = {
     }
   },
   insertCurrentUserData: async (request, identifier: string | ObjectId, collection: string) => {
-    const sessionID = (request as ISessionRequest).sessionID;
+    const sessionID = request.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
 
     if (!ObjectId.isValid(identifier) || !userData) return false;
@@ -268,7 +277,7 @@ const Mongo: IMongo = {
     return true;
   },
   getCurrentUserData: async (request, response) => {
-    const sessionID = (request as ISessionRequest).sessionID;
+    const sessionID = request.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) {
       return response
@@ -303,8 +312,8 @@ const Mongo: IMongo = {
       const endIndex = cookieSID.indexOf('.');
       cookieSID = cookieSID.substring(startIndex, endIndex);
     }
-    const sessionID = (request as ISessionRequest).sessionID = (cookieSID) ?
-      cookieSID : (request as ISessionRequest).sessionID;
+    const sessionID = request.sessionID = (cookieSID) ?
+      cookieSID : request.sessionID;
 
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) {
@@ -312,7 +321,7 @@ const Mongo: IMongo = {
     }
     return next();
   },
-  submitService: async (request, response) => {
+  submitService: (request, response) => {
     const digobjCollection: Collection<IMetaDataDigitalObject> =
       getObjectsRepository()
         .collection('digitalobject');
@@ -454,7 +463,7 @@ const Mongo: IMongo = {
       .collection(RequestCollection);
 
     let resultObject = request.body;
-    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
+    const userData = await getCurrentUserBySession(request.sessionID);
     if (!userData) {
       return response
         .send({ status: 'error', message: 'Cannot fetch current user from database' });
@@ -535,17 +544,18 @@ const Mongo: IMongo = {
     const result = await collection.updateOne(
       { _id: identifier },
       { $set: { settings } });
-    return response.send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
+    return response
+      .send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
   isUserOwnerOfObject: async (request, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier) : identifier;
-    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
+    const userData = await getCurrentUserBySession(request.sessionID);
     return JSON.stringify((userData) ? userData.data : '')
       .indexOf(_id.toString()) !== -1;
   },
   isUserAdmin: async (request): Promise<boolean> => {
-    const userData = await getCurrentUserBySession((request as ISessionRequest).sessionID);
+    const userData = await getCurrentUserBySession(request.sessionID);
     return (userData) ? userData.role === 'A' : false;
   },
   /**
@@ -626,7 +636,7 @@ const Mongo: IMongo = {
 
     const collection = getObjectsRepository()
       .collection(RequestCollection);
-    const sessionID = (request as ISessionRequest).sessionID;
+    const sessionID = request.sessionID;
 
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;

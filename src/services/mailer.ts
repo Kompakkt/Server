@@ -1,8 +1,6 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { Db, ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
-
-import { ISessionRequest } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -10,14 +8,23 @@ import { Mongo } from './mongo';
 
 const MAIL_LIMIT = 3;
 
-const Mailer = {
+interface IMailer {
+  isConfigValid(): any;
+  sendMail(request: Request, response: Response): Promise<any>;
+  addUserToDatabase(request: Request, mailSent: boolean): any;
+  countUserMails(request: Request, destination: string): Promise<any>;
+  getMailRelatedDatabaseEntries(_: Request, response: Response): Promise<any>;
+  toggleMailAnswered(request: Request, response: Response): Promise<any>;
+}
+
+const Mailer: IMailer = {
   isConfigValid: () => {
     return Configuration.Mailer
       && Configuration.Mailer.Host
       && Configuration.Mailer.Port
       && Configuration.Mailer.Target;
   },
-  sendMail: async (request: ISessionRequest, response: Response): Promise<any> => {
+  sendMail: async (request, response): Promise<any> => {
     if (!request.body || !Configuration.Mailer.Target
       || !(Configuration.Mailer.Target as any)[request.body.target]) {
       return response.send({ status: 'error' });
@@ -62,7 +69,7 @@ const Mailer = {
       .addUserToDatabase(request, result)
       .catch(() => { });
   },
-  addUserToDatabase: async (request: ISessionRequest, mailSent: boolean) => {
+  addUserToDatabase: async (request, mailSent) => {
     const target = request.body.target;
     if (!Configuration.Mailer.Target || !Object
       .keys(Configuration.Mailer.Target)
@@ -88,7 +95,7 @@ const Mailer = {
       Logger.info(`Added user to DB ${document}`);
     }
   },
-  countUserMails: async (request: ISessionRequest, destination: string) => {
+  countUserMails: async (request, destination) => {
     const AccDb: Db = Mongo.getAccountsRepository();
     const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
@@ -98,7 +105,7 @@ const Mailer = {
       .filter(entry => entry.user._id.toString() === user._id.toString());
     return entries.length;
   },
-  getMailRelatedDatabaseEntries: async (_: ISessionRequest, response: Response): Promise<any> => {
+  getMailRelatedDatabaseEntries: async (_, response): Promise<any> => {
     const AccDb: Db = Mongo.getAccountsRepository();
     if (!Configuration.Mailer.Target) {
       return response
@@ -114,7 +121,7 @@ const Mailer = {
     }
     response.send({ status: 'ok', ..._res });
   },
-  toggleMailAnswered: async (request: ISessionRequest, response: Response): Promise<any> => {
+  toggleMailAnswered: async (request, response): Promise<any> => {
     const target = request.params.target;
     const identifier = request.params.identifier;
     if (!Configuration.Mailer.Target) {

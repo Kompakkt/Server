@@ -1,17 +1,17 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 
-import { IAnnotation, ICompilation, ILDAPData, IModel, ISessionRequest } from '../interfaces';
+import { IAnnotation, ICompilation, ILDAPData, IModel } from '../interfaces';
 
 import { Mongo } from './mongo';
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
-  findAllModelOwnersRequest(request: ISessionRequest, response: Response): Promise<any>;
-  findAllModelOwners(modelId: string): Promise<any>;
-  countModelUses(request: ISessionRequest, response: Response): Promise<any>;
-  addAnnotationsToAnnotationList(request: ISessionRequest, response: Response): Promise<any>;
-  applyActionToModelOwner(request: ISessionRequest, response: Response): any;
+  findAllModelOwnersRequest(request: Request, response: Response): any;
+  findAllModelOwners(modelId: string): any;
+  countModelUses(request: Request, response: Response): any;
+  addAnnotationsToAnnotationList(request: Request, response: Response): any;
+  applyActionToModelOwner(request: Request, response: Response): any;
 }
 
 const Utility: IUtility = {

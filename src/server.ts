@@ -1,3 +1,5 @@
+import { NextFunction, Request, Response } from 'express';
+
 import { Admin } from './services/admin';
 import { Cleaning } from './services/cleaning';
 import { Europeana } from './services/europeana';
@@ -96,15 +98,17 @@ Server.post(
   Mongo.searchByObjectFilter,
 );
 // Publish or unpublish a model
-Server.post(
-  '/api/v1/post/publish',
-  Mongo.validateLoginSession,
-  (request, response, next) => Mongo.isUserOwnerOfObject(request, request.body.identifier)
+const userOwnerHandler = (request: Request, response: Response, next: NextFunction) => {
+  Mongo.isUserOwnerOfObject(request, request.body.identifier)
     .then((isOwner): any => {
       if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model' });
       next();
     })
-    .catch(() => response.send({ status: 'error', message: 'Not owner of model' })),
+    .catch(() => response.send({ status: 'error', message: 'Not owner of model' }));
+};
+Server.post(
+  '/api/v1/post/publish',
+  Mongo.validateLoginSession, userOwnerHandler,
   Admin.toggleObjectPublishedState);
 
 // Upload API

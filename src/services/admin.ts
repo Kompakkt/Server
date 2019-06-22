@@ -1,15 +1,22 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { ILDAPData, IModel, ISessionRequest } from '../interfaces';
+import { ILDAPData, IModel } from '../interfaces';
 
 import { Mongo } from './mongo';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;
 
-const Admin = {
-  checkIsAdmin: async (request: ISessionRequest, response: Response, next: NextFunction): Promise<any> => {
+interface IAdmin {
+  checkIsAdmin(request: Request, response: Response, next: NextFunction): Promise<any>;
+  getAllLDAPUsers(_: Request, response: Response): Promise<any>;
+  promoteUserToRole(request: Request, response: Response): Promise<any>;
+  toggleObjectPublishedState(request: Request, response: Response): Promise<any>;
+}
+
+const Admin: IAdmin = {
+  checkIsAdmin: async (request, response, next) => {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
@@ -18,9 +25,9 @@ const Admin = {
     if (!found || found.role !== 'A') {
       return response.send({ status: 'error', message: 'Could not verify your admin status' });
     }
-    next();
+    return next();
   },
-  getAllLDAPUsers: async (_: Request, response: Response): Promise<any> => {
+  getAllLDAPUsers: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection<ILDAPData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
@@ -45,7 +52,7 @@ const Admin = {
       }));
     response.send({ status: 'ok', users: filteredAccounts });
   },
-  promoteUserToRole: async (request: ISessionRequest, response: Response): Promise<any> => {
+  promoteUserToRole: async (request, response) => {
     const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
       return response.send({ status: 'error', message: 'Invalid identifier' });
@@ -59,13 +66,13 @@ const Admin = {
         if (updateResult.result.ok !== 1) {
           return response.send({ status: 'error', message: 'Updating user role failed' });
         }
-        response.send({ status: 'ok', message: 'User role successfully updated' });
+        return response.send({ status: 'ok', message: 'User role successfully updated' });
         break;
       default:
-        response.send({ status: 'error', message: 'Invalid role specified' });
+        return response.send({ status: 'error', message: 'Invalid role specified' });
     }
   },
-  toggleObjectPublishedState: async (request: ISessionRequest, response: Response): Promise<any> => {
+  toggleObjectPublishedState: async (request, response) => {
     const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
       return response.send({ status: 'error', message: 'Incorrect request parameters' });
@@ -82,7 +89,7 @@ const Admin = {
     if (updateResult.result.ok !== 1) {
       return response.send({ status: 'error', message: 'Failed updating published state' });
     }
-    response.send({ status: 'ok', ...await Mongo.resolve(_id, 'model') });
+    return response.send({ status: 'ok', ...await Mongo.resolve(_id, 'model') });
   },
 };
 

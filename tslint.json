@@ -54,6 +54,7 @@
     ],
     "interface-over-type-literal": true,
     "label-position": true,
+    "match-default-export-name": false,
     "max-line-length": [
       true,
       100
@@ -94,6 +95,7 @@
       "ignore-params"
     ],
     "no-misused-new": true,
+    "no-null-keyword": false,
     "no-non-null-assertion": true,
     "no-parameter-properties": false,
     "no-shadowed-variable": true,

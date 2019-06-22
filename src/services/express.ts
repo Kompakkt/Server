@@ -191,7 +191,7 @@ const registerUser = async (request: express.Request, response: express.Response
   const rank = (isFirstUser) ? 'A' : 'S';
   const role = rank;
 
-  const user = (request.body as any) as { username: string; password: string; };
+  const user = (request.body) as { username: string; password: string };
   const adjustedUser = { ...user, role, rank, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) {
