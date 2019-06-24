@@ -244,7 +244,7 @@ const Mongo: IMongo = {
                 .findOne({ sessionID, username }, (f_err, f_res) => {
                   if (f_err || !f_res) {
                     response.send({ status: 'error', message: 'Updated user not found' });
-                    Logger.err(f_err);
+                    Logger.err(f_err, 'Updated user not found');
                   } else {
                     response.send({ status: 'ok', ...f_res });
                   }
