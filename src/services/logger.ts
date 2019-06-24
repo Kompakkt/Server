@@ -46,7 +46,8 @@ const Logger: ILogger = {
     Logger.shouldWrite();
   },
   err: (...content) => {
-    const message = `[ERR|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
+    const _stack = new Error().stack;
+    const message = `[ERR|${Logger.getDate()}]\n${_stack}\n${Logger.prepareContent(content)}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Error) console.log(message);
     Logger.shouldWrite();
