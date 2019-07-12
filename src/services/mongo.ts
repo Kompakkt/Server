@@ -109,6 +109,7 @@ interface IMongo {
   updateModelSettings(request: Request, response: Response): Promise<any>;
   isUserOwnerOfObject(request: Request | ILDAPData, identifier: string | ObjectId): Promise<any>;
   isUserAdmin(request: Request): Promise<boolean>;
+  query(_id: string | ObjectId): any;
   resolve(obj: any, collection_name: string, depth?: number): Promise<any | null | undefined>;
   getObjectFromCollection(request: Request, response: Response): Promise<any>;
   getAllObjectsFromCollection(request: Request, response: Response): Promise<any>;
@@ -558,9 +559,15 @@ const Mongo: IMongo = {
     const userData = await getCurrentUserBySession(request.sessionID);
     return (userData) ? userData.role === 'A' : false;
   },
-  /**
-   * Simple resolving by collection name and Id
-   */
+  query: (_id: string | ObjectId) => {
+    return {
+      $or: [
+        { _id },
+        { _id: new ObjectId(_id) },
+        { _id: _id.toString() },
+      ],
+    };
+  },
   resolve: async (
     obj: any, collection_name: string, depth?: number): Promise<any | null | undefined> => {
     if (!obj) return undefined;
@@ -570,7 +577,7 @@ const Mongo: IMongo = {
     Logger.info(`Resolving ${collection_name} ${_id}`);
     const resolve_collection: Collection = getObjectsRepository()
       .collection(collection_name);
-    return resolve_collection.findOne({ $or: [{ _id }, { _id: _id.toString() }] })
+    return resolve_collection.findOne(Mongo.query(_id))
       .then(resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
