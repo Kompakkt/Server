@@ -47,7 +47,7 @@ Server.get(
   Mongo.getAllObjectsFromCollection,
 );
 // Return data linked to currently logged in LDAP Account
-Server.get('/api/v1/get/ldata', Mongo.validateLoginSession, Mongo.getCurrentUserData);
+Server.get(['/api/v1/get/ldata', '/auth'], Mongo.validateLoginSession, Mongo.getCurrentUserData);
 // Return a MongoDB ObjectId
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
@@ -150,7 +150,6 @@ Server.post(
 Server.post(
   '/register',
   Express.registerUser);
-Server.get('/auth', Mongo.validateLoginSession, (_, res) => res.send({ status: 'ok' }));
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
 // Admin requests
