@@ -39,13 +39,11 @@ Server.get(
     '/api/v1/get/find/:collection/:identifier',
     '/api/v1/get/find/:collection/:identifier/:password',
   ],
-  Mongo.validateLoginSession,
   Mongo.getObjectFromCollection,
 );
 // Return all documents of a collection
 Server.get(
   '/api/v1/get/findall/:collection',
-  Mongo.validateLoginSession,
   Mongo.getAllObjectsFromCollection,
 );
 // Return data linked to currently logged in LDAP Account
