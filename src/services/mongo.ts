@@ -101,6 +101,7 @@ interface IMongo {
   insertCurrentUserData(
     request: Request | ILDAPData,
     identifier: string | ObjectId, collection: string): Promise<any>;
+  resolveUserData(_userData: ILDAPData): Promise<any>;
   getCurrentUserData(request: Request, response: Response): Promise<any>;
   validateLoginSession(request: Request, response: Response, next: NextFunction): Promise<any>;
   submitService(request: Request, response: Response): void;
@@ -212,14 +213,14 @@ const Mongo: IMongo = {
             username, sessionID,
             data: {},
           },
-          (ins_err, ins_res) => {
+          async (ins_err, ins_res) => {
             if (ins_err) {
               response.send({ status: 'error' });
               Logger.err(ins_res);
             } else {
               Logger.info(ins_res.ops);
               const resultUser = ins_res.ops[0];
-              response.send({ status: 'ok', ...resultUser });
+              response.send({ status: 'ok', ...await Mongo.resolveUserData(resultUser) });
             }
           });
     } else {
@@ -242,12 +243,12 @@ const Mongo: IMongo = {
               Logger.err(up_err);
             } else {
               ldap()
-                .findOne({ sessionID, username }, (f_err, f_res) => {
+                .findOne({ sessionID, username }, async (f_err, f_res) => {
                   if (f_err || !f_res) {
                     response.send({ status: 'error', message: 'Updated user not found' });
                     Logger.err(f_err, 'Updated user not found');
                   } else {
-                    response.send({ status: 'ok', ...f_res });
+                    response.send({ status: 'ok', ...await Mongo.resolveUserData(f_res) });
                   }
                 });
             }
@@ -277,13 +278,8 @@ const Mongo: IMongo = {
     if (updateResult.result.ok !== 1) return false;
     return true;
   },
-  getCurrentUserData: async (request, response) => {
-    const sessionID = request.sessionID;
-    const userData = await getCurrentUserBySession(sessionID);
-    if (!userData) {
-      return response
-        .send({ status: 'error', message: 'User not found by sessionID. Try relogging' });
-    }
+  resolveUserData: async _userData => {
+    const userData = {..._userData};
     if (userData.data) {
       for (const property in userData.data) {
         if (!userData.data.hasOwnProperty(property)) continue;
@@ -302,8 +298,17 @@ const Mongo: IMongo = {
         }
       }
     }
+    return userData;
+  },
+  getCurrentUserData: async (request, response) => {
+    const sessionID = request.sessionID;
+    const userData = await getCurrentUserBySession(sessionID);
+    if (!userData) {
+      return response
+        .send({ status: 'error', message: 'User not found by sessionID. Try relogging' });
+    }
 
-    return response.send({ status: 'ok', ...userData });
+    return response.send({ status: 'ok', ...await Mongo.resolveUserData(userData) });
   },
   validateLoginSession: async (request, response, next) => {
     let cookieSID: string | undefined;
