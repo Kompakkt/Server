@@ -1,37 +1,37 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 
-import { IAnnotation, ICompilation, ILDAPData, IModel } from '../interfaces';
+import { IAnnotation, ICompilation, IEntity, ILDAPData } from '../interfaces';
 
 import { Mongo } from './mongo';
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
-  findAllModelOwnersRequest(request: Request, response: Response): any;
-  findAllModelOwners(modelId: string): any;
-  countModelUses(request: Request, response: Response): any;
+  findAllEntityOwnersRequest(request: Request, response: Response): any;
+  findAllEntityOwners(entityId: string): any;
+  countEntityUses(request: Request, response: Response): any;
   addAnnotationsToAnnotationList(request: Request, response: Response): any;
-  applyActionToModelOwner(request: Request, response: Response): any;
+  applyActionToEntityOwner(request: Request, response: Response): any;
 }
 
 const Utility: IUtility = {
-  findAllModelOwnersRequest: async (request, response) => {
-    const modelId = request.params.identifier;
-    if (!ObjectId.isValid(modelId)) {
-      response.send({ status: 'error', message: 'Invalid model _id ' });
+  findAllEntityOwnersRequest: async (request, response) => {
+    const entityId = request.params.identifier;
+    if (!ObjectId.isValid(entityId)) {
+      response.send({ status: 'error', message: 'Invalid entity _id ' });
       return;
     }
-    const accounts = await Utility.findAllModelOwners(modelId);
+    const accounts = await Utility.findAllEntityOwners(entityId);
     response.send({ status: 'ok', accounts });
   },
-  findAllModelOwners: async (modelId: string) => {
+  findAllEntityOwners: async (entityId: string) => {
     const AccDB = Mongo.getAccountsRepository();
     const ldap = AccDB.collection<ILDAPData>('users');
     const accounts = (await ldap.find({})
       .toArray())
       .filter(userData => {
-        const Models = JSON.stringify(userData.data.model);
-        return (Models) ? Models.indexOf(modelId) !== -1 : false;
+        const Entities = JSON.stringify(userData.data.entity);
+        return (Entities) ? Entities.indexOf(entityId) !== -1 : false;
       })
       .map(userData => ({
         fullname: userData.fullname,
@@ -40,20 +40,20 @@ const Utility: IUtility = {
       }));
     return accounts;
   },
-  countModelUses: async (request, response) => {
-    const modelId = request.params.identifier;
-    if (!ObjectId.isValid(modelId)) {
-      response.send({ status: 'error', message: 'Invalid model _id ' });
+  countEntityUses: async (request, response) => {
+    const entityId = request.params.identifier;
+    if (!ObjectId.isValid(entityId)) {
+      response.send({ status: 'error', message: 'Invalid entity _id ' });
       return;
     }
 
-    const ObjDB = Mongo.getObjectsRepository();
+    const ObjDB = Mongo.getEntitiesRepository();
     const compilations = (await ObjDB.collection<ICompilation>('compilation')
       .find({})
       .toArray())
       .filter(comp => {
-        const Models = JSON.stringify(comp.models);
-        return Models.indexOf(modelId) !== -1;
+        const Entities = JSON.stringify(comp.entities);
+        return Entities.indexOf(entityId) !== -1;
       });
     const occurences = compilations.length;
 
@@ -73,7 +73,7 @@ const Utility: IUtility = {
       return;
     }
 
-    const ObjDB = Mongo.getObjectsRepository();
+    const ObjDB = Mongo.getEntitiesRepository();
     const CompColl = ObjDB.collection<ICompilation>('compilation');
     const compilation = await CompColl.findOne({ _id: new ObjectId(compId) });
     if (!compilation) {
@@ -120,7 +120,7 @@ const Utility: IUtility = {
     validAnnotations.forEach(ann => Mongo.insertCurrentUserData(request, ann['_id'], 'annotation'));
     response.send({ status: 'ok', ...await Mongo.resolve(compId, 'compilation') });
   },
-  applyActionToModelOwner: async (request, response) => {
+  applyActionToEntityOwner: async (request, response) => {
     const command = request.body.command;
     if (!['add', 'remove'].includes(command)) {
       return response.send({ status: 'error', message: 'Invalid command. Use "add" or "remove"' });
@@ -133,10 +133,10 @@ const Utility: IUtility = {
     if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId)) {
       return response.send({ status: 'error', message: 'Incorrect owner _id given' });
     }
-    const modelId = request.body.modelId;
-    if (!modelId || !ObjectId.isValid(modelId)
-      || await Mongo.resolve(modelId, 'model') === undefined) {
-      return response.send({ status: 'error', message: 'Invalid model identifier' });
+    const entityId = request.body.entityId;
+    if (!entityId || !ObjectId.isValid(entityId)
+      || await Mongo.resolve(entityId, 'entity') === undefined) {
+      return response.send({ status: 'error', message: 'Invalid entity identifier' });
     }
     const AccDB = Mongo.getAccountsRepository();
     const ldap = AccDB.collection<ILDAPData>('users');
@@ -146,23 +146,23 @@ const Utility: IUtility = {
       return response.send({ status: 'error', message: 'Incorrect owner _id or username given' });
     }
 
-    account.data.model = (account.data.model) ? account.data.model : [];
-    account.data.model = account.data.model.filter(model => model);
+    account.data.entity = (account.data.entity) ? account.data.entity : [];
+    account.data.entity = account.data.entity.filter(entity => entity);
 
     switch (command) {
       case 'add':
-        if (!(account.data.model as IModel[])
-          .find(obj => obj.toString() === modelId.toString())) {
-          account.data.model.push(new ObjectId(modelId));
+        if (!(account.data.entity as IEntity[])
+          .find(obj => obj.toString() === entityId.toString())) {
+          account.data.entity.push(new ObjectId(entityId));
         }
         break;
       case 'remove':
-        const modelUses = (await Utility.findAllModelOwners(modelId)).length;
-        if (modelUses === 1) {
+        const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
+        if (entityUses === 1) {
           return response.send({ status: 'error', message: 'Cannot remove last owner' });
         }
-        account.data.model = (account.data.model as IModel[])
-          .filter(model => model.toString() !== modelId.toString());
+        account.data.entity = (account.data.entity as IEntity[])
+          .filter(entity => entity.toString() !== entityId.toString());
         break;
       default:
     }
@@ -172,7 +172,7 @@ const Utility: IUtility = {
       { $set: { data: account.data } });
 
     if (updateResult.result.ok !== 1) {
-      return response.send({ status: 'error', message: 'Failed updating model array' });
+      return response.send({ status: 'error', message: 'Failed updating entity array' });
     }
 
     return response.send({ status: 'ok' });

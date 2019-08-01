@@ -37,14 +37,14 @@ const Upload: IUpload = {
     ensureDir(dirname(newPath))
       .then(() => move(tempPath, newPath))
       .then(_ => {
-        const responseObject = {
+        const responseEntity = {
           metadata_file: filename,
-          metadata_object: request.headers['metadatakey'],
-          metadata_link: `models/${token}/${metaDataKey}/${filename}`,
+          metadata_entity: request.headers['metadatakey'],
+          metadata_link: `entities/${token}/${metaDataKey}/${filename}`,
           metadata_format: `${extname(newPath)}`,
           metadata_size: `${statSync(newPath).size} bytes`,
         };
-        response.send(JSON.stringify(responseObject));
+        response.send(JSON.stringify(responseEntity));
       })
       .catch(err => {
         Logger.err(err);
@@ -140,13 +140,13 @@ const Upload: IUpload = {
         // TODO: Add more filters
         const filter: string[] = [];
         switch (Type) {
-          case 'model': filter.push('.obj', '.babylon', '.gltf', '.stl'); break;
+          case 'entity': filter.push('.obj', '.babylon', '.gltf', '.stl'); break;
           default:
         }
 
         const filteredFiles = foundFiles.filter(file => {
           return filter.indexOf(extname(file.path)) !== -1;
-        }); // .map(file => file.path.substr(file.path.indexOf('models/')));
+        }); // .map(file => file.path.substr(file.path.indexOf('entities/')));
 
         const ResponseFile = {
           file_name: '',

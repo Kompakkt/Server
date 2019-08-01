@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { ILDAPData, IModel } from '../interfaces';
+import { IEntity, ILDAPData } from '../interfaces';
 
 import { Mongo } from './mongo';
 
@@ -12,7 +12,7 @@ interface IAdmin {
   checkIsAdmin(request: Request, response: Response, next: NextFunction): Promise<any>;
   getAllLDAPUsers(_: Request, response: Response): Promise<any>;
   promoteUserToRole(request: Request, response: Response): Promise<any>;
-  toggleObjectPublishedState(request: Request, response: Response): Promise<any>;
+  toggleEntityPublishedState(request: Request, response: Response): Promise<any>;
 }
 
 const Admin: IAdmin = {
@@ -45,7 +45,7 @@ const Admin: IAdmin = {
             const obj = account.data[coll][i];
             account.data[coll][i] = await Mongo.resolve(obj, coll);
           }
-          // Filter null objects
+          // Filter null entities
           account.data[coll] = account.data[coll].filter(obj => obj);
         }
         return account;
@@ -72,24 +72,24 @@ const Admin: IAdmin = {
         return response.send({ status: 'error', message: 'Invalid role specified' });
     }
   },
-  toggleObjectPublishedState: async (request, response) => {
+  toggleEntityPublishedState: async (request, response) => {
     const _id = checkAndReturnObjectId(request.body.identifier);
     if (!_id) {
       return response.send({ status: 'error', message: 'Incorrect request parameters' });
     }
-    const ObjDB: Db = Mongo.getObjectsRepository();
-    const ModelCollection: Collection<IModel> = ObjDB.collection('model');
-    const found = await ModelCollection.findOne({ _id });
+    const ObjDB: Db = Mongo.getEntitiesRepository();
+    const EntityCollection: Collection<IEntity> = ObjDB.collection('entity');
+    const found = await EntityCollection.findOne({ _id });
     if (!found) {
-      return response.send({ status: 'error', message: 'No object with this identifier found' });
+      return response.send({ status: 'error', message: 'No entity with this identifier found' });
     }
-    const isModelOnline: boolean = found.online;
-    const updateResult = await ObjDB.collection('model')
-      .updateOne({ _id }, { $set: { online: !isModelOnline } });
+    const isEntityOnline: boolean = found.online;
+    const updateResult = await ObjDB.collection('entity')
+      .updateOne({ _id }, { $set: { online: !isEntityOnline } });
     if (updateResult.result.ok !== 1) {
       return response.send({ status: 'error', message: 'Failed updating published state' });
     }
-    return response.send({ status: 'ok', ...await Mongo.resolve(_id, 'model') });
+    return response.send({ status: 'ok', ...await Mongo.resolve(_id, 'entity') });
   },
 };
 

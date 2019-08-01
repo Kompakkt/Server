@@ -1,7 +1,7 @@
-import { ICompilation, IMetaDataDigitalObject, IMetaDataPerson, IModel } from '../interfaces';
+import { ICompilation, IEntity, IMetaDataDigitalEntity, IMetaDataPerson } from '../interfaces';
 
 import { Mongo } from './mongo';
-import { isDigitalObject, isPerson } from './typeguards';
+import { isDigitalEntity, isPerson } from './typeguards';
 
 // TODO: Dynamic Resolving Depth
 
@@ -18,10 +18,10 @@ const resolvePerson = async (person: IMetaDataPerson) => {
   return person;
 };
 
-// Heavy nested resolving for DigitalObject
-export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject) => {
+// Heavy nested resolving for DigitalEntity
+export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
   // TODO: Use Typeguards
-  let currentId = digitalObject._id.toString();
+  let currentId = digitalEntity._id.toString();
   const resolveTopLevel = async (obj: any, property: string, field: string) => {
     if (obj[property] && obj[property].length && obj[property] instanceof Array) {
       for (let i = 0; i < obj[property].length; i++) {
@@ -39,21 +39,21 @@ export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject
     }
   };
 
-  let selector = digitalObject.digobj_rightsownerSelector;
+  let selector = digitalEntity.digobj_rightsownerSelector;
   const props = [
     ['digobj_rightsowner', (selector === INSTITUTION_SELECTOR) ? 'institution' : 'person'],
     ['digobj_person_existing'], ['contact_person_existing'], ['digobj_tags', 'tag']];
 
   for (const prop of props) {
-    await resolveTopLevel(digitalObject, prop[0], (prop[1]) ? prop[1] : 'person');
+    await resolveTopLevel(digitalEntity, prop[0], (prop[1]) ? prop[1] : 'person');
   }
 
-  if (digitalObject.phyObjs) {
-    const resolvedPhysicalObjects: any[] = [];
-    for (let phyObj of digitalObject.phyObjs) {
+  if (digitalEntity.phyObjs) {
+    const resolvedPhysicalEntities: any[] = [];
+    for (let phyObj of digitalEntity.phyObjs) {
       if (!phyObj) continue;
       currentId = phyObj._id.toString();
-      phyObj = await Mongo.resolve(phyObj, 'physicalobject');
+      phyObj = await Mongo.resolve(phyObj, 'physicalentity');
       if (!phyObj) continue;
       selector = phyObj.phyobj_rightsownerSelector;
       const phyProps = [
@@ -62,37 +62,37 @@ export const resolveDigitalObject = async (digitalObject: IMetaDataDigitalObject
       for (const phyProp of phyProps) {
         await resolveTopLevel(phyObj, phyProp[0], (phyProp[1]) ? phyProp[1] : 'person');
       }
-      resolvedPhysicalObjects.push(phyObj);
+      resolvedPhysicalEntities.push(phyObj);
     }
-    digitalObject.phyObjs = resolvedPhysicalObjects;
+    digitalEntity.phyObjs = resolvedPhysicalEntities;
   }
 
-  return digitalObject;
+  return digitalEntity;
 };
 
-export const resolveModel = async (model: IModel) => {
-  if (model.annotationList) {
-    for (let i = 0; i < model.annotationList.length; i++) {
-      const annotation = model.annotationList[i];
+export const resolveEntity = async (entity: IEntity) => {
+  if (entity.annotationList) {
+    for (let i = 0; i < entity.annotationList.length; i++) {
+      const annotation = entity.annotationList[i];
       if (!annotation) continue;
-      model.annotationList[i] = await Mongo.resolve(annotation, 'annotation');
+      entity.annotationList[i] = await Mongo.resolve(annotation, 'annotation');
     }
-    model.annotationList = model.annotationList.filter(_ => _);
+    entity.annotationList = entity.annotationList.filter(_ => _);
   }
-  if (model.relatedDigitalObject && !isDigitalObject(model.relatedDigitalObject)) {
-    model.relatedDigitalObject = await Mongo.resolve(model.relatedDigitalObject, 'digitalobject');
+  if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
+    entity.relatedDigitalEntity = await Mongo.resolve(entity.relatedDigitalEntity, 'digitalentity');
   }
-  return model;
+  return entity;
 };
 
 export const resolveCompilation = async (compilation: ICompilation) => {
-  if (compilation.models) {
-    for (let i = 0; i < compilation.models.length; i++) {
-      const model = compilation.models[i];
-      if (!model) continue;
-      compilation.models[i] = await Mongo.resolve(model, 'model');
+  if (compilation.entities) {
+    for (let i = 0; i < compilation.entities.length; i++) {
+      const entity = compilation.entities[i];
+      if (!entity) continue;
+      compilation.entities[i] = await Mongo.resolve(entity, 'entity');
     }
-    compilation.models = compilation.models.filter(_ => _);
+    compilation.entities = compilation.entities.filter(_ => _);
   }
   if (compilation.annotationList) {
     for (let i = 0; i < compilation.annotationList.length; i++) {

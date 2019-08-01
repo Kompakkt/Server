@@ -7,13 +7,13 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, InsertOneWriteOpResult, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, ILDAPData, IMetaDataDigitalObject, IModel } from '../interfaces';
+import { ICompilation, IEntity, ILDAPData, IMetaDataDigitalEntity } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { resolveCompilation, resolveDigitalObject, resolveModel } from './resolving-strategies';
-import { saveAnnotation, saveCompilation, saveDigitalObject, saveModel } from './saving-strategies';
-import { isAnnotation, isCompilation, isDigitalObject, isModel } from './typeguards';
+import { resolveCompilation, resolveDigitalEntity, resolveEntity } from './resolving-strategies';
+import { saveAnnotation, saveCompilation, saveDigitalEntity, saveEntity } from './saving-strategies';
+import { isAnnotation, isCompilation, isDigitalEntity, isEntity } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
 
@@ -32,7 +32,7 @@ const getUserByUsername = async (username: string) =>
   ldap()
     .findOne({ username });
 const getAllItemsOfCollection = async (collection: string) =>
-  getObjectsRepository()
+  getEntitiesRepository()
     .collection(collection)
     .find({})
     .toArray();
@@ -83,13 +83,13 @@ const Client = new MongoClient(MongoURL, {
   reconnectInterval: 1000,
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
-const getObjectsRepository = (): Db => Client.db(MongoConf.RepositoryDB);
+const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
 interface IMongo {
   init(): Promise<void>;
   isMongoDBConnected(_: Request, response: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
-  getObjectsRepository(): Db;
+  getEntitiesRepository(): Db;
   saveBase64toImage(
     base64input: string, subfolder: string,
     identifier: string | ObjectId): Promise<string>;
@@ -106,16 +106,16 @@ interface IMongo {
   validateLoginSession(request: Request, response: Response, next: NextFunction): Promise<any>;
   submitService(request: Request, response: Response): void;
   submit(request: Request, response: Response): Promise<any>;
-  addObjectToCollection(request: Request, response: Response): Promise<any>;
-  updateModelSettings(request: Request, response: Response): Promise<any>;
-  isUserOwnerOfObject(request: Request | ILDAPData, identifier: string | ObjectId): Promise<any>;
+  addEntityToCollection(request: Request, response: Response): Promise<any>;
+  updateEntitySettings(request: Request, response: Response): Promise<any>;
+  isUserOwnerOfEntity(request: Request | ILDAPData, identifier: string | ObjectId): Promise<any>;
   isUserAdmin(request: Request): Promise<boolean>;
   query(_id: string | ObjectId): any;
   resolve(obj: any, collection_name: string, depth?: number): Promise<any | null | undefined>;
-  getObjectFromCollection(request: Request, response: Response): Promise<any>;
-  getAllObjectsFromCollection(request: Request, response: Response): Promise<any>;
-  removeObjectFromCollection(request: Request, response: Response): any;
-  searchByObjectFilter(request: Request, response: Response): Promise<any>;
+  getEntityFromCollection(request: Request, response: Response): Promise<any>;
+  getAllEntitiesFromCollection(request: Request, response: Response): Promise<any>;
+  removeEntityFromCollection(request: Request, response: Response): any;
+  searchByEntityFilter(request: Request, response: Response): Promise<any>;
   searchByTextFilter(request: Request, response: Response): Promise<any>;
 }
 
@@ -143,7 +143,7 @@ const Mongo: IMongo = {
       response.send({ message: 'Cannot connect to Database. Contact sysadmin' });
     }
   },
-  getAccountsRepository, getObjectsRepository, saveBase64toImage,
+  getAccountsRepository, getEntitiesRepository, saveBase64toImage,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -288,13 +288,13 @@ const Mongo: IMongo = {
         // Filter possible null's
         userData.data[property] = userData.data[property].filter(obj => obj);
       }
-      // Add model owners to models
-      if (userData.data.model && userData.data.model.length > 0) {
-        for (const model of userData.data.model) {
-          if (!model) continue;
-          if (!isModel(model)) continue;
-          model.relatedModelOwners =
-            await Utility.findAllModelOwners(model._id.toString());
+      // Add entity owners to entities
+      if (userData.data.entity && userData.data.entity.length > 0) {
+        for (const entity of userData.data.entity) {
+          if (!entity) continue;
+          if (!isEntity(entity)) continue;
+          entity.relatedEntityOwners =
+            await Utility.findAllEntityOwners(entity._id.toString());
         }
       }
     }
@@ -328,12 +328,12 @@ const Mongo: IMongo = {
     return next();
   },
   submitService: (request, response) => {
-    const digobjCollection: Collection<IMetaDataDigitalObject> =
-      getObjectsRepository()
-        .collection('digitalobject');
-    const modelCollection: Collection<IModel> =
-      getObjectsRepository()
-        .collection('model');
+    const digobjCollection: Collection<IMetaDataDigitalEntity> =
+      getEntitiesRepository()
+        .collection('digitalentity');
+    const entityCollection: Collection<IEntity> =
+      getEntitiesRepository()
+        .collection('entity');
 
     const service: string = request.params.service;
     if (!service) response.send({ status: 'error', message: 'Incorrect request' });
@@ -344,37 +344,37 @@ const Mongo: IMongo = {
       switch (type) {
         case 'sound': type = 'audio'; break;
         case 'picture': type = 'image'; break;
-        case '3d': type = 'model'; break;
+        case '3d': type = 'entity'; break;
         default:
       }
       return type;
     };
 
-    // After adding a digitalobject inside of a model,
+    // After adding a digitalentity inside of a entity,
     // attach data to the current user
-    const insertFinalModelToCurrentUser = (modelResult: InsertOneWriteOpResult) => {
-      Mongo.insertCurrentUserData(request, modelResult.ops[0]._id, 'model')
+    const insertFinalEntityToCurrentUser = (entityResult: InsertOneWriteOpResult) => {
+      Mongo.insertCurrentUserData(request, entityResult.ops[0]._id, 'entity')
         .then(() => {
-          response.send({ status: 'ok', result: modelResult.ops[0] });
-          Logger.info(`Added Europeana object ${modelResult.ops[0]._id}`);
+          response.send({ status: 'ok', result: entityResult.ops[0] });
+          Logger.info(`Added Europeana entity ${entityResult.ops[0]._id}`);
         })
         .catch(err => {
           Logger.err(err);
-          response.send({ status: 'error', message: 'Failed adding finalized object to user' });
+          response.send({ status: 'error', message: 'Failed adding finalized entity to user' });
         });
     };
 
-    // After adding a digitalobject, add digitalobject
-    // to a model and push the model
-    const pushModel = (digobjResult: InsertOneWriteOpResult) => {
-      const resultObject = digobjResult.ops[0];
-      const modelObject: IModel = {
+    // After adding a digitalentity, add digitalentity
+    // to a entity and push the entity
+    const pushEntity = (digobjResult: InsertOneWriteOpResult) => {
+      const resultEntity = digobjResult.ops[0];
+      const entityEntity: IEntity = {
         _id: new ObjectId(),
         annotationList: [],
-        relatedDigitalObject: {
-          _id: resultObject._id,
+        relatedDigitalEntity: {
+          _id: resultEntity._id,
         },
-        name: resultObject.digobj_title,
+        name: resultEntity.digobj_title,
         ranking: 0,
         files: [],
         finished: true,
@@ -396,18 +396,18 @@ const Mongo: IMongo = {
             : '/previews/noimage.png',
         },
       };
-      modelCollection.insertOne(modelObject)
-        .then(insertFinalModelToCurrentUser)
+      entityCollection.insertOne(entityEntity)
+        .then(insertFinalEntityToCurrentUser)
         .catch(err => {
           Logger.err(err);
-          response.send({ status: 'error', message: 'Failed finalizing digitalobject' });
+          response.send({ status: 'error', message: 'Failed finalizing digitalentity' });
         });
     };
 
     switch (service) {
       case 'europeana':
         // TODO: Put into Europeana service to make every service self sustained?
-        const EuropeanaObject: IMetaDataDigitalObject = {
+        const EuropeanaEntity: IMetaDataDigitalEntity = {
           _id: new ObjectId(),
           digobj_type: mapTypes(request.body.type),
           digobj_title: request.body.title,
@@ -422,7 +422,7 @@ const Mongo: IMongo = {
           digobj_creation: [],
           digobj_dimensions: [],
           digobj_files: [],
-          digobj_objecttype: '',
+          digobj_entitytype: '',
           digobj_person: [],
           digobj_rightsowner: [],
           digobj_statement: '',
@@ -438,11 +438,11 @@ const Mongo: IMongo = {
           phyObjs: [],
         };
 
-        digobjCollection.insertOne(EuropeanaObject)
-          .then(pushModel)
+        digobjCollection.insertOne(EuropeanaEntity)
+          .then(pushEntity)
           .catch(err => {
             Logger.err(err);
-            response.send({ status: 'error', message: `Couldn't add as digitalobject` });
+            response.send({ status: 'error', message: `Couldn't add as digitalentity` });
           });
 
         break;
@@ -457,70 +457,70 @@ const Mongo: IMongo = {
    */
   submit: async (request, response) => {
     Logger.info('Handling submit request');
-    request.params.collection = 'digitalobject';
-    await Mongo.addObjectToCollection(request, response);
+    request.params.collection = 'digitalentity';
+    await Mongo.addEntityToCollection(request, response);
   },
-  addObjectToCollection: async (request, response) => {
+  addEntityToCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
-    const collection: Collection = getObjectsRepository()
+    const collection: Collection = getEntitiesRepository()
       .collection(RequestCollection);
 
-    let resultObject = request.body;
+    let resultEntity = request.body;
     const userData = await getCurrentUserBySession(request.sessionID);
     if (!userData) {
       return response
         .send({ status: 'error', message: 'Cannot fetch current user from database' });
     }
 
-    const isValidObjectId = ObjectId.isValid(resultObject['_id']);
+    const isValidObjectId = ObjectId.isValid(resultEntity['_id']);
     // tslint:disable-next-line:triple-equals
-    const doesObjectExist = (await Mongo.resolve(resultObject, RequestCollection, 0)) != undefined;
-    // If the object already exists we need to check for owner status
+    const doesEntityExist = (await Mongo.resolve(resultEntity, RequestCollection, 0)) != undefined;
+    // If the entity already exists we need to check for owner status
     // We skip this for annotations, since annotation ranking can be changed by owner
     // We check this in the saving strategy instead
-    if (isValidObjectId && doesObjectExist && !isAnnotation(resultObject)) {
-      if (!await Mongo.isUserOwnerOfObject(request, resultObject['_id'])) {
+    if (isValidObjectId && doesEntityExist && !isAnnotation(resultEntity)) {
+      if (!await Mongo.isUserOwnerOfEntity(request, resultEntity['_id'])) {
         return response.send({ status: 'error', message: 'Permission denied' });
       }
     }
 
     const _id = isValidObjectId
-      ? new ObjectId(resultObject._id)
+      ? new ObjectId(resultEntity._id)
       : new ObjectId();
-    resultObject._id = _id;
+    resultEntity._id = _id;
 
-    if (isCompilation(resultObject)) {
-      await saveCompilation(resultObject, userData)
-        .then(compilation => resultObject = compilation)
+    if (isCompilation(resultEntity)) {
+      await saveCompilation(resultEntity, userData)
+        .then(compilation => resultEntity = compilation)
         .catch(rejected => response.send(rejected));
-    } else if (isModel(resultObject)) {
-      await saveModel(resultObject, userData)
-        .then(model => resultObject = model)
+    } else if (isEntity(resultEntity)) {
+      await saveEntity(resultEntity, userData)
+        .then(entity => resultEntity = entity)
         .catch(rejected => response.send(rejected));
-    } else if (isAnnotation(resultObject)) {
-      await saveAnnotation(resultObject, userData, doesObjectExist)
-        .then(annotation => resultObject = annotation)
+    } else if (isAnnotation(resultEntity)) {
+      await saveAnnotation(resultEntity, userData, doesEntityExist)
+        .then(annotation => resultEntity = annotation)
         .catch(rejected => response.send(rejected));
-    } else if (isDigitalObject(resultObject)) {
-      await saveDigitalObject(resultObject)
-        .then(async digitalobject => {
-          resultObject = digitalobject;
+    } else if (isDigitalEntity(resultEntity)) {
+      await saveDigitalEntity(resultEntity)
+        .then(async digitalentity => {
+          resultEntity = digitalentity;
           await Mongo
-            .insertCurrentUserData(request, resultObject._id, 'digitalobject');
+            .insertCurrentUserData(request, resultEntity._id, 'digitalentity');
         })
         .catch(rejected => response.send(rejected));
     } else {
       await Mongo.insertCurrentUserData(request, _id, RequestCollection);
     }
 
-    // We already got rejected. Don't update resultObject in DB
+    // We already got rejected. Don't update resultEntity in DB
     if (response.headersSent) return undefined;
 
     const updateResult = await collection
-      .updateOne({ _id }, { $set: resultObject }, { upsert: true });
+      .updateOne({ _id }, { $set: resultEntity }, { upsert: true });
 
     if (updateResult.result.ok !== 1) {
       Logger.err(`Failed updating ${RequestCollection} ${_id}`);
@@ -531,13 +531,13 @@ const Mongo: IMongo = {
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
     return response.send({ status: 'ok', ...await Mongo.resolve(resultId, RequestCollection) });
   },
-  updateModelSettings: async (request, response) => {
+  updateEntitySettings: async (request, response) => {
     const preview = request.body.preview;
     const identifier = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
-    const collection: Collection = getObjectsRepository()
-      .collection('model');
-    const subfolder = 'model';
+    const collection: Collection = getEntitiesRepository()
+      .collection('entity');
+    const subfolder = 'entity';
 
     const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
     if (finalImagePath === '') {
@@ -553,7 +553,7 @@ const Mongo: IMongo = {
     return response
       .send((result.result.ok === 1) ? { status: 'ok', settings } : { status: 'error' });
   },
-  isUserOwnerOfObject: async (request, identifier: string | ObjectId) => {
+  isUserOwnerOfEntity: async (request, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier) : identifier;
     const userData = await getCurrentUserBySession(request.sessionID);
@@ -580,17 +580,17 @@ const Mongo: IMongo = {
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
     Logger.info(`Resolving ${collection_name} ${_id}`);
-    const resolve_collection: Collection = getObjectsRepository()
+    const resolve_collection: Collection = getEntitiesRepository()
       .collection(collection_name);
     return resolve_collection.findOne(Mongo.query(_id))
       .then(resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
-        if (isDigitalObject(resolve_result)) {
-          return resolveDigitalObject(resolve_result);
+        if (isDigitalEntity(resolve_result)) {
+          return resolveDigitalEntity(resolve_result);
         }
-        if (isModel(resolve_result)) {
-          return resolveModel(resolve_result);
+        if (isEntity(resolve_result)) {
+          return resolveEntity(resolve_result);
         }
         if (isCompilation(resolve_result)) {
           return resolveCompilation(resolve_result);
@@ -598,23 +598,23 @@ const Mongo: IMongo = {
         return resolve_result;
       });
   },
-  getObjectFromCollection: async (request, response) => {
+  getEntityFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
     const _id = (ObjectId.isValid(request.params.identifier)) ?
       new ObjectId(request.params.identifier) : request.params.identifier;
     const password = (request.params.password) ? request.params.password : '';
-    const object = await Mongo.resolve(_id, RequestCollection);
-    if (!object) {
+    const entity = await Mongo.resolve(_id, RequestCollection);
+    if (!entity) {
       return response
         .send({ status: 'error', message: `No ${RequestCollection} found with given identifier` });
     }
 
-    if (isCompilation(object)) {
-      const compilation = object;
+    if (isCompilation(entity)) {
+      const compilation = entity;
       const _pw = compilation.password;
       const isPasswordProtected = (_pw && _pw.length > 0);
-      const isUserOwner = await Mongo.isUserOwnerOfObject(request, _id);
+      const isUserOwner = await Mongo.isUserOwnerOfEntity(request, _id);
       const isPasswordCorrect = (_pw && _pw === password);
 
       if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
@@ -624,9 +624,9 @@ const Mongo: IMongo = {
 
       return response.send({ status: 'ok', message: 'Password protected compilation' });
     }
-    return response.send({ status: 'ok', ...object });
+    return response.send({ status: 'ok', ...entity });
   },
-  getAllObjectsFromCollection: async (request, response) => {
+  getAllEntitiesFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
     let results = await getAllItemsOfCollection(RequestCollection);
 
@@ -643,10 +643,10 @@ const Mongo: IMongo = {
 
     response.send(results);
   },
-  removeObjectFromCollection: async (request, response) => {
+  removeEntityFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
 
-    const collection = getObjectsRepository()
+    const collection = getEntitiesRepository()
       .collection(RequestCollection);
     const sessionID = request.sessionID;
 
@@ -657,7 +657,7 @@ const Mongo: IMongo = {
 
     if (!find_result || (!find_result.username || !request.body.username)
       || (request.body.username !== find_result.username)) {
-      Logger.err(`Object removal failed due to username & session not matching`);
+      Logger.err(`Entity removal failed due to username & session not matching`);
       response.send({
         status: 'error',
         message: 'Input username does not match username with current sessionID',
@@ -666,15 +666,15 @@ const Mongo: IMongo = {
     }
 
     // Flatten account.data so its an array of ObjectId.toString()
-    const UserRelatedObjects =
+    const UserRelatedEntities =
       Array.prototype.concat(...Object.values(find_result.data))
         .map(id => id.toString());
 
-    if (!UserRelatedObjects.find(obj => obj === identifier.toString())) {
-      Logger.err(`Object removal failed because Object does not belong to user`);
+    if (!UserRelatedEntities.find(obj => obj === identifier.toString())) {
+      Logger.err(`Entity removal failed because Entity does not belong to user`);
       response.send({
         status: 'error',
-        message: 'Object with identifier does not belong to account with this sessionID',
+        message: 'Entity with identifier does not belong to account with this sessionID',
       });
       return;
     }
@@ -700,12 +700,12 @@ const Mongo: IMongo = {
       response.send({ status: 'error' });
     }
   },
-  searchByObjectFilter: async (request, response) => {
+  searchByEntityFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
     const body: any = (request.body) ? request.body : {};
     const filter: any = (body.filter) ? body.filter : {};
 
-    const doesObjectPropertyMatch = (obj: any, propName: string, _filter = filter) => {
+    const doesEntityPropertyMatch = (obj: any, propName: string, _filter = filter) => {
       if (obj[propName] === null || obj[propName] === undefined) return false;
       switch (typeof (obj[propName])) {
         case 'string':
@@ -714,24 +714,24 @@ const Mongo: IMongo = {
         case 'object':
           switch (typeof (_filter[propName])) {
             case 'string':
-              // Case: search for string inside of object
+              // Case: search for string inside of entity
               if (JSON
                 .stringify(obj[propName])
                 .indexOf(_filter[propName]) === -1) return false;
               break;
             case 'object':
-              // Case: recursive search inside of object + array of objects
+              // Case: recursive search inside of entity + array of entities
               for (const prop in _filter[propName]) {
                 if (Array.isArray(obj[propName])) {
                   let resultInArray = false;
                   for (const innerObj of obj[propName]) {
-                    if (doesObjectPropertyMatch(innerObj, prop, _filter[propName])) {
+                    if (doesEntityPropertyMatch(innerObj, prop, _filter[propName])) {
                       resultInArray = true;
                     }
                   }
                   if (!resultInArray) return false;
                 } else {
-                  if (!doesObjectPropertyMatch(obj[propName], prop, _filter[propName])) {
+                  if (!doesEntityPropertyMatch(obj[propName], prop, _filter[propName])) {
                     return false;
                   }
                 }
@@ -747,17 +747,17 @@ const Mongo: IMongo = {
       return true;
     };
 
-    let allObjects = await getAllItemsOfCollection(RequestCollection);
-    allObjects = await Promise.all(allObjects.map(obj => Mongo.resolve(obj, RequestCollection)));
-    allObjects = allObjects.filter(obj => {
+    let allEntities = await getAllItemsOfCollection(RequestCollection);
+    allEntities = await Promise.all(allEntities.map(obj => Mongo.resolve(obj, RequestCollection)));
+    allEntities = allEntities.filter(obj => {
       for (const prop in filter) {
         if (!filter.hasOwnProperty(prop)) continue;
-        if (!doesObjectPropertyMatch(obj, prop)) return false;
+        if (!doesEntityPropertyMatch(obj, prop)) return false;
       }
       return true;
     });
 
-    response.send(allObjects);
+    response.send(allEntities);
   },
   searchByTextFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
@@ -765,7 +765,7 @@ const Mongo: IMongo = {
     const filter = (request.body.filter)
       ? request.body.filter.map((_: any) => _.toLowerCase())
       : [''];
-    let allObjects = await getAllItemsOfCollection(RequestCollection);
+    let allEntities = await getAllItemsOfCollection(RequestCollection);
 
     const getNestedValues = (obj: any) => {
       let result: string[] = [];
@@ -805,18 +805,18 @@ const Mongo: IMongo = {
     };
 
     switch (RequestCollection) {
-      case 'digitalobject':
-        await Promise.all(allObjects.map(async digObj => Mongo.resolve(digObj, 'digitalobject')));
+      case 'digitalentity':
+        await Promise.all(allEntities.map(async digObj => Mongo.resolve(digObj, 'digitalentity')));
         break;
-      case 'model':
-        allObjects = allObjects.filter(model =>
-          model && model.finished && model.online
-          && model.relatedDigitalObject && model.relatedDigitalObject['_id']);
-        for (const obj of allObjects) {
-          if (obj.relatedDigitalObject['_id']) {
+      case 'entity':
+        allEntities = allEntities.filter(entity =>
+          entity && entity.finished && entity.online
+          && entity.relatedDigitalEntity && entity.relatedDigitalEntity['_id']);
+        for (const obj of allEntities) {
+          if (obj.relatedDigitalEntity['_id']) {
             const tempDigObj =
-              await Mongo.resolve(obj.relatedDigitalObject, 'digitalobject');
-            obj.relatedDigitalObject = await Mongo.resolve(tempDigObj, 'digitalobject');
+              await Mongo.resolve(obj.relatedDigitalEntity, 'digitalentity');
+            obj.relatedDigitalEntity = await Mongo.resolve(tempDigObj, 'digitalentity');
             obj.settings.preview = '';
           }
         }
@@ -824,7 +824,7 @@ const Mongo: IMongo = {
       default:
     }
 
-    response.send(filterResults(allObjects));
+    response.send(filterResults(allEntities));
   },
 };
 

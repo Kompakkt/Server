@@ -39,12 +39,12 @@ Server.get(
     '/api/v1/get/find/:collection/:identifier',
     '/api/v1/get/find/:collection/:identifier/:password',
   ],
-  Mongo.getObjectFromCollection,
+  Mongo.getEntityFromCollection,
 );
 // Return all documents of a collection
 Server.get(
   '/api/v1/get/findall/:collection',
-  Mongo.getAllObjectsFromCollection,
+  Mongo.getAllEntitiesFromCollection,
 );
 // Return data linked to currently logged in LDAP Account
 Server.get(['/api/v1/get/ldata', '/auth'], Mongo.validateLoginSession, Mongo.getCurrentUserData);
@@ -57,7 +57,7 @@ Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 Server.post(
   '/api/v1/post/push/:collection',
   Mongo.validateLoginSession,
-  Mongo.addObjectToCollection,
+  Mongo.addEntityToCollection,
 );
 // On user submit
 Server.post(
@@ -74,7 +74,7 @@ Server.post(
 Server.post(
   '/api/v1/post/settings/:identifier',
   Mongo.validateLoginSession,
-  Mongo.updateModelSettings,
+  Mongo.updateEntitySettings,
 );
 // Remove document from collection
 Server.post(
@@ -82,7 +82,7 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Mongo.validateLoginSession,
-  Mongo.removeObjectFromCollection,
+  Mongo.removeEntityFromCollection,
 );
 // Return search data
 Server.post(
@@ -91,23 +91,23 @@ Server.post(
   Mongo.searchByTextFilter,
 );
 Server.post(
-  '/api/v1/post/searchobject/:collection',
+  '/api/v1/post/searchentity/:collection',
   Mongo.validateLoginSession,
-  Mongo.searchByObjectFilter,
+  Mongo.searchByEntityFilter,
 );
-// Publish or unpublish a model
+// Publish or unpublish a entity
 const userOwnerHandler = (request: Request, response: Response, next: NextFunction) => {
-  Mongo.isUserOwnerOfObject(request, request.body.identifier)
+  Mongo.isUserOwnerOfEntity(request, request.body.identifier)
     .then((isOwner): any => {
-      if (!isOwner) return response.send({ status: 'error', message: 'Not owner of model' });
+      if (!isOwner) return response.send({ status: 'error', message: 'Not owner of entity' });
       next();
     })
-    .catch(() => response.send({ status: 'error', message: 'Not owner of model' }));
+    .catch(() => response.send({ status: 'error', message: 'Not owner of entity' }));
 };
 Server.post(
   '/api/v1/post/publish',
   Mongo.validateLoginSession, userOwnerHandler,
-  Admin.toggleObjectPublishedState);
+  Admin.toggleEntityPublishedState);
 
 // Upload API
 // Upload a file to the server
@@ -172,7 +172,7 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Admin.toggleObjectPublishedState);
+  Admin.toggleEntityPublishedState);
 
 // Europeana
 // TODO: Auslagern
@@ -180,16 +180,16 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
   await Europeana.getRecordData(`${request.params.record}/${request.params.id}`)
     .then((result: any) => {
       try {
-        const _relURL = result.data.object.europeanaAggregation.aggregatedCHO
+        const _relURL = result.data.entity.europeanaAggregation.aggregatedCHO
           .toString()
           .replace('/item/', '');
         const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
-        const _fallbackURL = result.data.object.europeanaAggregation.edmPreview;
-        const _type = result.data.object.type;
+        const _fallbackURL = result.data.entity.europeanaAggregation.edmPreview;
+        const _type = result.data.entity.type;
         response.send(
           {
             status: 'ok',
-            data: result.data.object,
+            data: result.data.entity,
             fileUrl: _fullURL,
             fallbackUrl: _fallbackURL,
             type: _type,
@@ -241,14 +241,14 @@ Server.post(
 
 // Utility
 Server.get(
-  '/utility/findmodelowners/:identifier',
+  '/utility/findentityowners/:identifier',
   Mongo.validateLoginSession,
-  Utility.findAllModelOwnersRequest);
+  Utility.findAllEntityOwnersRequest);
 
 Server.get(
-  '/utility/countmodeluses/:identifier',
+  '/utility/countentityuses/:identifier',
   Mongo.validateLoginSession,
-  Utility.countModelUses);
+  Utility.countEntityUses);
 
 Server.post(
   '/utility/moveannotations/:identifier',
@@ -256,9 +256,9 @@ Server.post(
   Utility.addAnnotationsToAnnotationList);
 
 Server.post(
-  '/utility/applyactiontomodelowner',
+  '/utility/applyactiontoentityowner',
   Express.authenticate(),
   Mongo.updateSessionId,
-  Utility.applyActionToModelOwner);
+  Utility.applyActionToEntityOwner);
 
 Express.startListening();

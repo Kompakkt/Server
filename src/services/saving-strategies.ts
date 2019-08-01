@@ -2,15 +2,15 @@ import flatten from 'flatten';
 import { Collection, ObjectId } from 'mongodb';
 
 // tslint:disable-next-line:max-line-length
-import { IAnnotation, ICompilation, ILDAPData, IMetaDataDigitalObject, IMetaDataPhysicalObject,  IModel } from '../interfaces';
+import { IAnnotation, ICompilation, IEntity, IGroup, ILDAPData, IMetaDataDigitalEntity, IMetaDataPhysicalEntity, IUserData } from '../interfaces';
 
 import { Logger } from './logger';
 import { Mongo } from './mongo';
 import { isAnnotation } from './typeguards';
 
 const updateAnnotationList =
-  async (modelOrCompId: string, add_to_coll: string, annotationId: string) => {
-    const obj: IModel | ICompilation = await Mongo.resolve(modelOrCompId, add_to_coll, 0);
+  async (entityOrCompId: string, add_to_coll: string, annotationId: string) => {
+    const obj: IEntity | ICompilation = await Mongo.resolve(entityOrCompId, add_to_coll, 0);
     // Create annotationList if missing
     obj.annotationList = (obj.annotationList)
       ? obj.annotationList : [];
@@ -45,27 +45,27 @@ const saveCompilation = async (compilation: ICompilation, userData: ILDAPData) =
     username: userData.username,
     fullname: userData.fullname,
   };
-  // Compilations should have all their models referenced by _id
-  compilation.models =
-    (compilation.models.filter(model => model) as IModel[])
-      .map(model => ({ _id: new ObjectId(model['_id']) }));
+  // Compilations should have all their entities referenced by _id
+  compilation.entities =
+    (compilation.entities.filter(entity => entity) as IEntity[])
+      .map(entity => ({ _id: new ObjectId(entity['_id']) }));
 
   await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
   return compilation;
 };
 
 const saveAnnotation = async (
-  annotation: IAnnotation, userData: ILDAPData, doesObjectExist: boolean) => {
+  annotation: IAnnotation, userData: ILDAPData, doesEntityExist: boolean) => {
   return new Promise<IAnnotation>(async (resolve, reject) => {
     // If the Annotation already exists, check for owner
-    const isAnnotationOwner = (doesObjectExist)
-      ? await Mongo.isUserOwnerOfObject(userData, annotation._id)
+    const isAnnotationOwner = (doesEntityExist)
+      ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
       : true;
     // Check if anything was missing for safety
     if (!annotation || !annotation.target || !annotation.target.source) {
       return reject({
         status: 'error', message: 'Invalid annotation',
-        invalidObject: annotation,
+        invalidEntity: annotation,
       });
     }
     const source = annotation.target.source;
@@ -80,28 +80,28 @@ const saveAnnotation = async (
       annotation.body.content.relatedPerspective.preview, 'annotation', annotation._id);
 
     // Assume invalid data
-    const relatedModelId = source.relatedModel as string | undefined;
+    const relatedEntityId = source.relatedEntity as string | undefined;
     const relatedCompId = source.relatedCompilation;
     // Check if === undefined because otherwise this quits on empty string
-    if (relatedModelId === undefined || relatedCompId === undefined) {
-      return reject({ status: 'error', message: 'Related model or compilation undefined' });
+    if (relatedEntityId === undefined || relatedCompId === undefined) {
+      return reject({ status: 'error', message: 'Related entity or compilation undefined' });
     }
 
-    const validModel = ObjectId.isValid(relatedModelId);
+    const validEntity = ObjectId.isValid(relatedEntityId);
     const validCompilation = ObjectId.isValid(relatedCompId);
 
-    if (!validModel) {
-      return reject({ status: 'error', message: 'Invalid related model id' });
+    if (!validEntity) {
+      return reject({ status: 'error', message: 'Invalid related entity id' });
     }
 
     // Case: Trying to change Default Annotations
-    const isModelOwner = await Mongo.isUserOwnerOfObject(userData, relatedModelId);
-    if (!validCompilation && !isModelOwner) {
+    const isEntityOwner = await Mongo.isUserOwnerOfEntity(userData, relatedEntityId);
+    if (!validCompilation && !isEntityOwner) {
       return reject({ status: 'error', message: 'Permission denied' });
     }
 
     // Case: Compilation owner trying to re-rank annotations
-    const isCompilationOwner = await Mongo.isUserOwnerOfObject(userData, relatedCompId);
+    const isCompilationOwner = await Mongo.isUserOwnerOfEntity(userData, relatedCompId);
     if (!isAnnotationOwner) {
       if (isCompilationOwner) {
         const oldAnnotation: IAnnotation | null = await Mongo.resolve(annotation, 'annotation');
@@ -122,23 +122,23 @@ const saveAnnotation = async (
     annotation.lastModifiedBy.name = userData.fullname;
     annotation.lastModifiedBy.type = 'person';
 
-    const modelOrCompId = (!validCompilation) ? relatedModelId : relatedCompId;
-    const requestedCollection = (!validCompilation) ? 'model' : 'compilation';
-    const resultModelOrComp =
+    const entityOrCompId = (!validCompilation) ? relatedEntityId : relatedCompId;
+    const requestedCollection = (!validCompilation) ? 'entity' : 'compilation';
+    const resultEntityOrComp =
       await updateAnnotationList(
-        modelOrCompId, requestedCollection,
+        entityOrCompId, requestedCollection,
         annotation._id.toString());
 
     // Finally we update the annotationList in the compilation
-    const coll: Collection = Mongo.getObjectsRepository()
+    const coll: Collection = Mongo.getEntitiesRepository()
       .collection(requestedCollection);
     const listUpdateResult = await coll
       .updateOne(
-        { _id: new ObjectId(modelOrCompId) },
-        { $set: { annotationList: resultModelOrComp.annotationList } });
+        { _id: new ObjectId(entityOrCompId) },
+        { $set: { annotationList: resultEntityOrComp.annotationList } });
 
     if (listUpdateResult.result.ok !== 1) {
-      Logger.err(`Failed updating annotationList of ${requestedCollection} ${modelOrCompId}`);
+      Logger.err(`Failed updating annotationList of ${requestedCollection} ${entityOrCompId}`);
       return reject({ status: 'error' });
     }
 
@@ -149,27 +149,39 @@ const saveAnnotation = async (
   });
 };
 
-const saveModel = async (model: IModel, userData: ILDAPData) => {
+const saveEntity = async (entity: IEntity, userData: ILDAPData) => {
   /* Preview image URLs might have a corrupted address
  * because of Kompakkt runnning in an iframe
  * This removes the host address from the URL
  * so images will load correctly */
-  if (model.settings && model.settings.preview) {
-    model.settings.preview = await Mongo.saveBase64toImage(
-      model.settings.preview, 'model', model._id);
+  if (entity.settings && entity.settings.preview) {
+    entity.settings.preview = await Mongo.saveBase64toImage(
+      entity.settings.preview, 'entity', entity._id);
   }
-  await Mongo.insertCurrentUserData(userData, model._id, 'model');
-  return model;
+  await Mongo.insertCurrentUserData(userData, entity._id, 'entity');
+  return entity;
 };
 
-const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
+const saveGroup = async (group: IGroup, userData: ILDAPData) => {
+  const strippedUserData: IUserData = {
+    username: userData.username,
+    fullname: userData.fullname,
+    _id: userData._id,
+  };
+  group.creator = strippedUserData;
+  group.members = [strippedUserData];
+  group.owners = [strippedUserData];
+  return group;
+};
+
+const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity) => {
   /**
-   * Handle re-submit for changing a finished DigitalObject
+   * Handle re-submit for changing a finished DigitalEntity
    */
-  const isResObjIdValid = ObjectId.isValid(digitalobject._id);
-  digitalobject._id = isResObjIdValid
-    ? new ObjectId(digitalobject._id) : new ObjectId();
-  Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalObject ${digitalobject._id}`);
+  const isResObjIdValid = ObjectId.isValid(digitalentity._id);
+  digitalentity._id = isResObjIdValid
+    ? new ObjectId(digitalentity._id) : new ObjectId();
+  Logger.info(`${isResObjIdValid ? 'Re-' : ''}Submitting DigitalEntity ${digitalentity._id}`);
 
   // We overwrite this in the phyobj loop so we can
   let currentPhyObjId = '';
@@ -177,13 +189,13 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
   //// FILTER FUNCTIONS ////
   const addToRightsOwnerFilter = (person: any) =>
     person['value'] && person['value'].indexOf('add_to_new_rightsowner') !== -1;
-  const filterObjectsWithoutID = (obj: any) => ObjectId.isValid(obj._id);
+  const filterEntitiesWithoutID = (obj: any) => ObjectId.isValid(obj._id);
 
   /**
    * Adds data {field} to a collection {collection}
-   * and returns the {_id} of the created object.
+   * and returns the {_id} of the created entity.
    * If {field} already has an {_id} property the server
-   * will assume the object already exists in the collection
+   * will assume the entity already exists in the collection
    * and instead return the existing {_id}
    */
   // TODO: Roles interface?
@@ -193,14 +205,14 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
       field = await addNestedInstitution(field);
     }
     const coll: Collection = Mongo
-      .getObjectsRepository()
+      .getEntitiesRepository()
       .collection(add_to_coll);
     const isPersonOrInstitution = ['person', 'institution'].includes(add_to_coll);
-    const _digId = ((currentPhyObjId !== '') ? currentPhyObjId : digitalobject._id)
+    const _digId = ((currentPhyObjId !== '') ? currentPhyObjId : digitalentity._id)
       .toString();
     // By default, update/create the document
     // but if its an existing person/institution
-    // fetch the object and update roles
+    // fetch the entity and update roles
     const isIdValid = ObjectId.isValid(field['_id']);
     const _id = (isIdValid) ? new ObjectId(field['_id']) : new ObjectId();
     if (isIdValid) {
@@ -266,7 +278,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
     for (let i = 1; i < arr.length; i++) {
       result = result.concat(arr[i]);
     }
-    result = result.filter(filterObjectsWithoutID);
+    result = result.filter(filterEntitiesWithoutID);
     const final: any[] = [];
     for (const res of result) {
       const obj = { _id: new ObjectId(res._id) };
@@ -277,16 +289,16 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
   };
 
   // Always single
-  let digobj_rightsowner: any[] = digitalobject.digobj_rightsowner;
-  let digobj_rightsowner_person: any[] = digitalobject.digobj_rightsowner_person;
-  let digobj_rightsowner_institution: any[] = digitalobject.digobj_rightsowner_institution;
+  let digobj_rightsowner: any[] = digitalentity.digobj_rightsowner;
+  let digobj_rightsowner_person: any[] = digitalentity.digobj_rightsowner_person;
+  let digobj_rightsowner_institution: any[] = digitalentity.digobj_rightsowner_institution;
   // Can be multiple
-  let contact_person: any[] = digitalobject.contact_person;
-  let contact_person_existing: any[] = digitalobject.contact_person_existing;
-  let digobj_person: any[] = digitalobject.digobj_person;
-  let digobj_person_existing: any[] = digitalobject.digobj_person_existing;
-  const digobj_tags: any[] = digitalobject.digobj_tags;
-  const phyObjs: any[] = digitalobject.phyObjs;
+  let contact_person: any[] = digitalentity.contact_person;
+  let contact_person_existing: any[] = digitalentity.contact_person_existing;
+  let digobj_person: any[] = digitalentity.digobj_person;
+  let digobj_person_existing: any[] = digitalentity.digobj_person_existing;
+  const digobj_tags: any[] = digitalentity.digobj_tags;
+  const phyObjs: any[] = digitalentity.phyObjs;
 
   const handleRightsOwnerBase = async (
     inArr: any[], existArrs: any[],
@@ -342,7 +354,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
 
   await handleRightsOwnerSelector(
     digobj_rightsowner, digobj_rightsowner_person,
-    digobj_rightsowner_institution, digitalobject.digobj_rightsownerSelector);
+    digobj_rightsowner_institution, digitalentity.digobj_rightsownerSelector);
 
   /**
    * Newly added rightsowner persons and institutions can be
@@ -393,7 +405,7 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
     _tempId, 'person_role');
 
   for (let i = 0; i < phyObjs.length; i++) {
-    const phyObj: IMetaDataPhysicalObject = phyObjs[i];
+    const phyObj: IMetaDataPhysicalEntity = phyObjs[i];
     let phyobj_rightsowner: any[] = phyObj.phyobj_rightsowner;
     let phyobj_rightsowner_person: any[] = phyObj.phyobj_rightsowner_person;
     let phyobj_rightsowner_institution: any[] = phyObj.phyobj_rightsowner_institution;
@@ -448,12 +460,12 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
       phyobj_rightsowner_institution, phyobj_person, phyobj_person_existing,
       phyobj_institution, phyobj_institution_existing,
     };
-    phyObjs[i] = await addAndGetId(finalPhy, 'physicalobject');
+    phyObjs[i] = await addAndGetId(finalPhy, 'physicalentity');
   }
 
   /**
    * Re-assignment:
-   * When editing a finished object we want to have all persons/institutions that have been added
+   * When editing a finished entity we want to have all persons/institutions that have been added
    * on the previous submit to be existing persons/institutions, otherwise they would fill up
    * the metadata form in the frontend
    * Also: remove everything without an _id (which is the remainings from tag-input)
@@ -467,13 +479,13 @@ const saveDigitalObject = async (digitalobject: IMetaDataDigitalObject) => {
   digobj_rightsowner_institution = digobj_rightsowner_person =
     contact_person = digobj_person = [];
 
-  const finalObject = {
-    ...digitalobject, digobj_rightsowner_person, digobj_rightsowner_institution,
+  const finalEntity = {
+    ...digitalentity, digobj_rightsowner_person, digobj_rightsowner_institution,
     contact_person, contact_person_existing, digobj_person_existing,
     digobj_person, digobj_tags, phyObjs, digobj_rightsowner,
   };
 
-  return finalObject;
+  return finalEntity;
 };
 
-export { saveAnnotation, saveCompilation, saveDigitalObject, saveModel };
+export { saveAnnotation, saveCompilation, saveDigitalEntity, saveGroup, saveEntity };

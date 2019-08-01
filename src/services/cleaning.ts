@@ -11,11 +11,11 @@ interface ICleaning {
 
 const Cleaning: ICleaning = {
   deleteUnusedPersonsAndInstitutions: async (_, response) => {
-    const ObjDB: Db = Mongo.getObjectsRepository();
+    const ObjDB: Db = Mongo.getEntitiesRepository();
     const personCollection = ObjDB.collection('person');
     const instCollection = ObjDB.collection('institution');
-    const digobjCollection = ObjDB.collection('digitalobject');
-    const phyobjCollection = ObjDB.collection('physicalobject');
+    const digobjCollection = ObjDB.collection('digitalentity');
+    const phyobjCollection = ObjDB.collection('physicalentity');
     const allPersons = await personCollection.find({})
       .toArray();
     const allInstitutions = await instCollection.find({})

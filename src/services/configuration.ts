@@ -56,7 +56,7 @@ interface IConfiguration {
 const LoadConfig = () => {
   const DefaultConfiguration: IConfiguration = {
     Mongo: {
-      RepositoryDB: 'objectsrepository',
+      RepositoryDB: 'entitiesrepository',
       AccountsDB: 'accounts',
       Port: 27017,
       Hostname: 'localhost',
