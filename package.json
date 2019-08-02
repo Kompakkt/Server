@@ -7,7 +7,8 @@
     "start": "ts-node src/server.ts",
     "build": "tsc -p .",
     "dev": "./node_modules/nodemon/bin/nodemon.js",
-    "report": "jscpd -k 10 -l 2 src/"
+    "report": "jscpd -k 10 -l 2 src/",
+    "prettier": "prettier src/**/*.ts --write"
   },
   "repository": {
     "type": "git",
@@ -29,6 +30,11 @@
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/DH-Cologne/ObjectsRepositoryServer/issues"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "pretty-quick --staged --pattern 'src/**/*.ts'"
+    }
   },
   "homepage": "https://github.com/DH-Cologne/ObjectsRepositoryServer#readme",
   "dependencies": {
@@ -77,8 +83,11 @@
     "@types/passport": "^1.0.0",
     "@types/passport-local": "^1.0.33",
     "@types/socket.io": "^2.1.2",
+    "husky": "^3.0.2",
     "jscpd": "^2.0.15",
     "jscpd-badge-reporter": "^1.1.3",
-    "jscpd-html-reporter": "^2.0.1"
+    "jscpd-html-reporter": "^2.0.1",
+    "prettier": "^1.18.2",
+    "pretty-quick": "^1.11.1"
   }
 }
