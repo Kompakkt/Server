@@ -409,32 +409,25 @@ const Mongo: IMongo = {
         // TODO: Put into Europeana service to make every service self sustained?
         const EuropeanaEntity: IMetaDataDigitalEntity = {
           _id: new ObjectId(),
-          digobj_type: mapTypes(request.body.type),
-          digobj_title: request.body.title,
-          digobj_description: request.body.description,
-          digobj_licence: request.body.license,
-          digobj_externalLink: [{
-            externalLink_description: 'Europeana URL',
-            externalLink_value: request.body.page,
+          type: mapTypes(request.body.type),
+          title: request.body.title,
+          description: request.body.description,
+          licence: request.body.license,
+          externalLink: [{
+            description: 'Europeana URL',
+            value: request.body.page,
           }],
-          digobj_externalIdentifier: [],
-          digobj_discipline: [],
-          digobj_creation: [],
-          digobj_dimensions: [],
-          digobj_files: [],
-          digobj_entitytype: '',
-          digobj_person: [],
-          digobj_rightsowner: [],
-          digobj_statement: '',
-          digobj_tags: [],
-          digobj_metadata_files: [],
-          digobj_person_existing: [],
-          digobj_rightsowner_institution: [],
-          digobj_rightsowner_person: [],
-          digobj_rightsownerSelector: 1,
-          digobj_person_existing_role: [],
-          contact_person: [],
-          contact_person_existing: [],
+          externalId: [],
+          discipline: [],
+          creation: [],
+          dimensions: [],
+          files: [],
+          objecttype: '',
+          persons: [],
+          institutions: [],
+          statement: '',
+          tags: [],
+          metadata_files: [],
           phyObjs: [],
         };
 
@@ -505,7 +498,7 @@ const Mongo: IMongo = {
         .then(annotation => resultEntity = annotation)
         .catch(rejected => response.send(rejected));
     } else if (isDigitalEntity(resultEntity)) {
-      await saveDigitalEntity(resultEntity)
+      await saveDigitalEntity(resultEntity, userData)
         .then(async digitalentity => {
           resultEntity = digitalentity;
           await Mongo

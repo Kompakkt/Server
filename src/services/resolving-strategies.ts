@@ -1,73 +1,71 @@
-import { ICompilation, IEntity, IMetaDataDigitalEntity, IMetaDataPerson } from '../interfaces';
+import { ICompilation, IEntity, IMetaDataDigitalEntity, IMetaDataPerson, IMetaDataPhysicalEntity } from '../interfaces';
 
 import { Mongo } from './mongo';
-import { isDigitalEntity, isPerson } from './typeguards';
-
-// TODO: Dynamic Resolving Depth
-
-const INSTITUTION_SELECTOR = 2;
+import { isDigitalEntity } from './typeguards';
 
 const resolvePerson = async (person: IMetaDataPerson) => {
-  if (person.person_institution_data) {
-    for (let j = 0; j < person.person_institution_data.length; j++) {
-      if (!person.person_institution_data[j]['_id']) continue;
-      person.person_institution_data[j] =
-        await Mongo.resolve(person.person_institution_data[j]['_id'], 'institution');
+  if (person.institution) {
+    for (let j = 0; j < person.institution.length; j++) {
+      if (!person.institution[j]['_id']) continue;
+      person.institution[j] =
+        await Mongo.resolve(person.institution[j]['_id'], 'institution');
     }
   }
   return person;
 };
 
-// Heavy nested resolving for DigitalEntity
+const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity) => {
+  if (!entity || !entity._id) {
+    return entity;
+  }
+  const _id = entity._id.toString();
+
+  for (let i = 0; i < entity.persons.length; i++) {
+    const resolved: IMetaDataPerson = await Mongo.resolve(entity.persons[i], 'person');
+    if (!resolved) {
+      continue;
+    }
+    entity.persons[i] = await resolvePerson(resolved);
+
+    if (!entity.persons[i].roles) {
+      entity.persons[i].roles = {};
+    }
+    if (!entity.persons[i].roles[_id]) {
+      entity.persons[i].roles[_id] = [];
+    }
+  }
+
+  for (let i = 0; i < entity.institutions.length; i++) {
+    entity.institutions[i] =
+      await Mongo.resolve(entity.institutions[i], 'institution');
+  }
+
+  if (isDigitalEntity(entity)) {
+    for (let i = 0; i < entity.tags.length; i++) {
+      entity.tags[i] =
+        await Mongo.resolve(entity.tags[i], 'tag');
+    }
+  }
+
+  return entity;
+};
+
 export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
-  // TODO: Use Typeguards
-  let currentId = digitalEntity._id.toString();
-  const resolveTopLevel = async (obj: any, property: string, field: string) => {
-    if (obj[property] && obj[property].length && obj[property] instanceof Array) {
-      for (let i = 0; i < obj[property].length; i++) {
-        const resolved = await Mongo.resolve(obj[property][i], field);
-        if (!resolved) continue;
-        obj[property][i] = isPerson(resolved)
-          ? await resolvePerson(resolved)
-          : resolved;
-        if (obj[property][i]['roles'] && obj[property][i]['roles'][currentId]) {
-          const old = obj[property][i]['roles'][currentId];
-          obj[property][i]['roles'] = {};
-          obj[property][i]['roles'][currentId] = old;
-        }
+  const resolvedDigital =
+    (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
+
+  if (resolvedDigital.phyObjs) {
+    for (let i = 0; i < resolvedDigital.phyObjs.length; i++) {
+      const resolved = await Mongo.resolve(resolvedDigital.phyObjs[i], 'physicalentity');
+      if (!resolved) {
+        continue;
       }
+      resolvedDigital.phyObjs[i] =
+        (await resolveMetaDataEntity(resolved)) as IMetaDataPhysicalEntity;
     }
-  };
-
-  let selector = digitalEntity.digobj_rightsownerSelector;
-  const props = [
-    ['digobj_rightsowner', (selector === INSTITUTION_SELECTOR) ? 'institution' : 'person'],
-    ['digobj_person_existing'], ['contact_person_existing'], ['digobj_tags', 'tag']];
-
-  for (const prop of props) {
-    await resolveTopLevel(digitalEntity, prop[0], (prop[1]) ? prop[1] : 'person');
   }
 
-  if (digitalEntity.phyObjs) {
-    const resolvedPhysicalEntities: any[] = [];
-    for (let phyObj of digitalEntity.phyObjs) {
-      if (!phyObj) continue;
-      currentId = phyObj._id.toString();
-      phyObj = await Mongo.resolve(phyObj, 'physicalentity');
-      if (!phyObj) continue;
-      selector = phyObj.phyobj_rightsownerSelector;
-      const phyProps = [
-        ['phyobj_rightsowner', (selector === INSTITUTION_SELECTOR) ? 'institution' : 'person'],
-        ['phyobj_person_existing'], ['phyobj_institution_existing', 'institution']];
-      for (const phyProp of phyProps) {
-        await resolveTopLevel(phyObj, phyProp[0], (phyProp[1]) ? phyProp[1] : 'person');
-      }
-      resolvedPhysicalEntities.push(phyObj);
-    }
-    digitalEntity.phyObjs = resolvedPhysicalEntities;
-  }
-
-  return digitalEntity;
+  return resolvedDigital;
 };
 
 export const resolveEntity = async (entity: IEntity) => {

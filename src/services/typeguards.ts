@@ -20,11 +20,11 @@ export const isAnnotation = (obj: any): obj is IAnnotation => {
 };
 
 export const isDigitalEntity = (obj: any): obj is IMetaDataDigitalEntity => {
-  const digobj = obj as IMetaDataDigitalEntity | IInvalid;
-  return digobj && digobj.digobj_title !== undefined;
+  const digentity = obj as IMetaDataDigitalEntity | IInvalid;
+  return digentity && digentity.type && digentity.licence !== undefined;
 };
 
 export const isPerson = (obj: any): obj is IMetaDataPerson => {
   const person = obj as IMetaDataPerson | IInvalid;
-  return person && person.person_prename !== undefined && person.person_surname !== undefined;
+  return person && person.prename !== undefined && person.name !== undefined;
 };
