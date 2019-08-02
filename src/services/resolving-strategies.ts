@@ -6,9 +6,8 @@ import { isDigitalEntity } from './typeguards';
 const resolvePerson = async (person: IMetaDataPerson) => {
   if (person.institution) {
     for (let j = 0; j < person.institution.length; j++) {
-      if (!person.institution[j]['_id']) continue;
       person.institution[j] =
-        await Mongo.resolve(person.institution[j]['_id'], 'institution');
+        await Mongo.resolve(person.institution[j], 'institution');
     }
   }
   return person;
