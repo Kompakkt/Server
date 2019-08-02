@@ -1,22 +1,41 @@
 // tslint:disable-next-line
-import { IAnnotation, ICompilation, IMetaDataDigitalEntity, IMetaDataPerson, IEntity, IInvalid } from '../interfaces';
+import {
+  IAnnotation,
+  ICompilation,
+  IMetaDataDigitalEntity,
+  IMetaDataPerson,
+  IEntity,
+  IInvalid,
+} from '../interfaces';
 
 export const isCompilation = (obj: any): obj is ICompilation => {
   const compilation = obj as ICompilation | IInvalid;
-  return compilation && compilation.entities !== undefined
-    && compilation.name !== undefined
-    && compilation.description !== undefined;
+  return (
+    compilation &&
+    compilation.entities !== undefined &&
+    compilation.name !== undefined &&
+    compilation.description !== undefined
+  );
 };
 
 export const isEntity = (obj: any): obj is IEntity => {
   const entity = obj as IEntity | IInvalid;
-  return entity && entity.name !== undefined && entity.mediaType !== undefined
-    && entity.online !== undefined && entity.finished !== undefined;
+  return (
+    entity &&
+    entity.name !== undefined &&
+    entity.mediaType !== undefined &&
+    entity.online !== undefined &&
+    entity.finished !== undefined
+  );
 };
 
 export const isAnnotation = (obj: any): obj is IAnnotation => {
   const annotation = obj as IAnnotation | IInvalid;
-  return annotation && annotation.body !== undefined && annotation.target !== undefined;
+  return (
+    annotation &&
+    annotation.body !== undefined &&
+    annotation.target !== undefined
+  );
 };
 
 export const isDigitalEntity = (obj: any): obj is IMetaDataDigitalEntity => {

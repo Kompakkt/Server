@@ -25,29 +25,38 @@ interface ILogger {
 }
 
 const Logger: ILogger = {
-  path: join(RootDirectory, 'server.log'), stack,
+  path: join(RootDirectory, 'server.log'),
+  stack,
   autosave: setInterval(() => Logger.writeToLog(), _autosaveInterval),
   info: (...content) => {
-    const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
+    const message = `[INFO|${Logger.getDate()}]\t${Logger.prepareContent(
+      content,
+    )}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Info) console.log(message);
     Logger.shouldWrite();
   },
   log: (...content) => {
-    const message = `[LOG|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
+    const message = `[LOG|${Logger.getDate()}]\t${Logger.prepareContent(
+      content,
+    )}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Log) console.log(message);
     Logger.shouldWrite();
   },
   warn: (...content) => {
-    const message = `[WARN|${Logger.getDate()}]\t${Logger.prepareContent(content)}`;
+    const message = `[WARN|${Logger.getDate()}]\t${Logger.prepareContent(
+      content,
+    )}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Warn) console.log(message);
     Logger.shouldWrite();
   },
   err: (...content) => {
     const _stack = new Error().stack;
-    const message = `[ERR|${Logger.getDate()}]\n${_stack}\n${Logger.prepareContent(content)}`;
+    const message = `[ERR|${Logger.getDate()}]\n${_stack}\n${Logger.prepareContent(
+      content,
+    )}`;
     Logger.stack.add(message);
     if (Environment.logLevel >= LogLevel.Error) console.log(message);
     Logger.shouldWrite();
@@ -59,9 +68,10 @@ const Logger: ILogger = {
   prepareContent: (...content) => {
     let result = '';
     for (const element of content) {
-      result += (typeof (element) === 'object')
-      ? `\n${inspect(element, { showHidden: false, depth: undefined })}`
-      : element;
+      result +=
+        typeof element === 'object'
+          ? `\n${inspect(element, { showHidden: false, depth: undefined })}`
+          : element;
     }
     return result;
   },
@@ -81,7 +91,11 @@ const Logger: ILogger = {
     const written = statSync(Logger.path).size - sizeBefore;
 
     if (written <= 0) return;
-    console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
+    console.log(
+      `${written} bytes written to log. String bytelength: ${Buffer.byteLength(
+        lines,
+      )}`,
+    );
     if (written === Buffer.byteLength(lines)) {
       console.log(`Log looks like a success. Clearing log stack`);
       Logger.stack.clear();

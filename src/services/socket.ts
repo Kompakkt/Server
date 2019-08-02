@@ -49,7 +49,6 @@ const Users: {
 } = {};
 
 const Socket = {
-
   _handler: (socket: Socket) => {
     Logger.info(`SocketIO connection ${socket.id}`);
 
@@ -63,13 +62,16 @@ const Socket = {
     };
 
     socket.on('disconnect', () => {
-      WebSocket.to(Users[socket.id].room)
-        .emit('lostConnection', { user: Users[socket.id], annotations: [] });
+      WebSocket.to(Users[socket.id].room).emit('lostConnection', {
+        user: Users[socket.id],
+        annotations: [],
+      });
     });
 
     // Custom Events
     socket.on('message', (data: IMessage) => {
-      socket.to(Users[socket.id].room)
+      socket
+        .to(Users[socket.id].room)
         .emit('message', { ...data, user: Users[socket.id] });
     });
 
@@ -87,40 +89,41 @@ const Socket = {
       };
       Users[socket.id] = newUser;
       socket.join(data.user.room);
-      WebSocket.to(data.user.room)
-        .emit('newUser', emitUser);
+      WebSocket.to(data.user.room).emit('newUser', emitUser);
     });
 
     socket.on('roomDataRequest', (data: IRoomData) => {
       data.requester.user.socketId = socket.id;
-      socket.to(data.recipient)
-        .emit('roomDataRequest', data);
+      socket.to(data.recipient).emit('roomDataRequest', data);
     });
 
     socket.on('roomDataAnswer', (data: IRoomData) => {
       data.info.user.socketId = socket.id;
-      socket.to(data.requester.user.socketId)
-        .emit('roomDataAnswer', data);
+      socket.to(data.requester.user.socketId).emit('roomDataAnswer', data);
     });
 
     socket.on('createAnnotation', (data: IAnnotation) => {
-      socket.to(Users[socket.id].room)
+      socket
+        .to(Users[socket.id].room)
         .emit('createAnnotation', { ...data, user: Users[socket.id] });
     });
 
     socket.on('editAnnotation', (data: IAnnotation) => {
-      socket.to(Users[socket.id].room)
+      socket
+        .to(Users[socket.id].room)
         .emit('editAnnotation', { ...data, user: Users[socket.id] });
     });
 
     socket.on('deleteAnnotation', (data: IAnnotation) => {
-      socket.to(Users[socket.id].room)
+      socket
+        .to(Users[socket.id].room)
         .emit('deleteAnnotation', { ...data, user: Users[socket.id] });
     });
 
     socket.on('changeRanking', (data: IChangeRanking) => {
-      socket.to(Users[socket.id].room)
-        .emit('changeRanking', { ...data, user: Users[socket.id]});
+      socket
+        .to(Users[socket.id].room)
+        .emit('changeRanking', { ...data, user: Users[socket.id] });
     });
 
     socket.on('changeRoom', (data: IChangeRoom) => {
@@ -128,13 +131,13 @@ const Socket = {
         user: Users[socket.id],
         annotations: data.annotations,
       };
-      socket.to(Users[socket.id].room)
-        .emit('changeRoom', emitData);
+      socket.to(Users[socket.id].room).emit('changeRoom', emitData);
       socket.leave(Users[socket.id].room);
     });
 
     socket.on('logout', (data: IUserInfo) => {
-      socket.to(Users[socket.id].room)
+      socket
+        .to(Users[socket.id].room)
         .emit('lostConnection', { ...data, user: Users[socket.id] });
     });
   },

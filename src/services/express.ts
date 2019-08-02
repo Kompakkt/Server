@@ -27,7 +27,10 @@ const createServer = () => {
     const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
     const options = { key: privateKey, cert: certificate };
-    if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
+    if (
+      Conf.Express.SSLPaths.Passphrase &&
+      Conf.Express.SSLPaths.Passphrase.length > 0
+    ) {
       (options as any)['passphrase'] = Conf.Express.SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
@@ -47,7 +50,7 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (_request, callback) => {
     });
   } else {
     const request = _request as express.Request;
-    const DN = (Conf.Express.LDAP.DNauthUID)
+    const DN = Conf.Express.LDAP.DNauthUID
       ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
       : Conf.Express.LDAP.DN;
     callback(undefined, {
@@ -77,20 +80,24 @@ const WebSocket = SocketIo(Listener);
 // ExpressJS Middleware
 // Enable CORS
 // TODO: Find out which routes need CORS
-Server.use('*', cors({
-  origin: true,
-  credentials: true,
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE'.split(','),
-  allowedHeaders: [
-    'X-Requested-With',
-    'Access-Control-Allow-Origin',
-    'content-type',
-    'semirandomtoken',
-    'relPath',
-    'metadatakey',
-    'prefix',
-    'filetype'],
-}));
+Server.use(
+  '*',
+  cors({
+    origin: true,
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE'.split(','),
+    allowedHeaders: [
+      'X-Requested-With',
+      'Access-Control-Allow-Origin',
+      'content-type',
+      'semirandomtoken',
+      'relPath',
+      'metadatakey',
+      'prefix',
+      'filetype',
+    ],
+  }),
+);
 // This turns request.body from application/json requests into readable JSON
 Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
@@ -102,41 +109,50 @@ Server.use('/previews', express.static(`${upDir}/previews`));
 
 // Create preview directory and default preview file
 ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
-if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
+if (
+  !pathExistsSync(
+    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`,
+  )
+) {
   copySync(
     `${RootDirectory}/assets/noimage.png`,
-    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`);
+    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`,
+  );
 }
 
 // Passport
-passport.use(new LdapStrategy(
-  getLDAPConfig, (user: any, done: any): LdapStrategy.VerifyCallback => {
-    const adjustedUser = {
-      fullname: user['cn'],
-      prename: user['givenName'],
-      surname: user['sn'],
-      rank: user['UniColognePersonStatus'],
-      mail: user['mail'],
-      role: user['UniColognePersonStatus'],
-    };
-    return done(undefined, adjustedUser);
-  }));
+passport.use(
+  new LdapStrategy(
+    getLDAPConfig,
+    (user: any, done: any): LdapStrategy.VerifyCallback => {
+      const adjustedUser = {
+        fullname: user['cn'],
+        prename: user['givenName'],
+        surname: user['sn'],
+        rank: user['UniColognePersonStatus'],
+        mail: user['mail'],
+        role: user['UniColognePersonStatus'],
+      };
+      return done(undefined, adjustedUser);
+    },
+  ),
+);
 
-passport.use(new LocalStrategy((username: string, password: string, done: any) => {
-  const coll = Mongo
-    .getAccountsRepository()
-    .collection('users');
-  coll.findOne({ username }, async (err, user) => {
-    if (err) return done(err);
-    if (!user) return done(undefined, false);
-    if (!await verifyUser(username, password)) return done(undefined, false);
-    return done(undefined, user);
-  });
-}));
+passport.use(
+  new LocalStrategy((username: string, password: string, done: any) => {
+    const coll = Mongo.getAccountsRepository().collection('users');
+    coll.findOne({ username }, async (err, user) => {
+      if (err) return done(err);
+      if (!user) return done(undefined, false);
+      if (!(await verifyUser(username, password)))
+        return done(undefined, false);
+      return done(undefined, user);
+    });
+  }),
+);
 
 passport.serializeUser((user: any, done) => {
-  const serialValue = Object
-    .keys(user)
+  const serialValue = Object.keys(user)
     .reduce((acc, val) => `${acc}${val}${user[val]}`, '')
     .replace(/[.]*[_]*[-]*/g, '');
   done(undefined, serialValue);
@@ -161,27 +177,32 @@ const saltHashPassword = (password: string) => {
   return sha512(password, generateSalt(SALT_LENGTH));
 };
 
-const registerUser = async (request: express.Request, response: express.Response): Promise<any> => {
-  const coll = Mongo
-    .getAccountsRepository()
-    .collection('users');
-  const passwords = Mongo
-    .getAccountsRepository()
-    .collection('passwords');
+const registerUser = async (
+  request: express.Request,
+  response: express.Response,
+): Promise<any> => {
+  const coll = Mongo.getAccountsRepository().collection('users');
+  const passwords = Mongo.getAccountsRepository().collection('passwords');
 
   const isUser = (obj: any): obj is ILDAPData => {
     const person = obj as ILDAPData | IInvalid;
-    return person && person.fullname !== undefined && person.prename !== undefined
-      && person.surname !== undefined && person.mail !== undefined
-      && person.username !== undefined && (person as any)['password'] !== undefined;
+    return (
+      person &&
+      person.fullname !== undefined &&
+      person.prename !== undefined &&
+      person.surname !== undefined &&
+      person.mail !== undefined &&
+      person.username !== undefined &&
+      (person as any)['password'] !== undefined
+    );
   };
 
   // First user gets admin
   const isFirstUser = (await coll.findOne({})) === null;
-  const rank = (isFirstUser) ? 'A' : 'S';
+  const rank = isFirstUser ? 'A' : 'S';
   const role = rank;
 
-  const user = (request.body) as { username: string; password: string };
+  const user = request.body as { username: string; password: string };
   const adjustedUser = { ...user, role, rank, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) {
@@ -190,27 +211,33 @@ const registerUser = async (request: express.Request, response: express.Response
   if (isUser(adjustedUser)) {
     // tslint:disable-next-line
     delete adjustedUser['password'];
-    await passwords.updateOne(
-      { username: user.username },
-      { $set: { username: user.username, password: saltHashPassword(user.password) } },
-      { upsert: true })
+    await passwords
+      .updateOne(
+        { username: user.username },
+        {
+          $set: {
+            username: user.username,
+            password: saltHashPassword(user.password),
+          },
+        },
+        { upsert: true },
+      )
       .then()
       .catch();
-    coll.insertOne(adjustedUser)
+    coll
+      .insertOne(adjustedUser)
       .then(() => response.send({ status: 'ok', message: 'Registered' }))
-      .catch(() => response.send({ status: 'error', message: 'Failed inserting user' }));
+      .catch(() =>
+        response.send({ status: 'error', message: 'Failed inserting user' }),
+      );
   } else {
     response.send({ status: 'error', message: 'Incomplete user data' });
   }
 };
 
 const verifyUser = async (username: string, password: string) => {
-  const coll = Mongo
-    .getAccountsRepository()
-    .collection('users');
-  const passwords = Mongo
-    .getAccountsRepository()
-    .collection('passwords');
+  const coll = Mongo.getAccountsRepository().collection('users');
+  const passwords = Mongo.getAccountsRepository().collection('passwords');
   const userInDB = await coll.findOne({ username });
   if (!userInDB) return false;
   const pwOfUser = await passwords.findOne({ username });
@@ -224,24 +251,30 @@ const verifyUser = async (username: string, password: string) => {
 Server.use(passport.initialize());
 
 const UUID_LENGTH = 64;
-const genid = () =>
-  randomBytes(UUID_LENGTH)
-    .toString('hex');
+const genid = () => randomBytes(UUID_LENGTH).toString('hex');
 
-Server.use(expressSession({
-  genid,
-  secret: Conf.Express.PassportSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: false,
-    sameSite: false,
-  },
-}));
+Server.use(
+  expressSession({
+    genid,
+    secret: Conf.Express.PassportSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: false,
+      sameSite: false,
+    },
+  }),
+);
 Server.use(passport.session());
 
 const Express = {
-  Server, passport, createServer, getLDAPConfig, startListening, authenticate, registerUser,
+  Server,
+  passport,
+  createServer,
+  getLDAPConfig,
+  startListening,
+  authenticate,
+  registerUser,
 };
 
 export { Express, Server, WebSocket };

@@ -1,4 +1,10 @@
-import { ICompilation, IEntity, IMetaDataDigitalEntity, IMetaDataPerson, IMetaDataPhysicalEntity } from '../interfaces';
+import {
+  ICompilation,
+  IEntity,
+  IMetaDataDigitalEntity,
+  IMetaDataPerson,
+  IMetaDataPhysicalEntity,
+} from '../interfaces';
 
 import { Mongo } from './mongo';
 import { isDigitalEntity } from './typeguards';
@@ -6,21 +12,28 @@ import { isDigitalEntity } from './typeguards';
 const resolvePerson = async (person: IMetaDataPerson) => {
   if (person.institution) {
     for (let j = 0; j < person.institution.length; j++) {
-      person.institution[j] =
-        await Mongo.resolve(person.institution[j], 'institution');
+      person.institution[j] = await Mongo.resolve(
+        person.institution[j],
+        'institution',
+      );
     }
   }
   return person;
 };
 
-const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity) => {
+const resolveMetaDataEntity = async (
+  entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
+) => {
   if (!entity || !entity._id) {
     return entity;
   }
   const _id = entity._id.toString();
 
   for (let i = 0; i < entity.persons.length; i++) {
-    const resolved: IMetaDataPerson = await Mongo.resolve(entity.persons[i], 'person');
+    const resolved: IMetaDataPerson = await Mongo.resolve(
+      entity.persons[i],
+      'person',
+    );
     if (!resolved) {
       continue;
     }
@@ -35,32 +48,40 @@ const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataP
   }
 
   for (let i = 0; i < entity.institutions.length; i++) {
-    entity.institutions[i] =
-      await Mongo.resolve(entity.institutions[i], 'institution');
+    entity.institutions[i] = await Mongo.resolve(
+      entity.institutions[i],
+      'institution',
+    );
   }
 
   if (isDigitalEntity(entity)) {
     for (let i = 0; i < entity.tags.length; i++) {
-      entity.tags[i] =
-        await Mongo.resolve(entity.tags[i], 'tag');
+      entity.tags[i] = await Mongo.resolve(entity.tags[i], 'tag');
     }
   }
 
   return entity;
 };
 
-export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
-  const resolvedDigital =
-    (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
+export const resolveDigitalEntity = async (
+  digitalEntity: IMetaDataDigitalEntity,
+) => {
+  const resolvedDigital = (await resolveMetaDataEntity(
+    digitalEntity,
+  )) as IMetaDataDigitalEntity;
 
   if (resolvedDigital.phyObjs) {
     for (let i = 0; i < resolvedDigital.phyObjs.length; i++) {
-      const resolved = await Mongo.resolve(resolvedDigital.phyObjs[i], 'physicalentity');
+      const resolved = await Mongo.resolve(
+        resolvedDigital.phyObjs[i],
+        'physicalentity',
+      );
       if (!resolved) {
         continue;
       }
-      resolvedDigital.phyObjs[i] =
-        (await resolveMetaDataEntity(resolved)) as IMetaDataPhysicalEntity;
+      resolvedDigital.phyObjs[i] = (await resolveMetaDataEntity(
+        resolved,
+      )) as IMetaDataPhysicalEntity;
     }
   }
 
@@ -76,8 +97,14 @@ export const resolveEntity = async (entity: IEntity) => {
     }
     entity.annotationList = entity.annotationList.filter(_ => _);
   }
-  if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
-    entity.relatedDigitalEntity = await Mongo.resolve(entity.relatedDigitalEntity, 'digitalentity');
+  if (
+    entity.relatedDigitalEntity &&
+    !isDigitalEntity(entity.relatedDigitalEntity)
+  ) {
+    entity.relatedDigitalEntity = await Mongo.resolve(
+      entity.relatedDigitalEntity,
+      'digitalentity',
+    );
   }
   return entity;
 };
@@ -95,7 +122,10 @@ export const resolveCompilation = async (compilation: ICompilation) => {
     for (let i = 0; i < compilation.annotationList.length; i++) {
       const annotation = compilation.annotationList[i];
       if (!annotation) continue;
-      compilation.annotationList[i] = await Mongo.resolve(annotation, 'annotation');
+      compilation.annotationList[i] = await Mongo.resolve(
+        annotation,
+        'annotation',
+      );
     }
     compilation.annotationList = compilation.annotationList.filter(_ => _);
   }

@@ -48,8 +48,10 @@ const Upload: IUpload = {
       })
       .catch(err => {
         Logger.err(err);
-        return response
-          .send({ status: 'error', message: 'Failed ensuring file directory' });
+        return response.send({
+          status: 'error',
+          message: 'Failed ensuring file directory',
+        });
       });
   },
   CancelMetadata: () => {
@@ -61,14 +63,15 @@ const Upload: IUpload = {
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
     const relPath = request.headers['relpath'];
     const folderOrFilePath =
-      (relPath && relPath.length > 0)
-      ? relPath : slugify(request['file'].originalname);
-    const destPath =
-      join(
-        `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
-        `${request.headers['filetype']}`,
-        `${request.headers['semirandomtoken']}/`,
-        `${folderOrFilePath}`);
+      relPath && relPath.length > 0
+        ? relPath
+        : slugify(request['file'].originalname);
+    const destPath = join(
+      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
+      `${request.headers['filetype']}`,
+      `${request.headers['semirandomtoken']}/`,
+      `${folderOrFilePath}`,
+    );
 
     ensureDir(dirname(destPath))
       .then(() => move(tempPath, destPath))
@@ -82,7 +85,9 @@ const Upload: IUpload = {
     const Token = request.body.uuid;
     const Type = request.body.type;
     if (!Token || !Type) {
-      Logger.err(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      Logger.err(
+        `Upload cancel request failed. Token: ${Token}, Type: ${Type}`,
+      );
       response.send({ status: 'error' });
       return;
     }
@@ -92,7 +97,12 @@ const Upload: IUpload = {
 
     pathExists(path)
       .then(() => removeSync(path))
-      .then(() => response.send({ status: 'ok', message: 'Successfully cancelled upload' }))
+      .then(() =>
+        response.send({
+          status: 'ok',
+          message: 'Successfully cancelled upload',
+        }),
+      )
       .catch(err => {
         Logger.err(err);
         response.send({ status: 'error', message: 'Failed cancelling upload' });
@@ -103,7 +113,9 @@ const Upload: IUpload = {
     const Token = request.body.uuid;
     const Type = request.body.type;
     if (!Token || !Type) {
-      Logger.err(`Upload cancel request failed. Token: ${Token}, Type: ${Type}`);
+      Logger.err(
+        `Upload cancel request failed. Token: ${Token}, Type: ${Type}`,
+      );
       response.send({ status: 'error', message: 'Missing type or token' });
       return;
     }
@@ -140,7 +152,9 @@ const Upload: IUpload = {
         // TODO: Add more filters
         const filter: string[] = [];
         switch (Type) {
-          case 'entity': filter.push('.obj', '.babylon', '.gltf', '.stl'); break;
+          case 'entity':
+            filter.push('.obj', '.babylon', '.gltf', '.stl');
+            break;
           default:
         }
 
@@ -155,30 +169,36 @@ const Upload: IUpload = {
           file_format: '',
         };
 
-        const prepareResponseFiles = (fileArray: ReadonlyArray<klawSync.Item>) => {
-          return fileArray.map(file => {
-            const result = { ...ResponseFile };
-            result.file_format = extname(file.path);
-            let _relativePath = file.path.replace(RootDirectory, '');
-            _relativePath = (_relativePath.charAt(0) === '/')
-              ? _relativePath.substr(1) : _relativePath;
+        const prepareResponseFiles = (
+          fileArray: ReadonlyArray<klawSync.Item>,
+        ) => {
+          return fileArray
+            .map(file => {
+              const result = { ...ResponseFile };
+              result.file_format = extname(file.path);
+              let _relativePath = file.path.replace(RootDirectory, '');
+              _relativePath =
+                _relativePath.charAt(0) === '/'
+                  ? _relativePath.substr(1)
+                  : _relativePath;
 
-            result.file_link = `${_relativePath}`;
-            result.file_name = `${basename(file.path)}`;
-            result.file_size = parseInt(`${file.stats.size}`, 10);
-            return result;
-          })
+              result.file_link = `${_relativePath}`;
+              result.file_name = `${basename(file.path)}`;
+              result.file_size = parseInt(`${file.stats.size}`, 10);
+              return result;
+            })
             .sort((a, b) => a.file_size - b.file_size);
         };
 
-        const ResponseFiles = prepareResponseFiles((filteredFiles.length > 0)
-          ? filteredFiles : foundFiles);
+        const ResponseFiles = prepareResponseFiles(
+          filteredFiles.length > 0 ? filteredFiles : foundFiles,
+        );
         Logger.info(ResponseFiles);
         response.send({ status: 'ok', files: ResponseFiles });
       })
       .catch(err => {
         Logger.err(err);
-        response.send({ status: 'error', message: 'Unknown error'});
+        response.send({ status: 'error', message: 'Unknown error' });
       });
   },
 };

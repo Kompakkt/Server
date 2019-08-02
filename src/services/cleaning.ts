@@ -5,7 +5,10 @@ import { Logger } from './logger';
 import { Mongo } from './mongo';
 
 interface ICleaning {
-  deleteUnusedPersonsAndInstitutions(_: Request, response: Response): Promise<any>;
+  deleteUnusedPersonsAndInstitutions(
+    _: Request,
+    response: Response,
+  ): Promise<any>;
   deleteNullRefs(_: Request, response: Response): Promise<any>;
 }
 
@@ -16,25 +19,25 @@ const Cleaning: ICleaning = {
     const instCollection = ObjDB.collection('institution');
     const digobjCollection = ObjDB.collection('digitalentity');
     const phyobjCollection = ObjDB.collection('physicalentity');
-    const allPersons = await personCollection.find({})
-      .toArray();
-    const allInstitutions = await instCollection.find({})
-      .toArray();
-    const allDigObjs = await digobjCollection.find({})
-      .toArray();
-    const allPhyObjs = await phyobjCollection.find({})
-      .toArray();
+    const allPersons = await personCollection.find({}).toArray();
+    const allInstitutions = await instCollection.find({}).toArray();
+    const allDigObjs = await digobjCollection.find({}).toArray();
+    const allPhyObjs = await phyobjCollection.find({}).toArray();
 
     const total: any[] = [];
 
     // TODO: Delete Tags
 
-    const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(allPhyObjs)}`;
+    const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(
+      allPhyObjs,
+    )}`;
     for (const person of allPersons) {
       const _id = person._id;
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
-      const deleteResult = await personCollection.deleteOne({ _id: person._id });
+      const deleteResult = await personCollection.deleteOne({
+        _id: person._id,
+      });
       if (deleteResult.result.ok === 1) {
         Logger.info(`Deleted unused person ${person}`);
         total.push({ person, result: deleteResult.result });
@@ -44,7 +47,9 @@ const Cleaning: ICleaning = {
       const _id = institution._id;
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
-      const deleteResult = await instCollection.deleteOne({ _id: institution._id });
+      const deleteResult = await instCollection.deleteOne({
+        _id: institution._id,
+      });
       if (deleteResult.result.ok === 1) {
         Logger.info(`Deleted unused institution ${institution}`);
         total.push({ institution, result: deleteResult.result });
@@ -57,8 +62,7 @@ const Cleaning: ICleaning = {
   deleteNullRefs: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const ldap: Collection = AccDB.collection('users');
-    const allUsers = await ldap.find({})
-      .toArray();
+    const allUsers = await ldap.find({}).toArray();
 
     const total: any[] = [];
 
@@ -72,17 +76,25 @@ const Cleaning: ICleaning = {
       return deletedReferences;
     };
 
-    const deleteUserNullRefs = async (user: any, nullrefs: any[]): Promise<boolean> => {
+    const deleteUserNullRefs = async (
+      user: any,
+      nullrefs: any[],
+    ): Promise<boolean> => {
       for (const ref of nullrefs) {
         const index = user.data[ref.field].indexOf(ref._id);
         user.data[ref.field].splice(index, 1);
       }
-      const updateResult = await ldap.updateOne({ _id: user._id }, { $set: { data: user.data } });
+      const updateResult = await ldap.updateOne(
+        { _id: user._id },
+        { $set: { data: user.data } },
+      );
       if (updateResult.result.ok !== 1) {
         Logger.err(`Failed deleting missing references of user ${user._id}`);
         return false;
       }
-      Logger.info(`Deleted ${nullrefs.length} missing references from user ${user._id}`);
+      Logger.info(
+        `Deleted ${nullrefs.length} missing references from user ${user._id}`,
+      );
       return true;
     };
 
