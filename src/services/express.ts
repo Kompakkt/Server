@@ -1,5 +1,4 @@
 import * as bodyParser from 'body-parser';
-import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { BinaryLike, createHmac, randomBytes } from 'crypto';
@@ -13,7 +12,6 @@ import passport from 'passport';
 import LdapStrategy from 'passport-ldapauth';
 import { Strategy as LocalStrategy } from 'passport-local';
 import SocketIo from 'socket.io';
-import { constants } from 'zlib';
 
 import { RootDirectory } from '../environment';
 import { IInvalid, ILDAPData } from '../interfaces';
@@ -97,14 +95,6 @@ Server.use('*', cors({
 Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
 Server.use(cookieParser());
-// Gzipping Middleware
-Server.use(compression({
-  strategy: constants.Z_FILTERED,
-  level: 9,
-  memLevel: 9,
-  windowBits: 15,
-  chunkSize: 65536,
-}));
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 Server.use('/uploads', express.static(upDir));
