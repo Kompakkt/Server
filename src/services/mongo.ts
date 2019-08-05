@@ -26,6 +26,7 @@ import {
   resolveCompilation,
   resolveDigitalEntity,
   resolveEntity,
+  resolvePerson,
 } from './resolving-strategies';
 import {
   saveAnnotation,
@@ -38,6 +39,7 @@ import {
   isCompilation,
   isDigitalEntity,
   isEntity,
+  isPerson,
 } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
@@ -735,6 +737,9 @@ const Mongo: IMongo = {
       }
       if (isCompilation(resolve_result)) {
         return resolveCompilation(resolve_result);
+      }
+      if (isPerson(resolve_result)) {
+        return resolvePerson(resolve_result);
       }
       return resolve_result;
     });

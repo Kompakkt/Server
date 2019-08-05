@@ -9,7 +9,7 @@ import {
 import { Mongo } from './mongo';
 import { isDigitalEntity } from './typeguards';
 
-const resolvePerson = async (person: IMetaDataPerson) => {
+export const resolvePerson = async (person: IMetaDataPerson) => {
   if (person.institution) {
     for (let j = 0; j < person.institution.length; j++) {
       person.institution[j] = await Mongo.resolve(
