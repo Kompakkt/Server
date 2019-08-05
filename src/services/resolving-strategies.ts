@@ -10,12 +10,14 @@ import { Mongo } from './mongo';
 import { isDigitalEntity } from './typeguards';
 
 export const resolvePerson = async (person: IMetaDataPerson) => {
-  if (person.institution) {
-    for (let j = 0; j < person.institution.length; j++) {
-      person.institution[j] = await Mongo.resolve(
-        person.institution[j],
-        'institution',
-      );
+  if (person.institutions) {
+    for (const id in person.institutions) {
+      for (let i = 0; i < person.institutions[id].length; i++) {
+        person.institutions[i] = await Mongo.resolve(
+          person.institutions[i],
+          'institution',
+        );
+      }
     }
   }
   return person;

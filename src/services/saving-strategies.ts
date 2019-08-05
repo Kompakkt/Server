@@ -239,16 +239,26 @@ const saveMetaDataEntity = async (
   const saveInstitution = async (institution: IMetaDataInstitution) => {
     const resolved = await Mongo.resolve(institution, 'institution');
     institution._id = resolved ? resolved._id : new ObjectId();
-    // If person exists, combine roles
-    if (resolved) {
-      institution.roles = { ...institution.roles, ...resolved.roles };
-    }
 
     if (!institution.roles) {
       institution.roles = {};
     }
-    const id = newEntity._id.toString();
-    institution.roles[id] = institution.role;
+    if (!institution.addresses) {
+      institution.addresses = {};
+    }
+    if (!institution.notes) {
+      institution.notes = {};
+    }
+
+    // If institution exists, combine roles
+    if (resolved) {
+      institution.roles = { ...institution.roles, ...resolved.roles };
+      institution.addresses = {
+        ...institution.addresses,
+        ...resolved.addresses,
+      };
+      institution.notes = { ...institution.notes, ...resolved.notes };
+    }
 
     return Mongo.getEntitiesRepository()
       .collection('institution')
@@ -258,7 +268,7 @@ const saveMetaDataEntity = async (
         { upsert: true },
       )
       .then(res => {
-        const _id = res.upsertedId._id ? res.upsertedId._id : institution._id;
+        const _id = res.upsertedId ? res.upsertedId._id : institution._id;
         Mongo.insertCurrentUserData(userData, _id, 'institution');
         return _id;
       });
@@ -267,22 +277,38 @@ const saveMetaDataEntity = async (
   const savePerson = async (person: IMetaDataPerson) => {
     const resolved = await Mongo.resolve(person, 'person');
     person._id = resolved ? resolved._id : new ObjectId();
-    // If person exists, combine roles
-    if (resolved) {
-      person.roles = { ...person.roles, ...resolved.roles };
-    }
 
+    // If person exists, combine roles
     if (!person.roles) {
       person.roles = {};
     }
 
-    const id = newEntity._id.toString();
-    person.roles[id] = person.role;
+    if (!person.institutions) {
+      person.institutions = {};
+    }
 
-    for (let i = 0; i < person.institution.length; i++) {
-      person.institution[i] = (await saveInstitution(
-        person.institution[i],
-      )) as any;
+    if (!person.contact_references) {
+      person.contact_references = {};
+    }
+
+    if (resolved) {
+      person.roles = { ...person.roles, ...resolved.roles };
+      person.institutions = {
+        ...person.institutions,
+        ...resolved.institutions,
+      };
+      person.contact_references = {
+        ...person.contact_references,
+        ...resolved.contact_references,
+      };
+    }
+
+    for (const id in person.institutions) {
+      for (let i = 0; i < person.institutions[id].length; i++) {
+        person.institutions[id][i] = (await saveInstitution(
+          person.institutions[id][i],
+        )) as any;
+      }
     }
 
     return Mongo.getEntitiesRepository()
@@ -293,7 +319,7 @@ const saveMetaDataEntity = async (
         { upsert: true },
       )
       .then(res => {
-        const _id = res.upsertedId._id ? res.upsertedId._id : person._id;
+        const _id = res.upsertedId ? res.upsertedId._id : person._id;
         Mongo.insertCurrentUserData(userData, _id, 'person');
         return _id;
       });
