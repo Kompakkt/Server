@@ -348,7 +348,7 @@ const saveMetaDataEntity = async (
         .collection('tag')
         .updateOne(Mongo.query(tag._id), { $set: { ...tag } }, { upsert: true })
         .then(res => {
-          const _id = res.upsertedId._id ? res.upsertedId._id : tag._id;
+          const _id = res.upsertedId ? res.upsertedId._id : tag._id;
           Mongo.insertCurrentUserData(userData, _id, 'tag');
           return _id;
         })) as any;
