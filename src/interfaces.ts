@@ -297,6 +297,12 @@ export interface ICompilation {
   password?: string;
   entities: Array<IEntity | null | IUnresolvedEntity>;
   annotationList: Array<IAnnotation | null | ObjectId>;
+
+  whitelist: {
+    enabled: boolean;
+    persons: IUserData[];
+    groups: IGroup[];
+  };
 }
 
 // Socket related

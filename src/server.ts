@@ -47,9 +47,35 @@ Server.get(
   Mongo.getAllEntitiesFromCollection,
 );
 // Return data linked to currently logged in LDAP Account
-Server.get(['/api/v1/get/ldata', '/auth'], Mongo.validateLoginSession, Mongo.getCurrentUserData);
+Server.get(
+  ['/api/v1/get/ldata', '/auth'],
+  Mongo.validateLoginSession,
+  Mongo.getCurrentUserData,
+);
 // Return a MongoDB ObjectId
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
+
+Server.get('/api/v1/get/users', async (_, response) => {
+  const users = await Mongo.getAccountsRepository()
+    .collection('users')
+    .find({})
+    .toArray();
+  response.send(
+    users.map(user => ({
+      username: user.username,
+      fullname: user.fullname,
+      _id: user._id,
+    })),
+  );
+});
+
+Server.get('/api/v1/get/groups', async (_, response) => {
+  const groups = await Mongo.getAccountsRepository()
+    .collection('groups')
+    .find({})
+    .toArray();
+  response.send(groups);
+});
 
 // POST
 // Post single document to collection
@@ -60,11 +86,7 @@ Server.post(
   Mongo.addEntityToCollection,
 );
 // On user submit
-Server.post(
-  '/api/v1/post/submit',
-  Mongo.validateLoginSession,
-  Mongo.submit,
-);
+Server.post('/api/v1/post/submit', Mongo.validateLoginSession, Mongo.submit);
 Server.post(
   '/api/v1/post/submit/:service',
   Mongo.validateLoginSession,
@@ -87,27 +109,39 @@ Server.post(
 // Return search data
 Server.post(
   '/api/v1/post/search/:collection',
-  Mongo.validateLoginSession,
+  // Mongo.validateLoginSession,
   Mongo.searchByTextFilter,
 );
 Server.post(
   '/api/v1/post/searchentity/:collection',
-  Mongo.validateLoginSession,
+  // Mongo.validateLoginSession,
   Mongo.searchByEntityFilter,
 );
 // Publish or unpublish a entity
-const userOwnerHandler = (request: Request, response: Response, next: NextFunction) => {
+const userOwnerHandler = (
+  request: Request,
+  response: Response,
+  next: NextFunction,
+) => {
   Mongo.isUserOwnerOfEntity(request, request.body.identifier)
     .then((isOwner): any => {
-      if (!isOwner) return response.send({ status: 'error', message: 'Not owner of entity' });
+      if (!isOwner)
+        return response.send({
+          status: 'error',
+          message: 'Not owner of entity',
+        });
       next();
     })
-    .catch(() => response.send({ status: 'error', message: 'Not owner of entity' }));
+    .catch(() =>
+      response.send({ status: 'error', message: 'Not owner of entity' }),
+    );
 };
 Server.post(
   '/api/v1/post/publish',
-  Mongo.validateLoginSession, userOwnerHandler,
-  Admin.toggleEntityPublishedState);
+  Mongo.validateLoginSession,
+  userOwnerHandler,
+  Admin.toggleEntityPublishedState,
+);
 
 // Upload API
 // Upload a file to the server
@@ -119,25 +153,21 @@ Server.post(
 );
 // User signals that all necessary files are uploaded
 // TODO: Post Upload Cleanup
-Server.post(
-  '/uploadfinished',
-  Mongo.validateLoginSession,
-  Upload.UploadFinish,
-);
+Server.post('/uploadfinished', Mongo.validateLoginSession, Upload.UploadFinish);
 // User signals that upload was cancelled
-Server.post(
-  '/uploadcancel',
-  Mongo.validateLoginSession,
-  Upload.UploadCancel,
-);
+Server.post('/uploadcancel', Mongo.validateLoginSession, Upload.UploadCancel);
 // Metadata
 Server.post(
-  '/addmetadata', Mongo.validateLoginSession,
-  Upload.Multer.single('file'), Upload.AddMetadata,
+  '/addmetadata',
+  Mongo.validateLoginSession,
+  Upload.Multer.single('file'),
+  Upload.AddMetadata,
 );
 Server.post(
-  '/cancelmetadata', Mongo.validateLoginSession,
-  Upload.Multer.single('file'), Upload.CancelMetadata,
+  '/cancelmetadata',
+  Mongo.validateLoginSession,
+  Upload.Multer.single('file'),
+  Upload.CancelMetadata,
 );
 
 // General authentication route
@@ -147,9 +177,7 @@ Server.post(
   Mongo.addToAccounts,
 );
 // Authentication
-Server.post(
-  '/register',
-  Express.registerUser);
+Server.post('/register', Express.registerUser);
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
 // Admin requests
@@ -158,21 +186,24 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Admin.getAllLDAPUsers);
+  Admin.getAllLDAPUsers,
+);
 
 Server.post(
   '/admin/promoteuser',
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Admin.promoteUserToRole);
+  Admin.promoteUserToRole,
+);
 
 Server.post(
   '/admin/togglepublished',
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Admin.toggleEntityPublishedState);
+  Admin.toggleEntityPublishedState,
+);
 
 // Europeana
 // TODO: Auslagern
@@ -186,14 +217,13 @@ Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
         const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
         const _fallbackURL = result.data.entity.europeanaAggregation.edmPreview;
         const _type = result.data.entity.type;
-        response.send(
-          {
-            status: 'ok',
-            data: result.data.entity,
-            fileUrl: _fullURL,
-            fallbackUrl: _fallbackURL,
-            type: _type,
-          });
+        response.send({
+          status: 'ok',
+          data: result.data.entity,
+          fileUrl: _fullURL,
+          fallbackUrl: _fallbackURL,
+          type: _type,
+        });
       } catch (_) {
         response.send({ status: 'error' });
       }
@@ -212,14 +242,16 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Mailer.getMailRelatedDatabaseEntries);
+  Mailer.getMailRelatedDatabaseEntries,
+);
 
 Server.post(
   '/mailer/toggleanswered/:target/:identifier',
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Mailer.toggleMailAnswered);
+  Mailer.toggleMailAnswered,
+);
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
@@ -230,35 +262,41 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Cleaning.deleteNullRefs);
+  Cleaning.deleteNullRefs,
+);
 
 Server.post(
   '/cleaning/deleteunused',
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Cleaning.deleteUnusedPersonsAndInstitutions);
+  Cleaning.deleteUnusedPersonsAndInstitutions,
+);
 
 // Utility
 Server.get(
   '/utility/findentityowners/:identifier',
   Mongo.validateLoginSession,
-  Utility.findAllEntityOwnersRequest);
+  Utility.findAllEntityOwnersRequest,
+);
 
 Server.get(
   '/utility/countentityuses/:identifier',
   Mongo.validateLoginSession,
-  Utility.countEntityUses);
+  Utility.countEntityUses,
+);
 
 Server.post(
   '/utility/moveannotations/:identifier',
   Mongo.validateLoginSession,
-  Utility.addAnnotationsToAnnotationList);
+  Utility.addAnnotationsToAnnotationList,
+);
 
 Server.post(
   '/utility/applyactiontoentityowner',
   Express.authenticate(),
   Mongo.updateSessionId,
-  Utility.applyActionToEntityOwner);
+  Utility.applyActionToEntityOwner,
+);
 
 Express.startListening();
