@@ -950,7 +950,26 @@ const Mongo: IMongo = {
     const filter = request.body.filter
       ? request.body.filter.map((_: any) => _.toLowerCase())
       : [''];
-    let allEntities = await getAllItemsOfCollection(RequestCollection);
+    const offset = request.body.offset ? parseInt(request.body.offset, 10) : 0;
+    const length = 20;
+
+    if (typeof offset !== 'number') {
+      response.send({ status: 'error', message: 'Offset is not a number' });
+      return;
+    }
+
+    if (offset < 0) {
+      response.send({ status: 'error', message: 'Offset is smaller than 0' });
+      return;
+    }
+
+    let allEntities = (await getAllItemsOfCollection(RequestCollection)).slice(
+      offset,
+      offset + length,
+    );
+    allEntities = await Promise.all(
+      allEntities.map(obj => Mongo.resolve(obj, RequestCollection)),
+    );
 
     const getNestedValues = (obj: any) => {
       let result: string[] = [];
@@ -982,46 +1001,12 @@ const Mongo: IMongo = {
             break;
           }
           if (j === filter.length - 1) {
-            result.push(obj._id);
+            result.push(obj);
           }
         }
       }
       return result;
     };
-
-    switch (RequestCollection) {
-      case 'digitalentity':
-        await Promise.all(
-          allEntities.map(async digObj =>
-            Mongo.resolve(digObj, 'digitalentity'),
-          ),
-        );
-        break;
-      case 'entity':
-        allEntities = allEntities.filter(
-          entity =>
-            entity &&
-            entity.finished &&
-            entity.online &&
-            entity.relatedDigitalEntity &&
-            entity.relatedDigitalEntity['_id'],
-        );
-        for (const obj of allEntities) {
-          if (obj.relatedDigitalEntity['_id']) {
-            const tempDigObj = await Mongo.resolve(
-              obj.relatedDigitalEntity,
-              'digitalentity',
-            );
-            obj.relatedDigitalEntity = await Mongo.resolve(
-              tempDigObj,
-              'digitalentity',
-            );
-            obj.settings.preview = '';
-          }
-        }
-        break;
-      default:
-    }
 
     response.send(filterResults(allEntities));
   },
