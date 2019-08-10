@@ -70,7 +70,7 @@ Server.get('/api/v1/get/users', async (_, response) => {
 });
 
 Server.get('/api/v1/get/groups', async (_, response) => {
-  const groups = await Mongo.getAccountsRepository()
+  const groups = await Mongo.getEntitiesRepository()
     .collection('groups')
     .find({})
     .toArray();
