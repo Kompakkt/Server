@@ -4,21 +4,10 @@ import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
-import {
-  Collection,
-  Db,
-  InsertOneWriteOpResult,
-  MongoClient,
-  ObjectId,
-} from 'mongodb';
+import { Collection, Db, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import {
-  ICompilation,
-  IEntity,
-  ILDAPData,
-  IMetaDataDigitalEntity,
-} from '../interfaces';
+import { ICompilation, ILDAPData } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -152,7 +141,6 @@ interface IMongo {
     response: Response,
     next: NextFunction,
   ): Promise<any>;
-  submitService(request: Request, response: Response): void;
   submit(request: Request, response: Response): Promise<any>;
   addEntityToCollection(request: Request, response: Response): Promise<any>;
   updateEntitySettings(request: Request, response: Response): Promise<any>;
@@ -426,147 +414,6 @@ const Mongo: IMongo = {
       return response.send({ status: 'error', message: 'Invalid session' });
     }
     return next();
-  },
-  submitService: (request, response) => {
-    const digobjCollection: Collection<
-      IMetaDataDigitalEntity
-    > = getEntitiesRepository().collection('digitalentity');
-    const entityCollection: Collection<
-      IEntity
-    > = getEntitiesRepository().collection('entity');
-
-    const service: string = request.params.service;
-    if (!service)
-      response.send({ status: 'error', message: 'Incorrect request' });
-
-    const mapTypes = (resType: string) => {
-      let type = resType;
-      type = type.toLowerCase();
-      switch (type) {
-        case 'sound':
-          type = 'audio';
-          break;
-        case 'picture':
-          type = 'image';
-          break;
-        case '3d':
-          type = 'entity';
-          break;
-        default:
-      }
-      return type;
-    };
-
-    // After adding a digitalentity inside of a entity,
-    // attach data to the current user
-    const insertFinalEntityToCurrentUser = (
-      entityResult: InsertOneWriteOpResult,
-    ) => {
-      Mongo.insertCurrentUserData(request, entityResult.ops[0]._id, 'entity')
-        .then(() => {
-          response.send({ status: 'ok', result: entityResult.ops[0] });
-          Logger.info(`Added Europeana entity ${entityResult.ops[0]._id}`);
-        })
-        .catch(err => {
-          Logger.err(err);
-          response.send({
-            status: 'error',
-            message: 'Failed adding finalized entity to user',
-          });
-        });
-    };
-
-    // After adding a digitalentity, add digitalentity
-    // to a entity and push the entity
-    const pushEntity = (digobjResult: InsertOneWriteOpResult) => {
-      const resultEntity = digobjResult.ops[0];
-      const entityEntity: IEntity = {
-        _id: new ObjectId(),
-        annotationList: [],
-        relatedDigitalEntity: {
-          _id: resultEntity._id,
-        },
-        name: resultEntity.digobj_title,
-        ranking: 0,
-        files: [],
-        finished: true,
-        online: true,
-        mediaType: mapTypes(request.body.type),
-        dataSource: {
-          isExternal: true,
-          service,
-        },
-        processed: {
-          low: request.body._fileUrl,
-          medium: request.body._fileUrl,
-          high: request.body._fileUrl,
-          raw: request.body._fileUrl,
-        },
-        settings: {
-          preview: request.body._previewUrl
-            ? request.body._previewUrl
-            : '/previews/noimage.png',
-        },
-      };
-      entityCollection
-        .insertOne(entityEntity)
-        .then(insertFinalEntityToCurrentUser)
-        .catch(err => {
-          Logger.err(err);
-          response.send({
-            status: 'error',
-            message: 'Failed finalizing digitalentity',
-          });
-        });
-    };
-
-    switch (service) {
-      case 'europeana':
-        // TODO: Put into Europeana service to make every service self sustained?
-        const EuropeanaEntity: IMetaDataDigitalEntity = {
-          _id: new ObjectId(),
-          type: mapTypes(request.body.type),
-          title: request.body.title,
-          description: request.body.description,
-          licence: request.body.license,
-          externalLink: [
-            {
-              description: 'Europeana URL',
-              value: request.body.page,
-            },
-          ],
-          externalId: [],
-          discipline: [],
-          creation: [],
-          dimensions: [],
-          files: [],
-          objecttype: '',
-          persons: [],
-          institutions: [],
-          statement: '',
-          tags: [],
-          metadata_files: [],
-          phyObjs: [],
-        };
-
-        digobjCollection
-          .insertOne(EuropeanaEntity)
-          .then(pushEntity)
-          .catch(err => {
-            Logger.err(err);
-            response.send({
-              status: 'error',
-              message: `Couldn't add as digitalentity`,
-            });
-          });
-
-        break;
-      default:
-        response.send({
-          status: 'error',
-          message: `Service ${service} not configured`,
-        });
-    }
   },
   /**
    * DEPRECATED: Redirects to correct function though!

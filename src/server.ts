@@ -87,11 +87,6 @@ Server.post(
 );
 // On user submit
 Server.post('/api/v1/post/submit', Mongo.validateLoginSession, Mongo.submit);
-Server.post(
-  '/api/v1/post/submit/:service',
-  Mongo.validateLoginSession,
-  Mongo.submitService,
-);
 // On Screenshot update
 Server.post(
   '/api/v1/post/settings/:identifier',
