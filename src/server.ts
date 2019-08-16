@@ -294,4 +294,16 @@ Server.post(
   Utility.applyActionToEntityOwner,
 );
 
+Server.get(
+  '/utility/finduseringroups',
+  Mongo.validateLoginSession,
+  Utility.findUserInGroups,
+);
+
+Server.get(
+  '/utility/finduserincompilations',
+  Mongo.validateLoginSession,
+  Utility.findUserInCompilations,
+);
+
 Express.startListening();

@@ -1,9 +1,15 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 
-import { IAnnotation, ICompilation, IEntity, ILDAPData } from '../interfaces';
+import {
+  IAnnotation,
+  ICompilation,
+  IEntity,
+  ILDAPData,
+  IGroup,
+} from '../interfaces';
 
-import { Mongo } from './mongo';
+import { Mongo, getCurrentUserBySession } from './mongo';
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
@@ -12,6 +18,9 @@ interface IUtility {
   countEntityUses(request: Request, response: Response): any;
   addAnnotationsToAnnotationList(request: Request, response: Response): any;
   applyActionToEntityOwner(request: Request, response: Response): any;
+
+  findUserInGroups(request: Request, response: Response): any;
+  findUserInCompilations(request: Request, response: Response): any;
 }
 
 const Utility: IUtility = {
@@ -228,6 +237,74 @@ const Utility: IUtility = {
     }
 
     return response.send({ status: 'ok' });
+  },
+  findUserInGroups: async (request, response) => {
+    const user = await getCurrentUserBySession(request.sessionID);
+    if (!user) {
+      response.send({
+        status: 'error',
+        message: 'Failed getting user by SessionId',
+      });
+      return;
+    }
+    const groups = await Mongo.getEntitiesRepository()
+      .collection<IGroup>('group')
+      .find({})
+      .toArray();
+
+    response.send({
+      status: 'ok',
+      groups: groups.filter(
+        group =>
+          JSON.stringify(group.members).includes(user._id.toString()) ||
+          JSON.stringify(group.owners).includes(user._id.toString()),
+      ),
+    });
+  },
+  findUserInCompilations: async (request, response) => {
+    const user = await getCurrentUserBySession(request.sessionID);
+    if (!user) {
+      response.send({
+        status: 'error',
+        message: 'Failed getting user by SessionId',
+      });
+      return;
+    }
+    const compilations = await Promise.all(
+      (await Mongo.getEntitiesRepository()
+        .collection<ICompilation>('compilation')
+        .find({})
+        .toArray())
+        .filter(comp => comp.whitelist.enabled)
+        .map(async comp => {
+          // Get latest versions of groups
+          comp.whitelist.groups = await Promise.all(
+            comp.whitelist.groups.map(group => Mongo.resolve(group, 'group')),
+          );
+          return comp;
+        }),
+    );
+
+    const filteredCompilations = compilations.filter(
+      compilation =>
+        JSON.stringify(compilation.whitelist.groups).includes(
+          user._id.toString(),
+        ) ||
+        JSON.stringify(compilation.whitelist.persons).includes(
+          user._id.toString(),
+        ),
+    );
+
+    const resolvedCompilations = await Promise.all(
+      filteredCompilations.map(
+        comp => Mongo.resolve(comp, 'compilation') as Promise<ICompilation>,
+      ),
+    );
+
+    response.send({
+      status: 'ok',
+      compilations: resolvedCompilations,
+    });
   },
 };
 

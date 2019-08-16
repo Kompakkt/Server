@@ -861,4 +861,4 @@ const Mongo: IMongo = {
 
 Mongo.init().catch(e => Logger.err(e));
 
-export { Mongo };
+export { Mongo, getCurrentUserBySession };
