@@ -54,27 +54,35 @@ Server.get(
 // Return a MongoDB ObjectId
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
-Server.get('/api/v1/get/users', async (_, response) => {
-  const users = await Mongo.getAccountsRepository()
-    .collection('users')
-    .find({})
-    .toArray();
-  response.send(
-    users.map(user => ({
-      username: user.username,
-      fullname: user.fullname,
-      _id: user._id,
-    })),
-  );
-});
+Server.get(
+  '/api/v1/get/users',
+  Mongo.validateLoginSession,
+  async (_, response) => {
+    const users = await Mongo.getAccountsRepository()
+      .collection('users')
+      .find({})
+      .toArray();
+    response.send(
+      users.map(user => ({
+        username: user.username,
+        fullname: user.fullname,
+        _id: user._id,
+      })),
+    );
+  },
+);
 
-Server.get('/api/v1/get/groups', async (_, response) => {
-  const groups = await Mongo.getEntitiesRepository()
-    .collection('groups')
-    .find({})
-    .toArray();
-  response.send(groups);
-});
+Server.get(
+  '/api/v1/get/groups',
+  Mongo.validateLoginSession,
+  async (_, response) => {
+    const groups = await Mongo.getEntitiesRepository()
+      .collection('groups')
+      .find({})
+      .toArray();
+    response.send(groups);
+  },
+);
 
 // POST
 // Post single document to collection
