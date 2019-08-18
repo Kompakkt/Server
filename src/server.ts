@@ -2,7 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 
 import { Admin } from './services/admin';
 import { Cleaning } from './services/cleaning';
-import { Europeana } from './services/europeana';
 import { Express, Server, WebSocket } from './services/express';
 import { Mailer } from './services/mailer';
 import { Mongo } from './services/mongo';
@@ -102,14 +101,9 @@ Server.post(
   Mongo.removeEntityFromCollection,
 );
 // Return search data
-Server.post(
-  '/api/v1/post/search/:collection',
-  // Mongo.validateLoginSession,
-  Mongo.searchByTextFilter,
-);
+Server.post('/api/v1/post/search/:collection', Mongo.searchByTextFilter);
 Server.post(
   '/api/v1/post/searchentity/:collection',
-  // Mongo.validateLoginSession,
   Mongo.searchByEntityFilter,
 );
 // Publish or unpublish a entity
@@ -199,35 +193,6 @@ Server.post(
   Admin.checkIsAdmin,
   Admin.toggleEntityPublishedState,
 );
-
-// Europeana
-// TODO: Auslagern
-Server.get('/api/v1/get/europeana/:record/:id', async (request, response) => {
-  await Europeana.getRecordData(`${request.params.record}/${request.params.id}`)
-    .then((result: any) => {
-      try {
-        const _relURL = result.data.entity.europeanaAggregation.aggregatedCHO
-          .toString()
-          .replace('/item/', '');
-        const _fullURL = `https://proxy.europeana.eu/${_relURL}`;
-        const _fallbackURL = result.data.entity.europeanaAggregation.edmPreview;
-        const _type = result.data.entity.type;
-        response.send({
-          status: 'ok',
-          data: result.data.entity,
-          fileUrl: _fullURL,
-          fallbackUrl: _fallbackURL,
-          type: _type,
-        });
-      } catch (_) {
-        response.send({ status: 'error' });
-      }
-    })
-    .catch(e => {
-      console.log(e);
-      response.send({ status: 'error' });
-    });
-});
 
 // Mailer
 Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
