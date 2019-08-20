@@ -279,4 +279,10 @@ Server.get(
   Utility.findUserInCompilations,
 );
 
+Server.get(
+  '/utility/finduserinmetadata',
+  Mongo.validateLoginSession,
+  Utility.findUserInMetadata,
+);
+
 Express.startListening();

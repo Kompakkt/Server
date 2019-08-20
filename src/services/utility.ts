@@ -21,6 +21,8 @@ interface IUtility {
 
   findUserInGroups(request: Request, response: Response): any;
   findUserInCompilations(request: Request, response: Response): any;
+
+  findUserInMetadata(request: Request, response: Response): any;
 }
 
 const Utility: IUtility = {
@@ -305,6 +307,29 @@ const Utility: IUtility = {
       status: 'ok',
       compilations: resolvedCompilations,
     });
+  },
+  findUserInMetadata: async (request, response) => {
+    const user = await getCurrentUserBySession(request.sessionID);
+    if (!user) {
+      response.send({
+        status: 'error',
+        message: 'Failed getting user by SessionId',
+      });
+      return;
+    }
+    const entities = (await Promise.all(
+      (await Mongo.getEntitiesRepository()
+        .collection<IEntity>('entity')
+        .find({})
+        .toArray()).map(entity => Mongo.resolve(entity, 'entity')),
+    )).filter(entity => {
+      const stringified = JSON.stringify(entity.relatedDigitalEntity);
+      return (
+        stringified.includes(user.fullname) || stringified.includes(user.mail)
+      );
+    });
+
+    response.send({ status: 'ok', entities });
   },
 };
 
