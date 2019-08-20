@@ -40,7 +40,9 @@ export const isAnnotation = (obj: any): obj is IAnnotation => {
 
 export const isDigitalEntity = (obj: any): obj is IMetaDataDigitalEntity => {
   const digentity = obj as IMetaDataDigitalEntity | IInvalid;
-  return digentity && digentity.type && digentity.licence !== undefined;
+  return (
+    digentity && digentity.type !== undefined && digentity.licence !== undefined
+  );
 };
 
 export const isPerson = (obj: any): obj is IMetaDataPerson => {
