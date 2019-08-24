@@ -383,7 +383,7 @@ const saveDigitalEntity = async (
         { upsert: true },
       )
       .then(res => {
-        const _id = res.upsertedId._id ? res.upsertedId._id : savedEntity._id;
+        const _id = res.upsertedId ? res.upsertedId._id : savedEntity._id;
         Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
         return _id;
       })) as any;

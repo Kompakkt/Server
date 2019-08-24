@@ -1,3 +1,5 @@
+import { ObjectId } from 'mongodb';
+
 import {
   ICompilation,
   IEntity,
@@ -13,9 +15,10 @@ export const resolvePerson = async (person: IMetaDataPerson) => {
   if (person.institutions) {
     for (const id in person.institutions) {
       if (!person.institutions[id]) continue;
+      if (!ObjectId.isValid(id)) continue;
       for (let i = 0; i < person.institutions[id].length; i++) {
-        person.institutions[i] = await Mongo.resolve(
-          person.institutions[i],
+        person.institutions[id][i] = await Mongo.resolve(
+          person.institutions[id][i],
           'institution',
         );
       }
