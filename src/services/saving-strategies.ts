@@ -1,6 +1,7 @@
 import { Collection, ObjectId } from 'mongodb';
+import { ensureDirSync, writeFile } from 'fs-extra';
+import { join } from 'path';
 
-// tslint:disable-next-line:max-line-length
 import {
   IAnnotation,
   ICompilation,
@@ -14,10 +15,14 @@ import {
   IMetaDataInstitution,
   IUserData,
 } from '../interfaces';
+import { RootDirectory } from '../environment';
 
 import { Logger } from './logger';
 import { Mongo } from './mongo';
+import { Configuration as Conf } from './configuration';
 import { isAnnotation, isDigitalEntity } from './typeguards';
+
+const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 
 const updateAnnotationList = async (
   entityOrCompId: string,
@@ -333,6 +338,27 @@ const saveMetaDataEntity = async (
     newEntity.institutions[i] = (await saveInstitution(
       newEntity.institutions[i],
     )) as any;
+  }
+
+  // Save unsaved metadata files and return link
+  const https = Conf.Express.enableHTTPS ? 'https' : 'http';
+  const pubip = Conf.Express.PublicIP;
+  const port = Conf.Express.Port;
+  ensureDirSync(join(upDir, '/metadata_files/'));
+  for (let i = 0; i < newEntity.metadata_files.length; i++) {
+    const file = newEntity.metadata_files[i];
+    if (file.file_link.startsWith('http')) continue;
+    const filename = `${newEntity._id}_${file.file_name}`;
+
+    await writeFile(
+      join(upDir, '/metadata_files/', `${filename}`),
+      file.file_link,
+    );
+
+    const final = `${https}://${pubip}:${port}/uploads/metadata_files/${filename}`;
+    file.file_link = final;
+
+    newEntity.metadata_files[i] = file;
   }
 
   if (isDigitalEntity(newEntity)) {
