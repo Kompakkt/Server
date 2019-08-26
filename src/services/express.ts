@@ -20,6 +20,7 @@ import { IInvalid, ILDAPData } from '../interfaces';
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
+import { serveFile } from './dynamic-compression';
 
 const Server = express();
 const createServer = () => {
@@ -107,7 +108,8 @@ Server.use(cookieParser());
 Server.use(shrinkRay());
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
-Server.use('/uploads', express.static(upDir));
+//Server.use('/uploads', express.static(upDir));
+Server.use('/uploads', serveFile(upDir));
 Server.use('/previews', express.static(`${upDir}/previews`));
 
 // Create preview directory and default preview file
