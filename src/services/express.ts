@@ -4,6 +4,7 @@ import cors from 'cors';
 import { BinaryLike, createHmac, randomBytes } from 'crypto';
 import express from 'express';
 import expressSession from 'express-session';
+import shrinkRay from 'shrink-ray-current';
 import { readFileSync } from 'fs';
 import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
 import * as HTTP from 'http';
@@ -102,6 +103,8 @@ Server.use(
 Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
 Server.use(cookieParser());
+// Compression: Brotli -> Fallback GZIP
+Server.use(shrinkRay());
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 Server.use('/uploads', express.static(upDir));
