@@ -134,7 +134,7 @@ interface IMongo {
     identifier: string | ObjectId,
     collection: string,
   ): Promise<any>;
-  resolveUserData(_userData: ILDAPData): Promise<any>;
+  resolveUserData(_userData: ILDAPData): Promise<ILDAPData>;
   getCurrentUserData(request: Request, response: Response): Promise<any>;
   validateLoginSession(
     request: Request,
@@ -546,9 +546,14 @@ const Mongo: IMongo = {
       ? new ObjectId(identifier)
       : identifier;
     const userData = await getCurrentUserBySession(request.sessionID);
+    if (!userData) {
+      return false;
+    }
+    const resolvedUser = await Mongo.resolveUserData(userData);
     return (
-      JSON.stringify(userData ? userData.data : '').indexOf(_id.toString()) !==
-      -1
+      JSON.stringify(resolvedUser ? resolvedUser.data : '').indexOf(
+        _id.toString(),
+      ) !== -1
     );
   },
   isUserAdmin: async (request): Promise<boolean> => {
