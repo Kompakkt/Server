@@ -2,17 +2,16 @@ import { Request, Response } from 'express';
 import { Db, ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
 
+import { IUserData } from '../interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
-
-const MAIL_LIMIT = 3;
 
 interface IMailer {
   isConfigValid(): any;
   sendMail(request: Request, response: Response): Promise<any>;
   addUserToDatabase(request: Request, mailSent: boolean): any;
-  countUserMails(request: Request, destination: string): Promise<any>;
+  countUserMails(request: Request, destination: string): Promise<number>;
   getMailRelatedDatabaseEntries(_: Request, response: Response): Promise<any>;
   toggleMailAnswered(request: Request, response: Response): Promise<any>;
 }
@@ -27,6 +26,19 @@ interface ISendMailRequest {
   subject?: string;
   mailbody?: string;
   target?: ETarget;
+}
+
+interface IMailEntry {
+  _id: string | ObjectId;
+  target: string;
+  content: {
+    mailbody: string;
+    subject: string;
+  };
+  timestamp: string;
+  user: IUserData;
+  answered: boolean;
+  mailSent: boolean;
 }
 
 const Mailer: IMailer = {
@@ -44,7 +56,10 @@ const Mailer: IMailer = {
       !Configuration.Mailer.Target ||
       !(Configuration.Mailer.Target as any)[request.body.target]
     ) {
-      return response.send({ status: 'error' });
+      return response.send({
+        status: 'error',
+        message: 'Server mail config invalid',
+      });
     }
 
     const body = request.body as ISendMailRequest;
@@ -64,16 +79,26 @@ const Mailer: IMailer = {
       text: body.mailbody,
     };
 
-    const MailCount = await Mailer.countUserMails(request, body.target);
+    const unansweredMails = await Mailer.countUserMails(request, body.target);
     switch (body.target) {
-      case ETarget.bugreport:
+      case ETarget.contact:
+        if (unansweredMails >= 3) {
+          return response.send({
+            status: 'error',
+            message: 'Limit for this category reached',
+          });
+        }
         break;
+      case ETarget.upload:
+        if (unansweredMails >= 1) {
+          return response.send({
+            status: 'error',
+            message: 'Limit for this category reached',
+          });
+        }
+        break;
+      case ETarget.bugreport:
       default:
-        if (MailCount < MAIL_LIMIT) break;
-        return response.send({
-          status: 'error',
-          message: 'Limit for this category reached',
-        });
     }
 
     let result = true;
@@ -126,9 +151,10 @@ const Mailer: IMailer = {
     const AccDb: Db = Mongo.getAccountsRepository();
     const ldap = AccDb.collection('users');
     const user = await ldap.findOne({ sessionID: request.sessionID });
-    const collection = AccDb.collection(destination);
+    const collection = AccDb.collection<IMailEntry>(destination);
     const entries = (await collection.find({}).toArray()).filter(
-      entry => entry.user._id.toString() === user._id.toString(),
+      entry =>
+        !entry.answered && entry.user._id.toString() === user._id.toString(),
     );
     return entries.length;
   },

@@ -161,9 +161,7 @@ export interface IUserData {
   role: EUserRank;
 
   data: {
-    [key: string]: Array<
-      string | null | IEntity | IAnnotation | ICompilation | ObjectId
-    >;
+    [key: string]: Array<string | null | any | ObjectId>;
   };
 }
 
