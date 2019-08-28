@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { IEntity, ILDAPData } from '../interfaces';
+import { IEntity, IUserData, EUserRank } from '../interfaces';
 
 import { Mongo } from './mongo';
 
@@ -27,9 +27,9 @@ const Admin: IAdmin = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<ILDAPData> = AccDB.collection('users');
+    const ldap: Collection<IUserData> = AccDB.collection('users');
     const found = await ldap.findOne({ username, sessionID });
-    if (!found || found.role !== 'A') {
+    if (!found || found.role !== EUserRank.admin) {
       return response.send({
         status: 'error',
         message: 'Could not verify your admin status',
@@ -39,7 +39,7 @@ const Admin: IAdmin = {
   },
   getAllLDAPUsers: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<ILDAPData> = AccDB.collection('users');
+    const ldap: Collection<IUserData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
     const allAccounts = await ldap.find({}).toArray();
     const filteredAccounts = await Promise.all(
@@ -72,12 +72,11 @@ const Admin: IAdmin = {
     }
     const role = request.body.role;
     switch (role) {
-      case 'S':
-      case 'B':
-      case 'U':
-      case 'A':
+      case EUserRank.user:
+      case EUserRank.uploader:
+      case EUserRank.admin:
         const AccDB: Db = Mongo.getAccountsRepository();
-        const ldap: Collection<ILDAPData> = AccDB.collection('users');
+        const ldap: Collection<IUserData> = AccDB.collection('users');
         const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1) {
           return response.send({

@@ -7,7 +7,7 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, ILDAPData } from '../interfaces';
+import { ICompilation, IUserData, EUserRank } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -36,7 +36,7 @@ import { Utility } from './utility';
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
 
-const ldap = (): Collection<ILDAPData> =>
+const ldap = (): Collection<IUserData> =>
   getAccountsRepository().collection('users');
 const getCurrentUserBySession = async (sessionID: string | undefined) => {
   if (!sessionID) return null;
@@ -130,11 +130,11 @@ interface IMongo {
   ): Promise<any>;
   addToAccounts(request: Request, response: Response): any;
   insertCurrentUserData(
-    request: Request | ILDAPData,
+    request: Request | IUserData,
     identifier: string | ObjectId,
     collection: string,
   ): Promise<any>;
-  resolveUserData(_userData: ILDAPData): Promise<ILDAPData>;
+  resolveUserData(_userData: IUserData): Promise<IUserData>;
   getCurrentUserData(request: Request, response: Response): Promise<any>;
   validateLoginSession(
     request: Request,
@@ -145,7 +145,7 @@ interface IMongo {
   addEntityToCollection(request: Request, response: Response): Promise<any>;
   updateEntitySettings(request: Request, response: Response): Promise<any>;
   isUserOwnerOfEntity(
-    request: Request | ILDAPData,
+    request: Request | IUserData,
     identifier: string | ObjectId,
   ): Promise<any>;
   isUserAdmin(request: Request): Promise<boolean>;
@@ -221,10 +221,9 @@ const Mongo: IMongo = {
     });
   },
   updateSessionId: async (request, response, next) => {
-    const user: ILDAPData = request.user;
+    const user: IUserData = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
-    const userData = await getUserByUsername(username);
 
     const updateResult = await ldap().updateOne(
       { username },
@@ -233,12 +232,6 @@ const Mongo: IMongo = {
           username,
           sessionID,
           ...user,
-          role:
-            userData && userData.role
-              ? userData.role === ''
-                ? user.role
-                : userData.role
-              : user.role,
         },
       },
     );
@@ -252,7 +245,7 @@ const Mongo: IMongo = {
     return next();
   },
   addToAccounts: async (request, response) => {
-    const user: ILDAPData = request.user;
+    const user: IUserData = request.user;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID ? request.sessionID : null;
     const userData = await getUserByUsername(username);
@@ -296,11 +289,6 @@ const Mongo: IMongo = {
           $set: {
             ...user,
             sessionID,
-            role: userData.role
-              ? userData.role === ''
-                ? user.role
-                : userData.role
-              : user.role,
           },
         },
         (up_err, _) => {
@@ -558,7 +546,7 @@ const Mongo: IMongo = {
   },
   isUserAdmin: async (request): Promise<boolean> => {
     const userData = await getCurrentUserBySession(request.sessionID);
-    return userData ? userData.role === 'A' : false;
+    return userData ? userData.role === EUserRank.admin : false;
   },
   query: (_id: string | ObjectId) => {
     return {

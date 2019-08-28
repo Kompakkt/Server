@@ -7,13 +7,13 @@ import {
   ICompilation,
   IEntity,
   IGroup,
-  ILDAPData,
+  IUserData,
   IMetaDataDigitalEntity,
   IMetaDataPhysicalEntity,
   IMetaDataTag,
   IMetaDataPerson,
   IMetaDataInstitution,
-  IUserData,
+  IStrippedUserData,
 } from '../interfaces';
 import { RootDirectory } from '../environment';
 
@@ -63,7 +63,7 @@ const updateAnnotationList = async (
 
 const saveCompilation = async (
   compilation: ICompilation,
-  userData: ILDAPData,
+  userData: IUserData,
 ) => {
   compilation.annotationList = compilation.annotationList
     ? compilation.annotationList
@@ -84,7 +84,7 @@ const saveCompilation = async (
 
 const saveAnnotation = async (
   annotation: IAnnotation,
-  userData: ILDAPData,
+  userData: IUserData,
   doesEntityExist: boolean,
 ) => {
   return new Promise<IAnnotation>(async (resolve, reject) => {
@@ -207,7 +207,7 @@ const saveAnnotation = async (
   });
 };
 
-const saveEntity = async (entity: IEntity, userData: ILDAPData) => {
+const saveEntity = async (entity: IEntity, userData: IUserData) => {
   /* Preview image URLs might have a corrupted address
    * because of Kompakkt runnning in an iframe
    * This removes the host address from the URL
@@ -223,8 +223,8 @@ const saveEntity = async (entity: IEntity, userData: ILDAPData) => {
   return entity;
 };
 
-const saveGroup = async (group: IGroup, userData: ILDAPData) => {
-  const strippedUserData: IUserData = {
+const saveGroup = async (group: IGroup, userData: IUserData) => {
+  const strippedUserData: IStrippedUserData = {
     username: userData.username,
     fullname: userData.fullname,
     _id: userData._id,
@@ -237,7 +237,7 @@ const saveGroup = async (group: IGroup, userData: ILDAPData) => {
 
 const saveMetaDataEntity = async (
   entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
-  userData: ILDAPData,
+  userData: IUserData,
 ) => {
   const newEntity = { ...entity };
 
@@ -386,7 +386,7 @@ const saveMetaDataEntity = async (
 
 const saveDigitalEntity = async (
   digitalentity: IMetaDataDigitalEntity,
-  userData: ILDAPData,
+  userData: IUserData,
 ) => {
   const newEntity = (await saveMetaDataEntity(
     digitalentity,

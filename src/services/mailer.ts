@@ -17,6 +17,18 @@ interface IMailer {
   toggleMailAnswered(request: Request, response: Response): Promise<any>;
 }
 
+enum ETarget {
+  contact = 'contact',
+  upload = 'upload',
+  bugreport = 'bugreport',
+}
+
+interface ISendMailRequest {
+  subject?: string;
+  mailbody?: string;
+  target?: ETarget;
+}
+
 const Mailer: IMailer = {
   isConfigValid: () => {
     return (
@@ -35,22 +47,26 @@ const Mailer: IMailer = {
       return response.send({ status: 'error' });
     }
 
+    const body = request.body as ISendMailRequest;
+    if (!body.target || !body.mailbody || !body.subject) {
+      return response.send({ status: 'error', message: 'Incomplete request' });
+    }
+
     const transporter = nodemailer.createTransport({
       host: Configuration.Mailer.Host,
       port: Configuration.Mailer.Port,
     });
 
     const mailOptions = {
-      from: (Configuration.Mailer.Target as any)[request.body.target],
-      to: (Configuration.Mailer.Target as any)[request.body.target],
-      subject: request.body.subject,
-      text: request.body.mailbody,
+      from: Configuration.Mailer.Target[body.target],
+      to: Configuration.Mailer.Target[body.target],
+      subject: body.subject,
+      text: body.mailbody,
     };
 
-    const MailCount = await Mailer.countUserMails(request, request.body.target);
-    // TODO: configurable limits
-    switch (request.body.target) {
-      case 'bugreport':
+    const MailCount = await Mailer.countUserMails(request, body.target);
+    switch (body.target) {
+      case ETarget.bugreport:
         break;
       default:
         if (MailCount < MAIL_LIMIT) break;

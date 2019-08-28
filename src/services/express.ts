@@ -15,7 +15,7 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import SocketIo from 'socket.io';
 
 import { RootDirectory } from '../environment';
-import { IInvalid, ILDAPData } from '../interfaces';
+import { IInvalid, IUserData, EUserRank } from '../interfaces';
 
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
@@ -134,9 +134,8 @@ passport.use(
         fullname: user['cn'],
         prename: user['givenName'],
         surname: user['sn'],
-        rank: user['UniColognePersonStatus'],
         mail: user['mail'],
-        role: user['UniColognePersonStatus'],
+        role: EUserRank.user,
       };
       return done(undefined, adjustedUser);
     },
@@ -189,8 +188,8 @@ const registerUser = async (
   const coll = Mongo.getAccountsRepository().collection('users');
   const passwords = Mongo.getAccountsRepository().collection('passwords');
 
-  const isUser = (obj: any): obj is ILDAPData => {
-    const person = obj as ILDAPData | IInvalid;
+  const isUser = (obj: any): obj is IUserData => {
+    const person = obj as IUserData | IInvalid;
     return (
       person &&
       person.fullname !== undefined &&
@@ -204,11 +203,10 @@ const registerUser = async (
 
   // First user gets admin
   const isFirstUser = (await coll.findOne({})) === null;
-  const rank = isFirstUser ? 'A' : 'S';
-  const role = rank;
+  const role = isFirstUser ? EUserRank.admin : EUserRank.user;
 
-  const user = request.body as { username: string; password: string };
-  const adjustedUser = { ...user, role, rank, data: {} };
+  const user = request.body as IUserData & { password: string };
+  const adjustedUser = { ...user, role, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) {
     return response.send({ status: 'error', message: 'User already exists' });

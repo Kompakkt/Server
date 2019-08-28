@@ -5,7 +5,7 @@ import {
   IAnnotation,
   ICompilation,
   IEntity,
-  ILDAPData,
+  IUserData,
   IGroup,
 } from '../interfaces';
 
@@ -37,7 +37,7 @@ const Utility: IUtility = {
   },
   findAllEntityOwners: async (entityId: string) => {
     const AccDB = Mongo.getAccountsRepository();
-    const ldap = AccDB.collection<ILDAPData>('users');
+    const ldap = AccDB.collection<IUserData>('users');
     const accounts = (await ldap.find({}).toArray())
       .filter(userData => {
         const Entities = JSON.stringify(userData.data.entity);
@@ -187,7 +187,7 @@ const Utility: IUtility = {
       });
     }
     const AccDB = Mongo.getAccountsRepository();
-    const ldap = AccDB.collection<ILDAPData>('users');
+    const ldap = AccDB.collection<IUserData>('users');
     const findUserQuery = ownerId
       ? { _id: new ObjectId(ownerId) }
       : { username: ownerUsername };
