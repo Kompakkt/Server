@@ -269,15 +269,15 @@ const Mongo: IMongo = {
 
     users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
-      .then(async result => {
-        console.log(result);
+      .then(async _ => {
+        Logger.log(`User ${updatedUser.username} logged in`);
         response.send({
           status: 'ok',
           ...(await Mongo.resolveUserData(updatedUser)),
         });
       })
       .catch(error => {
-        console.log(error);
+        Logger.err(error);
         response.send({
           status: 'error',
           message: 'Failed updating user entry in database',
