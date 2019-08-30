@@ -27,8 +27,8 @@ const Admin: IAdmin = {
     const username = request.body.username;
     const sessionID = request.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<IUserData> = AccDB.collection('users');
-    const found = await ldap.findOne({ username, sessionID });
+    const users: Collection<IUserData> = AccDB.collection('users');
+    const found = await users.findOne({ username, sessionID });
     if (!found || found.role !== EUserRank.admin) {
       return response.send({
         status: 'error',
@@ -39,9 +39,9 @@ const Admin: IAdmin = {
   },
   getAllLDAPUsers: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection<IUserData> = AccDB.collection('users');
+    const users: Collection<IUserData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
-    const allAccounts = await ldap.find({}).toArray();
+    const allAccounts = await users.find({}).toArray();
     const filteredAccounts = await Promise.all(
       allAccounts
         .map(account => {
@@ -76,8 +76,8 @@ const Admin: IAdmin = {
       case EUserRank.uploader:
       case EUserRank.admin:
         const AccDB: Db = Mongo.getAccountsRepository();
-        const ldap: Collection<IUserData> = AccDB.collection('users');
-        const updateResult = await ldap.updateOne({ _id }, { $set: { role } });
+        const users: Collection<IUserData> = AccDB.collection('users');
+        const updateResult = await users.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1) {
           return response.send({
             status: 'error',

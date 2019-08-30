@@ -125,8 +125,8 @@ const Mailer: IMailer = {
       return;
 
     const AccDb: Db = Mongo.getAccountsRepository();
-    const ldap = AccDb.collection('users');
-    const user = await ldap.findOne({ sessionID: request.sessionID });
+    const users = AccDb.collection('users');
+    const user = await users.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(target);
 
     const subject = request.body.subject;
@@ -149,8 +149,8 @@ const Mailer: IMailer = {
   },
   countUserMails: async (request, destination) => {
     const AccDb: Db = Mongo.getAccountsRepository();
-    const ldap = AccDb.collection('users');
-    const user = await ldap.findOne({ sessionID: request.sessionID });
+    const users = AccDb.collection('users');
+    const user = await users.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection<IMailEntry>(destination);
     const entries = (await collection.find({}).toArray()).filter(
       entry =>

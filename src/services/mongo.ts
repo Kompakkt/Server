@@ -36,14 +36,14 @@ import { Utility } from './utility';
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
 
-const ldap = (): Collection<IUserData> =>
+const users = (): Collection<IUserData> =>
   getAccountsRepository().collection('users');
 const getCurrentUserBySession = async (sessionID: string | undefined) => {
   if (!sessionID) return null;
-  return ldap().findOne({ sessionID });
+  return users().findOne({ sessionID });
 };
 const getUserByUsername = async (username: string) =>
-  ldap().findOne({ username });
+  users().findOne({ username });
 const getAllItemsOfCollection = async (collection: string) =>
   getEntitiesRepository()
     .collection(collection)
@@ -215,7 +215,7 @@ const Mongo: IMongo = {
   },
   invalidateSession: (request, response) => {
     const sessionID = request.sessionID;
-    ldap().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
+    users().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
       Logger.log('Logged out');
       response.send({ status: 'ok', message: 'Logged out' });
     });
@@ -225,7 +225,7 @@ const Mongo: IMongo = {
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID;
 
-    const updateResult = await ldap().updateOne(
+    const updateResult = await users().updateOne(
       { username },
       {
         $set: {
@@ -267,7 +267,7 @@ const Mongo: IMongo = {
     // _id is immutable in MongoDB, so we can't update the field
     delete updatedUser['_id'];
 
-    ldap()
+    users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
       .then(async result => {
         console.log(result);
@@ -305,7 +305,7 @@ const Mongo: IMongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await ldap().updateOne(
+    const updateResult = await users().updateOne(
       { sessionID },
       { $set: { data: userData.data } },
     );
@@ -655,7 +655,7 @@ const Mongo: IMongo = {
         RequestCollection
       ].filter(id => id !== identifier.toString());
 
-      const update_result = await ldap().updateOne(
+      const update_result = await users().updateOne(
         { sessionID },
         { $set: { data: find_result.data } },
       );

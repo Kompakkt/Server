@@ -179,7 +179,7 @@ Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
 // Admin requests
 Server.post(
-  '/admin/getldap',
+  '/admin/getusers',
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,

@@ -37,8 +37,8 @@ const Utility: IUtility = {
   },
   findAllEntityOwners: async (entityId: string) => {
     const AccDB = Mongo.getAccountsRepository();
-    const ldap = AccDB.collection<IUserData>('users');
-    const accounts = (await ldap.find({}).toArray())
+    const users = AccDB.collection<IUserData>('users');
+    const accounts = (await users.find({}).toArray())
       .filter(userData => {
         const Entities = JSON.stringify(userData.data.entity);
         return Entities ? Entities.indexOf(entityId) !== -1 : false;
@@ -187,11 +187,11 @@ const Utility: IUtility = {
       });
     }
     const AccDB = Mongo.getAccountsRepository();
-    const ldap = AccDB.collection<IUserData>('users');
+    const users = AccDB.collection<IUserData>('users');
     const findUserQuery = ownerId
       ? { _id: new ObjectId(ownerId) }
       : { username: ownerUsername };
-    const account = await ldap.findOne(findUserQuery);
+    const account = await users.findOne(findUserQuery);
     if (!account) {
       return response.send({
         status: 'error',
@@ -227,7 +227,7 @@ const Utility: IUtility = {
       default:
     }
 
-    const updateResult = await ldap.updateOne(findUserQuery, {
+    const updateResult = await users.updateOne(findUserQuery, {
       $set: { data: account.data },
     });
 

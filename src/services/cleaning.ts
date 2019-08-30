@@ -61,8 +61,8 @@ const Cleaning: ICleaning = {
   },
   deleteNullRefs: async (_, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
-    const ldap: Collection = AccDB.collection('users');
-    const allUsers = await ldap.find({}).toArray();
+    const users: Collection = AccDB.collection('users');
+    const allUsers = await users.find({}).toArray();
 
     const total: any[] = [];
 
@@ -84,7 +84,7 @@ const Cleaning: ICleaning = {
         const index = user.data[ref.field].indexOf(ref._id);
         user.data[ref.field].splice(index, 1);
       }
-      const updateResult = await ldap.updateOne(
+      const updateResult = await users.updateOne(
         { _id: user._id },
         { $set: { data: user.data } },
       );
