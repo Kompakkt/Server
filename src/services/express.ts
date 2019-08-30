@@ -146,10 +146,15 @@ passport.use(
   new LocalStrategy((username: string, password: string, done: any) => {
     const coll = Mongo.getAccountsRepository().collection('users');
     coll.findOne({ username }, async (err, user) => {
-      if (err) return done(err);
-      if (!user) return done(undefined, false);
-      if (!(await verifyUser(username, password)))
+      if (err) {
+        return done(err);
+      }
+      if (!user) {
         return done(undefined, false);
+      }
+      if (!(await verifyUser(username, password))) {
+        return done(undefined, false);
+      }
       return done(undefined, user);
     });
   }),

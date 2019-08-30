@@ -289,6 +289,7 @@ const Mongo: IMongo = {
           $set: {
             ...user,
             sessionID,
+            role: userData.role,
           },
         },
         (up_err, _) => {
