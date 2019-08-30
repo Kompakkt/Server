@@ -321,7 +321,7 @@ export interface ICompilation extends IWhitelist, IAnnotationList {
   name: string;
   description: string;
   relatedOwner?: IRelatedOwner;
-  password?: string;
+  password?: string | boolean;
   entities: Array<IEntity | null | IUnresolvedEntity>;
 }
 

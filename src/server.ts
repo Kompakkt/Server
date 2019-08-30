@@ -114,6 +114,9 @@ Server.post(
   '/api/v1/post/searchentity/:collection',
   Mongo.searchByEntityFilter,
 );
+// Explore request
+Server.post('/api/v1/post/explore', Mongo.explore);
+
 // Publish or unpublish a entity
 const userOwnerHandler = (
   request: Request,

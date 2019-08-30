@@ -7,7 +7,7 @@ import * as pngquant from 'imagemin-pngquant';
 import { Collection, Db, MongoClient, ObjectId } from 'mongodb';
 
 import { RootDirectory } from '../environment';
-import { ICompilation, IUserData, EUserRank } from '../interfaces';
+import { ICompilation, IEntity, IUserData, EUserRank } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -32,6 +32,19 @@ import {
 } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
+
+interface IExploreRequest {
+  searchEntity: boolean;
+  types: string[];
+  filters: {
+    annotatable: boolean;
+    annotated: boolean;
+    restricted: boolean;
+    associated: boolean;
+  };
+  searchText: string;
+  offset: number;
+}
 
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
@@ -163,6 +176,7 @@ interface IMongo {
   removeEntityFromCollection(request: Request, response: Response): any;
   searchByEntityFilter(request: Request, response: Response): Promise<any>;
   searchByTextFilter(request: Request, response: Response): Promise<any>;
+  explore(request: Request, response: Response): Promise<any>;
 }
 
 const Mongo: IMongo = {
@@ -571,7 +585,7 @@ const Mongo: IMongo = {
     if (isCompilation(entity)) {
       const compilation = entity;
       const _pw = compilation.password;
-      const isPasswordProtected = _pw && _pw.length > 0;
+      const isPasswordProtected = _pw && _pw !== '';
       const isUserOwner = await Mongo.isUserOwnerOfEntity(request, _id);
       const isPasswordCorrect = _pw && _pw === password;
 
@@ -599,7 +613,7 @@ const Mongo: IMongo = {
     if (results.length > 0 && isCompilation(results[0])) {
       const isPasswordProtected = (compilation: ICompilation) =>
         !compilation.password ||
-        (compilation.password && compilation.password.length === 0);
+        (compilation.password && compilation.password !== '');
       results = results.filter(isPasswordProtected);
     }
 
@@ -818,6 +832,148 @@ const Mongo: IMongo = {
     };
 
     response.send(filterResults(allEntities));
+  },
+  explore: async (request, response) => {
+    const {
+      types,
+      offset,
+      searchEntity,
+      filters,
+      searchText,
+    } = request.body as IExploreRequest;
+    const items = new Array<IEntity | ICompilation>();
+    const limit = 20;
+    const userData = await getCurrentUserBySession(request.sessionID);
+    const userOwned = userData ? JSON.stringify(userData.data) : '';
+
+    if (searchEntity) {
+      const cursor = await Mongo.getEntitiesRepository()
+        .collection<IEntity>('entity')
+        .find({
+          finished: true,
+          online: true,
+          mediaType: {
+            $in: types,
+          },
+        })
+        .sort({
+          name: 1,
+        })
+        .skip(offset);
+
+      const entities: IEntity[] = [];
+
+      const canContinue = () =>
+        cursor.hasNext() && !cursor.isClosed() && entities.length < limit;
+
+      while (canContinue()) {
+        const _entity = await cursor.next();
+        if (!_entity) continue;
+
+        const isOwner = userOwned.includes(_entity._id.toString());
+        const metadata = JSON.stringify(_entity).toLowerCase();
+
+        const isAnnotatable = isOwner; // only owner can set default annotations
+        if (filters.annotatable && !isAnnotatable) continue;
+
+        const isAnnotated = _entity.annotationList.length > 0;
+        if (filters.annotated && !isAnnotated) continue;
+
+        let isRestricted = false;
+        // Whitelist visibility filter
+        if (_entity.whitelist.enabled) {
+          if (!userData) continue;
+          // TODO: manual checking instead of JSON.stringify
+          const isWhitelisted = JSON.stringify(_entity.whitelist).includes(
+            userData._id.toString(),
+          );
+          if (!isOwner && !isWhitelisted) continue;
+          isRestricted = true;
+        }
+        if (filters.restricted && !isRestricted) continue;
+
+        const isAssociated = userData // user appears in metadata
+          ? metadata.includes(userData.fullname.toLowerCase()) ||
+            metadata.includes(userData.mail.toLowerCase())
+          : false;
+        if (filters.associated && !isAssociated) continue;
+
+        // Search text filter
+        if (searchText !== '' && !metadata.includes(searchText)) {
+          continue;
+        }
+
+        entities.push(_entity);
+      }
+
+      items.push(...entities);
+    } else {
+      const cursor = await Mongo.getEntitiesRepository()
+        .collection<ICompilation>('compilation')
+        .find({})
+        .sort({
+          name: 1,
+        })
+        .skip(offset);
+      const compilations: ICompilation[] = [];
+
+      const canContinue = () =>
+        cursor.hasNext() && !cursor.isClosed() && compilations.length < limit;
+
+      while (canContinue()) {
+        const _comp = await cursor.next();
+        if (!_comp) continue;
+        const resolved: ICompilation = await Mongo.resolve(
+          _comp,
+          'compilation',
+        );
+
+        if (searchText !== '') {
+          if (
+            !resolved.name.toLowerCase().includes(searchText) &&
+            !resolved.description.toLowerCase().includes(searchText)
+          ) {
+            continue;
+          }
+        }
+
+        const isOwner = userOwned.includes(resolved._id.toString());
+
+        const isAnnotatable = isOwner
+          ? // owner can always annotate
+            true
+          : // only logged in and only if included in whitelist
+          resolved.whitelist.enabled && userData
+          ? JSON.stringify(resolved.whitelist).includes(userData._id.toString())
+          : false;
+        if (filters.annotatable && !isAnnotatable) continue;
+
+        const isAnnotated = resolved.annotationList.length > 0;
+        if (filters.annotated && !isAnnotated) continue;
+
+        let isRestricted = false;
+
+        // TODO: decide what to do with password protected compilations
+        if (resolved.password && resolved.password !== '') {
+          resolved.annotationList = [];
+          resolved.entities = (resolved.entities as IEntity[]).map(_e => {
+            _e.relatedDigitalEntity = { _id: 'hidden' };
+            _e.processed = { low: '', medium: '', high: '', raw: '' };
+            _e.annotationList = [];
+            return _e;
+          });
+          resolved.password = true;
+          isRestricted = true;
+        }
+        if (filters.restricted && !isRestricted) continue;
+
+        compilations.push(resolved);
+      }
+
+      items.push(...compilations);
+    }
+
+    response.send(items.sort((a, b) => a.name.localeCompare(b.name)));
   },
 };
 
