@@ -864,7 +864,10 @@ const Mongo: IMongo = {
       const entities: IEntity[] = [];
 
       const canContinue = () =>
-        cursor.hasNext() && !cursor.isClosed() && entities.length < limit;
+        cursor.hasNext() &&
+        !cursor.isClosed() &&
+        entities.length < limit &&
+        types.length > 0;
 
       while (canContinue()) {
         const _entity = await cursor.next();
