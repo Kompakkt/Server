@@ -235,17 +235,25 @@ const Mongo: IMongo = {
     });
   },
   updateSessionId: async (request, response, next) => {
-    const user: IUserData = request.user;
     const username = request.body.username.toLowerCase();
+    const userData = await getUserByUsername(username);
+
+    if (!userData) {
+      return response.send({
+        status: 'error',
+        message: 'Failed finding user with username',
+      });
+    }
+
     const sessionID = request.sessionID;
 
     const updateResult = await users().updateOne(
       { username },
       {
         $set: {
+          ...userData,
           username,
           sessionID,
-          ...user,
         },
       },
     );
