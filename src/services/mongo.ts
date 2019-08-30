@@ -255,66 +255,34 @@ const Mongo: IMongo = {
       return;
     }
 
+    const updatedUser: IUserData = {
+      ...user,
+      username,
+      sessionID,
+      data: userData ? userData.data : {},
+      role: userData ? userData.role : EUserRank.user,
+    };
+
     // Users returned by local strategy might have _id field
     // _id is immutable in MongoDB, so we can't update the field
-    delete user['_id'];
+    delete updatedUser['_id'];
 
-    if (!userData) {
-      ldap().insertOne(
-        {
-          ...user,
-          _id: new ObjectId(),
-          username,
-          sessionID,
-          data: {},
-        },
-        async (ins_err, ins_res) => {
-          if (ins_err) {
-            response.send({ status: 'error' });
-            Logger.err(ins_res);
-          } else {
-            Logger.info(ins_res.ops);
-            const resultUser = ins_res.ops[0];
-            response.send({
-              status: 'ok',
-              ...(await Mongo.resolveUserData(resultUser)),
-            });
-          }
-        },
-      );
-    } else {
-      ldap().updateOne(
-        { username },
-        {
-          $set: {
-            ...user,
-            sessionID,
-            role: userData.role,
-          },
-        },
-        (up_err, _) => {
-          if (up_err) {
-            response.send({ status: 'error' });
-            Logger.err(up_err);
-          } else {
-            ldap().findOne({ sessionID, username }, async (f_err, f_res) => {
-              if (f_err || !f_res) {
-                response.send({
-                  status: 'error',
-                  message: 'Updated user not found',
-                });
-                Logger.err(f_err, 'Updated user not found');
-              } else {
-                response.send({
-                  status: 'ok',
-                  ...(await Mongo.resolveUserData(f_res)),
-                });
-              }
-            });
-          }
-        },
-      );
-    }
+    ldap()
+      .updateOne({ username }, { $set: updatedUser }, { upsert: true })
+      .then(async result => {
+        console.log(result);
+        response.send({
+          status: 'ok',
+          ...(await Mongo.resolveUserData(updatedUser)),
+        });
+      })
+      .catch(error => {
+        console.log(error);
+        response.send({
+          status: 'error',
+          message: 'Failed updating user entry in database',
+        });
+      });
   },
   insertCurrentUserData: async (
     request,
