@@ -906,7 +906,7 @@ const Mongo: IMongo = {
           continue;
         }
 
-        entities.push(_entity);
+        entities.push(await Mongo.resolve(_entity, 'entity'));
       }
 
       items.push(...entities);
