@@ -553,27 +553,35 @@ const Mongo: IMongo = {
     const parsedId = obj['_id'] ? obj['_id'] : obj;
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
-    Logger.info(`Resolving ${collection_name} ${_id}`);
     const resolve_collection: Collection = getEntitiesRepository().collection(
       collection_name,
     );
-    return resolve_collection.findOne(Mongo.query(_id)).then(resolve_result => {
-      if (depth && depth === 0) return resolve_result;
+    return resolve_collection
+      .findOne(Mongo.query(_id))
+      .then(resolve_result => {
+        if (depth && depth === 0) return resolve_result;
 
-      if (isDigitalEntity(resolve_result)) {
-        return resolveDigitalEntity(resolve_result);
-      }
-      if (isEntity(resolve_result)) {
-        return resolveEntity(resolve_result);
-      }
-      if (isCompilation(resolve_result)) {
-        return resolveCompilation(resolve_result);
-      }
-      if (isPerson(resolve_result)) {
-        return resolvePerson(resolve_result);
-      }
-      return resolve_result;
-    });
+        if (isDigitalEntity(resolve_result)) {
+          return resolveDigitalEntity(resolve_result);
+        }
+        if (isEntity(resolve_result)) {
+          return resolveEntity(resolve_result);
+        }
+        if (isCompilation(resolve_result)) {
+          return resolveCompilation(resolve_result);
+        }
+        if (isPerson(resolve_result)) {
+          return resolvePerson(resolve_result);
+        }
+        return resolve_result;
+      })
+      .catch(err => {
+        Logger.warn(
+          `Encountered error trying to resolve ${parsedId} in ${collection_name}`,
+        );
+        Logger.err(err);
+        return undefined;
+      });
   },
   getEntityFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
