@@ -619,19 +619,18 @@ const Mongo: IMongo = {
   },
   getAllEntitiesFromCollection: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
+    const allowed = ['person', 'institution', 'tag'];
+    if (!allowed.includes(RequestCollection)) {
+      response.send([]);
+      return;
+    }
+
     let results = await getAllItemsOfCollection(RequestCollection);
 
     for (let i = 0; i < results.length; i++) {
       results[i] = await Mongo.resolve(results[i], RequestCollection);
     }
     results = results.filter(_ => _);
-
-    if (results.length > 0 && isCompilation(results[0])) {
-      const isPasswordProtected = (compilation: ICompilation) =>
-        !compilation.password ||
-        (compilation.password && compilation.password !== '');
-      results = results.filter(isPasswordProtected);
-    }
 
     response.send(results);
   },
