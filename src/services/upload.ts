@@ -127,27 +127,7 @@ const Upload: IUpload = {
         response.send({ status: 'error', message: 'Filepath not found' });
       })
       .then(async () => {
-        const foundFiles = klawSync(path);
-        /* Babylon seems to have trouble displaying
-         * OBJs with Specular materials, so we fix this*/
-
-        /*await Promise.all(foundFiles
-          .filter(file => extname(file.path)
-            .includes('.mtl'))
-          .map(item =>
-            readFile(item.path)
-              .then(content => {
-                content.toString()
-                  .split('\n')
-                  .map(line => {
-                    if (!line.includes('Ks')) return line;
-                    return 'Ks 0.000000 0.000000 0.000000';
-                  })
-                  .join('\n');
-                return content;
-              })
-              .then(content => writeFile(item.path, content))
-              .catch(err => Logger.err(err))));*/
+        const foundFiles = klawSync(path).filter(item => item.stats.isFile());
 
         // TODO: Add more filters
         const filter: string[] = [];
@@ -160,7 +140,7 @@ const Upload: IUpload = {
 
         const filteredFiles = foundFiles.filter(file => {
           return filter.indexOf(extname(file.path)) !== -1;
-        }); // .map(file => file.path.substr(file.path.indexOf('entities/')));
+        });
 
         const ResponseFile = {
           file_name: '',

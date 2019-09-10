@@ -111,7 +111,6 @@ const LoadConfig = () => {
     return confObj;
   } catch (error) {
     if (isMaster) {
-      Logger.err(error);
       if (error.code === 'ENOENT') {
         Logger.err(
           'Config file not found. Falling back to default configuration',
@@ -120,6 +119,7 @@ const LoadConfig = () => {
         Logger.err(
           'Failed loading configuration file. Falling back to default configuration',
         );
+        Logger.err(error);
       }
       Logger.log(DefaultConfiguration);
     }
