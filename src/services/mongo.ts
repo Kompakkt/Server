@@ -267,7 +267,7 @@ const Mongo: IMongo = {
     return next();
   },
   addToAccounts: async (request, response) => {
-    const user: IUserData = request.user;
+    const user: IUserData = request.user as IUserData;
     const username = request.body.username.toLowerCase();
     const sessionID = request.sessionID ? request.sessionID : null;
     const userData = await getUserByUsername(username);
