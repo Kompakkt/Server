@@ -19,6 +19,9 @@ interface IUpload {
   UploadFinish(request: Request, response: Response): void;
 }
 
+const slug = (text: string) =>
+  slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
+
 const Upload: IUpload = {
   Multer: multer({
     dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
@@ -61,11 +64,12 @@ const Upload: IUpload = {
     // TODO: Checksum
     // TODO: Do this without headers?
     const tempPath = `${request['file'].destination}/${request['file'].filename}`;
-    const relPath = request.headers['relpath'];
+    const relPath = request.headers['relpath'] as string | undefined;
+    console.log(relPath);
     const folderOrFilePath =
       relPath && relPath.length > 0
-        ? relPath
-        : slugify(request['file'].originalname);
+        ? slug(relPath)
+        : slug(request['file'].originalname);
     const destPath = join(
       `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
       `${request.headers['filetype']}`,
