@@ -186,7 +186,15 @@ Server.post(
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
-  Admin.getAllLDAPUsers,
+  Admin.getAllUsers,
+);
+
+Server.post(
+  '/admin/getuser/:identifier',
+  Express.authenticate(),
+  Mongo.updateSessionId,
+  Admin.checkIsAdmin,
+  Admin.getUser,
 );
 
 Server.post(
