@@ -77,7 +77,7 @@ Server.get(
   Mongo.validateLoginSession,
   async (_, response) => {
     const groups = await Mongo.getEntitiesRepository()
-      .collection('groups')
+      .collection('group')
       .find({})
       .toArray();
     response.send(groups);
