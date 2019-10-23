@@ -234,3 +234,86 @@ Response example:
   ]
 }
 ```
+
+# Find groups you participate in
+
+## Locket route
+
+This route uses your current session to find yourself in groups.
+
+## GET
+
+```/utility/finduseringroups```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "groups": [
+    {
+      "_id": "...",
+      "creator": {
+        "username": "mmustermann",
+        "fullname": "Max Mustermann",
+        "_id": "..."
+      },
+      "members": [
+        {
+          "username": "mmusterfrau",
+          "fullname": "Marie Musterfrau",
+          "_id": "..."
+        },
+        // ...
+      ],
+      "name": "lkj",
+      "owners": [
+        // ...
+      ]
+    },
+    // ...
+  ]
+}
+```
+
+# Find compilations you participate in
+
+## Locked route
+
+This route uses your current session to find yourself in groups.
+
+## GET
+
+```/utility/finduserincompilations```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "compilations": [
+    // ...
+  ]
+}
+```
+
+# Find objects you are mentioned in
+
+## Locked route
+
+This route uses your current session to find yourself in groups.
+
+## GET
+
+```/utility/finduserinmetadata```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "entities": [
+    // ...
+  ]
+}
+```
