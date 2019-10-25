@@ -3,7 +3,10 @@ import { Collection, Db, ObjectId } from 'mongodb';
 
 import { IEntity, IUserData, EUserRank } from '../interfaces';
 
+import { Configuration } from './configuration';
 import { Mongo } from './mongo';
+import { Mailer } from './mailer';
+import { Logger } from './logger';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;
@@ -93,12 +96,28 @@ const Admin: IAdmin = {
       case EUserRank.admin:
         const AccDB: Db = Mongo.getAccountsRepository();
         const users: Collection<IUserData> = AccDB.collection('users');
+        const user = await users.findOne({ _id });
         const updateResult = await users.updateOne({ _id }, { $set: { role } });
-        if (updateResult.result.ok !== 1) {
+        if (updateResult.result.ok !== 1 || !user) {
           return response.send({
             status: 'error',
             message: 'Updating user role failed',
           });
+        }
+        if (Configuration.Mailer && Configuration.Mailer.Target) {
+          Mailer.sendMail({
+            from: Configuration.Mailer.Target['contact'],
+            to: user.mail,
+            subject: 'Your Kompakkt role has been updated',
+            text: `
+Hey ${user.fullname},
+
+Your role on Kompakkt has been changed from ${user.role} to ${role}
+
+Visit https://kompakkt.uni-koeln.de/profile to see what has changed`.trimLeft(),
+          })
+            .then(result => Logger.log(`Mail sent`, result))
+            .catch(error => Logger.warn(`Failed to send mail`, error));
         }
         return response.send({
           status: 'ok',

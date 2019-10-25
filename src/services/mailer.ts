@@ -9,7 +9,13 @@ import { Mongo } from './mongo';
 
 interface IMailer {
   isConfigValid(): any;
-  sendMail(request: Request, response: Response): Promise<any>;
+  sendMailRequest(request: Request, response: Response): Promise<any>;
+  sendMail(mail: {
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+  }): Promise<any>;
   addUserToDatabase(request: Request, mailSent: boolean): any;
   countUserMails(request: Request, destination: string): Promise<number>;
   getMailRelatedDatabaseEntries(_: Request, response: Response): Promise<any>;
@@ -41,6 +47,11 @@ interface IMailEntry {
   mailSent: boolean;
 }
 
+const transporter = nodemailer.createTransport({
+  host: Configuration.Mailer.Host,
+  port: Configuration.Mailer.Port,
+});
+
 const Mailer: IMailer = {
   isConfigValid: () => {
     return (
@@ -50,7 +61,8 @@ const Mailer: IMailer = {
       Configuration.Mailer.Target
     );
   },
-  sendMail: async (request, response): Promise<any> => {
+  sendMail: async mail => transporter.sendMail(mail),
+  sendMailRequest: async (request, response): Promise<any> => {
     if (
       !request.body ||
       !Configuration.Mailer.Target ||
@@ -66,11 +78,6 @@ const Mailer: IMailer = {
     if (!body.target || !body.mailbody || !body.subject) {
       return response.send({ status: 'error', message: 'Incomplete request' });
     }
-
-    const transporter = nodemailer.createTransport({
-      host: Configuration.Mailer.Host,
-      port: Configuration.Mailer.Port,
-    });
 
     const mailOptions = {
       from: Configuration.Mailer.Target[body.target],
@@ -102,8 +109,8 @@ const Mailer: IMailer = {
     }
 
     let result = true;
-    await transporter
-      .sendMail(mailOptions)
+
+    await Mailer.sendMail(mailOptions)
       .then(success => {
         Logger.info(`Nodemailer sent mail:`, success);
         response.send({ status: 'ok', message: 'Mail has been sent' });
