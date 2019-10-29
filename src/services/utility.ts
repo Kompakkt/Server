@@ -9,7 +9,7 @@ import {
   IGroup,
 } from '../interfaces';
 
-import { Mongo, getCurrentUserBySession } from './mongo';
+import { Mongo, getCurrentUserBySession, areObjectIdsEqual } from './mongo';
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
@@ -57,13 +57,34 @@ const Utility: IUtility = {
       return;
     }
 
+    const user = await getCurrentUserBySession(request.sessionID);
+
+    const isUserOwnerOfCompilation = (comp: ICompilation) => {
+      if (!comp.relatedOwner || !user) return false;
+      return areObjectIdsEqual(comp.relatedOwner._id, user._id);
+    };
+    const isCompilationNotPWProtected = (comp: ICompilation) =>
+      comp.password === '' || comp.password === false || !comp.password;
+
     const ObjDB = Mongo.getEntitiesRepository();
     const compilations = (await ObjDB.collection<ICompilation>('compilation')
       .find({})
-      .toArray()).filter(comp => {
-      const Entities = JSON.stringify(comp.entities);
-      return Entities.indexOf(entityId) !== -1;
-    });
+      .toArray())
+      .filter(
+        comp =>
+          isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp),
+      )
+      .filter(comp => {
+        const Entities = JSON.stringify(comp.entities);
+        return Entities.indexOf(entityId) !== -1;
+      })
+      .map(comp => {
+        // TODO: decide if and how to censor/strip pw protected compilations
+        if (!isCompilationNotPWProtected(comp)) {
+          comp.password = true;
+        }
+        return comp;
+      });
     const occurences = compilations.length;
 
     response.send({ status: 'ok', occurences, compilations });

@@ -63,6 +63,11 @@ const getAllItemsOfCollection = async (collection: string) =>
     .find({})
     .toArray();
 
+const areObjectIdsEqual = (
+  firstId: string | ObjectId,
+  secondId: string | ObjectId,
+) => new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
+
 const saveBase64toImage = async (
   base64input: string,
   subfolder: string,
@@ -997,4 +1002,4 @@ const Mongo: IMongo = {
 
 Mongo.init().catch(e => Logger.err(e));
 
-export { Mongo, getCurrentUserBySession };
+export { Mongo, getCurrentUserBySession, areObjectIdsEqual };
