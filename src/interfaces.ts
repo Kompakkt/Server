@@ -48,7 +48,7 @@ export interface IMetaDataPerson {
     [relatedEntityId: string]: IMetaDataInstitution[];
   };
   contact_references: {
-    [relatedEntityId: string]: IMetaDataContactReference[];
+    [relatedEntityId: string]: IMetaDataContactReference;
   };
 }
 

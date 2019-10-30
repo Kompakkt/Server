@@ -252,6 +252,22 @@ Server.post(
   Cleaning.deleteUnusedPersonsAndInstitutions,
 );
 
+Server.post(
+  '/cleaning/cleanpersonfields',
+  Express.authenticate(),
+  Mongo.updateSessionId,
+  Admin.checkIsAdmin,
+  Cleaning.cleanPersonFields,
+);
+
+Server.post(
+  '/cleaning/cleaninstitutionfields',
+  Express.authenticate(),
+  Mongo.updateSessionId,
+  Admin.checkIsAdmin,
+  Cleaning.cleanInstitutionFields,
+);
+
 // Utility
 Server.get(
   '/utility/findentityowners/:identifier',

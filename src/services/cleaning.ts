@@ -3,6 +3,7 @@ import { Collection, Db } from 'mongodb';
 
 import { Logger } from './logger';
 import { Mongo } from './mongo';
+import { IMetaDataPerson, IMetaDataInstitution } from '../interfaces';
 
 interface ICleaning {
   deleteUnusedPersonsAndInstitutions(
@@ -10,6 +11,10 @@ interface ICleaning {
     response: Response,
   ): Promise<any>;
   deleteNullRefs(_: Request, response: Response): Promise<any>;
+
+  cleanPersonFields(_: Request, response: Response): Promise<any>;
+
+  cleanInstitutionFields(_: Request, response: Response): Promise<any>;
 }
 
 const Cleaning: ICleaning = {
@@ -115,6 +120,130 @@ const Cleaning: ICleaning = {
       await iterateOverUserData(user);
     }
     response.send({ status: 'ok', total });
+  },
+  cleanPersonFields: async (_, response) => {
+    const ObjDB: Db = Mongo.getEntitiesRepository();
+    const personCollection = ObjDB.collection<IMetaDataPerson>('person');
+    const cursor = personCollection.find({});
+
+    const canContinue = async () =>
+      (await cursor.hasNext()) && !cursor.isClosed();
+
+    let totalSaved = 0;
+    const personsChanged = new Array<IMetaDataPerson>();
+
+    while (await canContinue()) {
+      const person = await cursor.next();
+      if (!person) break;
+
+      const sizeBefore = JSON.stringify(person).length;
+
+      let changedPerson = false;
+      for (const _id in person.institutions) {
+        if (person.institutions[_id].length === 0) {
+          delete person.institutions[_id];
+          changedPerson = true;
+        }
+      }
+      for (const _id in person.roles) {
+        if (person.roles[_id].length === 0) {
+          delete person.roles[_id];
+          changedPerson = true;
+        }
+      }
+      for (const _id in person.contact_references) {
+        const ref = person.contact_references[_id];
+        if (ref.mail === '' && ref.phonenumber === '') {
+          delete person.contact_references[_id];
+          changedPerson = true;
+        }
+      }
+
+      const sizeAfter = JSON.stringify(person).length;
+
+      if (changedPerson) {
+        const result = await personCollection.updateOne(
+          { _id: person._id },
+          { $set: person },
+        );
+        if (result.result.ok !== 1) {
+          Logger.err('Failed updating cleaned person', person, result);
+        }
+        personsChanged.push(person);
+        totalSaved += sizeBefore - sizeAfter;
+      }
+    }
+
+    Logger.log(
+      `Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`,
+    );
+
+    response.send({ status: 'ok', personsChanged, totalSaved });
+  },
+  cleanInstitutionFields: async (_, response) => {
+    const ObjDB: Db = Mongo.getEntitiesRepository();
+    const instCollection = ObjDB.collection<IMetaDataInstitution>(
+      'institution',
+    );
+    const cursor = instCollection.find({});
+
+    const canContinue = async () =>
+      (await cursor.hasNext()) && !cursor.isClosed();
+
+    const changedInsts = new Array<IMetaDataInstitution>();
+    let totalSaved = 0;
+
+    while (await canContinue()) {
+      const inst = await cursor.next();
+      if (!inst) continue;
+
+      let changed = false;
+      const sizeBefore = JSON.stringify(inst).length;
+
+      for (const _id in inst.addresses) {
+        const addr = inst.addresses[_id];
+        delete addr.creation_date;
+
+        if (Object.values(addr).join('').length === 0) {
+          delete inst.addresses[_id];
+          changed = true;
+        }
+      }
+
+      for (const _id in inst.notes) {
+        const note = inst.notes[_id];
+        if (note.length === 0) {
+          delete inst.notes[_id];
+          changed = true;
+        }
+      }
+
+      for (const _id in inst.roles) {
+        const role = inst.roles[_id];
+        if (role.length === 0) {
+          delete inst.roles[_id];
+          changed = true;
+        }
+      }
+
+      const sizeAfter = JSON.stringify(inst).length;
+
+      if (changed) {
+        changedInsts.push(inst);
+        totalSaved += sizeBefore - sizeAfter;
+
+        // TODO: update on server & fix entity-landing page
+        const result = await instCollection.updateOne(
+          { _id: inst._id },
+          { $set: inst },
+        );
+        if (result.result.ok !== 1) {
+          Logger.err('Failed updating cleaned inst', inst, result);
+        }
+      }
+    }
+
+    response.send({ status: 'ok', changedInsts, totalSaved });
   },
 };
 
