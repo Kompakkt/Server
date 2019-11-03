@@ -214,7 +214,7 @@ Server.post(
 );
 
 // Mailer
-Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMail);
+Server.post('/sendmail', Mongo.validateLoginSession, Mailer.sendMailRequest);
 
 Server.post(
   '/mailer/getmailentries',
