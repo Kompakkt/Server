@@ -1,0 +1,88 @@
+src/
+  # Root folder
+
+  server.ts
+    # Entry point
+    # Handles routes (and threads?)
+
+  routes/
+    # Folder containing all routes
+    # Each typescript file is an endpoint, e.g.:
+    # /login
+    # /upload/endpoint
+    # /api/v1/get/find/:parameters
+
+    login.ts
+    logout.ts
+    register.ts
+    auth.ts
+
+    admin/
+      # Admin locked routes
+      getusers.ts
+      promoteuser.ts
+      togglepublished.ts
+
+    upload/
+      # Handles file upload
+      endpoint.ts
+      finish.ts
+      cancel.ts
+
+    utility/
+      # Utility routes for displaying details in frontend
+      countentityuses.ts
+      moveannotations.ts
+      applyactiontoentityowner.ts
+
+    find/
+      user/
+        groups.ts
+        compilations.ts
+        metadata.ts
+
+      entity/
+        owners.ts
+
+    api/
+      # Main object api
+      v1/
+        get/
+          find.ts
+          findall.ts
+          currentuser.ts
+          groups.ts
+          users.ts
+
+        post/
+          push.ts
+          settings.ts
+          remove.ts
+          search.ts
+          publish.ts
+
+    cleaning/
+      # Database cleaning
+      delete/
+        nullrefs.ts
+        unused.ts
+
+    mailer/
+      # Nodemailer setup and utilities
+      sendmail.ts
+      getentries.ts
+      toggleanswered.ts
+
+  utils/
+    interfaces.ts
+    typeguards.ts
+    logger.ts
+    saving-strategies.ts
+    resolving-strategies.ts
+
+  services/
+    express.ts
+    passport.ts
+    socket.ts
+    mongo.ts
+    mailer.ts
