@@ -22,6 +22,8 @@ import {
   saveCompilation,
   saveDigitalEntity,
   saveEntity,
+  savePerson,
+  saveInstitution,
 } from './saving-strategies';
 import {
   isAnnotation,
@@ -29,6 +31,7 @@ import {
   isDigitalEntity,
   isEntity,
   isPerson,
+  isInstitution,
 } from './typeguards';
 import { Utility } from './utility';
 /* tslint:enable:max-line-length */
@@ -431,10 +434,18 @@ const Mongo: IMongo = {
     // tslint:disable-next-line:triple-equals
     const doesEntityExist =
       (await Mongo.resolve(resultEntity, RequestCollection, 0)) != undefined;
-    // If the entity already exists we need to check for owner status
-    // We skip this for annotations, since annotation ranking can be changed by owner
-    // We check this in the saving strategy instead
-    if (isValidObjectId && doesEntityExist && !isAnnotation(resultEntity)) {
+
+    /**
+     * If the entity already exists we need to check for owner status
+     * We skip this for annotations, since annotation ranking can be changed by owner
+     * We check this in the saving strategy instead
+     * We also skip this for persons and institutions since their nested content
+     * (addresses, contact_references, etc.) can also be updated
+     */
+    const isAllowedType = (_e: any) =>
+      isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
+
+    if (isValidObjectId && doesEntityExist && !isAllowedType(resultEntity)) {
       if (!(await Mongo.isUserOwnerOfEntity(request, resultEntity['_id']))) {
         return response.send({ status: 'error', message: 'Permission denied' });
       }
@@ -456,6 +467,14 @@ const Mongo: IMongo = {
     } else if (isAnnotation(resultEntity)) {
       await saveAnnotation(resultEntity, userData, doesEntityExist)
         .then(annotation => (resultEntity = annotation))
+        .catch(rejected => response.send(rejected));
+    } else if (isPerson(resultEntity)) {
+      await savePerson(resultEntity, userData)
+        .then(person => (resultEntity = person))
+        .catch(rejected => response.send(rejected));
+    } else if (isInstitution(resultEntity)) {
+      await saveInstitution(resultEntity, userData)
+        .then(institution => (resultEntity = institution))
         .catch(rejected => response.send(rejected));
     } else if (isDigitalEntity(resultEntity)) {
       await saveDigitalEntity(resultEntity, userData)

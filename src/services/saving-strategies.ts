@@ -235,109 +235,134 @@ const saveGroup = async (group: IGroup, userData: IUserData) => {
   return group;
 };
 
-const saveMetaDataEntity = async (
-  entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
+const savePerson = async (
+  person: IMetaDataPerson,
   userData: IUserData,
+  save = false,
 ) => {
-  const newEntity = { ...entity };
+  const resolved = await Mongo.resolve(person, 'person');
+  person._id = resolved ? resolved._id : new ObjectId();
 
-  const saveInstitution = async (institution: IMetaDataInstitution) => {
-    const resolved = await Mongo.resolve(institution, 'institution');
-    institution._id = resolved ? resolved._id : new ObjectId();
+  // If person exists, combine roles
+  if (!person.roles) {
+    person.roles = {};
+  }
 
-    if (!institution.roles) {
-      institution.roles = {};
-    }
-    if (!institution.addresses) {
-      institution.addresses = {};
-    }
-    if (!institution.notes) {
-      institution.notes = {};
-    }
+  if (!person.institutions) {
+    person.institutions = {};
+  }
 
-    // If institution exists, combine roles
-    if (resolved) {
-      institution.roles = { ...institution.roles, ...resolved.roles };
-      institution.addresses = {
-        ...institution.addresses,
-        ...resolved.addresses,
-      };
-      institution.notes = { ...institution.notes, ...resolved.notes };
-    }
+  if (!person.contact_references) {
+    person.contact_references = {};
+  }
 
+  if (resolved) {
+    person.roles = { ...person.roles, ...resolved.roles };
+    person.institutions = {
+      ...person.institutions,
+      ...resolved.institutions,
+    };
+    person.contact_references = {
+      ...person.contact_references,
+      ...resolved.contact_references,
+    };
+  }
+
+  for (const id in person.institutions) {
+    person.institutions[id] = person.institutions[id].filter(_ => _);
+    for (let i = 0; i < person.institutions[id].length; i++) {
+      person.institutions[id][i] = (await saveInstitution(
+        person.institutions[id][i],
+        userData,
+        true,
+      )) as any;
+    }
+  }
+
+  const _id = person._id;
+  if (save) {
+    return Mongo.getEntitiesRepository()
+      .collection('person')
+      .updateOne(Mongo.query(_id), { $set: { ...person } }, { upsert: true })
+      .then(res => {
+        const _id = res.upsertedId ? res.upsertedId._id : person._id;
+        Mongo.insertCurrentUserData(userData, _id, 'person');
+        return person;
+      });
+  } else {
+    delete person._id;
+    return person;
+  }
+};
+
+const saveInstitution = async (
+  institution: IMetaDataInstitution,
+  userData: IUserData,
+  save = false,
+) => {
+  const resolved = await Mongo.resolve(institution, 'institution');
+  institution._id = resolved ? resolved._id : new ObjectId();
+
+  if (!institution.roles) {
+    institution.roles = {};
+  }
+  if (!institution.addresses) {
+    institution.addresses = {};
+  }
+  if (!institution.notes) {
+    institution.notes = {};
+  }
+
+  // If institution exists, combine roles
+  if (resolved) {
+    institution.roles = { ...institution.roles, ...resolved.roles };
+    institution.addresses = {
+      ...institution.addresses,
+      ...resolved.addresses,
+    };
+    institution.notes = { ...institution.notes, ...resolved.notes };
+  }
+
+  const _id = institution._id;
+  if (save) {
     return Mongo.getEntitiesRepository()
       .collection('institution')
       .updateOne(
-        Mongo.query(institution._id),
+        Mongo.query(_id),
         { $set: { ...institution } },
         { upsert: true },
       )
       .then(res => {
         const _id = res.upsertedId ? res.upsertedId._id : institution._id;
         Mongo.insertCurrentUserData(userData, _id, 'institution');
-        return _id;
+        return institution;
       });
-  };
+  } else {
+    delete institution._id;
+    return institution;
+  }
+};
 
-  const savePerson = async (person: IMetaDataPerson) => {
-    const resolved = await Mongo.resolve(person, 'person');
-    person._id = resolved ? resolved._id : new ObjectId();
-
-    // If person exists, combine roles
-    if (!person.roles) {
-      person.roles = {};
-    }
-
-    if (!person.institutions) {
-      person.institutions = {};
-    }
-
-    if (!person.contact_references) {
-      person.contact_references = {};
-    }
-
-    if (resolved) {
-      person.roles = { ...person.roles, ...resolved.roles };
-      person.institutions = {
-        ...person.institutions,
-        ...resolved.institutions,
-      };
-      person.contact_references = {
-        ...person.contact_references,
-        ...resolved.contact_references,
-      };
-    }
-
-    for (const id in person.institutions) {
-      for (let i = 0; i < person.institutions[id].length; i++) {
-        person.institutions[id][i] = (await saveInstitution(
-          person.institutions[id][i],
-        )) as any;
-      }
-    }
-
-    return Mongo.getEntitiesRepository()
-      .collection('person')
-      .updateOne(
-        Mongo.query(person._id),
-        { $set: { ...person } },
-        { upsert: true },
-      )
-      .then(res => {
-        const _id = res.upsertedId ? res.upsertedId._id : person._id;
-        Mongo.insertCurrentUserData(userData, _id, 'person');
-        return _id;
-      });
-  };
+const saveMetaDataEntity = async (
+  entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
+  userData: IUserData,
+) => {
+  const newEntity = { ...entity };
 
   for (let i = 0; i < newEntity.persons.length; i++) {
-    newEntity.persons[i] = (await savePerson(newEntity.persons[i])) as any;
+    newEntity.persons[i] = ((await savePerson(
+      newEntity.persons[i],
+      userData,
+      true,
+    )) as any)._id;
   }
 
   for (let i = 0; i < newEntity.institutions.length; i++) {
-    newEntity.institutions[i] = (await saveInstitution(
+    newEntity.institutions[i] = ((await saveInstitution(
       newEntity.institutions[i],
-    )) as any;
+      userData,
+      true,
+    )) as any)._id;
   }
 
   // Save unsaved metadata files and return link
@@ -424,4 +449,6 @@ export {
   saveDigitalEntity,
   saveGroup,
   saveEntity,
+  savePerson,
+  saveInstitution,
 };

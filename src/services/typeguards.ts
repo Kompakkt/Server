@@ -4,6 +4,7 @@ import {
   ICompilation,
   IMetaDataDigitalEntity,
   IMetaDataPerson,
+  IMetaDataInstitution,
   IEntity,
   IInvalid,
 } from '../interfaces';
@@ -48,4 +49,9 @@ export const isDigitalEntity = (obj: any): obj is IMetaDataDigitalEntity => {
 export const isPerson = (obj: any): obj is IMetaDataPerson => {
   const person = obj as IMetaDataPerson | IInvalid;
   return person && person.prename !== undefined && person.name !== undefined;
+};
+
+export const isInstitution = (obj: any): obj is IMetaDataInstitution => {
+  const inst = obj as IMetaDataInstitution | IInvalid;
+  return inst && inst.name !== undefined && inst.addresses !== undefined;
 };
