@@ -257,14 +257,14 @@ const savePerson = async (
   }
 
   if (resolved) {
-    person.roles = { ...person.roles, ...resolved.roles };
+    person.roles = { ...resolved.roles, ...person.roles };
     person.institutions = {
-      ...person.institutions,
       ...resolved.institutions,
+      ...person.institutions,
     };
     person.contact_references = {
-      ...person.contact_references,
       ...resolved.contact_references,
+      ...person.contact_references,
     };
   }
 
@@ -315,12 +315,12 @@ const saveInstitution = async (
 
   // If institution exists, combine roles
   if (resolved) {
-    institution.roles = { ...institution.roles, ...resolved.roles };
+    institution.roles = { ...resolved.roles, ...institution.roles };
     institution.addresses = {
-      ...institution.addresses,
       ...resolved.addresses,
+      ...institution.addresses,
     };
-    institution.notes = { ...institution.notes, ...resolved.notes };
+    institution.notes = { ...resolved.notes, ...institution.notes };
   }
 
   const _id = institution._id;
