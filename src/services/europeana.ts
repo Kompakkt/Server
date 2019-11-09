@@ -4,11 +4,7 @@ import { Configuration } from './configuration';
 
 const Europeana = {
   getRecordData: async (record_id: string) => {
-    if (
-      !Configuration ||
-      !Configuration.Services ||
-      !Configuration.Services.Europeana
-    ) {
+    if (!Configuration?.Services?.Europeana) {
       return new Promise<any>((_, reject) =>
         reject('Europeana missing from config'),
       );

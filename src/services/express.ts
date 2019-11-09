@@ -29,10 +29,7 @@ const createServer = () => {
     const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
     const options = { key: privateKey, cert: certificate };
-    if (
-      Conf.Express.SSLPaths.Passphrase &&
-      Conf.Express.SSLPaths.Passphrase.length > 0
-    ) {
+    if (Conf.Express.SSLPaths.Passphrase?.length > 0) {
       (options as any)['passphrase'] = Conf.Express.SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
@@ -196,12 +193,11 @@ const registerUser = async (
   const isUser = (obj: any): obj is IUserData => {
     const person = obj as IUserData | IInvalid;
     return (
-      person &&
-      person.fullname !== undefined &&
-      person.prename !== undefined &&
-      person.surname !== undefined &&
-      person.mail !== undefined &&
-      person.username !== undefined &&
+      person?.fullname !== undefined &&
+      person?.prename !== undefined &&
+      person?.surname !== undefined &&
+      person?.mail !== undefined &&
+      person?.username !== undefined &&
       (person as any)['password'] !== undefined
     );
   };

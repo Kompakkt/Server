@@ -67,9 +67,11 @@ const Utility: IUtility = {
       comp.password === '' || comp.password === false || !comp.password;
 
     const ObjDB = Mongo.getEntitiesRepository();
-    const compilations = (await ObjDB.collection<ICompilation>('compilation')
-      .find({})
-      .toArray())
+    const compilations = (
+      await ObjDB.collection<ICompilation>('compilation')
+        .find({})
+        .toArray()
+    )
       .filter(
         comp =>
           isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp),
@@ -138,9 +140,7 @@ const Utility: IUtility = {
       return;
     }
 
-    compilation.annotationList = compilation.annotationList
-      ? compilation.annotationList
-      : [];
+    compilation.annotationList = compilation.annotationList ?? [];
     compilation.annotationList = Array.from(
       new Set(
         (compilation.annotationList.filter(ann => ann) as Array<
@@ -220,7 +220,7 @@ const Utility: IUtility = {
       });
     }
 
-    account.data.entity = account.data.entity ? account.data.entity : [];
+    account.data.entity = account.data.entity ?? [];
     account.data.entity = account.data.entity.filter(entity => entity);
 
     switch (command) {
@@ -294,10 +294,12 @@ const Utility: IUtility = {
       return;
     }
     const compilations = await Promise.all(
-      (await Mongo.getEntitiesRepository()
-        .collection<ICompilation>('compilation')
-        .find({})
-        .toArray())
+      (
+        await Mongo.getEntitiesRepository()
+          .collection<ICompilation>('compilation')
+          .find({})
+          .toArray()
+      )
         .filter(comp => comp.whitelist.enabled)
         .map(async comp => {
           // Get latest versions of groups
@@ -338,12 +340,16 @@ const Utility: IUtility = {
       });
       return;
     }
-    const entities = (await Promise.all(
-      (await Mongo.getEntitiesRepository()
-        .collection<IEntity>('entity')
-        .find({})
-        .toArray()).map(entity => Mongo.resolve(entity, 'entity')),
-    )).filter(entity => {
+    const entities = (
+      await Promise.all(
+        (
+          await Mongo.getEntitiesRepository()
+            .collection<IEntity>('entity')
+            .find({})
+            .toArray()
+        ).map(entity => Mongo.resolve(entity, 'entity')),
+      )
+    ).filter(entity => {
       const stringified = JSON.stringify(entity.relatedDigitalEntity);
       return (
         stringified.includes(user.fullname) || stringified.includes(user.mail)

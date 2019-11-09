@@ -104,9 +104,9 @@ const Admin: IAdmin = {
             message: 'Updating user role failed',
           });
         }
-        if (Configuration.Mailer && Configuration.Mailer.Target) {
+        if (Configuration?.Mailer?.Target?.contact) {
           Mailer.sendMail({
-            from: Configuration.Mailer.Target['contact'],
+            from: Configuration.Mailer.Target.contact,
             to: user.mail,
             subject: 'Your Kompakkt role has been updated',
             text: `

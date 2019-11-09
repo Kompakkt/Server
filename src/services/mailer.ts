@@ -55,10 +55,9 @@ const transporter = nodemailer.createTransport({
 const Mailer: IMailer = {
   isConfigValid: () => {
     return (
-      Configuration.Mailer &&
-      Configuration.Mailer.Host &&
-      Configuration.Mailer.Port &&
-      Configuration.Mailer.Target
+      Configuration.Mailer?.Host &&
+      Configuration.Mailer?.Port &&
+      Configuration.Mailer?.Target
     );
   },
   sendMail: async mail => transporter.sendMail(mail),

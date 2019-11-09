@@ -357,7 +357,7 @@ const Mongo: IMongo = {
         userData.data[property] = userData.data[property].filter(obj => obj);
       }
       // Add entity owners to entities
-      if (userData.data.entity && userData.data.entity.length > 0) {
+      if (userData.data.entity?.length > 0) {
         for (const entity of userData.data.entity) {
           if (!entity) continue;
           if (!isEntity(entity)) continue;
@@ -672,7 +672,8 @@ const Mongo: IMongo = {
 
     if (
       !find_result ||
-      (!find_result.username || !request.body.username) ||
+      !find_result.username ||
+      !request.body.username ||
       request.body.username !== find_result.username
     ) {
       Logger.err(

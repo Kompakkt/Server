@@ -12,46 +12,38 @@ import {
 export const isCompilation = (obj: any): obj is ICompilation => {
   const compilation = obj as ICompilation | IInvalid;
   return (
-    compilation &&
-    compilation.entities !== undefined &&
-    compilation.name !== undefined &&
-    compilation.description !== undefined
+    compilation?.entities !== undefined &&
+    compilation?.name !== undefined &&
+    compilation?.description !== undefined
   );
 };
 
 export const isEntity = (obj: any): obj is IEntity => {
   const entity = obj as IEntity | IInvalid;
   return (
-    entity &&
-    entity.name !== undefined &&
-    entity.mediaType !== undefined &&
-    entity.online !== undefined &&
-    entity.finished !== undefined
+    entity?.name !== undefined &&
+    entity?.mediaType !== undefined &&
+    entity?.online !== undefined &&
+    entity?.finished !== undefined
   );
 };
 
 export const isAnnotation = (obj: any): obj is IAnnotation => {
   const annotation = obj as IAnnotation | IInvalid;
-  return (
-    annotation &&
-    annotation.body !== undefined &&
-    annotation.target !== undefined
-  );
+  return annotation?.body !== undefined && annotation?.target !== undefined;
 };
 
 export const isDigitalEntity = (obj: any): obj is IMetaDataDigitalEntity => {
   const digentity = obj as IMetaDataDigitalEntity | IInvalid;
-  return (
-    digentity && digentity.type !== undefined && digentity.licence !== undefined
-  );
+  return digentity?.type !== undefined && digentity?.licence !== undefined;
 };
 
 export const isPerson = (obj: any): obj is IMetaDataPerson => {
   const person = obj as IMetaDataPerson | IInvalid;
-  return person && person.prename !== undefined && person.name !== undefined;
+  return person?.prename !== undefined && person?.name !== undefined;
 };
 
 export const isInstitution = (obj: any): obj is IMetaDataInstitution => {
   const inst = obj as IMetaDataInstitution | IInvalid;
-  return inst && inst.name !== undefined && inst.addresses !== undefined;
+  return inst?.name !== undefined && inst?.addresses !== undefined;
 };

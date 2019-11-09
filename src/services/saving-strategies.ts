@@ -35,7 +35,7 @@ const updateAnnotationList = async (
     0,
   );
   // Create annotationList if missing
-  obj.annotationList = obj.annotationList ? obj.annotationList : [];
+  obj.annotationList = obj.annotationList ?? [];
   // Filter null
   obj.annotationList = obj.annotationList.filter(_annotation => _annotation);
 
@@ -65,9 +65,7 @@ const saveCompilation = async (
   compilation: ICompilation,
   userData: IUserData,
 ) => {
-  compilation.annotationList = compilation.annotationList
-    ? compilation.annotationList
-    : [];
+  compilation.annotationList = compilation.annotationList ?? [];
   compilation.relatedOwner = {
     _id: userData._id,
     username: userData.username,
@@ -93,7 +91,7 @@ const saveAnnotation = async (
       ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
       : true;
     // Check if anything was missing for safety
-    if (!annotation || !annotation.target || !annotation.target.source) {
+    if (!annotation?.target?.source) {
       return reject({
         status: 'error',
         message: 'Invalid annotation',
@@ -104,11 +102,7 @@ const saveAnnotation = async (
     if (!source) {
       return reject({ status: 'error', message: 'Missing source' });
     }
-    if (
-      !annotation.body ||
-      !annotation.body.content ||
-      !annotation.body.content.relatedPerspective
-    ) {
+    if (!annotation?.body?.content?.relatedPerspective) {
       return reject({
         status: 'error',
         message: 'Missing body.content.relatedPerspective',
@@ -168,9 +162,7 @@ const saveAnnotation = async (
     }
 
     // Update data inside of annotation
-    annotation.generated = annotation.generated
-      ? annotation.generated
-      : new Date().toISOString();
+    annotation.generated = annotation.generated ?? new Date().toISOString();
     annotation.lastModificationDate = new Date().toISOString();
     annotation.lastModifiedBy._id = userData._id;
     annotation.lastModifiedBy.name = userData.fullname;
@@ -212,7 +204,7 @@ const saveEntity = async (entity: IEntity, userData: IUserData) => {
    * because of Kompakkt runnning in an iframe
    * This removes the host address from the URL
    * so images will load correctly */
-  if (entity.settings && entity.settings.preview) {
+  if (entity?.settings?.preview) {
     entity.settings.preview = await Mongo.saveBase64toImage(
       entity.settings.preview,
       'entity',
