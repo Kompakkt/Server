@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ensureDir, move, pathExists, removeSync, statSync } from 'fs-extra';
+import { ensureDir, move, pathExists, statSync } from 'fs-extra';
 import klawSync from 'klaw-sync';
 import multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
@@ -85,32 +85,12 @@ const Upload: IUpload = {
         response.send({ status: 'error', message: 'Upload request failed' });
       });
   },
-  UploadCancel: (request, response) => {
-    const Token = request.body.uuid;
-    const Type = request.body.type;
-    if (!Token || !Type) {
-      Logger.err(
-        `Upload cancel request failed. Token: ${Token}, Type: ${Type}`,
-      );
-      response.send({ status: 'error' });
-      return;
-    }
-    const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
-
-    Logger.info(`Cancelling upload request ${Token}`);
-
-    pathExists(path)
-      .then(() => removeSync(path))
-      .then(() =>
-        response.send({
-          status: 'ok',
-          message: 'Successfully cancelled upload',
-        }),
-      )
-      .catch(err => {
-        Logger.err(err);
-        response.send({ status: 'error', message: 'Failed cancelling upload' });
-      });
+  // TODO: Deprecate and move to Cleaning service
+  UploadCancel: (_, response) => {
+    response.send({
+      status: 'ok',
+      message: 'Successfully cancelled upload',
+    });
   },
   UploadFinish: async (request, response) => {
     Logger.info(request.body);
