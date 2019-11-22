@@ -672,7 +672,8 @@ const Mongo: IMongo = {
 
     if (
       !find_result ||
-      (!find_result.username || !request.body.username) ||
+      !find_result.username ||
+      !request.body.username ||
       request.body.username !== find_result.username
     ) {
       Logger.err(
