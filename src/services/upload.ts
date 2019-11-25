@@ -19,18 +19,33 @@ interface IUpload {
   UploadFinish(request: Request, response: Response): void;
 }
 
+const tempDir = `${RootDirectory}/${Configuration.Uploads.TempDirectory}`;
+const uploadDir = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
+const subfolders = [
+  'model',
+  'audio',
+  'video',
+  'image',
+  'previews',
+  'metadata_files',
+];
+
+ensureDir(tempDir);
+ensureDir(uploadDir);
+subfolders.forEach(folder => ensureDir(`${uploadDir}${folder}`));
+
 const slug = (text: string) =>
   slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
 
 const Upload: IUpload = {
   Multer: multer({
-    dest: `${RootDirectory}/${Configuration.Uploads.TempDirectory}`,
+    dest: tempDir,
   }),
   AddMetadata: (request, response) => {
     const token = request.headers['semirandomtoken'];
     const metaDataKey = request.headers['metadatakey'];
     const tempPath = `${request['file'].path}`;
-    let newPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
+    let newPath = uploadDir;
     newPath += `${token}/`;
     newPath += `${metaDataKey}/`;
     // Filename gets a prefix of the metadata input field selected
@@ -71,7 +86,7 @@ const Upload: IUpload = {
         ? slug(relPath)
         : slug(request['file'].originalname);
     const destPath = join(
-      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`,
+      uploadDir,
       `${request.headers['filetype']}`,
       `${request.headers['semirandomtoken']}/`,
       `${folderOrFilePath}`,

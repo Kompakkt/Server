@@ -237,7 +237,7 @@ WebSocket.on('connection', Socket._handler);
 
 // Cleaning
 Server.post(
-  '/cleaning/deletenullrefs',
+  ['/cleaning/deletenullrefs', '/cleaning/deletenullrefs/:confirm'],
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
@@ -245,7 +245,7 @@ Server.post(
 );
 
 Server.post(
-  '/cleaning/deleteunused',
+  ['/cleaning/deleteunused', '/cleaning/deleteunused/:confirm'],
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
@@ -253,7 +253,7 @@ Server.post(
 );
 
 Server.post(
-  '/cleaning/cleanpersonfields',
+  ['/cleaning/cleanpersonfields', '/cleaning/cleanpersonfields/:confirm'],
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
@@ -261,11 +261,22 @@ Server.post(
 );
 
 Server.post(
-  '/cleaning/cleaninstitutionfields',
+  [
+    '/cleaning/cleaninstitutionfields',
+    '/cleaning/cleaninstitutionfields/:confirm',
+  ],
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Cleaning.cleanInstitutionFields,
+);
+
+Server.post(
+  ['/cleaning/cleanuploadedfiles', '/cleaning/cleanuploadedfiles/:confirm'],
+  Express.authenticate(),
+  Mongo.updateSessionId,
+  Admin.checkIsAdmin,
+  Cleaning.cleanUploadedFiles,
 );
 
 // Utility

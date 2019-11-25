@@ -1,24 +1,42 @@
 import { Request, Response } from 'express';
 import { Collection, Db } from 'mongodb';
+import { unlink } from 'fs-extra';
 
+import klawSync from 'klaw-sync';
+
+import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
-import { IMetaDataPerson, IMetaDataInstitution } from '../interfaces';
+import { RootDirectory } from '../environment';
+import { IMetaDataPerson, IMetaDataInstitution, IEntity } from '../interfaces';
+
+const deleteFile = async (path: string) =>
+  new Promise<void>((resolve, reject) =>
+    unlink(`${RootDirectory}/${path}`, err => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    }),
+  );
 
 interface ICleaning {
   deleteUnusedPersonsAndInstitutions(
-    _: Request,
+    request: Request,
     response: Response,
   ): Promise<any>;
-  deleteNullRefs(_: Request, response: Response): Promise<any>;
+  deleteNullRefs(request: Request, response: Response): Promise<any>;
 
-  cleanPersonFields(_: Request, response: Response): Promise<any>;
+  cleanPersonFields(request: Request, response: Response): Promise<any>;
 
-  cleanInstitutionFields(_: Request, response: Response): Promise<any>;
+  cleanInstitutionFields(request: Request, response: Response): Promise<any>;
+
+  cleanUploadedFiles(request: Request, response: Response): Promise<any>;
 }
 
 const Cleaning: ICleaning = {
-  deleteUnusedPersonsAndInstitutions: async (_, response) => {
+  deleteUnusedPersonsAndInstitutions: async (request, response) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const personCollection = ObjDB.collection('person');
     const instCollection = ObjDB.collection('institution');
@@ -28,6 +46,8 @@ const Cleaning: ICleaning = {
     const allInstitutions = await instCollection.find({}).toArray();
     const allDigObjs = await digobjCollection.find({}).toArray();
     const allPhyObjs = await phyobjCollection.find({}).toArray();
+
+    const confirm = request.params.confirm || false;
 
     const total: any[] = [];
 
@@ -40,6 +60,7 @@ const Cleaning: ICleaning = {
       const _id = person._id;
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
+      if (!confirm) continue;
       const deleteResult = await personCollection.deleteOne({
         _id: person._id,
       });
@@ -52,6 +73,7 @@ const Cleaning: ICleaning = {
       const _id = institution._id;
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
+      if (!confirm) continue;
       const deleteResult = await instCollection.deleteOne({
         _id: institution._id,
       });
@@ -62,12 +84,19 @@ const Cleaning: ICleaning = {
     }
 
     Logger.log(`Deleted ${total.length} unused persons and/or institutions`);
-    response.send({ status: 'ok', total, amount: total.length });
+    response.send({
+      status: 'ok',
+      confirm,
+      total,
+      amount: total.length,
+    });
   },
-  deleteNullRefs: async (_, response) => {
+  deleteNullRefs: async (request, response) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const users: Collection = AccDB.collection('users');
     const allUsers = await users.find({}).toArray();
+
+    const confirm = request.params.confirm || false;
 
     const total: any[] = [];
 
@@ -89,6 +118,7 @@ const Cleaning: ICleaning = {
         const index = user.data[ref.field].indexOf(ref._id);
         user.data[ref.field].splice(index, 1);
       }
+      if (!confirm) return true;
       const updateResult = await users.updateOne(
         { _id: user._id },
         { $set: { data: user.data } },
@@ -119,12 +149,14 @@ const Cleaning: ICleaning = {
     for (const user of allUsers) {
       await iterateOverUserData(user);
     }
-    response.send({ status: 'ok', total });
+    response.send({ status: 'ok', confirm, total });
   },
-  cleanPersonFields: async (_, response) => {
+  cleanPersonFields: async (request, response) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const personCollection = ObjDB.collection<IMetaDataPerson>('person');
     const cursor = personCollection.find({});
+
+    const confirm = request.params.confirm || false;
 
     const canContinue = async () =>
       (await cursor.hasNext()) && !cursor.isClosed();
@@ -162,12 +194,14 @@ const Cleaning: ICleaning = {
       const sizeAfter = JSON.stringify(person).length;
 
       if (changedPerson) {
-        const result = await personCollection.updateOne(
-          { _id: person._id },
-          { $set: person },
-        );
-        if (result.result.ok !== 1) {
-          Logger.err('Failed updating cleaned person', person, result);
+        if (confirm) {
+          const result = await personCollection.updateOne(
+            { _id: person._id },
+            { $set: person },
+          );
+          if (result.result.ok !== 1) {
+            Logger.err('Failed updating cleaned person', person, result);
+          }
         }
         personsChanged.push(person);
         totalSaved += sizeBefore - sizeAfter;
@@ -178,14 +212,16 @@ const Cleaning: ICleaning = {
       `Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`,
     );
 
-    response.send({ status: 'ok', personsChanged, totalSaved });
+    response.send({ status: 'ok', confirm, personsChanged, totalSaved });
   },
-  cleanInstitutionFields: async (_, response) => {
+  cleanInstitutionFields: async (request, response) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const instCollection = ObjDB.collection<IMetaDataInstitution>(
       'institution',
     );
     const cursor = instCollection.find({});
+
+    const confirm = request.params.confirm || false;
 
     const canContinue = async () =>
       (await cursor.hasNext()) && !cursor.isClosed();
@@ -232,18 +268,57 @@ const Cleaning: ICleaning = {
         changedInsts.push(inst);
         totalSaved += sizeBefore - sizeAfter;
 
-        // TODO: update on server & fix entity-landing page
-        const result = await instCollection.updateOne(
-          { _id: inst._id },
-          { $set: inst },
-        );
-        if (result.result.ok !== 1) {
-          Logger.err('Failed updating cleaned inst', inst, result);
+        if (confirm) {
+          // TODO: update on server & fix entity-landing page
+          const result = await instCollection.updateOne(
+            { _id: inst._id },
+            { $set: inst },
+          );
+          if (result.result.ok !== 1) {
+            Logger.err('Failed updating cleaned inst', inst, result);
+          }
         }
       }
     }
 
-    response.send({ status: 'ok', changedInsts, totalSaved });
+    response.send({ status: 'ok', confirm, changedInsts, totalSaved });
+  },
+  cleanUploadedFiles: async (request, response) => {
+    const ObjDB: Db = Mongo.getEntitiesRepository();
+    const entities = await ObjDB.collection<IEntity>('entity')
+      .find({})
+      .toArray();
+    // Get all file paths from entities and flatten the array
+    const files = ([] as string[]).concat(
+      ...entities.map(entity => entity.files.map(file => file.file_link)),
+    );
+
+    const confirm = request.params.confirm || false;
+
+    const subfolders = ['model', 'video', 'audio', 'image'];
+
+    const uploadPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}`;
+    const existingFiles = ([] as string[]).concat(
+      ...subfolders.map(folder =>
+        klawSync(`${uploadPath}/${folder}`)
+          .filter(item => !item.stats.isDirectory())
+          .map(item => item.path.replace(`${RootDirectory}/`, '')),
+      ),
+    );
+
+    const filesToDelete = existingFiles.filter(file => !files.includes(file));
+
+    if (confirm) {
+      await Promise.all(filesToDelete.map(deleteFile));
+    }
+
+    response.send({
+      status: 'ok',
+      confirm,
+      files,
+      existingFiles,
+      filesToDelete,
+    });
   },
 };
 
