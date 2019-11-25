@@ -1006,10 +1006,13 @@ const Mongo: IMongo = {
         .skip(offset);
       const compilations: ICompilation[] = [];
 
-      const canContinue = () =>
-        cursor.hasNext() && !cursor.isClosed() && compilations.length < limit;
+      const canContinue = async () =>
+        (await cursor.hasNext()) &&
+        !cursor.isClosed() &&
+        compilations.length < limit &&
+        types.length > 0;
 
-      while (canContinue()) {
+      while (await canContinue()) {
         const _comp = await cursor.next();
         if (!_comp) continue;
         const resolved: ICompilation = await Mongo.resolve(
