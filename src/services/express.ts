@@ -13,6 +13,7 @@ import passport from 'passport';
 import LdapStrategy from 'passport-ldapauth';
 import { Strategy as LocalStrategy } from 'passport-local';
 import SocketIo from 'socket.io';
+import responseTime from 'response-time';
 
 import { RootDirectory } from '../environment';
 import { IInvalid, IUserData, EUserRank } from '../interfaces';
@@ -106,6 +107,8 @@ Server.use(bodyParser.json({ limit: '50mb' }));
 Server.use(cookieParser());
 // Compression: Brotli -> Fallback GZIP
 Server.use(shrinkRay());
+// Measure response time of request
+Server.use(responseTime());
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 //Server.use('/uploads', express.static(upDir));
