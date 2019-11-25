@@ -6,7 +6,7 @@ import klawSync from 'klaw-sync';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo } from './mongo';
+import { Mongo, updateOne } from './mongo';
 import { RootDirectory } from '../environment';
 import { IMetaDataPerson, IMetaDataInstitution, IEntity } from '../interfaces';
 
@@ -119,7 +119,8 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await users.updateOne(
+      const updateResult = await updateOne(
+        users,
         { _id: user._id },
         { $set: { data: user.data } },
       );
@@ -195,7 +196,8 @@ const Cleaning: ICleaning = {
 
       if (changedPerson) {
         if (confirm) {
-          const result = await personCollection.updateOne(
+          const result = await updateOne(
+            personCollection,
             { _id: person._id },
             { $set: person },
           );
@@ -270,7 +272,8 @@ const Cleaning: ICleaning = {
 
         if (confirm) {
           // TODO: update on server & fix entity-landing page
-          const result = await instCollection.updateOne(
+          const result = await updateOne(
+            instCollection,
             { _id: inst._id },
             { $set: inst },
           );

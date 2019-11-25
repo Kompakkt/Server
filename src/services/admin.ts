@@ -4,7 +4,7 @@ import { Collection, Db, ObjectId } from 'mongodb';
 import { IEntity, IUserData, EUserRank } from '../interfaces';
 
 import { Configuration } from './configuration';
-import { Mongo } from './mongo';
+import { Mongo, updateOne } from './mongo';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
 
@@ -97,7 +97,11 @@ const Admin: IAdmin = {
         const AccDB: Db = Mongo.getAccountsRepository();
         const users: Collection<IUserData> = AccDB.collection('users');
         const user = await users.findOne({ _id });
-        const updateResult = await users.updateOne({ _id }, { $set: { role } });
+        const updateResult = await updateOne(
+          users,
+          { _id },
+          { $set: { role } },
+        );
         if (updateResult.result.ok !== 1 || !user) {
           return response.send({
             status: 'error',
@@ -149,7 +153,8 @@ Visit https://kompakkt.uni-koeln.de/profile to see what has changed`.trimLeft(),
       });
     }
     const isEntityOnline: boolean = found.online;
-    const updateResult = await ObjDB.collection('entity').updateOne(
+    const updateResult = await updateOne(
+      ObjDB.collection('entity'),
       { _id },
       { $set: { online: !isEntityOnline } },
     );

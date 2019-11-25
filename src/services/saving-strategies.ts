@@ -18,7 +18,7 @@ import {
 import { RootDirectory } from '../environment';
 
 import { Logger } from './logger';
-import { Mongo } from './mongo';
+import { Mongo, updateOne } from './mongo';
 import { Configuration as Conf } from './configuration';
 import { isAnnotation, isDigitalEntity } from './typeguards';
 
@@ -188,7 +188,8 @@ const saveAnnotation = async (
     const coll: Collection = Mongo.getEntitiesRepository().collection(
       requestedCollection,
     );
-    const listUpdateResult = await coll.updateOne(
+    const listUpdateResult = await updateOne(
+      coll,
       { _id: new ObjectId(entityOrCompId) },
       { $set: { annotationList: resultEntityOrComp.annotationList } },
     );
@@ -281,14 +282,16 @@ const savePerson = async (
 
   const _id = person._id;
   if (save) {
-    return Mongo.getEntitiesRepository()
-      .collection('person')
-      .updateOne(Mongo.query(_id), { $set: { ...person } }, { upsert: true })
-      .then(res => {
-        const _id = res.upsertedId ? res.upsertedId._id : person._id;
-        Mongo.insertCurrentUserData(userData, _id, 'person');
-        return person;
-      });
+    return updateOne(
+      Mongo.getEntitiesRepository().collection('person'),
+      Mongo.query(_id),
+      { $set: { ...person } },
+      { upsert: true },
+    ).then(res => {
+      const _id = res.upsertedId ? res.upsertedId._id : person._id;
+      Mongo.insertCurrentUserData(userData, _id, 'person');
+      return person;
+    });
   } else {
     delete person._id;
     return person;
@@ -325,18 +328,16 @@ const saveInstitution = async (
 
   const _id = institution._id;
   if (save) {
-    return Mongo.getEntitiesRepository()
-      .collection('institution')
-      .updateOne(
-        Mongo.query(_id),
-        { $set: { ...institution } },
-        { upsert: true },
-      )
-      .then(res => {
-        const _id = res.upsertedId ? res.upsertedId._id : institution._id;
-        Mongo.insertCurrentUserData(userData, _id, 'institution');
-        return institution;
-      });
+    return updateOne(
+      Mongo.getEntitiesRepository().collection('institution'),
+      Mongo.query(_id),
+      { $set: { ...institution } },
+      { upsert: true },
+    ).then(res => {
+      const _id = res.upsertedId ? res.upsertedId._id : institution._id;
+      Mongo.insertCurrentUserData(userData, _id, 'institution');
+      return institution;
+    });
   } else {
     delete institution._id;
     return institution;
@@ -395,14 +396,16 @@ const saveMetaDataEntity = async (
 
       tag._id = ObjectId.isValid(tag._id) ? tag._id : new ObjectId();
 
-      newEntity.tags[i] = (await Mongo.getEntitiesRepository()
-        .collection('tag')
-        .updateOne(Mongo.query(tag._id), { $set: { ...tag } }, { upsert: true })
-        .then(res => {
-          const _id = res.upsertedId ? res.upsertedId._id : tag._id;
-          Mongo.insertCurrentUserData(userData, _id, 'tag');
-          return _id;
-        })) as any;
+      newEntity.tags[i] = (await updateOne(
+        Mongo.getEntitiesRepository().collection('tag'),
+        Mongo.query(tag._id),
+        { $set: { ...tag } },
+        { upsert: true },
+      ).then(res => {
+        const _id = res.upsertedId ? res.upsertedId._id : tag._id;
+        Mongo.insertCurrentUserData(userData, _id, 'tag');
+        return _id;
+      })) as any;
     }
   }
 
@@ -426,18 +429,16 @@ const saveDigitalEntity = async (
       newEntity.phyObjs[i],
       userData,
     )) as IMetaDataPhysicalEntity;
-    newEntity.phyObjs[i] = (await Mongo.getEntitiesRepository()
-      .collection('physicalentity')
-      .updateOne(
-        Mongo.query(savedEntity._id),
-        { $set: { ...savedEntity } },
-        { upsert: true },
-      )
-      .then(res => {
-        const _id = res.upsertedId ? res.upsertedId._id : savedEntity._id;
-        Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
-        return _id;
-      })) as any;
+    newEntity.phyObjs[i] = (await updateOne(
+      Mongo.getEntitiesRepository().collection('physicalentity'),
+      Mongo.query(savedEntity._id),
+      { $set: { ...savedEntity } },
+      { upsert: true },
+    ).then(res => {
+      const _id = res.upsertedId ? res.upsertedId._id : savedEntity._id;
+      Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
+      return _id;
+    })) as any;
   }
 
   return newEntity;

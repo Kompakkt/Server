@@ -5,7 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { IUserData } from '../interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo } from './mongo';
+import { Mongo, updateOne } from './mongo';
 
 interface IMailer {
   isConfigValid(): any;
@@ -211,7 +211,8 @@ const Mailer: IMailer = {
       });
     }
     const isAnswered = oldEntry.answered;
-    const updateResult = await targetColl.updateOne(
+    const updateResult = await updateOne(
+      targetColl,
       { _id },
       { $set: { answered: !isAnswered } },
     );

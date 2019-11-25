@@ -9,7 +9,12 @@ import {
   IGroup,
 } from '../interfaces';
 
-import { Mongo, getCurrentUserBySession, areObjectIdsEqual } from './mongo';
+import {
+  Mongo,
+  getCurrentUserBySession,
+  areObjectIdsEqual,
+  updateOne,
+} from './mongo';
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
@@ -155,7 +160,8 @@ const Utility: IUtility = {
       ),
     );
 
-    const updateResult = await CompColl.updateOne(
+    const updateResult = await updateOne(
+      CompColl,
       { _id: new ObjectId(compId) },
       { $set: { annotationList: compilation['annotationList'] } },
     );
@@ -250,7 +256,7 @@ const Utility: IUtility = {
       default:
     }
 
-    const updateResult = await users.updateOne(findUserQuery, {
+    const updateResult = await updateOne(users, findUserQuery, {
       $set: { data: account.data },
     });
 

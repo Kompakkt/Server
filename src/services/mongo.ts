@@ -4,7 +4,23 @@ import { writeFileSync } from 'fs';
 import { ensureDirSync } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
-import { Collection, Db, MongoClient, ObjectId } from 'mongodb';
+import {
+  Collection,
+  Db,
+  MongoClient,
+  ObjectId,
+  FilterQuery,
+  UpdateQuery,
+  UpdateOneOptions,
+} from 'mongodb';
+import LRU from 'lru-cache';
+
+const memCache = new LRU({
+  max: 1000,
+  maxAge: 1000 * 60 * 60,
+  updateAgeOnGet: true,
+  stale: true,
+});
 
 import { RootDirectory } from '../environment';
 import { ICompilation, IEntity, IUserData, EUserRank } from '../interfaces';
@@ -65,6 +81,19 @@ const getAllItemsOfCollection = async (collection: string) =>
     .collection(collection)
     .find({})
     .toArray();
+
+// Wrapper to combine MongoDB updateOne & Cache
+const updateOne = async (
+  coll: Collection<any>,
+  query: FilterQuery<any>,
+  update: UpdateQuery<any>,
+  options?: UpdateOneOptions,
+) => {
+  Object.values(query).forEach(opt => {
+    if (memCache.has(opt)) memCache.del(opt);
+  });
+  return coll.updateOne(query, update, options);
+};
 
 const areObjectIdsEqual = (
   firstId: string | ObjectId,
@@ -256,7 +285,8 @@ const Mongo: IMongo = {
 
     const sessionID = request.sessionID;
 
-    const updateResult = await users().updateOne(
+    const updateResult = await updateOne(
+      users(),
       { username },
       {
         $set: {
@@ -298,8 +328,7 @@ const Mongo: IMongo = {
     // _id is immutable in MongoDB, so we can't update the field
     delete updatedUser['_id'];
 
-    users()
-      .updateOne({ username }, { $set: updatedUser }, { upsert: true })
+    updateOne(users(), { username }, { $set: updatedUser }, { upsert: true })
       .then(async _ => {
         Logger.log(`User ${updatedUser.username} logged in`);
         response.send({
@@ -336,7 +365,8 @@ const Mongo: IMongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await users().updateOne(
+    const updateResult = await updateOne(
+      users(),
       { sessionID },
       { $set: { data: userData.data } },
     );
@@ -349,6 +379,7 @@ const Mongo: IMongo = {
     if (userData.data) {
       for (const property in userData.data) {
         if (!userData.data.hasOwnProperty(property)) continue;
+
         userData.data[property] = await Promise.all(
           userData.data[property].map(async obj =>
             Mongo.resolve(obj, property),
@@ -457,6 +488,9 @@ const Mongo: IMongo = {
       : new ObjectId();
     resultEntity._id = _id;
 
+    // Remove outdated cached document
+    if (memCache.has(_id.toString())) memCache.del(_id.toString());
+
     if (isCompilation(resultEntity)) {
       await saveCompilation(resultEntity, userData)
         .then(compilation => (resultEntity = compilation))
@@ -495,7 +529,8 @@ const Mongo: IMongo = {
     // We already got rejected. Don't update resultEntity in DB
     if (response.headersSent) return undefined;
 
-    const updateResult = await collection.updateOne(
+    const updateResult = await updateOne(
+      collection,
       { _id },
       { $set: resultEntity },
       { upsert: true },
@@ -537,7 +572,8 @@ const Mongo: IMongo = {
 
     // Overwrite old settings
     const settings = { ...request.body, preview: finalImagePath };
-    const result = await collection.updateOne(
+    const result = await updateOne(
+      collection,
       { _id: identifier },
       { $set: { settings } },
     );
@@ -575,15 +611,18 @@ const Mongo: IMongo = {
     depth?: number,
   ): Promise<any | null | undefined> => {
     if (!obj) return undefined;
-    const parsedId = obj['_id'] ? obj['_id'] : obj;
+    const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
     const resolve_collection: Collection = getEntitiesRepository().collection(
       collection_name,
     );
+    if (memCache.has(parsedId)) return memCache.get(parsedId);
     return resolve_collection
       .findOne(Mongo.query(_id))
-      .then(resolve_result => {
+      .then(async resolve_result => {
+        memCache.set(parsedId, resolve_result);
+
         if (depth && depth === 0) return resolve_result;
 
         if (isDigitalEntity(resolve_result)) {
@@ -710,7 +749,8 @@ const Mongo: IMongo = {
         RequestCollection
       ].filter(id => id !== identifier.toString());
 
-      const update_result = await users().updateOne(
+      const update_result = await updateOne(
+        users(),
         { sessionID },
         { $set: { data: find_result.data } },
       );
@@ -1021,6 +1061,14 @@ const Mongo: IMongo = {
   },
 };
 
-Mongo.init().catch(e => Logger.err(e));
+Mongo.init()
+  .then(() => Logger.info('Connected to MongoDB'))
+  .catch(e => Logger.err(e));
 
-export { Mongo, getCurrentUserBySession, areObjectIdsEqual };
+export {
+  Mongo,
+  getCurrentUserBySession,
+  areObjectIdsEqual,
+  memCache,
+  updateOne,
+};
