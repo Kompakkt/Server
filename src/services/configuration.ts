@@ -105,8 +105,7 @@ const LoadConfig = () => {
       );
     }
 
-    Logger.info('Configuration details: ');
-    Logger.info(confObj);
+    Logger.info('Configuration loaded from file');
 
     return confObj;
   } catch (error) {
@@ -121,7 +120,7 @@ const LoadConfig = () => {
         );
         Logger.err(error);
       }
-      Logger.log(DefaultConfiguration);
+      Logger.log('Configuration loaded from defaults');
     }
     return DefaultConfiguration;
   }
