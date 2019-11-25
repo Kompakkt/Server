@@ -386,7 +386,9 @@ const Mongo: IMongo = {
           ),
         );
         // Filter possible null's
-        userData.data[property] = userData.data[property].filter(obj => obj);
+        userData.data[property] = userData.data[property].filter(
+          obj => obj && Object.keys(obj).length > 0,
+        );
       }
       // Add entity owners to entities
       if (userData.data.entity && userData.data.entity.length > 0) {
