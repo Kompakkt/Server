@@ -127,6 +127,7 @@ const Client = new MongoClient(MongoURL, {
   useNewUrlParser: true,
   reconnectTries: Number.POSITIVE_INFINITY,
   reconnectInterval: 1000,
+  useUnifiedTopology: true,
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
