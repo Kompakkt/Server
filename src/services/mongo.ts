@@ -89,9 +89,7 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  Object.values(query).forEach(opt => {
-    if (memCache.has(opt)) memCache.del(opt);
-  });
+  memCache.reset();
   return coll.updateOne(query, update, options);
 };
 
@@ -285,8 +283,7 @@ const Mongo: IMongo = {
 
     const sessionID = request.sessionID;
 
-    const updateResult = await updateOne(
-      users(),
+    const updateResult = await users().updateOne(
       { username },
       {
         $set: {
@@ -328,7 +325,8 @@ const Mongo: IMongo = {
     // _id is immutable in MongoDB, so we can't update the field
     delete updatedUser['_id'];
 
-    updateOne(users(), { username }, { $set: updatedUser }, { upsert: true })
+    users()
+      .updateOne({ username }, { $set: updatedUser }, { upsert: true })
       .then(async _ => {
         Logger.log(`User ${updatedUser.username} logged in`);
         response.send({
@@ -365,8 +363,7 @@ const Mongo: IMongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await updateOne(
-      users(),
+    const updateResult = await users().updateOne(
       { sessionID },
       { $set: { data: userData.data } },
     );
@@ -447,6 +444,8 @@ const Mongo: IMongo = {
     await Mongo.addEntityToCollection(request, response);
   },
   addEntityToCollection: async (request, response) => {
+    memCache.reset();
+
     const RequestCollection = request.params.collection.toLowerCase();
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
@@ -489,9 +488,6 @@ const Mongo: IMongo = {
       ? new ObjectId(resultEntity._id)
       : new ObjectId();
     resultEntity._id = _id;
-
-    // Remove outdated cached document
-    if (memCache.has(_id.toString())) memCache.del(_id.toString());
 
     if (isCompilation(resultEntity)) {
       await saveCompilation(resultEntity, userData)
@@ -619,7 +615,15 @@ const Mongo: IMongo = {
     const resolve_collection: Collection = getEntitiesRepository().collection(
       collection_name,
     );
-    if (memCache.has(parsedId)) return { ...(memCache.get(parsedId) as any) };
+    const peek = memCache.peek(parsedId) as any;
+    // Check if in cache
+    if (peek) {
+      // Check if cache is valid
+      if (Object.keys(peek).length > 0)
+        return { ...(memCache.get(parsedId) as any) };
+      // Otherwise delete invalid entry
+      memCache.del(parsedId);
+    }
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
@@ -751,8 +755,7 @@ const Mongo: IMongo = {
         RequestCollection
       ].filter(id => id !== identifier.toString());
 
-      const update_result = await updateOne(
-        users(),
+      const update_result = await users().updateOne(
         { sessionID },
         { $set: { data: find_result.data } },
       );
@@ -1064,7 +1067,10 @@ const Mongo: IMongo = {
 };
 
 Mongo.init()
-  .then(() => Logger.info('Connected to MongoDB'))
+  .then(() => {
+    Logger.info('Connected to MongoDB. Cleaning SessionIDs');
+    users().updateMany({}, { $set: { sessionID: '' } });
+  })
   .catch(e => Logger.err(e));
 
 export {

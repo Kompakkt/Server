@@ -97,11 +97,7 @@ const Admin: IAdmin = {
         const AccDB: Db = Mongo.getAccountsRepository();
         const users: Collection<IUserData> = AccDB.collection('users');
         const user = await users.findOne({ _id });
-        const updateResult = await updateOne(
-          users,
-          { _id },
-          { $set: { role } },
-        );
+        const updateResult = await users.updateOne({ _id }, { $set: { role } });
         if (updateResult.result.ok !== 1 || !user) {
           return response.send({
             status: 'error',

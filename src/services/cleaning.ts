@@ -104,7 +104,7 @@ const Cleaning: ICleaning = {
       const deletedReferences: any[] = [];
       for (const _id of array) {
         const result = await Mongo.resolve(_id, field);
-        if (result !== null) continue;
+        if (result !== null && Object.keys(result).length > 0) continue;
         deletedReferences.push({ field, _id });
       }
       return deletedReferences;
@@ -119,8 +119,7 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await updateOne(
-        users,
+      const updateResult = await users.updateOne(
         { _id: user._id },
         { $set: { data: user.data } },
       );
@@ -142,7 +141,7 @@ const Cleaning: ICleaning = {
           const nullRefs = await checkReferences(user.data[property], property);
           if (nullRefs.length === 0) continue;
           const success = await deleteUserNullRefs(user, nullRefs);
-          if (success) total.push({ user, nullRefs });
+          if (success) total.push({ user: user.username, nullRefs });
         }
       }
     };

@@ -256,7 +256,7 @@ const Utility: IUtility = {
       default:
     }
 
-    const updateResult = await updateOne(users, findUserQuery, {
+    const updateResult = await users.updateOne(findUserQuery, {
       $set: { data: account.data },
     });
 
