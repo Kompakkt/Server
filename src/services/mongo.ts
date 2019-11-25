@@ -617,7 +617,7 @@ const Mongo: IMongo = {
     const resolve_collection: Collection = getEntitiesRepository().collection(
       collection_name,
     );
-    if (memCache.has(parsedId)) return memCache.get(parsedId);
+    if (memCache.has(parsedId)) return { ...(memCache.get(parsedId) as any) };
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
