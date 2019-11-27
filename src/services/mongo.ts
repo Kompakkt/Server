@@ -957,7 +957,7 @@ const Mongo: IMongo = {
 
       while (await canContinue()) {
         const _entity = await cursor.next();
-        if (!_entity) continue;
+        if (!_entity || !_entity._id) continue;
 
         const isOwner = userOwned.includes(_entity._id.toString());
         const metadata = JSON.stringify(_entity).toLowerCase();
@@ -1019,6 +1019,8 @@ const Mongo: IMongo = {
           _comp,
           'compilation',
         );
+
+        if (!resolved || !resolved._id) continue;
 
         if (searchText !== '') {
           if (
