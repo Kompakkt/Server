@@ -618,16 +618,16 @@ const Mongo: IMongo = {
     // Check if in cache
     if (peek) {
       // Check if cache is valid
+      // The large size of some documents (e.g. resolved compilations)
+      // makes JSON.parse(JSON.stringify(...)) the fastest method of cloning
       if (Object.keys(peek).length > 0)
-        return { ...(memCache.get(parsedId) as any) };
+        return JSON.parse(JSON.stringify(memCache.get(parsedId))) as T;
       // Otherwise delete invalid entry
       memCache.del(parsedId);
     }
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
-        memCache.set(parsedId, resolve_result);
-
         if (depth && depth === 0) return resolve_result;
 
         if (isDigitalEntity(resolve_result)) {
@@ -644,7 +644,10 @@ const Mongo: IMongo = {
         }
         return resolve_result;
       })
-      .then(result => result as T | null)
+      .then(result => {
+        if (result) memCache.set(parsedId, result);
+        return result as T | null;
+      })
       .catch(err => {
         Logger.warn(
           `Encountered error trying to resolve ${parsedId} in ${collection_name}`,
