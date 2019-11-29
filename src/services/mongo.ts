@@ -22,7 +22,13 @@ const memCache = new LRU({
 });
 
 import { RootDirectory } from '../environment';
-import { ICompilation, IEntity, IUserData, EUserRank } from '../interfaces';
+import {
+  ICompilation,
+  IEntity,
+  IUserData,
+  EUserRank,
+  IMetaDataDigitalEntity,
+} from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
@@ -997,7 +1003,17 @@ const Mongo: IMongo = {
           continue;
         }
 
-        entities.push(resolved);
+        const {
+          description,
+          licence,
+        } = resolved.relatedDigitalEntity as IMetaDataDigitalEntity;
+        entities.push({
+          ...resolved,
+          relatedDigitalEntity: {
+            description,
+            licence,
+          } as IMetaDataDigitalEntity,
+        } as IEntity);
       }
 
       items.push(...entities);
