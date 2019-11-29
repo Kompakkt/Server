@@ -97,7 +97,7 @@ const Utility: IUtility = {
     response.send({ status: 'ok', occurences, compilations });
   },
   addAnnotationsToAnnotationList: async (request, response) => {
-    const annotations = request.body.annotations;
+    const annotations = request.body.annotations as string[] | undefined;
     if (!annotations || !Array.isArray(annotations)) {
       response.send({ status: 'error', message: 'No annotation array sent' });
       return;
@@ -121,11 +121,13 @@ const Utility: IUtility = {
       return;
     }
 
-    const resolvedAnnotations = await Promise.all(
-      annotations
-        .filter(ann => ObjectId.isValid(ann))
-        .map(ann => Mongo.resolve(ann, 'annotation')),
-    );
+    const resolvedAnnotations = (
+      await Promise.all(
+        annotations
+          .filter(ann => ObjectId.isValid(ann))
+          .map(ann => Mongo.resolve<IAnnotation>(ann, 'annotation')),
+      )
+    ).filter(ann => ann) as IAnnotation[];
     const validAnnotations = resolvedAnnotations
       .filter(ann => ann !== undefined && ann)
       .map(ann => {
@@ -179,7 +181,7 @@ const Utility: IUtility = {
     );
     response.send({
       status: 'ok',
-      ...(await Mongo.resolve(compId, 'compilation')),
+      ...(await Mongo.resolve<ICompilation>(compId, 'compilation')),
     });
   },
   applyActionToEntityOwner: async (request, response) => {
@@ -208,7 +210,7 @@ const Utility: IUtility = {
     if (
       !entityId ||
       !ObjectId.isValid(entityId) ||
-      (await Mongo.resolve(entityId, 'entity')) === undefined
+      (await Mongo.resolve<IEntity>(entityId, 'entity')) === undefined
     ) {
       return response.send({
         status: 'error',
@@ -311,9 +313,13 @@ const Utility: IUtility = {
         .filter(comp => comp.whitelist.enabled)
         .map(async comp => {
           // Get latest versions of groups
-          comp.whitelist.groups = await Promise.all(
-            comp.whitelist.groups.map(group => Mongo.resolve(group, 'group')),
-          );
+          comp.whitelist.groups = (
+            await Promise.all(
+              comp.whitelist.groups.map(group =>
+                Mongo.resolve<IGroup>(group, 'group'),
+              ),
+            )
+          ).filter(group => group) as IGroup[];
           return comp;
         }),
     );
@@ -328,11 +334,13 @@ const Utility: IUtility = {
         ),
     );
 
-    const resolvedCompilations = await Promise.all(
-      filteredCompilations.map(
-        comp => Mongo.resolve(comp, 'compilation') as Promise<ICompilation>,
-      ),
-    );
+    const resolvedCompilations = (
+      await Promise.all(
+        filteredCompilations.map(comp =>
+          Mongo.resolve<ICompilation>(comp, 'compilation'),
+        ),
+      )
+    ).filter(comp => comp) as ICompilation[];
 
     response.send({
       status: 'ok',
@@ -348,23 +356,24 @@ const Utility: IUtility = {
       });
       return;
     }
-    const entities = (
+    const entities = await Mongo.getEntitiesRepository()
+      .collection<IEntity>('entity')
+      .find({})
+      .toArray();
+
+    const resolvedEntities = (
       await Promise.all(
-        (
-          await Mongo.getEntitiesRepository()
-            .collection<IEntity>('entity')
-            .find({})
-            .toArray()
-        ).map(entity => Mongo.resolve(entity, 'entity')),
+        entities.map(entity => Mongo.resolve<IEntity>(entity, 'entity')),
       )
     ).filter(entity => {
+      if (!entity) return false;
       const stringified = JSON.stringify(entity.relatedDigitalEntity);
       return (
         stringified.includes(user.fullname) || stringified.includes(user.mail)
       );
     });
 
-    response.send({ status: 'ok', entities });
+    response.send({ status: 'ok', resolvedEntities });
   },
 };
 

@@ -199,11 +199,11 @@ interface IMongo {
   ): Promise<any>;
   isUserAdmin(request: Request): Promise<boolean>;
   query(_id: string | ObjectId): any;
-  resolve(
+  resolve<T>(
     obj: any,
     collection_name: string,
     depth?: number,
-  ): Promise<any | null | undefined>;
+  ): Promise<T | null | undefined>;
   getEntityFromCollection(request: Request, response: Response): Promise<any>;
   getAllEntitiesFromCollection(
     request: Request,
@@ -545,7 +545,7 @@ const Mongo: IMongo = {
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
     return response.send({
       status: 'ok',
-      ...(await Mongo.resolve(resultId, RequestCollection)),
+      ...(await Mongo.resolve<any>(resultId, RequestCollection)),
     });
   },
   updateEntitySettings: async (request, response) => {
@@ -594,7 +594,7 @@ const Mongo: IMongo = {
       ) !== -1
     );
   },
-  isUserAdmin: async (request): Promise<boolean> => {
+  isUserAdmin: async request => {
     const userData = await getCurrentUserBySession(request.sessionID);
     return userData ? userData.role === EUserRank.admin : false;
   },
@@ -603,16 +603,16 @@ const Mongo: IMongo = {
       $or: [{ _id }, { _id: new ObjectId(_id) }, { _id: _id.toString() }],
     };
   },
-  resolve: async (
+  resolve: async <T extends unknown>(
     obj: any,
     collection_name: string,
     depth?: number,
-  ): Promise<any | null | undefined> => {
+  ) => {
     if (!obj) return undefined;
     const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
-    const resolve_collection: Collection = getEntitiesRepository().collection(
+    const resolve_collection = getEntitiesRepository().collection<T>(
       collection_name,
     );
     /*const peek = memCache.peek(parsedId) as any;
@@ -645,6 +645,7 @@ const Mongo: IMongo = {
         }
         return resolve_result;
       })
+      .then(result => result as T | null)
       .catch(err => {
         Logger.warn(
           `Encountered error trying to resolve ${parsedId} in ${collection_name}`,
@@ -660,7 +661,7 @@ const Mongo: IMongo = {
       ? new ObjectId(request.params.identifier)
       : request.params.identifier;
     const password = request.params.password ? request.params.password : '';
-    const entity = await Mongo.resolve(_id, RequestCollection);
+    const entity = await Mongo.resolve<any>(_id, RequestCollection);
     if (!entity) {
       return response.send({
         status: 'error',
@@ -958,22 +959,24 @@ const Mongo: IMongo = {
       while (await canContinue()) {
         const _entity = await cursor.next();
         if (!_entity || !_entity._id) continue;
+        const resolved = await Mongo.resolve<IEntity>(_entity, 'entity');
+        if (!resolved) continue;
 
-        const isOwner = userOwned.includes(_entity._id.toString());
-        const metadata = JSON.stringify(_entity).toLowerCase();
+        const isOwner = userOwned.includes(resolved._id.toString());
+        const metadata = JSON.stringify(resolved).toLowerCase();
 
         const isAnnotatable = isOwner; // only owner can set default annotations
         if (filters.annotatable && !isAnnotatable) continue;
 
-        const isAnnotated = _entity.annotationList.length > 0;
+        const isAnnotated = resolved.annotationList.length > 0;
         if (filters.annotated && !isAnnotated) continue;
 
         let isRestricted = false;
         // Whitelist visibility filter
-        if (_entity.whitelist.enabled) {
+        if (resolved.whitelist.enabled) {
           if (!userData) continue;
           // TODO: manual checking instead of JSON.stringify
-          const isWhitelisted = JSON.stringify(_entity.whitelist).includes(
+          const isWhitelisted = JSON.stringify(resolved.whitelist).includes(
             userData._id.toString(),
           );
           if (!isOwner && !isWhitelisted) continue;
@@ -992,7 +995,7 @@ const Mongo: IMongo = {
           continue;
         }
 
-        entities.push(await Mongo.resolve(_entity, 'entity'));
+        entities.push(resolved);
       }
 
       items.push(...entities);
@@ -1015,7 +1018,7 @@ const Mongo: IMongo = {
       while (await canContinue()) {
         const _comp = await cursor.next();
         if (!_comp) continue;
-        const resolved: ICompilation = await Mongo.resolve(
+        const resolved = await Mongo.resolve<ICompilation>(
           _comp,
           'compilation',
         );

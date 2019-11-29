@@ -29,11 +29,12 @@ const updateAnnotationList = async (
   add_to_coll: string,
   annotationId: string,
 ) => {
-  const obj: IEntity | ICompilation = await Mongo.resolve(
+  const obj = await Mongo.resolve<IEntity | ICompilation>(
     entityOrCompId,
     add_to_coll,
     0,
   );
+  if (!obj) return undefined;
   // Create annotationList if missing
   obj.annotationList = obj.annotationList ? obj.annotationList : [];
   // Filter null
@@ -154,7 +155,7 @@ const saveAnnotation = async (
     );
     if (!isAnnotationOwner) {
       if (isCompilationOwner) {
-        const oldAnnotation: IAnnotation | null = await Mongo.resolve(
+        const oldAnnotation = await Mongo.resolve<IAnnotation>(
           annotation,
           'annotation',
         );
@@ -183,6 +184,13 @@ const saveAnnotation = async (
       requestedCollection,
       annotation._id.toString(),
     );
+
+    if (!resultEntityOrComp) {
+      return reject({
+        status: 'error',
+        message: 'Failed updating annotationList',
+      });
+    }
 
     // Finally we update the annotationList in the compilation
     const coll: Collection = Mongo.getEntitiesRepository().collection(
@@ -241,8 +249,8 @@ const savePerson = async (
   userData: IUserData,
   save = false,
 ) => {
-  const resolved = await Mongo.resolve(person, 'person');
-  person._id = resolved ? resolved._id : new ObjectId();
+  const resolved = await Mongo.resolve<IMetaDataPerson>(person, 'person');
+  person._id = resolved ? resolved._id : new ObjectId().toString();
 
   // If person exists, combine roles
   if (!person.roles) {
@@ -303,8 +311,11 @@ const saveInstitution = async (
   userData: IUserData,
   save = false,
 ) => {
-  const resolved = await Mongo.resolve(institution, 'institution');
-  institution._id = resolved ? resolved._id : new ObjectId();
+  const resolved = await Mongo.resolve<IMetaDataInstitution>(
+    institution,
+    'institution',
+  );
+  institution._id = resolved ? resolved._id : new ObjectId().toString();
 
   if (!institution.roles) {
     institution.roles = {};

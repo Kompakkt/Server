@@ -162,7 +162,7 @@ Visit https://kompakkt.uni-koeln.de/profile to see what has changed`.trimLeft(),
     }
     return response.send({
       status: 'ok',
-      ...(await Mongo.resolve(_id, 'entity')),
+      ...(await Mongo.resolve<IEntity>(_id, 'entity')),
     });
   },
 };

@@ -103,7 +103,7 @@ const Cleaning: ICleaning = {
     const checkReferences = async (array: any[], field: string) => {
       const deletedReferences: any[] = [];
       for (const _id of array) {
-        const result = await Mongo.resolve(_id, field);
+        const result = await Mongo.resolve<any>(_id, field);
         if (result !== null && Object.keys(result).length > 0) continue;
         deletedReferences.push({ field, _id });
       }

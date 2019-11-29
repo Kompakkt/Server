@@ -5,7 +5,10 @@ import {
   IEntity,
   IMetaDataDigitalEntity,
   IMetaDataPerson,
+  IMetaDataInstitution,
   IMetaDataPhysicalEntity,
+  IMetaDataTag,
+  IAnnotation,
 } from '../interfaces';
 
 import { Mongo } from './mongo';
@@ -17,10 +20,12 @@ export const resolvePerson = async (person: IMetaDataPerson) => {
       if (!person.institutions[id]) continue;
       if (!ObjectId.isValid(id)) continue;
       for (let i = 0; i < person.institutions[id].length; i++) {
-        person.institutions[id][i] = await Mongo.resolve(
+        const resolved = await Mongo.resolve<IMetaDataInstitution>(
           person.institutions[id][i],
           'institution',
         );
+        if (!resolved) continue;
+        person.institutions[id][i] = resolved;
       }
     }
   }
@@ -36,13 +41,11 @@ const resolveMetaDataEntity = async (
   const _id = entity._id.toString();
 
   for (let i = 0; i < entity.persons.length; i++) {
-    const resolved: IMetaDataPerson = await Mongo.resolve(
+    const resolved = await Mongo.resolve<IMetaDataPerson>(
       entity.persons[i],
       'person',
     );
-    if (!resolved) {
-      continue;
-    }
+    if (!resolved) continue;
     entity.persons[i] = await resolvePerson(resolved);
 
     if (!entity.persons[i].roles) {
@@ -54,15 +57,19 @@ const resolveMetaDataEntity = async (
   }
 
   for (let i = 0; i < entity.institutions.length; i++) {
-    entity.institutions[i] = await Mongo.resolve(
+    const resolved = await Mongo.resolve<IMetaDataInstitution>(
       entity.institutions[i],
       'institution',
     );
+    if (!resolved) continue;
+    entity.institutions[i] = resolved;
   }
 
   if (isDigitalEntity(entity)) {
     for (let i = 0; i < entity.tags.length; i++) {
-      entity.tags[i] = await Mongo.resolve(entity.tags[i], 'tag');
+      const resolved = await Mongo.resolve<IMetaDataTag>(entity.tags[i], 'tag');
+      if (!resolved) continue;
+      entity.tags[i] = resolved;
     }
   }
 
@@ -78,7 +85,7 @@ export const resolveDigitalEntity = async (
 
   if (resolvedDigital.phyObjs) {
     for (let i = 0; i < resolvedDigital.phyObjs.length; i++) {
-      const resolved = await Mongo.resolve(
+      const resolved = await Mongo.resolve<IMetaDataPhysicalEntity>(
         resolvedDigital.phyObjs[i],
         'physicalentity',
       );
@@ -99,7 +106,12 @@ export const resolveEntity = async (entity: IEntity) => {
     for (let i = 0; i < entity.annotationList.length; i++) {
       const annotation = entity.annotationList[i];
       if (!annotation) continue;
-      entity.annotationList[i] = await Mongo.resolve(annotation, 'annotation');
+      const resolved = await Mongo.resolve<IAnnotation>(
+        annotation,
+        'annotation',
+      );
+      if (!resolved) continue;
+      entity.annotationList[i] = resolved;
     }
     entity.annotationList = entity.annotationList.filter(_ => _);
   }
@@ -107,10 +119,13 @@ export const resolveEntity = async (entity: IEntity) => {
     entity.relatedDigitalEntity &&
     !isDigitalEntity(entity.relatedDigitalEntity)
   ) {
-    entity.relatedDigitalEntity = await Mongo.resolve(
+    const resolved = await Mongo.resolve<IMetaDataDigitalEntity>(
       entity.relatedDigitalEntity,
       'digitalentity',
     );
+    if (resolved) {
+      entity.relatedDigitalEntity = resolved;
+    }
   }
   return entity;
 };
@@ -120,7 +135,9 @@ export const resolveCompilation = async (compilation: ICompilation) => {
     for (let i = 0; i < compilation.entities.length; i++) {
       const entity = compilation.entities[i];
       if (!entity) continue;
-      compilation.entities[i] = await Mongo.resolve(entity, 'entity');
+      const resolved = await Mongo.resolve<IEntity>(entity, 'entity');
+      if (!resolved) continue;
+      compilation.entities[i] = resolved;
     }
     compilation.entities = compilation.entities.filter(_ => _);
   }
@@ -128,10 +145,12 @@ export const resolveCompilation = async (compilation: ICompilation) => {
     for (let i = 0; i < compilation.annotationList.length; i++) {
       const annotation = compilation.annotationList[i];
       if (!annotation) continue;
-      compilation.annotationList[i] = await Mongo.resolve(
+      const resolved = await Mongo.resolve<IAnnotation>(
         annotation,
         'annotation',
       );
+      if (!resolved) continue;
+      compilation.annotationList[i] = resolved;
     }
     compilation.annotationList = compilation.annotationList.filter(_ => _);
   }
