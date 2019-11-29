@@ -1038,6 +1038,9 @@ const Mongo: IMongo = {
 
         const isOwner = userOwned.includes(resolved._id.toString());
 
+        const isPWProtected =
+          resolved.password !== undefined && resolved.password !== '';
+
         const isAnnotatable = isOwner
           ? // owner can always annotate
             true
@@ -1047,26 +1050,24 @@ const Mongo: IMongo = {
           : false;
         if (filters.annotatable && !isAnnotatable) continue;
 
+        if (isPWProtected && !isOwner && !isAnnotatable) continue;
+        if (filters.restricted && isPWProtected) continue;
+
         const isAnnotated = resolved.annotationList.length > 0;
         if (filters.annotated && !isAnnotated) continue;
 
-        let isRestricted = false;
-
-        // TODO: decide what to do with password protected compilations
-        if (resolved.password && resolved.password !== '') {
-          resolved.annotationList = [];
-          resolved.entities = (resolved.entities as IEntity[]).map(_e => {
-            _e.relatedDigitalEntity = { _id: 'hidden' };
-            _e.processed = { low: '', medium: '', high: '', raw: '' };
-            _e.annotationList = [];
-            return _e;
-          });
-          resolved.password = true;
-          isRestricted = true;
-        }
-        if (filters.restricted && !isRestricted) continue;
-
-        compilations.push(resolved);
+        compilations.push({
+          ...resolved,
+          password: isPWProtected,
+          annotationList: [],
+          entities: resolved.entities
+            .map(_e => {
+              if (!_e) return null;
+              const { mediaType, name, settings } = _e as IEntity;
+              return { mediaType, name, settings } as IEntity;
+            })
+            .filter(_e => _e),
+        });
       }
 
       items.push(...compilations);
