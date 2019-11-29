@@ -13,14 +13,13 @@ import {
   UpdateQuery,
   UpdateOneOptions,
 } from 'mongodb';
-//import LRU from 'lru-cache';
+import LRU from 'lru-cache';
 
-/*const memCache = new LRU({
-  max: 1000,
-  maxAge: 1000 * 60 * 60,
+const memCache = new LRU({
+  max: 250,
+  maxAge: 1000 * 60,
   updateAgeOnGet: true,
-  stale: true,
-});*/
+});
 
 import { RootDirectory } from '../environment';
 import { ICompilation, IEntity, IUserData, EUserRank } from '../interfaces';
@@ -89,7 +88,7 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  //memCache.reset();
+  memCache.reset();
   return coll.updateOne(query, update, options);
 };
 
@@ -444,7 +443,7 @@ const Mongo: IMongo = {
     await Mongo.addEntityToCollection(request, response);
   },
   addEntityToCollection: async (request, response) => {
-    //memCache.reset();
+    memCache.reset();
 
     const RequestCollection = request.params.collection.toLowerCase();
 
@@ -615,7 +614,7 @@ const Mongo: IMongo = {
     const resolve_collection = getEntitiesRepository().collection<T>(
       collection_name,
     );
-    /*const peek = memCache.peek(parsedId) as any;
+    const peek = memCache.peek(parsedId) as any;
     // Check if in cache
     if (peek) {
       // Check if cache is valid
@@ -623,11 +622,11 @@ const Mongo: IMongo = {
         return { ...(memCache.get(parsedId) as any) };
       // Otherwise delete invalid entry
       memCache.del(parsedId);
-    }*/
+    }
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
-        //memCache.set(parsedId, resolve_result);
+        memCache.set(parsedId, resolve_result);
 
         if (depth && depth === 0) return resolve_result;
 
@@ -1085,6 +1084,6 @@ export {
   Mongo,
   getCurrentUserBySession,
   areObjectIdsEqual,
-  //memCache,
+  memCache,
   updateOne,
 };
