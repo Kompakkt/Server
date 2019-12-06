@@ -937,7 +937,7 @@ const Mongo: IMongo = {
       searchText,
     } = request.body as IExploreRequest;
     const items = new Array<IEntity | ICompilation>();
-    const limit = 20;
+    const limit = 30;
     const userData = await getCurrentUserBySession(request.sessionID);
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
