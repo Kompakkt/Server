@@ -280,16 +280,14 @@ Server.post(
 );
 
 // Utility
+// Not locked
+Server.get('/utility/countentityuses/:identifier', Utility.countEntityUses);
+
+// Session-locked
 Server.get(
   '/utility/findentityowners/:identifier',
   Mongo.validateLoginSession,
   Utility.findAllEntityOwnersRequest,
-);
-
-Server.get(
-  '/utility/countentityuses/:identifier',
-  Mongo.validateLoginSession,
-  Utility.countEntityUses,
 );
 
 Server.post(

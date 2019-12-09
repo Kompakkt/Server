@@ -84,13 +84,6 @@ const Utility: IUtility = {
       .filter(comp => {
         const Entities = JSON.stringify(comp.entities);
         return Entities.indexOf(entityId) !== -1;
-      })
-      .map(comp => {
-        // TODO: decide if and how to censor/strip pw protected compilations
-        if (!isCompilationNotPWProtected(comp)) {
-          comp.password = true;
-        }
-        return comp;
       });
     const occurences = compilations.length;
 
