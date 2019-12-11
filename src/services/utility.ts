@@ -30,6 +30,12 @@ interface IUtility {
   findUserInMetadata(request: Request, response: Response): any;
 }
 
+const collectionAsArray = <T extends unknown>(collection: string, query = {}) =>
+  Mongo.getEntitiesRepository()
+    .collection<T>(collection)
+    .find(query)
+    .toArray();
+
 const Utility: IUtility = {
   findAllEntityOwnersRequest: async (request, response) => {
     const entityId = request.params.identifier;
@@ -71,20 +77,27 @@ const Utility: IUtility = {
     const isCompilationNotPWProtected = (comp: ICompilation) =>
       comp.password === '' || comp.password === false || !comp.password;
 
-    const ObjDB = Mongo.getEntitiesRepository();
-    const compilations = (
-      await ObjDB.collection<ICompilation>('compilation')
-        .find({})
-        .toArray()
-    )
-      .filter(
-        comp =>
-          isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp),
-      )
-      .filter(comp => {
-        const Entities = JSON.stringify(comp.entities);
-        return Entities.indexOf(entityId) !== -1;
-      });
+    const isValid = (comp: ICompilation) =>
+      isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp);
+
+    const includesEntity = (comp: ICompilation) =>
+      JSON.stringify(comp.entities).indexOf(entityId) !== -1;
+
+    const compilations = await Promise.all(
+      (await collectionAsArray<ICompilation>('compilation'))
+        .filter(isValid)
+        .filter(includesEntity)
+        .map(async comp => {
+          comp.annotationList = (
+            await Promise.all(
+              comp.annotationList.map(anno =>
+                Mongo.resolve<IAnnotation>(anno, 'annotation'),
+              ),
+            )
+          ).filter(anno => anno) as IAnnotation[];
+          return comp;
+        }),
+    );
     const occurences = compilations.length;
 
     response.send({ status: 'ok', occurences, compilations });
@@ -273,10 +286,7 @@ const Utility: IUtility = {
       });
       return;
     }
-    const groups = await Mongo.getEntitiesRepository()
-      .collection<IGroup>('group')
-      .find({})
-      .toArray();
+    const groups = await collectionAsArray<IGroup>('group');
 
     response.send({
       status: 'ok',
@@ -297,12 +307,7 @@ const Utility: IUtility = {
       return;
     }
     const compilations = await Promise.all(
-      (
-        await Mongo.getEntitiesRepository()
-          .collection<ICompilation>('compilation')
-          .find({})
-          .toArray()
-      )
+      (await collectionAsArray<ICompilation>('compilation'))
         .filter(comp => comp.whitelist.enabled)
         .map(async comp => {
           // Get latest versions of groups
@@ -349,10 +354,7 @@ const Utility: IUtility = {
       });
       return;
     }
-    const entities = await Mongo.getEntitiesRepository()
-      .collection<IEntity>('entity')
-      .find({})
-      .toArray();
+    const entities = await collectionAsArray<IEntity>('entity');
 
     const resolvedEntities = (
       await Promise.all(

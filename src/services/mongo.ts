@@ -16,6 +16,7 @@ import {
 
 import { RootDirectory } from '../environment';
 import {
+  IAnnotation,
   ICompilation,
   IEntity,
   IUserData,
@@ -1078,7 +1079,9 @@ const Mongo: IMongo = {
         compilations.push({
           ...resolved,
           password: isPWProtected,
-          annotationList: [],
+          annotationList: resolved.annotationList
+            .filter(ann => ann)
+            .map(ann => ({ _id: (ann as IAnnotation)._id })) as IAnnotation[],
           entities: resolved.entities
             .map(_e => {
               if (!_e) return null;
