@@ -13,13 +13,11 @@ import {
   UpdateQuery,
   UpdateOneOptions,
 } from 'mongodb';
-import LRU from 'lru-cache';
+import Redis from 'ioredis';
+import hash from 'object-hash';
 
-const memCache = new LRU({
-  max: 250,
-  maxAge: 1000 * 60,
-  updateAgeOnGet: true,
-});
+const redis = new Redis();
+redis.flushall().then(() => Logger.log('Flushed Redis'));
 
 import { RootDirectory } from '../environment';
 import {
@@ -94,7 +92,7 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  memCache.reset();
+  await redis.flushall();
   return coll.updateOne(query, update, options);
 };
 
@@ -449,7 +447,7 @@ const Mongo: IMongo = {
     await Mongo.addEntityToCollection(request, response);
   },
   addEntityToCollection: async (request, response) => {
-    memCache.reset();
+    redis.flushall();
 
     const RequestCollection = request.params.collection.toLowerCase();
 
@@ -620,16 +618,10 @@ const Mongo: IMongo = {
     const resolve_collection = getEntitiesRepository().collection<T>(
       collection_name,
     );
-    const peek = memCache.peek(parsedId) as any;
-    // Check if in cache
-    if (peek) {
-      // Check if cache is valid
-      // The large size of some documents (e.g. resolved compilations)
-      // makes JSON.parse(JSON.stringify(...)) the fastest method of cloning
-      if (Object.keys(peek).length > 0)
-        return JSON.parse(JSON.stringify(memCache.get(parsedId))) as T;
-      // Otherwise delete invalid entry
-      memCache.del(parsedId);
+
+    const temp = await redis.get(parsedId);
+    if (temp !== undefined && temp !== null) {
+      return JSON.parse(temp) as T | null;
     }
     return resolve_collection
       .findOne(Mongo.query(_id))
@@ -650,8 +642,9 @@ const Mongo: IMongo = {
         }
         return resolve_result;
       })
-      .then(result => {
-        if (result) memCache.set(parsedId, result);
+      .then(async result => {
+        if (result)
+          await redis.set(parsedId, JSON.stringify(result), 'EX', 3600);
         return result as T | null;
       })
       .catch(err => {
@@ -941,7 +934,13 @@ const Mongo: IMongo = {
     const userData = await getCurrentUserBySession(request.sessionID);
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
-    if (searchEntity) {
+    // Check if request is cached
+    const requestHash = hash(request.body);
+    const temp = await redis.get(requestHash);
+
+    if (temp) {
+      items.push(...JSON.parse(temp));
+    } else if (searchEntity) {
       const cursor = await Mongo.getEntitiesRepository()
         .collection<IEntity>('entity')
         .find({
@@ -1090,6 +1089,9 @@ const Mongo: IMongo = {
     }
 
     response.send(items.sort((a, b) => a.name.localeCompare(b.name)));
+
+    // Cache full request
+    redis.set(requestHash, JSON.stringify(items), 'EX', 60);
   },
 };
 
@@ -1100,10 +1102,4 @@ Mongo.init()
   })
   .catch(e => Logger.err(e));
 
-export {
-  Mongo,
-  getCurrentUserBySession,
-  areObjectIdsEqual,
-  memCache,
-  updateOne,
-};
+export { Mongo, getCurrentUserBySession, areObjectIdsEqual, updateOne };
