@@ -13,11 +13,6 @@ import {
   UpdateQuery,
   UpdateOneOptions,
 } from 'mongodb';
-import Redis from 'ioredis';
-import hash from 'object-hash';
-
-const redis = new Redis();
-redis.flushall().then(() => Logger.log('Flushed Redis'));
 
 import { RootDirectory } from '../environment';
 import {
@@ -29,6 +24,7 @@ import {
 } from '../interfaces';
 
 import { Configuration } from './configuration';
+import { Cache } from './cache';
 import { Logger } from './logger';
 import {
   resolveCompilation,
@@ -92,7 +88,7 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  await redis.flushall();
+  await Cache.flush();
   return coll.updateOne(query, update, options);
 };
 
@@ -331,7 +327,7 @@ const Mongo: IMongo = {
     users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
       .then(async _ => {
-        Logger.log(`User ${updatedUser.username} logged in`);
+        // Logger.log(`User ${updatedUser.username} logged in`);
         response.send({
           status: 'ok',
           ...(await Mongo.resolveUserData(updatedUser)),
@@ -375,7 +371,15 @@ const Mongo: IMongo = {
     return true;
   },
   resolveUserData: async _userData => {
-    const userData = { ..._userData };
+    const userData = { ..._userData } as IUserData;
+
+    const hash = Cache.hash(userData.username);
+    const temp = await Cache.get<IUserData>(hash);
+
+    if (temp) {
+      return temp;
+    }
+
     if (userData.data) {
       for (const property in userData.data) {
         if (!userData.data.hasOwnProperty(property)) continue;
@@ -401,6 +405,9 @@ const Mongo: IMongo = {
         }
       }
     }
+
+    Cache.set(hash, userData);
+
     return userData;
   },
   getCurrentUserData: async (request, response) => {
@@ -447,7 +454,7 @@ const Mongo: IMongo = {
     await Mongo.addEntityToCollection(request, response);
   },
   addEntityToCollection: async (request, response) => {
-    redis.flushall();
+    Cache.flush();
 
     const RequestCollection = request.params.collection.toLowerCase();
 
@@ -619,10 +626,8 @@ const Mongo: IMongo = {
       collection_name,
     );
 
-    const temp = await redis.get(parsedId);
-    if (temp !== undefined && temp !== null) {
-      return JSON.parse(temp) as T | null;
-    }
+    const temp = await Cache.get<T>(parsedId);
+    if (temp) return temp as T;
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
@@ -643,8 +648,7 @@ const Mongo: IMongo = {
         return resolve_result;
       })
       .then(async result => {
-        if (result)
-          await redis.set(parsedId, JSON.stringify(result), 'EX', 3600);
+        if (result) await Cache.set(parsedId, result);
         return result as T | null;
       })
       .catch(err => {
@@ -935,11 +939,11 @@ const Mongo: IMongo = {
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
     // Check if request is cached
-    const requestHash = hash(request.body);
-    const temp = await redis.get(requestHash);
+    const requestHash = Cache.hash(request.body);
+    const temp = await Cache.get<IEntity[] | ICompilation[]>(requestHash);
 
     if (temp) {
-      items.push(...JSON.parse(temp));
+      items.push(...temp);
     } else if (searchEntity) {
       const cursor = await Mongo.getEntitiesRepository()
         .collection<IEntity>('entity')
@@ -1091,7 +1095,7 @@ const Mongo: IMongo = {
     response.send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
     // Cache full request
-    redis.set(requestHash, JSON.stringify(items), 'EX', 60);
+    Cache.set(requestHash, items);
   },
 };
 
