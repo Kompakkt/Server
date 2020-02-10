@@ -11,7 +11,7 @@ import { Configuration } from './configuration';
 import { Logger } from './logger';
 
 interface IUpload {
-  Multer: multer.Instance;
+  Multer: any;
   AddMetadata(request: Request, response: Response): void;
   CancelMetadata(request: Request, response: Response): void;
   UploadRequest(request: Request, response: Response): void;
