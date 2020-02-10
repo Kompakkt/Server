@@ -628,7 +628,18 @@ const Mongo: IMongo = {
     );
 
     const temp = await Cache.get<T>(parsedId);
-    if (temp) return temp as T;
+    if (temp) {
+      // Make sure returned object is valid and not {}
+      if ((temp as any)._id) {
+        return temp as T;
+      }
+      // Flush invalid object from cache
+      Cache.del(parsedId).then(numDelKeys => {
+        if (numDelKeys > 0) {
+          Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
+        }
+      });
+    }
     return resolve_collection
       .findOne(Mongo.query(_id))
       .then(async resolve_result => {
