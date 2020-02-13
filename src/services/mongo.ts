@@ -7,6 +7,7 @@ import * as pngquant from 'imagemin-pngquant';
 import {
   Collection,
   Db,
+  MatchKeysAndValues,
   MongoClient,
   ObjectId,
   FilterQuery,
@@ -90,6 +91,13 @@ const updateOne = async (
   options?: UpdateOneOptions,
 ) => {
   await Cache.flush();
+  // Mongo does not allow mutation of the _id property.
+  // Deletes _id from all $set queries
+  if (update.$set) {
+    const setobj = update.$set as any;
+    delete setobj['_id'];
+    update.$set = setobj as MatchKeysAndValues<any>;
+  }
   return coll.updateOne(query, update, options);
 };
 
