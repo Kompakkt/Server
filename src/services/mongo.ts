@@ -152,8 +152,9 @@ const saveBase64toImage = async (
 const MongoURL = `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
 const Client = new MongoClient(MongoURL, {
   useNewUrlParser: true,
-  reconnectTries: Number.POSITIVE_INFINITY,
-  reconnectInterval: 1000,
+  // DEPRECATED:
+  // reconnectTries: Number.POSITIVE_INFINITY,
+  // reconnectInterval: 1000,
   useUnifiedTopology: true,
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
