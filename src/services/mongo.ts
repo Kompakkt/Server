@@ -805,6 +805,7 @@ const Mongo: IMongo = {
       Logger.warn(delete_result);
       response.send({ status: 'error' });
     }
+    Cache.flush();
   },
   searchByEntityFilter: async (request, response) => {
     const RequestCollection = request.params.collection.toLowerCase();
