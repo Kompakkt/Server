@@ -132,16 +132,18 @@ export const resolveEntity = async (entity: IEntity) => {
 
 export const resolveCompilation = async (compilation: ICompilation) => {
   if (compilation.entities) {
+    const valid = new Array<IEntity>();
     for (let i = 0; i < compilation.entities.length; i++) {
       const entity = compilation.entities[i];
       if (!entity) continue;
       const resolved = await Mongo.resolve<IEntity>(entity, 'entity');
       if (!resolved) continue;
-      compilation.entities[i] = resolved;
+      valid.push(resolved);
     }
-    compilation.entities = compilation.entities.filter(_ => _);
+    compilation.entities = valid;
   }
   if (compilation.annotationList) {
+    const valid = new Array<IAnnotation>();
     for (let i = 0; i < compilation.annotationList.length; i++) {
       const annotation = compilation.annotationList[i];
       if (!annotation) continue;
@@ -150,9 +152,9 @@ export const resolveCompilation = async (compilation: ICompilation) => {
         'annotation',
       );
       if (!resolved) continue;
-      compilation.annotationList[i] = resolved;
+      valid.push(resolved);
     }
-    compilation.annotationList = compilation.annotationList.filter(_ => _);
+    compilation.annotationList = valid;
   }
   return compilation;
 };
