@@ -14,6 +14,7 @@ import {
   IMetaDataPerson,
   IMetaDataInstitution,
   IStrippedUserData,
+  IUnresolvedEntity,
 } from '../interfaces';
 import { RootDirectory } from '../environment';
 
@@ -74,10 +75,17 @@ const saveCompilation = async (
     username: userData.username,
     fullname: userData.fullname,
   };
+
   // Compilations should have all their entities referenced by _id
-  compilation.entities = (compilation.entities.filter(
-    entity => entity,
-  ) as IEntity[]).map(entity => ({ _id: new ObjectId(entity['_id']) }));
+  // Remove duplicates. Set of Objects doesnt remove duplicate, so use strings
+  const validIds = new Set<string>();
+  for (const entity of compilation.entities) {
+    if (!entity) continue;
+    validIds.add(entity._id.toString());
+  }
+  compilation.entities = Array.from(validIds).map(
+    _id => ({ _id: new ObjectId(_id) } as IUnresolvedEntity),
+  );
 
   await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
   return compilation;
