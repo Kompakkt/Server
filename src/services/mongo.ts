@@ -1067,6 +1067,7 @@ const Mongo: IMongo = {
         );
 
         if (!resolved || !resolved._id) continue;
+        if (resolved.entities.length === 0) continue;
 
         if (searchText !== '') {
           if (
