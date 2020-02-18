@@ -16,10 +16,11 @@ Server.use((request, response, next) => {
   if (request.body && request.body.username) {
     // LDAP doesn't care about e.g. whitespaces in usernames
     // so we fix this here
-    const regex = new RegExp(/[a-z0-9]+/i);
-    const result = request.body.username.match(regex);
-    if (result[0]) {
-      request.body.username = result[0];
+    const regex = new RegExp(/[a-zA-Z0-9äöüÄÖÜß\-\_]/gi);
+    const username = `${request.body.username}`;
+    const match = username.match(regex);
+    if (match) {
+      request.body.username = [...match].join('');
       next();
     } else {
       response.send({ status: 'error', message: 'Cannot handle username' });
