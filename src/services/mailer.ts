@@ -92,15 +92,15 @@ const Mailer: IMailer = {
         if (unansweredMails >= 3) {
           return response.send({
             status: 'error',
-            message: 'Limit for this category reached',
+            message: 'Limit for this category reached.',
           });
         }
         break;
       case ETarget.upload:
-        if (unansweredMails >= 1) {
+        if (unansweredMails > 0) {
           return response.send({
             status: 'error',
-            message: 'Limit for this category reached',
+            message: 'User already requested upload rights.',
           });
         }
         break;
