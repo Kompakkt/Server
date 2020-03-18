@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { IEntity, IUserData, EUserRank } from '../interfaces';
+import { EUserRank, IEntity, IUserData } from '../interfaces';
 
 import { Configuration } from './configuration';
 import { Mongo, updateOne } from './mongo';
@@ -92,6 +92,7 @@ const Admin: IAdmin = {
     const role = request.body.role;
     switch (role) {
       case EUserRank.user:
+      case EUserRank.uploadrequested:
       case EUserRank.uploader:
       case EUserRank.admin:
         const AccDB: Db = Mongo.getAccountsRepository();

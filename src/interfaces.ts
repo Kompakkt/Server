@@ -145,6 +145,7 @@ export interface ILoginData {
 
 export enum EUserRank {
   user = 'user',
+  uploadrequested = 'uploadrequested',
   uploader = 'uploader',
   admin = 'admin',
 }
