@@ -38,7 +38,7 @@ interface IChangeRanking {
 }
 
 interface IRoomData {
-  requester: IUserInfo;
+  reqer: IUserInfo;
   recipient: string;
   info: IUserInfo;
 }
@@ -93,13 +93,13 @@ const Socket = {
     });
 
     socket.on('roomDataRequest', (data: IRoomData) => {
-      data.requester.user.socketId = socket.id;
+      data.reqer.user.socketId = socket.id;
       socket.to(data.recipient).emit('roomDataRequest', data);
     });
 
     socket.on('roomDataAnswer', (data: IRoomData) => {
       data.info.user.socketId = socket.id;
-      socket.to(data.requester.user.socketId).emit('roomDataAnswer', data);
+      socket.to(data.reqer.user.socketId).emit('roomDataAnswer', data);
     });
 
     socket.on('createAnnotation', (data: IAnnotation) => {

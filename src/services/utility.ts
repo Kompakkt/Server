@@ -6,6 +6,7 @@ import {
   ICompilation,
   IEntity,
   IUserData,
+  IStrippedUserData,
   IGroup,
 } from '../interfaces';
 
@@ -18,16 +19,16 @@ import {
 import { isAnnotation } from './typeguards';
 
 interface IUtility {
-  findAllEntityOwnersRequest(request: Request, response: Response): any;
-  findAllEntityOwners(entityId: string): any;
-  countEntityUses(request: Request, response: Response): any;
-  addAnnotationsToAnnotationList(request: Request, response: Response): any;
-  applyActionToEntityOwner(request: Request, response: Response): any;
+  findAllEntityOwnersRequest(req: Request, res: Response): any;
+  findAllEntityOwners(entityId: string): Promise<IStrippedUserData[]>;
+  countEntityUses(req: Request, res: Response): any;
+  addAnnotationsToAnnotationList(req: Request, res: Response): any;
+  applyActionToEntityOwner(req: Request, res: Response): any;
 
-  findUserInGroups(request: Request, response: Response): any;
-  findUserInCompilations(request: Request, response: Response): any;
+  findUserInGroups(req: Request, res: Response): any;
+  findUserInCompilations(req: Request, res: Response): any;
 
-  findUserInMetadata(request: Request, response: Response): any;
+  findUserInMetadata(req: Request, res: Response): any;
 }
 
 const collectionAsArray = <T extends unknown>(collection: string, query = {}) =>
@@ -37,14 +38,13 @@ const collectionAsArray = <T extends unknown>(collection: string, query = {}) =>
     .toArray();
 
 const Utility: IUtility = {
-  findAllEntityOwnersRequest: async (request, response) => {
-    const entityId = request.params.identifier;
-    if (!ObjectId.isValid(entityId)) {
-      response.send({ status: 'error', message: 'Invalid entity _id ' });
-      return;
-    }
+  findAllEntityOwnersRequest: async (req, res) => {
+    const entityId = req.params.identifier;
+    if (!ObjectId.isValid(entityId))
+      return res.status(400).send('Invalid entity _id ');
+
     const accounts = await Utility.findAllEntityOwners(entityId);
-    response.send({ status: 'ok', accounts });
+    return res.status(200).send(accounts);
   },
   findAllEntityOwners: async (entityId: string) => {
     const AccDB = Mongo.getAccountsRepository();
@@ -54,21 +54,22 @@ const Utility: IUtility = {
         const Entities = JSON.stringify(userData.data.entity);
         return Entities ? Entities.indexOf(entityId) !== -1 : false;
       })
-      .map(userData => ({
-        fullname: userData.fullname,
-        username: userData.username,
-        _id: userData._id,
-      }));
+      .map(
+        userData =>
+          ({
+            fullname: userData.fullname,
+            username: userData.username,
+            _id: userData._id,
+          } as IStrippedUserData),
+      );
     return accounts;
   },
-  countEntityUses: async (request, response) => {
-    const entityId = request.params.identifier;
-    if (!ObjectId.isValid(entityId)) {
-      response.send({ status: 'error', message: 'Invalid entity _id ' });
-      return;
-    }
+  countEntityUses: async (req, res) => {
+    const entityId = req.params.identifier;
+    if (!ObjectId.isValid(entityId))
+      return res.status(404).send('Invalid entity _id ');
 
-    const user = await getCurrentUserBySession(request.sessionID);
+    const user = await getCurrentUserBySession(req.sessionID);
 
     const isUserOwnerOfCompilation = (comp: ICompilation) => {
       if (!comp.relatedOwner || !user) return false;
@@ -100,32 +101,26 @@ const Utility: IUtility = {
     );
     const occurences = compilations.length;
 
-    response.send({ status: 'ok', occurences, compilations });
+    return res.status(200).send({ occurences, compilations });
   },
-  addAnnotationsToAnnotationList: async (request, response) => {
-    const annotations = request.body.annotations as string[] | undefined;
-    if (!annotations || !Array.isArray(annotations)) {
-      response.send({ status: 'error', message: 'No annotation array sent' });
-      return;
-    }
+  addAnnotationsToAnnotationList: async (req, res) => {
+    const annotations = req.body.annotations as string[] | undefined;
+    if (!annotations || !Array.isArray(annotations))
+      return res.status(400).send('No annotation array sent');
 
-    const compId = request.params.identifier;
+    const compId = req.params.identifier;
     if (
       !compId ||
       !ObjectId.isValid(compId) ||
       (await Mongo.resolve(compId, 'compilation')) === undefined
     ) {
-      response.send({ status: 'error', message: 'Invalid compilation given' });
-      return;
+      return res.status(400).send('Invalid compilation given');
     }
 
     const ObjDB = Mongo.getEntitiesRepository();
     const CompColl = ObjDB.collection<ICompilation>('compilation');
     const compilation = await CompColl.findOne({ _id: new ObjectId(compId) });
-    if (!compilation) {
-      response.send({ status: 'error', message: 'Compilation not found' });
-      return;
-    }
+    if (!compilation) return res.status(404).send('Compilation not found');
 
     const resolvedAnnotations = (
       await Promise.all(
@@ -138,20 +133,14 @@ const Utility: IUtility = {
       .filter(ann => ann !== undefined && ann)
       .map(ann => {
         ann['_id'] = new ObjectId();
-        ann['target']['source']['relatedCompilation'] =
-          request.params.identifier;
+        ann['target']['source']['relatedCompilation'] = req.params.identifier;
         ann['lastModificationDate'] = new Date().toISOString();
         return ann;
       });
     const AnnColl = ObjDB.collection<IAnnotation>('annotation');
     const insertResult = await AnnColl.insertMany(validAnnotations);
-    if (insertResult.result.ok !== 1) {
-      response.send({
-        status: 'error',
-        message: 'Failed inserting Annotations',
-      });
-      return;
-    }
+    if (insertResult.result.ok !== 1)
+      return res.status(500).send('Failed inserting Annotations');
 
     compilation.annotationList = compilation.annotationList
       ? compilation.annotationList
@@ -173,55 +162,34 @@ const Utility: IUtility = {
       { _id: new ObjectId(compId) },
       { $set: { annotationList: compilation['annotationList'] } },
     );
-    if (updateResult.result.ok !== 1) {
-      response.send({
-        status: 'error',
-        message: 'Failed updating annotationList',
-      });
-      return;
-    }
+    if (updateResult.result.ok !== 1)
+      return res.status(500).send('Failed updating annotationList');
 
     // Add Annotations to LDAP user
     validAnnotations.forEach(ann =>
-      Mongo.insertCurrentUserData(request, ann['_id'], 'annotation'),
+      Mongo.insertCurrentUserData(req, ann['_id'], 'annotation'),
     );
-    response.send({
-      status: 'ok',
-      ...(await Mongo.resolve<ICompilation>(compId, 'compilation')),
-    });
+    return res
+      .status(200)
+      .send(await Mongo.resolve<ICompilation>(compId, 'compilation'));
   },
-  applyActionToEntityOwner: async (request, response) => {
-    const command = request.body.command;
-    if (!['add', 'remove'].includes(command)) {
-      return response.send({
-        status: 'error',
-        message: 'Invalid command. Use "add" or "remove"',
-      });
-    }
-    const ownerUsername = request.body.ownerUsername;
-    const ownerId = request.body.ownerId;
-    if (!ownerId && !ownerUsername) {
-      return response.send({
-        status: 'error',
-        message: 'No owner _id or username given',
-      });
-    }
-    if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId)) {
-      return response.send({
-        status: 'error',
-        message: 'Incorrect owner _id given',
-      });
-    }
-    const entityId = request.body.entityId;
+  applyActionToEntityOwner: async (req, res) => {
+    const command = req.body.command;
+    if (!['add', 'remove'].includes(command))
+      return res.status(400).send('Invalid command. Use "add" or "remove"');
+    const ownerUsername = req.body.ownerUsername;
+    const ownerId = req.body.ownerId;
+    if (!ownerId && !ownerUsername)
+      return res.status(400).send('No owner _id or username given');
+    if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId))
+      return res.status(400).send('Incorrect owner _id given');
+    const entityId = req.body.entityId;
     if (
       !entityId ||
       !ObjectId.isValid(entityId) ||
       (await Mongo.resolve<IEntity>(entityId, 'entity')) === undefined
     ) {
-      return response.send({
-        status: 'error',
-        message: 'Invalid entity identifier',
-      });
+      return res.status(400).send('Invalid entity identifier');
     }
     const AccDB = Mongo.getAccountsRepository();
     const users = AccDB.collection<IUserData>('users');
@@ -230,10 +198,7 @@ const Utility: IUtility = {
       : { username: ownerUsername };
     const account = await users.findOne(findUserQuery);
     if (!account) {
-      return response.send({
-        status: 'error',
-        message: 'Incorrect owner _id or username given',
-      });
+      return res.status(400).send('Incorrect owner _id or username given');
     }
 
     account.data.entity = account.data.entity ? account.data.entity : [];
@@ -251,12 +216,9 @@ const Utility: IUtility = {
         break;
       case 'remove':
         const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
-        if (entityUses === 1) {
-          return response.send({
-            status: 'error',
-            message: 'Cannot remove last owner',
-          });
-        }
+        if (entityUses === 1)
+          return res.status(403).send('Cannot remove last owner');
+
         account.data.entity = (account.data.entity as IEntity[]).filter(
           entity => entity.toString() !== entityId.toString(),
         );
@@ -268,44 +230,29 @@ const Utility: IUtility = {
       $set: { data: account.data },
     });
 
-    if (updateResult.result.ok !== 1) {
-      return response.send({
-        status: 'error',
-        message: 'Failed updating entity array',
-      });
-    }
+    if (updateResult.result.ok !== 1)
+      return res.status(500).send('Failed updating entity array');
 
-    return response.send({ status: 'ok' });
+    return res.status(200);
   },
-  findUserInGroups: async (request, response) => {
-    const user = await getCurrentUserBySession(request.sessionID);
-    if (!user) {
-      response.send({
-        status: 'error',
-        message: 'Failed getting user by SessionId',
-      });
-      return;
-    }
+  findUserInGroups: async (req, res) => {
+    const user = await getCurrentUserBySession(req.sessionID);
+    if (!user) return res.status(404).send('Failed getting user by SessionId');
     const groups = await collectionAsArray<IGroup>('group');
 
-    response.send({
-      status: 'ok',
-      groups: groups.filter(
-        group =>
-          JSON.stringify(group.members).includes(user._id.toString()) ||
-          JSON.stringify(group.owners).includes(user._id.toString()),
-      ),
-    });
+    return res
+      .status(200)
+      .send(
+        groups.filter(
+          group =>
+            JSON.stringify(group.members).includes(user._id.toString()) ||
+            JSON.stringify(group.owners).includes(user._id.toString()),
+        ),
+      );
   },
-  findUserInCompilations: async (request, response) => {
-    const user = await getCurrentUserBySession(request.sessionID);
-    if (!user) {
-      response.send({
-        status: 'error',
-        message: 'Failed getting user by SessionId',
-      });
-      return;
-    }
+  findUserInCompilations: async (req, res) => {
+    const user = await getCurrentUserBySession(req.sessionID);
+    if (!user) return res.status(404).send('Failed getting user by SessionId');
     const compilations = await Promise.all(
       (await collectionAsArray<ICompilation>('compilation'))
         .filter(comp => comp.whitelist.enabled)
@@ -340,20 +287,11 @@ const Utility: IUtility = {
       )
     ).filter(comp => comp) as ICompilation[];
 
-    response.send({
-      status: 'ok',
-      compilations: resolvedCompilations,
-    });
+    return res.status(200).send(resolvedCompilations);
   },
-  findUserInMetadata: async (request, response) => {
-    const user = await getCurrentUserBySession(request.sessionID);
-    if (!user) {
-      response.send({
-        status: 'error',
-        message: 'Failed getting user by SessionId',
-      });
-      return;
-    }
+  findUserInMetadata: async (req, res) => {
+    const user = await getCurrentUserBySession(req.sessionID);
+    if (!user) return res.status(404).send('Failed getting user by SessionId');
     const entities = await collectionAsArray<IEntity>('entity');
 
     const resolvedEntities = (
@@ -368,7 +306,7 @@ const Utility: IUtility = {
       );
     });
 
-    response.send({ status: 'ok', resolvedEntities });
+    return res.status(200).send(resolvedEntities);
   },
 };
 

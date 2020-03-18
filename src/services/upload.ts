@@ -12,11 +12,11 @@ import { Logger } from './logger';
 
 interface IUpload {
   Multer: any;
-  AddMetadata(request: Request, response: Response): void;
-  CancelMetadata(request: Request, response: Response): void;
-  UploadRequest(request: Request, response: Response): void;
-  UploadCancel(request: Request, response: Response): void;
-  UploadFinish(request: Request, response: Response): void;
+  AddMetadata(req: Request, res: Response): void;
+  CancelMetadata(req: Request, res: Response): void;
+  UploadRequest(req: Request, res: Response): void;
+  UploadCancel(req: Request, res: Response): void;
+  UploadFinish(req: Request, res: Response): void;
 }
 
 const tempDir = `${RootDirectory}/${Configuration.Uploads.TempDirectory}`;
@@ -41,89 +41,80 @@ const Upload: IUpload = {
   Multer: multer({
     dest: tempDir,
   }),
-  AddMetadata: (request, response) => {
-    const token = request.headers['semirandomtoken'];
-    const metaDataKey = request.headers['metadatakey'];
-    const tempPath = `${request['file'].path}`;
+  AddMetadata: (req, res) => {
+    const token = req.headers['semirandomtoken'];
+    const metaDataKey = req.headers['metadatakey'];
+    const tempPath = `${req['file'].path}`;
     let newPath = uploadDir;
     newPath += `${token}/`;
     newPath += `${metaDataKey}/`;
     // Filename gets a prefix of the metadata input field selected
-    const filename = `${request.headers['prefix']}-${request['file'].originalname}`;
+    const filename = `${req.headers['prefix']}-${req['file'].originalname}`;
     newPath += filename;
 
     ensureDir(dirname(newPath))
       .then(() => move(tempPath, newPath))
       .then(_ => {
-        const responseEntity = {
+        const resEntity = {
           metadata_file: filename,
-          metadata_entity: request.headers['metadatakey'],
+          metadata_entity: req.headers['metadatakey'],
           metadata_link: `entities/${token}/${metaDataKey}/${filename}`,
           metadata_format: `${extname(newPath)}`,
           metadata_size: `${statSync(newPath).size} bytes`,
         };
-        response.send(JSON.stringify(responseEntity));
+        res.status(200).send(resEntity);
       })
       .catch(err => {
         Logger.err(err);
-        return response.send({
-          status: 'error',
-          message: 'Failed ensuring file directory',
-        });
+        return res.status(500).send('Failed ensuring file directory');
       });
   },
   CancelMetadata: () => {
-    // TODO: Either remove on it's own via request or delete with the rest of the upload cancel
+    // TODO: Either remove on it's own via req or delete with the rest of the upload cancel
   },
-  UploadRequest: (request, response) => {
+  UploadRequest: (req, res) => {
     // TODO: Checksum
     // TODO: Do this without headers?
-    const tempPath = `${request['file'].destination}/${request['file'].filename}`;
-    const relPath = request.headers['relpath'] as string | undefined;
+    const tempPath = `${req['file'].destination}/${req['file'].filename}`;
+    const relPath = req.headers['relpath'] as string | undefined;
     console.log(relPath);
     const folderOrFilePath =
       relPath && relPath.length > 0
         ? slug(relPath)
-        : slug(request['file'].originalname);
+        : slug(req['file'].originalname);
     const destPath = join(
       uploadDir,
-      `${request.headers['filetype']}`,
-      `${request.headers['semirandomtoken']}/`,
+      `${req.headers['filetype']}`,
+      `${req.headers['semirandomtoken']}/`,
       `${folderOrFilePath}`,
     );
 
     ensureDir(dirname(destPath))
       .then(() => move(tempPath, destPath))
-      .then(() => response.send({ status: 'ok', message: 'Upload success' }))
+      .then(() => res.status(200).end())
       .catch(err => {
         Logger.err(err);
-        response.send({ status: 'error', message: 'Upload request failed' });
+        res.status(500).send('Upload req failed');
       });
   },
   // TODO: Deprecate and move to Cleaning service
-  UploadCancel: (_, response) => {
-    response.send({
-      status: 'ok',
-      message: 'Successfully cancelled upload',
-    });
+  UploadCancel: (_, res) => {
+    res.status(200).end();
   },
-  UploadFinish: async (request, response) => {
-    Logger.info(request.body);
-    const Token = request.body.uuid;
-    const Type = request.body.type;
+  UploadFinish: async (req, res) => {
+    Logger.info(req.body);
+    const Token = req.body.uuid;
+    const Type = req.body.type;
     if (!Token || !Type) {
-      Logger.err(
-        `Upload cancel request failed. Token: ${Token}, Type: ${Type}`,
-      );
-      response.send({ status: 'error', message: 'Missing type or token' });
-      return;
+      Logger.err(`Upload cancel req failed. Token: ${Token}, Type: ${Type}`);
+      return res.status(400).send('Missing type or token');
     }
     const path = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/${Type}/${Token}`;
 
-    pathExists(path)
+    return pathExists(path)
       .catch(err => {
         Logger.err(err);
-        response.send({ status: 'error', message: 'Filepath not found' });
+        res.status(500).send('Filepath not found');
       })
       .then(async () => {
         const foundFiles = klawSync(path).filter(item => item.stats.isFile());
@@ -173,11 +164,11 @@ const Upload: IUpload = {
           filteredFiles.length > 0 ? filteredFiles : foundFiles,
         );
         Logger.info(ResponseFiles);
-        response.send({ status: 'ok', files: ResponseFiles });
+        res.status(200).send(ResponseFiles);
       })
       .catch(err => {
         Logger.err(err);
-        response.send({ status: 'error', message: 'Unknown error' });
+        res.status(500).send('Unknown error');
       });
   },
 };

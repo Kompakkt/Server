@@ -170,7 +170,7 @@ const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 
 interface IMongo {
   init(): Promise<void>;
-  isMongoDBConnected(_: Request, response: Response, next: NextFunction): void;
+  isMongoDBConnected(_: Request, res: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
   getEntitiesRepository(): Db;
   saveBase64toImage(
@@ -178,50 +178,47 @@ interface IMongo {
     subfolder: string,
     identifier: string | ObjectId,
   ): Promise<string>;
-  fixObjectId(request: Request, _: Response, next: NextFunction): void;
-  getUnusedObjectId(_: Request, response: Response): void;
-  invalidateSession(request: Request, response: Response): void;
+  fixObjectId(req: Request, _: Response, next: NextFunction): void;
+  getUnusedObjectId(_: Request, res: Response): void;
+  invalidateSession(req: Request, res: Response): void;
   updateSessionId(
-    request: Request,
-    response: Response,
+    req: Request,
+    res: Response,
     next: NextFunction,
   ): Promise<any>;
-  addToAccounts(request: Request, response: Response): any;
+  addToAccounts(req: Request, res: Response): any;
   insertCurrentUserData(
-    request: Request | IUserData,
+    req: Request | IUserData,
     identifier: string | ObjectId,
     collection: string,
   ): Promise<any>;
   resolveUserData(_userData: IUserData): Promise<IUserData>;
-  getCurrentUserData(request: Request, response: Response): Promise<any>;
+  getCurrentUserData(req: Request, res: Response): Promise<any>;
   validateLoginSession(
-    request: Request,
-    response: Response,
+    req: Request,
+    res: Response,
     next: NextFunction,
   ): Promise<any>;
-  submit(request: Request, response: Response): Promise<any>;
-  addEntityToCollection(request: Request, response: Response): Promise<any>;
-  updateEntitySettings(request: Request, response: Response): Promise<any>;
+  submit(req: Request, res: Response): Promise<any>;
+  addEntityToCollection(req: Request, res: Response): Promise<any>;
+  updateEntitySettings(req: Request, res: Response): Promise<any>;
   isUserOwnerOfEntity(
-    request: Request | IUserData,
+    req: Request | IUserData,
     identifier: string | ObjectId,
   ): Promise<any>;
-  isUserAdmin(request: Request): Promise<boolean>;
+  isUserAdmin(req: Request): Promise<boolean>;
   query(_id: string | ObjectId): any;
   resolve<T>(
     obj: any,
     collection_name: string,
     depth?: number,
   ): Promise<T | null | undefined>;
-  getEntityFromCollection(request: Request, response: Response): Promise<any>;
-  getAllEntitiesFromCollection(
-    request: Request,
-    response: Response,
-  ): Promise<any>;
-  removeEntityFromCollection(request: Request, response: Response): any;
-  searchByEntityFilter(request: Request, response: Response): Promise<any>;
-  searchByTextFilter(request: Request, response: Response): Promise<any>;
-  explore(request: Request, response: Response): Promise<any>;
+  getEntityFromCollection(req: Request, res: Response): Promise<any>;
+  getAllEntitiesFromCollection(req: Request, res: Response): Promise<any>;
+  removeEntityFromCollection(req: Request, res: Response): any;
+  searchByEntityFilter(req: Request, res: Response): Promise<any>;
+  searchByTextFilter(req: Request, res: Response): Promise<any>;
+  explore(req: Request, res: Response): Promise<any>;
 }
 
 const Mongo: IMongo = {
@@ -239,16 +236,14 @@ const Mongo: IMongo = {
       });
     });
   },
-  isMongoDBConnected: (_, response, next) => {
-    const isConnected = Client.isConnected();
-    if (isConnected) {
-      next();
-    } else {
-      Logger.warn('Incoming request while not connected to MongoDB');
-      response.send({
-        message: 'Cannot connect to Database. Contact sysadmin',
-      });
+  isMongoDBConnected: (_, res, next) => {
+    if (!Client.isConnected()) {
+      Logger.warn('Incoming req while not connected to MongoDB');
+      return res
+        .status(500)
+        .send('Cannot connect to Database. Contact sysadmin');
     }
+    return next();
   },
   getAccountsRepository,
   getEntitiesRepository,
@@ -257,40 +252,32 @@ const Mongo: IMongo = {
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
    */
-  fixObjectId: (request, _, next) => {
-    if (request) {
-      if (
-        request.body &&
-        request.body['_id'] &&
-        ObjectId.isValid(request.body['_id'])
-      ) {
-        request.body['_id'] = new ObjectId(request.body['_id']);
+  fixObjectId: (req, _, next) => {
+    if (req) {
+      if (req.body && req.body['_id'] && ObjectId.isValid(req.body['_id'])) {
+        req.body['_id'] = new ObjectId(req.body['_id']);
       }
     }
     next();
   },
-  getUnusedObjectId: (_, response) => {
-    response.send(new ObjectId());
+  getUnusedObjectId: (_, res) => {
+    res.status(200).send(new ObjectId());
   },
-  invalidateSession: (request, response) => {
-    const sessionID = request.sessionID;
+  invalidateSession: (req, res) => {
+    const sessionID = req.sessionID;
     users().updateMany({ sessionID }, { $set: { sessionID: '' } }, () => {
       Logger.log('Logged out');
-      response.send({ status: 'ok', message: 'Logged out' });
+      res.status(200).end();
     });
   },
-  updateSessionId: async (request, response, next) => {
-    const username = request.body.username.toLowerCase();
+  updateSessionId: async (req, res, next) => {
+    const username = req.body.username.toLowerCase();
     const userData = await getUserByUsername(username);
 
-    if (!userData) {
-      return response.send({
-        status: 'error',
-        message: 'Failed finding user with username',
-      });
-    }
+    if (!userData)
+      return res.status(404).send('Failed finding user with username');
 
-    const sessionID = request.sessionID;
+    const sessionID = req.sessionID;
 
     const updateResult = await users().updateOne(
       { username },
@@ -303,24 +290,18 @@ const Mongo: IMongo = {
       },
     );
 
-    if (updateResult.result.ok !== 1) {
-      return response.send({
-        status: 'error',
-        message: 'Failed updating user in database',
-      });
-    }
+    if (updateResult.result.ok !== 1)
+      return res.status(500).send('Failed updating user in database');
+
     return next();
   },
-  addToAccounts: async (request, response) => {
-    const user: IUserData = request.user as IUserData;
-    const username = request.body.username.toLowerCase();
-    const sessionID = request.sessionID ? request.sessionID : null;
+  addToAccounts: async (req, res) => {
+    const user: IUserData = req.user as IUserData;
+    const username = req.body.username.toLowerCase();
+    const sessionID = req.sessionID ? req.sessionID : null;
     const userData = await getUserByUsername(username);
 
-    if (!sessionID) {
-      response.send({ status: 'error', message: 'Failed adding sessionID' });
-      return;
-    }
+    if (!sessionID) return res.status(400).send('No sessionID sent with req');
 
     const updatedUser: IUserData = {
       ...user,
@@ -334,29 +315,23 @@ const Mongo: IMongo = {
     // _id is immutable in MongoDB, so we can't update the field
     delete updatedUser['_id'];
 
-    users()
+    return users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
       .then(async _ => {
         // Logger.log(`User ${updatedUser.username} logged in`);
-        response.send({
-          status: 'ok',
-          ...(await Mongo.resolveUserData(updatedUser)),
-        });
+        res.status(200).send(await Mongo.resolveUserData(updatedUser));
       })
       .catch(error => {
         Logger.err(error);
-        response.send({
-          status: 'error',
-          message: 'Failed updating user entry in database',
-        });
+        res.status(500).send('Failed updating user entry in database');
       });
   },
   insertCurrentUserData: async (
-    request,
+    req,
     identifier: string | ObjectId,
     collection: string,
   ) => {
-    const sessionID = request.sessionID;
+    const sessionID = req.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
 
     if (!ObjectId.isValid(identifier) || !userData) return false;
@@ -420,37 +395,27 @@ const Mongo: IMongo = {
 
     return userData;
   },
-  getCurrentUserData: async (request, response) => {
-    const sessionID = request.sessionID;
+  getCurrentUserData: async (req, res) => {
+    const sessionID = req.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
-    if (!userData) {
-      return response.send({
-        status: 'error',
-        message: 'User not found by sessionID. Try relogging',
-      });
-    }
+    if (!userData)
+      return res.status(404).send('User not found by sessionID. Try relogging');
 
-    return response.send({
-      status: 'ok',
-      ...(await Mongo.resolveUserData(userData)),
-    });
+    return res.status(200).send(await Mongo.resolveUserData(userData));
   },
-  validateLoginSession: async (request, response, next) => {
+  validateLoginSession: async (req, res, next) => {
     let cookieSID: string | undefined;
-    if (request.cookies['connect.sid']) {
-      cookieSID = request.cookies['connect.sid'] as string;
+    if (req.cookies['connect.sid']) {
+      cookieSID = req.cookies['connect.sid'] as string;
       const startIndex = cookieSID.indexOf(':') + 1;
       const endIndex = cookieSID.indexOf('.');
       cookieSID = cookieSID.substring(startIndex, endIndex);
     }
-    const sessionID = (request.sessionID = cookieSID
-      ? cookieSID
-      : request.sessionID);
+    const sessionID = (req.sessionID = cookieSID ? cookieSID : req.sessionID);
 
     const userData = await getCurrentUserBySession(sessionID);
-    if (!userData) {
-      return response.send({ status: 'error', message: 'Invalid session' });
-    }
+    if (!userData) return res.status(404).send('User not found by session');
+
     return next();
   },
   /**
@@ -458,15 +423,15 @@ const Mongo: IMongo = {
    * When the user submits the metadataform this function
    * adds the missing data to defined collections
    */
-  submit: async (request, response) => {
-    Logger.info('Handling submit request');
-    request.params.collection = 'digitalentity';
-    await Mongo.addEntityToCollection(request, response);
+  submit: async (req, res) => {
+    Logger.info('Handling submit req');
+    req.params.collection = 'digitalentity';
+    await Mongo.addEntityToCollection(req, res);
   },
-  addEntityToCollection: async (request, response) => {
+  addEntityToCollection: async (req, res) => {
     Cache.flush();
 
-    const RequestCollection = request.params.collection.toLowerCase();
+    const RequestCollection = req.params.collection.toLowerCase();
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
@@ -474,14 +439,9 @@ const Mongo: IMongo = {
       RequestCollection,
     );
 
-    let resultEntity = request.body;
-    const userData = await getCurrentUserBySession(request.sessionID);
-    if (!userData) {
-      return response.send({
-        status: 'error',
-        message: 'Cannot fetch current user from database',
-      });
-    }
+    let resultEntity = req.body;
+    const userData = await getCurrentUserBySession(req.sessionID);
+    if (!userData) return res.status(404).send('User not found by session');
 
     const isValidObjectId = ObjectId.isValid(resultEntity['_id']);
     // tslint:disable-next-line:triple-equals
@@ -498,11 +458,9 @@ const Mongo: IMongo = {
     const isAllowedType = (_e: any) =>
       isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
-    if (isValidObjectId && doesEntityExist && !isAllowedType(resultEntity)) {
-      if (!(await Mongo.isUserOwnerOfEntity(request, resultEntity['_id']))) {
-        return response.send({ status: 'error', message: 'Permission denied' });
-      }
-    }
+    if (isValidObjectId && doesEntityExist && !isAllowedType(resultEntity))
+      if (!(await Mongo.isUserOwnerOfEntity(req, resultEntity['_id'])))
+        return res.status(401).send('User is not owner');
 
     const _id = isValidObjectId
       ? new ObjectId(resultEntity._id)
@@ -512,40 +470,40 @@ const Mongo: IMongo = {
     if (isCompilation(resultEntity)) {
       await saveCompilation(resultEntity, userData)
         .then(compilation => (resultEntity = compilation))
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else if (isEntity(resultEntity)) {
       await saveEntity(resultEntity, userData)
         .then(entity => (resultEntity = entity))
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else if (isAnnotation(resultEntity)) {
       await saveAnnotation(resultEntity, userData, doesEntityExist)
         .then(annotation => (resultEntity = annotation))
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else if (isPerson(resultEntity)) {
       await savePerson(resultEntity, userData)
         .then(person => (resultEntity = person))
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else if (isInstitution(resultEntity)) {
       await saveInstitution(resultEntity, userData)
         .then(institution => (resultEntity = institution))
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else if (isDigitalEntity(resultEntity)) {
       await saveDigitalEntity(resultEntity, userData)
         .then(async digitalentity => {
           resultEntity = digitalentity;
           await Mongo.insertCurrentUserData(
-            request,
+            req,
             resultEntity._id,
             'digitalentity',
           );
         })
-        .catch(rejected => response.send(rejected));
+        .catch(rejected => res.status(500).send(rejected));
     } else {
-      await Mongo.insertCurrentUserData(request, _id, RequestCollection);
+      await Mongo.insertCurrentUserData(req, _id, RequestCollection);
     }
 
     // We already got rejected. Don't update resultEntity in DB
-    if (response.headersSent) return undefined;
+    if (res.headersSent) return undefined;
 
     const updateResult = await updateOne(
       collection,
@@ -556,23 +514,24 @@ const Mongo: IMongo = {
 
     if (updateResult.result.ok !== 1) {
       Logger.err(`Failed updating ${RequestCollection} ${_id}`);
-      return response.send({ status: 'error' });
+      return res
+        .status(500)
+        .send(`Failed updating ${RequestCollection} ${_id}`);
     }
 
     const resultId = updateResult.upsertedId
       ? updateResult.upsertedId._id
       : _id;
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
-    return response.send({
-      status: 'ok',
-      ...(await Mongo.resolve<any>(resultId, RequestCollection)),
-    });
+    return res
+      .status(200)
+      .send(await Mongo.resolve<any>(resultId, RequestCollection));
   },
-  updateEntitySettings: async (request, response) => {
-    const preview = request.body.preview;
-    const identifier = ObjectId.isValid(request.params.identifier)
-      ? new ObjectId(request.params.identifier)
-      : request.params.identifier;
+  updateEntitySettings: async (req, res) => {
+    const preview = req.body.preview;
+    const identifier = ObjectId.isValid(req.params.identifier)
+      ? new ObjectId(req.params.identifier)
+      : req.params.identifier;
     const collection: Collection = getEntitiesRepository().collection('entity');
     const subfolder = 'entity';
 
@@ -581,41 +540,35 @@ const Mongo: IMongo = {
       subfolder,
       identifier,
     );
-    if (finalImagePath === '') {
-      return response.send({
-        status: 'error',
-        message: 'Failed saving preview image',
-      });
-    }
+    if (finalImagePath === '')
+      return res.status(500).send('Failed saving preview image');
 
     // Overwrite old settings
-    const settings = { ...request.body, preview: finalImagePath };
+    const settings = { ...req.body, preview: finalImagePath };
     const result = await updateOne(
       collection,
       { _id: identifier },
       { $set: { settings } },
     );
-    return response.send(
-      result.result.ok === 1 ? { status: 'ok', settings } : { status: 'error' },
-    );
+
+    if (result.result.ok !== 1)
+      return res.status(500).send('Failed updating settings');
+
+    return res.status(200).send(settings);
   },
-  isUserOwnerOfEntity: async (request, identifier: string | ObjectId) => {
+  isUserOwnerOfEntity: async (req, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier)
       ? new ObjectId(identifier)
       : identifier;
-    const userData = await getCurrentUserBySession(request.sessionID);
+    const userData = await getCurrentUserBySession(req.sessionID);
     if (!userData) {
       return false;
     }
-    const resolvedUser = await Mongo.resolveUserData(userData);
-    return (
-      JSON.stringify(resolvedUser ? resolvedUser.data : '').indexOf(
-        _id.toString(),
-      ) !== -1
-    );
+    const resolvedUser = (await Mongo.resolveUserData(userData)) ?? {};
+    return JSON.stringify(resolvedUser).indexOf(_id.toString()) !== -1;
   },
-  isUserAdmin: async request => {
-    const userData = await getCurrentUserBySession(request.sessionID);
+  isUserAdmin: async req => {
+    const userData = await getCurrentUserBySession(req.sessionID);
     return userData ? userData.role === EUserRank.admin : false;
   },
   query: (_id: string | ObjectId) => {
@@ -644,9 +597,8 @@ const Mongo: IMongo = {
       }
       // Flush invalid object from cache
       Cache.del(parsedId).then(numDelKeys => {
-        if (numDelKeys > 0) {
+        if (numDelKeys > 0)
           Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
-        }
       });
     }
     return resolve_collection
@@ -654,18 +606,16 @@ const Mongo: IMongo = {
       .then(async resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
-        if (isDigitalEntity(resolve_result)) {
+        if (isDigitalEntity(resolve_result))
           return resolveDigitalEntity(resolve_result);
-        }
-        if (isEntity(resolve_result)) {
-          return resolveEntity(resolve_result);
-        }
-        if (isCompilation(resolve_result)) {
+
+        if (isEntity(resolve_result)) return resolveEntity(resolve_result);
+
+        if (isCompilation(resolve_result))
           return resolveCompilation(resolve_result);
-        }
-        if (isPerson(resolve_result)) {
-          return resolvePerson(resolve_result);
-        }
+
+        if (isPerson(resolve_result)) return resolvePerson(resolve_result);
+
         return resolve_result;
       })
       .then(async result => {
@@ -680,47 +630,37 @@ const Mongo: IMongo = {
         return undefined;
       });
   },
-  getEntityFromCollection: async (request, response) => {
-    const RequestCollection = request.params.collection.toLowerCase();
+  getEntityFromCollection: async (req, res) => {
+    const RequestCollection = req.params.collection.toLowerCase();
 
-    const _id = ObjectId.isValid(request.params.identifier)
-      ? new ObjectId(request.params.identifier)
-      : request.params.identifier;
-    const password = request.params.password ? request.params.password : '';
+    const _id = ObjectId.isValid(req.params.identifier)
+      ? new ObjectId(req.params.identifier)
+      : req.params.identifier;
+    const password = req.params.password ? req.params.password : '';
     const entity = await Mongo.resolve<any>(_id, RequestCollection);
-    if (!entity) {
-      return response.send({
-        status: 'error',
-        message: `No ${RequestCollection} found with given identifier`,
-      });
-    }
+    if (!entity)
+      return res
+        .status(404)
+        .send(`No ${RequestCollection} found with given identifier`);
 
     if (isCompilation(entity)) {
       const compilation = entity;
       const _pw = compilation.password;
       const isPasswordProtected = _pw && _pw !== '';
-      const isUserOwner = await Mongo.isUserOwnerOfEntity(request, _id);
+      const isUserOwner = await Mongo.isUserOwnerOfEntity(req, _id);
       const isPasswordCorrect = _pw && _pw === password;
 
-      if (!isPasswordProtected || isUserOwner || isPasswordCorrect) {
-        response.send({ status: 'ok', ...compilation });
-        return undefined;
-      }
+      if (!isPasswordProtected || isUserOwner || isPasswordCorrect)
+        return res.status(200).send(compilation);
 
-      return response.send({
-        status: 'ok',
-        message: 'Password protected compilation',
-      });
+      return res.status(200).end();
     }
-    return response.send({ status: 'ok', ...entity });
+    return res.status(200).send(entity);
   },
-  getAllEntitiesFromCollection: async (request, response) => {
-    const RequestCollection = request.params.collection.toLowerCase();
+  getAllEntitiesFromCollection: async (req, res) => {
+    const RequestCollection = req.params.collection.toLowerCase();
     const allowed = ['person', 'institution', 'tag'];
-    if (!allowed.includes(RequestCollection)) {
-      response.send([]);
-      return;
-    }
+    if (!allowed.includes(RequestCollection)) return res.status(200).send([]);
 
     let results = await getAllItemsOfCollection(RequestCollection);
 
@@ -729,35 +669,29 @@ const Mongo: IMongo = {
     }
     results = results.filter(_ => _);
 
-    response.send(results);
+    return res.status(200).send(results);
   },
-  removeEntityFromCollection: async (request, response) => {
-    const RequestCollection = request.params.collection.toLowerCase();
+  removeEntityFromCollection: async (req, res) => {
+    const RequestCollection = req.params.collection.toLowerCase();
 
     const collection = getEntitiesRepository().collection(RequestCollection);
-    const sessionID = request.sessionID;
+    const sessionID = req.sessionID;
 
-    const identifier = ObjectId.isValid(request.params.identifier)
-      ? new ObjectId(request.params.identifier)
-      : request.params.identifier;
+    const identifier = ObjectId.isValid(req.params.identifier)
+      ? new ObjectId(req.params.identifier)
+      : req.params.identifier;
 
     const find_result = await getCurrentUserBySession(sessionID);
 
-    if (
-      !find_result ||
-      !find_result.username ||
-      !request.body.username ||
-      request.body.username !== find_result.username
-    ) {
+    if (!find_result) return res.status(404).send('User not found');
+
+    if (req.body?.username !== find_result?.username) {
       Logger.err(
         `Entity removal failed due to username & session not matching`,
       );
-      response.send({
-        status: 'error',
-        message:
-          'Input username does not match username with current sessionID',
-      });
-      return;
+      return res
+        .status(403)
+        .send('Input username does not match username with current sessionID');
     }
 
     // Flatten account.data so its an array of ObjectId.toString()
@@ -766,15 +700,9 @@ const Mongo: IMongo = {
       .map(id => id.toString());
 
     if (!UserRelatedEntities.find(obj => obj === identifier.toString())) {
-      Logger.err(
-        `Entity removal failed because Entity does not belong to user`,
-      );
-      response.send({
-        status: 'error',
-        message:
-          'Entity with identifier does not belong to account with this sessionID',
-      });
-      return;
+      const message = `Entity removal failed because Entity does not belong to user`;
+      Logger.err(message);
+      return res.status(401).send(message);
     }
     const delete_result = await collection.deleteOne({ _id: identifier });
     if (delete_result.result.ok === 1) {
@@ -788,28 +716,25 @@ const Mongo: IMongo = {
       );
 
       if (update_result.result.ok === 1) {
-        Logger.info(
-          `Deleted ${RequestCollection} ${request.params.identifier}`,
-        );
-        response.send({ status: 'ok' });
+        const message = `Deleted ${RequestCollection} ${req.params.identifier}`;
+        Logger.info(message);
+        res.status(200).send(message);
       } else {
-        Logger.warn(
-          `Failed deleting ${RequestCollection} ${request.params.identifier}`,
-        );
-        response.send({ status: 'error' });
+        const message = `Failed deleting ${RequestCollection} ${req.params.identifier}`;
+        Logger.warn(message);
+        res.status(500).send(message);
       }
     } else {
-      Logger.warn(
-        `Failed deleting ${RequestCollection} ${request.params.identifier}`,
-      );
+      const message = `Failed deleting ${RequestCollection} ${req.params.identifier}`;
+      Logger.warn(message);
       Logger.warn(delete_result);
-      response.send({ status: 'error' });
+      res.status(500).send(message);
     }
-    Cache.flush();
+    return Cache.flush();
   },
-  searchByEntityFilter: async (request, response) => {
-    const RequestCollection = request.params.collection.toLowerCase();
-    const body: any = request.body ? request.body : {};
+  searchByEntityFilter: async (req, res) => {
+    const RequestCollection = req.params.collection.toLowerCase();
+    const body: any = req.body ? req.body : {};
     const filter: any = body.filter ? body.filter : {};
 
     const doesEntityPropertyMatch = (
@@ -879,26 +804,21 @@ const Mongo: IMongo = {
       return true;
     });
 
-    response.send(allEntities);
+    return res.status(200).send(allEntities);
   },
-  searchByTextFilter: async (request, response) => {
-    const RequestCollection = request.params.collection.toLowerCase();
+  searchByTextFilter: async (req, res) => {
+    const RequestCollection = req.params.collection.toLowerCase();
 
-    const filter = request.body.filter
-      ? request.body.filter.map((_: any) => _.toLowerCase())
+    const filter = req.body.filter
+      ? req.body.filter.map((_: any) => _.toLowerCase())
       : [''];
-    const offset = request.body.offset ? parseInt(request.body.offset, 10) : 0;
+    const offset = req.body.offset ? parseInt(req.body.offset, 10) : 0;
     const length = 20;
 
-    if (typeof offset !== 'number') {
-      response.send({ status: 'error', message: 'Offset is not a number' });
-      return;
-    }
+    if (typeof offset !== 'number')
+      return res.status(400).send('Offset is not a number');
 
-    if (offset < 0) {
-      response.send({ status: 'error', message: 'Offset is smaller than 0' });
-      return;
-    }
+    if (offset < 0) return res.status(400).send('Offset is smaller than 0');
 
     let allEntities = (await getAllItemsOfCollection(RequestCollection)).slice(
       offset,
@@ -945,24 +865,24 @@ const Mongo: IMongo = {
       return result;
     };
 
-    response.send(filterResults(allEntities));
+    return res.status(200).send(filterResults(allEntities));
   },
-  explore: async (request, response) => {
+  explore: async (req, res) => {
     const {
       types,
       offset,
       searchEntity,
       filters,
       searchText,
-    } = request.body as IExploreRequest;
+    } = req.body as IExploreRequest;
     const items = new Array<IEntity | ICompilation>();
     const limit = 30;
-    const userData = await getCurrentUserBySession(request.sessionID);
+    const userData = await getCurrentUserBySession(req.sessionID);
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
-    // Check if request is cached
-    const requestHash = Cache.hash(request.body);
-    const temp = await Cache.get<IEntity[] | ICompilation[]>(requestHash);
+    // Check if req is cached
+    const reqHash = Cache.hash(req.body);
+    const temp = await Cache.get<IEntity[] | ICompilation[]>(reqHash);
 
     if (temp) {
       items.push(...temp);
@@ -1117,10 +1037,10 @@ const Mongo: IMongo = {
       items.push(...compilations);
     }
 
-    response.send(items.sort((a, b) => a.name.localeCompare(b.name)));
+    res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
-    // Cache full request
-    Cache.set(requestHash, items);
+    // Cache full req
+    Cache.set(reqHash, items);
   },
 };
 

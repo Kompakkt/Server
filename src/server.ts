@@ -12,18 +12,18 @@ import { Utility } from './services/utility';
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);
-Server.use((request, response, next) => {
-  if (request.body && request.body.username) {
+Server.use((req, res, next) => {
+  if (req.body && req.body.username) {
     // LDAP doesn't care about e.g. whitespaces in usernames
     // so we fix this here
     const regex = new RegExp(/[a-zA-Z0-9äöüÄÖÜß\-\_]/gi);
-    const username = `${request.body.username}`;
+    const username = `${req.body.username}`;
     const match = username.match(regex);
     if (match) {
-      request.body.username = [...match].join('');
+      req.body.username = [...match].join('');
       next();
     } else {
-      response.send({ status: 'error', message: 'Cannot handle username' });
+      res.status(403).send('Cannot handle username');
     }
   } else {
     next();
@@ -55,35 +55,27 @@ Server.get(
 // Return a MongoDB ObjectId
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
-Server.get(
-  '/api/v1/get/users',
-  Mongo.validateLoginSession,
-  async (_, response) => {
-    const users = await Mongo.getAccountsRepository()
-      .collection('users')
-      .find({})
-      .toArray();
-    response.send(
-      users.map(user => ({
-        username: user.username,
-        fullname: user.fullname,
-        _id: user._id,
-      })),
-    );
-  },
-);
+Server.get('/api/v1/get/users', Mongo.validateLoginSession, async (_, res) => {
+  const users = await Mongo.getAccountsRepository()
+    .collection('users')
+    .find({})
+    .toArray();
+  res.status(200).send(
+    users.map(user => ({
+      username: user.username,
+      fullname: user.fullname,
+      _id: user._id,
+    })),
+  );
+});
 
-Server.get(
-  '/api/v1/get/groups',
-  Mongo.validateLoginSession,
-  async (_, response) => {
-    const groups = await Mongo.getEntitiesRepository()
-      .collection('group')
-      .find({})
-      .toArray();
-    response.send(groups);
-  },
-);
+Server.get('/api/v1/get/groups', Mongo.validateLoginSession, async (_, res) => {
+  const groups = await Mongo.getEntitiesRepository()
+    .collection('group')
+    .find({})
+    .toArray();
+  res.status(200).send(groups);
+});
 
 // POST
 // Post single document to collection
@@ -115,27 +107,17 @@ Server.post(
   '/api/v1/post/searchentity/:collection',
   Mongo.searchByEntityFilter,
 );
-// Explore request
+// Explore req
 Server.post('/api/v1/post/explore', Mongo.explore);
 
 // Publish or unpublish a entity
-const userOwnerHandler = (
-  request: Request,
-  response: Response,
-  next: NextFunction,
-) => {
-  Mongo.isUserOwnerOfEntity(request, request.body.identifier)
+const userOwnerHandler = (req: Request, res: Response, next: NextFunction) => {
+  Mongo.isUserOwnerOfEntity(req, req.body.identifier)
     .then((isOwner): any => {
-      if (!isOwner)
-        return response.send({
-          status: 'error',
-          message: 'Not owner of entity',
-        });
+      if (!isOwner) throw new Error();
       next();
     })
-    .catch(() =>
-      response.send({ status: 'error', message: 'Not owner of entity' }),
-    );
+    .catch(() => res.status(403).send('Not owner of entity'));
 };
 Server.post(
   '/api/v1/post/publish',
@@ -181,7 +163,7 @@ Server.post(
 Server.post('/register', Express.registerUser);
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
 
-// Admin requests
+// Admin reqs
 Server.post(
   '/admin/getusers',
   Express.authenticate(),

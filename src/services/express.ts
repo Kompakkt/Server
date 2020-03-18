@@ -13,7 +13,7 @@ import passport from 'passport';
 import LdapStrategy from 'passport-ldapauth';
 import { Strategy as LocalStrategy } from 'passport-local';
 import SocketIo from 'socket.io';
-import responseTime from 'response-time';
+import resTime from 'response-time';
 
 import { RootDirectory } from '../environment';
 import { IInvalid, IUserData, EUserRank } from '../interfaces';
@@ -41,7 +41,7 @@ const createServer = () => {
   return HTTP.createServer(Server);
 };
 
-const getLDAPConfig: LdapStrategy.OptionsFunction = (_request, callback) => {
+const getLDAPConfig: LdapStrategy.OptionsFunction = (_req, callback) => {
   if (!Conf.Express.LDAP) {
     Logger.warn('LDAP not configured but strategy was called');
     callback('LDAP not configured', {
@@ -52,17 +52,17 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (_request, callback) => {
       },
     });
   } else {
-    const request = _request as express.Request;
+    const req = _req as express.Request;
     const DN = Conf.Express.LDAP.DNauthUID
-      ? `uid=${request.body.username},${Conf.Express.LDAP.DN}`
+      ? `uid=${req.body.username},${Conf.Express.LDAP.DN}`
       : Conf.Express.LDAP.DN;
     callback(undefined, {
       server: {
         url: Conf.Express.LDAP.Host,
         bindDN: DN,
-        bindCredentials: `${request.body.password}`,
+        bindCredentials: `${req.body.password}`,
         searchBase: Conf.Express.LDAP.searchBase,
-        searchFilter: `(uid=${request.body.username})`,
+        searchFilter: `(uid=${req.body.username})`,
         reconnect: true,
       },
     });
@@ -101,14 +101,14 @@ Server.use(
     ],
   }),
 );
-// This turns request.body from application/json requests into readable JSON
+// This turns req.body from application/json reqs into readable JSON
 Server.use(bodyParser.json({ limit: '50mb' }));
 // Same for cookies
 Server.use(cookieParser());
 // Compression: Brotli -> Fallback GZIP
 Server.use(shrinkRay());
-// Measure response time of request
-Server.use(responseTime());
+// Measure res time of req
+Server.use(resTime());
 // Static
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 //Server.use('/uploads', express.static(upDir));
@@ -190,8 +190,8 @@ const saltHashPassword = (password: string) => {
 };
 
 const registerUser = async (
-  request: express.Request,
-  response: express.Response,
+  req: express.Request,
+  res: express.Response,
 ): Promise<any> => {
   const coll = Mongo.getAccountsRepository().collection('users');
   const passwords = Mongo.getAccountsRepository().collection('passwords');
@@ -213,12 +213,10 @@ const registerUser = async (
   const isFirstUser = (await coll.findOne({})) === null;
   const role = isFirstUser ? EUserRank.admin : EUserRank.user;
 
-  const user = request.body as IUserData & { password: string };
+  const user = req.body as IUserData & { password: string };
   const adjustedUser = { ...user, role, data: {} };
   const userExists = (await coll.findOne({ username: user.username })) !== null;
-  if (userExists) {
-    return response.send({ status: 'error', message: 'User already exists' });
-  }
+  if (userExists) return res.status(409).send('User already exists');
   if (isUser(adjustedUser)) {
     // tslint:disable-next-line
     delete adjustedUser['password'];
@@ -237,12 +235,10 @@ const registerUser = async (
       .catch();
     coll
       .insertOne(adjustedUser)
-      .then(() => response.send({ status: 'ok', message: 'Registered' }))
-      .catch(() =>
-        response.send({ status: 'error', message: 'Failed inserting user' }),
-      );
+      .then(() => res.status(201).send('Registered'))
+      .catch(() => res.status(500).send('Failed inserting user'));
   } else {
-    response.send({ status: 'error', message: 'Incomplete user data' });
+    res.status(400).send('Incomplete user data');
   }
 };
 

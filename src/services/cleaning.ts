@@ -22,21 +22,18 @@ const deleteFile = async (path: string) =>
   );
 
 interface ICleaning {
-  deleteUnusedPersonsAndInstitutions(
-    request: Request,
-    response: Response,
-  ): Promise<any>;
-  deleteNullRefs(request: Request, response: Response): Promise<any>;
+  deleteUnusedPersonsAndInstitutions(req: Request, res: Response): Promise<any>;
+  deleteNullRefs(req: Request, res: Response): Promise<any>;
 
-  cleanPersonFields(request: Request, response: Response): Promise<any>;
+  cleanPersonFields(req: Request, res: Response): Promise<any>;
 
-  cleanInstitutionFields(request: Request, response: Response): Promise<any>;
+  cleanInstitutionFields(req: Request, res: Response): Promise<any>;
 
-  cleanUploadedFiles(request: Request, response: Response): Promise<any>;
+  cleanUploadedFiles(req: Request, res: Response): Promise<any>;
 }
 
 const Cleaning: ICleaning = {
-  deleteUnusedPersonsAndInstitutions: async (request, response) => {
+  deleteUnusedPersonsAndInstitutions: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const personCollection = ObjDB.collection('person');
     const instCollection = ObjDB.collection('institution');
@@ -47,7 +44,7 @@ const Cleaning: ICleaning = {
     const allDigObjs = await digobjCollection.find({}).toArray();
     const allPhyObjs = await phyobjCollection.find({}).toArray();
 
-    const confirm = request.params.confirm || false;
+    const confirm = req.params.confirm || false;
 
     const total: any[] = [];
 
@@ -84,19 +81,18 @@ const Cleaning: ICleaning = {
     }
 
     Logger.log(`Deleted ${total.length} unused persons and/or institutions`);
-    response.send({
-      status: 'ok',
+    res.status(200).send({
       confirm,
       total,
       amount: total.length,
     });
   },
-  deleteNullRefs: async (request, response) => {
+  deleteNullRefs: async (req, res) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const users: Collection = AccDB.collection('users');
     const allUsers = await users.find({}).toArray();
 
-    const confirm = request.params.confirm || false;
+    const confirm = req.params.confirm || false;
 
     const total: any[] = [];
 
@@ -149,14 +145,14 @@ const Cleaning: ICleaning = {
     for (const user of allUsers) {
       await iterateOverUserData(user);
     }
-    response.send({ status: 'ok', confirm, total });
+    res.status(200).send({ confirm, total });
   },
-  cleanPersonFields: async (request, response) => {
+  cleanPersonFields: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const personCollection = ObjDB.collection<IMetaDataPerson>('person');
     const cursor = personCollection.find({});
 
-    const confirm = request.params.confirm || false;
+    const confirm = req.params.confirm || false;
 
     const canContinue = async () =>
       (await cursor.hasNext()) && !cursor.isClosed();
@@ -213,16 +209,16 @@ const Cleaning: ICleaning = {
       `Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`,
     );
 
-    response.send({ status: 'ok', confirm, personsChanged, totalSaved });
+    res.status(200).send({ confirm, personsChanged, totalSaved });
   },
-  cleanInstitutionFields: async (request, response) => {
+  cleanInstitutionFields: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const instCollection = ObjDB.collection<IMetaDataInstitution>(
       'institution',
     );
     const cursor = instCollection.find({});
 
-    const confirm = request.params.confirm || false;
+    const confirm = req.params.confirm || false;
 
     const canContinue = async () =>
       (await cursor.hasNext()) && !cursor.isClosed();
@@ -270,7 +266,6 @@ const Cleaning: ICleaning = {
         totalSaved += sizeBefore - sizeAfter;
 
         if (confirm) {
-          // TODO: update on server & fix entity-landing page
           const result = await updateOne(
             instCollection,
             { _id: inst._id },
@@ -283,9 +278,9 @@ const Cleaning: ICleaning = {
       }
     }
 
-    response.send({ status: 'ok', confirm, changedInsts, totalSaved });
+    res.status(200).send({ confirm, changedInsts, totalSaved });
   },
-  cleanUploadedFiles: async (request, response) => {
+  cleanUploadedFiles: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const entities = await ObjDB.collection<IEntity>('entity')
       .find({})
@@ -295,7 +290,7 @@ const Cleaning: ICleaning = {
       ...entities.map(entity => entity.files.map(file => file.file_link)),
     );
 
-    const confirm = request.params.confirm || false;
+    const confirm = req.params.confirm || false;
 
     const subfolders = ['model', 'video', 'audio', 'image'];
 
@@ -314,8 +309,7 @@ const Cleaning: ICleaning = {
       await Promise.all(filesToDelete.map(deleteFile));
     }
 
-    response.send({
-      status: 'ok',
+    res.status(200).send({
       confirm,
       files,
       existingFiles,

@@ -102,27 +102,12 @@ const saveAnnotation = async (
       ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
       : true;
     // Check if anything was missing for safety
-    if (!annotation || !annotation.target || !annotation.target.source) {
-      return reject({
-        status: 'error',
-        message: 'Invalid annotation',
-        invalidEntity: annotation,
-      });
-    }
+    if (!annotation || !annotation.target?.source)
+      return reject('Invalid annotation');
     const source = annotation.target.source;
-    if (!source) {
-      return reject({ status: 'error', message: 'Missing source' });
-    }
-    if (
-      !annotation.body ||
-      !annotation.body.content ||
-      !annotation.body.content.relatedPerspective
-    ) {
-      return reject({
-        status: 'error',
-        message: 'Missing body.content.relatedPerspective',
-      });
-    }
+    if (!source) return reject('Missing source');
+    if (!annotation.body?.content?.relatedPerspective)
+      return reject('Missing body.content.relatedPerspective');
     annotation.body.content.relatedPerspective.preview = await Mongo.saveBase64toImage(
       annotation.body.content.relatedPerspective.preview,
       'annotation',
@@ -133,28 +118,20 @@ const saveAnnotation = async (
     const relatedEntityId = source.relatedEntity as string | undefined;
     const relatedCompId = source.relatedCompilation;
     // Check if === undefined because otherwise this quits on empty string
-    if (relatedEntityId === undefined || relatedCompId === undefined) {
-      return reject({
-        status: 'error',
-        message: 'Related entity or compilation undefined',
-      });
-    }
+    if (relatedEntityId === undefined || relatedCompId === undefined)
+      return reject('Related entity or compilation undefined');
 
     const validEntity = ObjectId.isValid(relatedEntityId);
     const validCompilation = ObjectId.isValid(relatedCompId);
 
-    if (!validEntity) {
-      return reject({ status: 'error', message: 'Invalid related entity id' });
-    }
+    if (!validEntity) return reject('Invalid related entity id');
 
     // Case: Trying to change Default Annotations
     const isEntityOwner = await Mongo.isUserOwnerOfEntity(
       userData,
       relatedEntityId,
     );
-    if (!validCompilation && !isEntityOwner) {
-      return reject({ status: 'error', message: 'Permission denied' });
-    }
+    if (!validCompilation && !isEntityOwner) return reject('Permission denied');
 
     // Case: Compilation owner trying to re-rank annotations
     const isCompilationOwner = await Mongo.isUserOwnerOfEntity(
@@ -168,11 +145,10 @@ const saveAnnotation = async (
           'annotation',
         );
         // Compilation owner is not supposed to change the annotation body
-        if (oldAnnotation && oldAnnotation.body === annotation.body) {
-          return reject({ status: 'error', message: 'Permission denied' });
-        }
+        if (oldAnnotation && oldAnnotation.body === annotation.body)
+          return reject('Permission denied');
       } else {
-        return reject({ status: 'error', message: 'Permission denied' });
+        return reject('Permission denied');
       }
     }
 
@@ -186,23 +162,18 @@ const saveAnnotation = async (
     annotation.lastModifiedBy.type = 'person';
 
     const entityOrCompId = !validCompilation ? relatedEntityId : relatedCompId;
-    const requestedCollection = !validCompilation ? 'entity' : 'compilation';
+    const reqedCollection = !validCompilation ? 'entity' : 'compilation';
     const resultEntityOrComp = await updateAnnotationList(
       entityOrCompId,
-      requestedCollection,
+      reqedCollection,
       annotation._id.toString(),
     );
 
-    if (!resultEntityOrComp) {
-      return reject({
-        status: 'error',
-        message: 'Failed updating annotationList',
-      });
-    }
+    if (!resultEntityOrComp) return reject('Failed updating annotationList');
 
     // Finally we update the annotationList in the compilation
     const coll: Collection = Mongo.getEntitiesRepository().collection(
-      requestedCollection,
+      reqedCollection,
     );
     const listUpdateResult = await updateOne(
       coll,
@@ -211,15 +182,14 @@ const saveAnnotation = async (
     );
 
     if (listUpdateResult.result.ok !== 1) {
-      Logger.err(
-        `Failed updating annotationList of ${requestedCollection} ${entityOrCompId}`,
-      );
-      return reject({ status: 'error' });
+      const message = `Failed updating annotationList of ${reqedCollection} ${entityOrCompId}`;
+      Logger.err(message);
+      return reject(message);
     }
 
-    if (isAnnotationOwner) {
+    if (isAnnotationOwner)
       await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
-    }
+
     resolve(annotation);
   });
 };
@@ -229,7 +199,7 @@ const saveEntity = async (entity: IEntity, userData: IUserData) => {
    * because of Kompakkt runnning in an iframe
    * This removes the host address from the URL
    * so images will load correctly */
-  if (entity.settings && entity.settings.preview) {
+  if (entity.settings?.preview) {
     entity.settings.preview = await Mongo.saveBase64toImage(
       entity.settings.preview,
       'entity',
@@ -261,17 +231,11 @@ const savePerson = async (
   person._id = resolved ? resolved._id : new ObjectId().toString();
 
   // If person exists, combine roles
-  if (!person.roles) {
-    person.roles = {};
-  }
+  if (!person.roles) person.roles = {};
 
-  if (!person.institutions) {
-    person.institutions = {};
-  }
+  if (!person.institutions) person.institutions = {};
 
-  if (!person.contact_references) {
-    person.contact_references = {};
-  }
+  if (!person.contact_references) person.contact_references = {};
 
   if (resolved) {
     person.roles = { ...resolved.roles, ...person.roles };
@@ -325,15 +289,9 @@ const saveInstitution = async (
   );
   institution._id = resolved ? resolved._id : new ObjectId().toString();
 
-  if (!institution.roles) {
-    institution.roles = {};
-  }
-  if (!institution.addresses) {
-    institution.addresses = {};
-  }
-  if (!institution.notes) {
-    institution.notes = {};
-  }
+  if (!institution.roles) institution.roles = {};
+  if (!institution.addresses) institution.addresses = {};
+  if (!institution.notes) institution.notes = {};
 
   // If institution exists, combine roles
   if (resolved) {

@@ -4,30 +4,30 @@ import { join } from 'path';
 import { brotliCompress, constants, gzip } from 'zlib';
 
 export const serveFile = (directory: string) => async (
-  request: Request,
-  response: Response,
+  req: Request,
+  res: Response,
 ) => {
-  const filename = join(directory, request.path);
-  const acceptedEncodings = request.headers['accept-encoding'] as
+  const filename = join(directory, req.path);
+  const acceptedEncodings = req.headers['accept-encoding'] as
     | string
     | undefined;
 
   const doesFileExist = await wrapperExists(filename);
 
   if (!doesFileExist) {
-    response.sendStatus(404);
+    res.sendStatus(404);
     return;
   }
 
   const resultFile = await wrapperReadFile(filename);
 
   if (!resultFile) {
-    response.sendStatus(404);
+    res.sendStatus(404);
     return;
   }
 
   if (!acceptedEncodings) {
-    response.send(resultFile);
+    res.status(200).send(resultFile);
     return;
   }
 
@@ -41,7 +41,7 @@ export const serveFile = (directory: string) => async (
       : await getBrotli(resultFile);
     if (result) {
       compressedFile = result;
-      response.setHeader('Content-Encoding', 'br');
+      res.setHeader('Content-Encoding', 'br');
       if (
         !doesCompressedExist &&
         !(await wrapperExists(`${compressedFilename}.tmp`))
@@ -57,7 +57,7 @@ export const serveFile = (directory: string) => async (
       : await getGZip(resultFile);
     if (result) {
       compressedFile = result;
-      response.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Encoding', 'gzip');
       if (
         !doesCompressedExist &&
         !(await wrapperExists(`${compressedFilename}.tmp`))
@@ -67,7 +67,7 @@ export const serveFile = (directory: string) => async (
     }
   }
 
-  response.send(compressedFile);
+  res.status(200).send(compressedFile);
 };
 
 const wrapperExists = async (filename: string) =>

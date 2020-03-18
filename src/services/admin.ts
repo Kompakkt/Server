@@ -12,36 +12,26 @@ const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;
 
 interface IAdmin {
-  checkIsAdmin(
-    request: Request,
-    response: Response,
-    next: NextFunction,
-  ): Promise<any>;
-  getAllUsers(_: Request, response: Response): Promise<any>;
-  getUser(request: Request, response: Response): Promise<any>;
-  promoteUserToRole(request: Request, response: Response): Promise<any>;
-  toggleEntityPublishedState(
-    request: Request,
-    response: Response,
-  ): Promise<any>;
+  checkIsAdmin(req: Request, res: Response, next: NextFunction): Promise<any>;
+  getAllUsers(_: Request, res: Response): Promise<any>;
+  getUser(req: Request, res: Response): any | void;
+  promoteUserToRole(req: Request, res: Response): Promise<any>;
+  toggleEntityPublishedState(req: Request, res: Response): Promise<any>;
 }
 
 const Admin: IAdmin = {
-  checkIsAdmin: async (request, response, next) => {
-    const username = request.body.username;
-    const sessionID = request.sessionID;
+  checkIsAdmin: async (req, res, next) => {
+    const username = req.body.username;
+    const sessionID = req.sessionID;
     const AccDB: Db = Mongo.getAccountsRepository();
     const users: Collection<IUserData> = AccDB.collection('users');
     const found = await users.findOne({ username, sessionID });
     if (!found || found.role !== EUserRank.admin) {
-      return response.send({
-        status: 'error',
-        message: 'Could not verify your admin status',
-      });
+      return res.status(401).send('Could not verify your admin status');
     }
     return next();
   },
-  getAllUsers: async (_, response) => {
+  getAllUsers: async (_, res) => {
     const AccDB: Db = Mongo.getAccountsRepository();
     const users: Collection<IUserData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
@@ -52,24 +42,18 @@ const Admin: IAdmin = {
         return account;
       }),
     );
-    response.send({ status: 'ok', users: filteredAccounts });
+    res.status(200).send(filteredAccounts);
   },
-  getUser: async (request, response) => {
-    const _id = checkAndReturnObjectId(request.params.identifier);
-    if (!_id) {
-      response.send({ status: 'error', message: 'Invalid identifier' });
-      return;
-    }
+  getUser: async (req, res) => {
+    const _id = checkAndReturnObjectId(req.params.identifier);
+    if (!_id) return res.status(400).send('Invalid identifier');
 
     const AccDB: Db = Mongo.getAccountsRepository();
     const users: Collection<IUserData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
     const user = await users.findOne({ _id });
 
-    if (!user) {
-      response.send({ status: 'error', message: 'User not found' });
-      return;
-    }
+    if (!user) return res.status(404).send('User not found');
 
     filterProperties.forEach(prop => ((user as any)[prop] = undefined));
 
@@ -82,14 +66,12 @@ const Admin: IAdmin = {
       // Filter null entities
       user.data[coll] = user.data[coll].filter(obj => obj);
     }
-    response.send({ status: 'ok', ...user });
+    return res.status(200).send(user);
   },
-  promoteUserToRole: async (request, response) => {
-    const _id = checkAndReturnObjectId(request.body.identifier);
-    if (!_id) {
-      return response.send({ status: 'error', message: 'Invalid identifier' });
-    }
-    const role = request.body.role;
+  promoteUserToRole: async (req, res) => {
+    const _id = checkAndReturnObjectId(req.body.identifier);
+    if (!_id) return res.status(400).send('Invalid identifier');
+    const role = req.body.role;
     switch (role) {
       case EUserRank.user:
       case EUserRank.uploadrequested:
@@ -99,67 +81,42 @@ const Admin: IAdmin = {
         const users: Collection<IUserData> = AccDB.collection('users');
         const user = await users.findOne({ _id });
 
-        if (!user) {
-          return response.send({
-            status: 'error',
-            message: 'Updating user role failed',
-          });
-        }
+        if (!user) return res.status(500).send('Updating user role failed');
+
         const updateResult = await updateOne(
           users,
           { _id },
           { $set: { role } },
         );
-        if (updateResult.result.ok !== 1) {
-          return response.send({
-            status: 'error',
-            message: 'Updating user role failed',
-          });
-        }
+        if (updateResult.result.ok !== 1)
+          return res.status(500).send('Updating user role failed');
+
         if (Configuration.Mailer && Configuration.Mailer.Target) {
           Mailer.sendMail({
             from: Configuration.Mailer.Target['contact'],
             to: user.mail,
             subject: 'Your Kompakkt role has been updated',
-            text: `
-Hey ${user.fullname},
-
-Your role on Kompakkt has been changed from ${user.role} to ${role}
-
-Visit https://kompakkt.uni-koeln.de/profile to see what has changed`.trimLeft(),
+            text: `Hey ${user.fullname},\n\nYour role on Kompakkt has been changed from ${user.role} to ${role}\n\nVisit https://kompakkt.uni-koeln.de/profile to see what has changed`,
           })
             .then(result => Logger.log(`Mail sent`, result))
             .catch(error => Logger.warn(`Failed to send mail`, error));
         }
-        return response.send({
-          status: 'ok',
-          message: 'User role successfully updated',
-        });
+        return res.status(200).end();
         break;
       default:
-        return response.send({
-          status: 'error',
-          message: 'Invalid role specified',
-        });
+        return res.status(400).send('Invalid role specified');
     }
   },
-  toggleEntityPublishedState: async (request, response) => {
-    const _id = checkAndReturnObjectId(request.body.identifier);
-    if (!_id) {
-      return response.send({
-        status: 'error',
-        message: 'Incorrect request parameters',
-      });
-    }
+  toggleEntityPublishedState: async (req, res) => {
+    const _id = checkAndReturnObjectId(req.body.identifier);
+    if (!_id) return res.status(400).send('Incorrect req parameters');
+
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const EntityCollection: Collection<IEntity> = ObjDB.collection('entity');
     const found = await EntityCollection.findOne({ _id });
-    if (!found) {
-      return response.send({
-        status: 'error',
-        message: 'No entity with this identifier found',
-      });
-    }
+    if (!found)
+      return res.status(404).send('No entity with this identifier found');
+
     const isEntityOnline: boolean = found.online;
     const updateResult = await updateOne(
       ObjDB.collection('entity'),
@@ -167,15 +124,9 @@ Visit https://kompakkt.uni-koeln.de/profile to see what has changed`.trimLeft(),
       { $set: { online: !isEntityOnline } },
     );
     if (updateResult.result.ok !== 1) {
-      return response.send({
-        status: 'error',
-        message: 'Failed updating published state',
-      });
+      return res.status(500).send('Failed updating published state');
     }
-    return response.send({
-      status: 'ok',
-      ...(await Mongo.resolve<IEntity>(_id, 'entity')),
-    });
+    return res.status(200).send(await Mongo.resolve<IEntity>(_id, 'entity'));
   },
 };
 
