@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Db, ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
 
-import { IUserData } from '../interfaces';
+import { IUserData, EUserRank } from '../interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo, updateOne } from './mongo';
@@ -135,6 +135,14 @@ const Mailer: IMailer = {
     const users = AccDb.collection('users');
     const user = await users.findOne({ sessionID: request.sessionID });
     const collection = AccDb.collection(target);
+
+    if (target === ETarget.upload && user.role === EUserRank.user) {
+      await updateOne(
+        users,
+        { sessionID: request.sessionID },
+        { $set: { role: EUserRank.uploadrequested } },
+      );
+    }
 
     const subject = request.body.subject;
     const mailbody = request.body.mailbody;
