@@ -8,7 +8,11 @@ import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo, updateOne } from './mongo';
 import { RootDirectory } from '../environment';
-import { IMetaDataPerson, IMetaDataInstitution, IEntity } from '../interfaces';
+import {
+  IMetaDataPerson,
+  IMetaDataInstitution,
+  IEntity,
+} from '@kompakkt/shared';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>

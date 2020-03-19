@@ -1,4 +1,4 @@
-import { Collection, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';
 
@@ -15,15 +15,22 @@ import {
   IMetaDataInstitution,
   IStrippedUserData,
   IUnresolvedEntity,
-} from '../interfaces';
+  isAnnotation,
+  isDigitalEntity,
+} from '@kompakkt/shared';
 import { RootDirectory } from '../environment';
 
 import { Logger } from './logger';
 import { Mongo, updateOne } from './mongo';
 import { Configuration as Conf } from './configuration';
-import { isAnnotation, isDigitalEntity } from './typeguards';
 
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
+
+const stripUserData = (obj: IUserData): IStrippedUserData => ({
+  _id: obj._id,
+  username: obj.username,
+  fullname: obj.fullname,
+});
 
 const updateAnnotationList = async (
   entityOrCompId: string,
@@ -36,59 +43,53 @@ const updateAnnotationList = async (
     0,
   );
   if (!obj) return undefined;
-  // Create annotationList if missing
-  obj.annotationList = obj.annotationList ? obj.annotationList : [];
-  // Filter null
-  obj.annotationList = obj.annotationList.filter(_annotation => _annotation);
 
-  const doesAnnotationExist = (obj.annotationList.filter(
-    _annotation => _annotation,
-  ) as Array<IAnnotation | ObjectId>).find(_annotation =>
-    isAnnotation(_annotation)
-      ? _annotation._id.toString() === annotationId
-      : _annotation.toString() === annotationId,
-  );
+  let doesAnnotationExist = false;
+  const annotationList: Array<IAnnotation | ObjectId> = [];
+  for (const _ann of obj.annotationList) {
+    // Filter null
+    if (!_ann) continue;
+    // Add annotation id to final array
+    annotationList.push(isAnnotation(_ann) ? new ObjectId(_ann._id) : _ann);
+    // Skip checking if we already found annotation
+    if (doesAnnotationExist) continue;
+    if (isAnnotation(_ann)) {
+      doesAnnotationExist = _ann._id.toString() === annotationId;
+    } else {
+      doesAnnotationExist = _ann.toString() === annotationId;
+    }
+  }
 
   // Add annotation to list if it doesn't exist
-  if (!doesAnnotationExist) obj.annotationList.push(new ObjectId(annotationId));
+  if (!doesAnnotationExist) annotationList.push(new ObjectId(annotationId));
 
-  // We resolved the compilation earlier, so now we have to replace
-  // the resolved annotations with their ObjectId again
-  obj.annotationList = (obj.annotationList as Array<
-    IAnnotation | ObjectId
-  >).map(_annotation =>
-    isAnnotation(_annotation) ? new ObjectId(_annotation._id) : _annotation,
-  );
-
-  return obj;
+  return { ...obj, annotationList };
 };
 
 const saveCompilation = async (
   compilation: ICompilation,
   userData: IUserData,
 ) => {
-  compilation.annotationList = compilation.annotationList
-    ? compilation.annotationList
-    : [];
-  compilation.relatedOwner = {
-    _id: userData._id,
-    username: userData.username,
-    fullname: userData.fullname,
-  };
+  // Clean annotationList
+  const annotationList: Array<IAnnotation | ObjectId> = [];
+  for (const _ann of compilation.annotationList) {
+    if (!_ann) continue;
+    annotationList.push(_ann);
+  }
 
-  // Compilations should have all their entities referenced by _id
-  // Remove duplicates. Set of Objects doesnt remove duplicate, so use strings
-  const validIds = new Set<string>();
+  // Add creator
+  if (!compilation.creator) compilation.creator = stripUserData(userData);
+
+  // Remove duplicates
+  const entities: IUnresolvedEntity[] = [];
   for (const entity of compilation.entities) {
     if (!entity) continue;
-    validIds.add(entity._id.toString());
+    if (entities.find(_e => _e._id === entity._id)) continue;
+    entities.push({ _id: new ObjectId(entity._id) });
   }
-  compilation.entities = Array.from(validIds).map(
-    _id => ({ _id: new ObjectId(_id) } as IUnresolvedEntity),
-  );
 
   await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
-  return compilation;
+  return { ...compilation, annotationList, entities };
 };
 
 const saveAnnotation = async (
@@ -153,9 +154,7 @@ const saveAnnotation = async (
     }
 
     // Update data inside of annotation
-    annotation.generated = annotation.generated
-      ? annotation.generated
-      : new Date().toISOString();
+    annotation.generated = annotation.generated ?? new Date().toISOString();
     annotation.lastModificationDate = new Date().toISOString();
     annotation.lastModifiedBy._id = userData._id;
     annotation.lastModifiedBy.name = userData.fullname;
@@ -172,9 +171,7 @@ const saveAnnotation = async (
     if (!resultEntityOrComp) return reject('Failed updating annotationList');
 
     // Finally we update the annotationList in the compilation
-    const coll: Collection = Mongo.getEntitiesRepository().collection(
-      reqedCollection,
-    );
+    const coll = Mongo.getEntitiesRepository().collection(reqedCollection);
     const listUpdateResult = await updateOne(
       coll,
       { _id: new ObjectId(entityOrCompId) },
@@ -195,6 +192,8 @@ const saveAnnotation = async (
 };
 
 const saveEntity = async (entity: IEntity, userData: IUserData) => {
+  if (!entity.creator) entity.creator = stripUserData(userData);
+
   /* Preview image URLs might have a corrupted address
    * because of Kompakkt runnning in an iframe
    * This removes the host address from the URL
@@ -211,11 +210,7 @@ const saveEntity = async (entity: IEntity, userData: IUserData) => {
 };
 
 const saveGroup = async (group: IGroup, userData: IUserData) => {
-  const strippedUserData: IStrippedUserData = {
-    username: userData.username,
-    fullname: userData.fullname,
-    _id: userData._id,
-  };
+  const strippedUserData = stripUserData(userData);
   group.creator = strippedUserData;
   group.members = [strippedUserData];
   group.owners = [strippedUserData];
@@ -228,30 +223,22 @@ const savePerson = async (
   save = false,
 ) => {
   const resolved = await Mongo.resolve<IMetaDataPerson>(person, 'person');
-  person._id = resolved ? resolved._id : new ObjectId().toString();
+  person._id = resolved?._id ?? new ObjectId().toString();
 
   // If person exists, combine roles
-  if (!person.roles) person.roles = {};
-
-  if (!person.institutions) person.institutions = {};
-
-  if (!person.contact_references) person.contact_references = {};
-
-  if (resolved) {
-    person.roles = { ...resolved.roles, ...person.roles };
-    person.institutions = {
-      ...resolved.institutions,
-      ...person.institutions,
-    };
-    person.contact_references = {
-      ...resolved.contact_references,
-      ...person.contact_references,
-    };
-  }
+  person.roles = { ...resolved?.roles, ...person?.roles };
+  person.institutions = {
+    ...resolved?.institutions,
+    ...person?.institutions,
+  };
+  person.contact_references = {
+    ...resolved?.contact_references,
+    ...person?.contact_references,
+  };
 
   for (const id in person.institutions) {
-    person.institutions[id] = person.institutions[id].filter(_ => _);
     for (let i = 0; i < person.institutions[id].length; i++) {
+      if (!person.institutions[id][i]) continue;
       person.institutions[id][i] = (await saveInstitution(
         person.institutions[id][i],
         userData,
@@ -268,7 +255,7 @@ const savePerson = async (
       { $set: { ...person } },
       { upsert: true },
     ).then(res => {
-      const _id = res.upsertedId ? res.upsertedId._id : person._id;
+      const _id = res.upsertedId?._id ?? person._id;
       Mongo.insertCurrentUserData(userData, _id, 'person');
       return person;
     });
@@ -287,21 +274,15 @@ const saveInstitution = async (
     institution,
     'institution',
   );
-  institution._id = resolved ? resolved._id : new ObjectId().toString();
-
-  if (!institution.roles) institution.roles = {};
-  if (!institution.addresses) institution.addresses = {};
-  if (!institution.notes) institution.notes = {};
+  institution._id = resolved?._id ?? new ObjectId().toString();
 
   // If institution exists, combine roles
-  if (resolved) {
-    institution.roles = { ...resolved.roles, ...institution.roles };
-    institution.addresses = {
-      ...resolved.addresses,
-      ...institution.addresses,
-    };
-    institution.notes = { ...resolved.notes, ...institution.notes };
-  }
+  institution.roles = { ...resolved?.roles, ...institution?.roles };
+  institution.addresses = {
+    ...resolved?.addresses,
+    ...institution?.addresses,
+  };
+  institution.notes = { ...resolved?.notes, ...institution?.notes };
 
   const _id = institution._id;
   if (save) {
@@ -311,7 +292,7 @@ const saveInstitution = async (
       { $set: { ...institution } },
       { upsert: true },
     ).then(res => {
-      const _id = res.upsertedId ? res.upsertedId._id : institution._id;
+      const _id = res.upsertedId?._id ?? institution._id;
       Mongo.insertCurrentUserData(userData, _id, 'institution');
       return institution;
     });
@@ -379,7 +360,7 @@ const saveMetaDataEntity = async (
         { $set: { ...tag } },
         { upsert: true },
       ).then(res => {
-        const _id = res.upsertedId ? res.upsertedId._id : tag._id;
+        const _id = res.upsertedId?._id ?? tag._id;
         Mongo.insertCurrentUserData(userData, _id, 'tag');
         return _id;
       })) as any;
@@ -412,7 +393,7 @@ const saveDigitalEntity = async (
       { $set: { ...savedEntity } },
       { upsert: true },
     ).then(res => {
-      const _id = res.upsertedId ? res.upsertedId._id : savedEntity._id;
+      const _id = res.upsertedId?._id ?? savedEntity._id;
       Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
       return _id;
     })) as any;

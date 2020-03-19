@@ -8,15 +8,10 @@ import {
   IUserData,
   IStrippedUserData,
   IGroup,
-} from '../interfaces';
+  isAnnotation,
+} from '@kompakkt/shared';
 
-import {
-  Mongo,
-  getCurrentUserBySession,
-  areObjectIdsEqual,
-  updateOne,
-} from './mongo';
-import { isAnnotation } from './typeguards';
+import { Mongo, getCurrentUserBySession, updateOne } from './mongo';
 
 interface IUtility {
   findAllEntityOwnersRequest(req: Request, res: Response): any;
@@ -71,10 +66,9 @@ const Utility: IUtility = {
 
     const user = await getCurrentUserBySession(req.sessionID);
 
-    const isUserOwnerOfCompilation = (comp: ICompilation) => {
-      if (!comp.relatedOwner || !user) return false;
-      return areObjectIdsEqual(comp.relatedOwner._id, user._id);
-    };
+    const isUserOwnerOfCompilation = (comp: ICompilation) =>
+      JSON.stringify(user?.data?.compilation)?.includes(comp._id.toString());
+
     const isCompilationNotPWProtected = (comp: ICompilation) =>
       comp.password === '' || comp.password === false || !comp.password;
 

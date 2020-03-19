@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { EUserRank, IEntity, IUserData } from '../interfaces';
+import { EUserRank, IEntity, IUserData } from '@kompakkt/shared';
 
 import { Configuration } from './configuration';
 import { Mongo, updateOne } from './mongo';

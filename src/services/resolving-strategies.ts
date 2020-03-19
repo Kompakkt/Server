@@ -9,10 +9,10 @@ import {
   IMetaDataPhysicalEntity,
   IMetaDataTag,
   IAnnotation,
-} from '../interfaces';
+  isDigitalEntity,
+} from '@kompakkt/shared';
 
 import { Mongo } from './mongo';
-import { isDigitalEntity } from './typeguards';
 
 export const resolvePerson = async (person: IMetaDataPerson) => {
   if (person.institutions) {

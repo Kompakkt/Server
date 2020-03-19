@@ -16,7 +16,7 @@ import SocketIo from 'socket.io';
 import resTime from 'response-time';
 
 import { RootDirectory } from '../environment';
-import { IInvalid, IUserData, EUserRank } from '../interfaces';
+import { IUserData, EUserRank } from '@kompakkt/shared';
 
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';
@@ -197,7 +197,7 @@ const registerUser = async (
   const passwords = Mongo.getAccountsRepository().collection('passwords');
 
   const isUser = (obj: any): obj is IUserData => {
-    const person = obj as IUserData | IInvalid;
+    const person = obj as IUserData;
     return (
       person &&
       person.fullname !== undefined &&

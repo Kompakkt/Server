@@ -23,7 +23,13 @@ import {
   IUserData,
   EUserRank,
   IMetaDataDigitalEntity,
-} from '../interfaces';
+  isAnnotation,
+  isCompilation,
+  isDigitalEntity,
+  isEntity,
+  isPerson,
+  isInstitution,
+} from '@kompakkt/shared';
 
 import { Configuration } from './configuration';
 import { Cache } from './cache';
@@ -42,15 +48,6 @@ import {
   savePerson,
   saveInstitution,
 } from './saving-strategies';
-import {
-  isAnnotation,
-  isCompilation,
-  isDigitalEntity,
-  isEntity,
-  isPerson,
-  isInstitution,
-} from './typeguards';
-import { Utility } from './utility';
 /* tslint:enable:max-line-length */
 
 interface IExploreRequest {
@@ -368,7 +365,6 @@ const Mongo: IMongo = {
     if (userData.data) {
       for (const property in userData.data) {
         if (!userData.data.hasOwnProperty(property)) continue;
-
         userData.data[property] = await Promise.all(
           userData.data[property].map(async obj =>
             Mongo.resolve(obj, property),
@@ -378,16 +374,6 @@ const Mongo: IMongo = {
         userData.data[property] = userData.data[property].filter(
           obj => obj && Object.keys(obj).length > 0,
         );
-      }
-      // Add entity owners to entities
-      if (userData.data.entity && userData.data.entity.length > 0) {
-        for (const entity of userData.data.entity) {
-          if (!entity) continue;
-          if (!isEntity(entity)) continue;
-          entity.relatedEntityOwners = await Utility.findAllEntityOwners(
-            entity._id.toString(),
-          );
-        }
       }
     }
 
