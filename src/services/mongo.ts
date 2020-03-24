@@ -17,7 +17,6 @@ import {
 
 import { RootDirectory } from '../environment';
 import {
-  IAnnotation,
   ICompilation,
   IEntity,
   IUserData,
@@ -907,7 +906,7 @@ const Mongo: IMongo = {
         const isAnnotatable = isOwner; // only owner can set default annotations
         if (filters.annotatable && !isAnnotatable) continue;
 
-        const isAnnotated = resolved.annotationList.length > 0;
+        const isAnnotated = Object.keys(resolved.annotations).length > 0;
         if (filters.annotated && !isAnnotated) continue;
 
         let isRestricted = false;
@@ -973,7 +972,7 @@ const Mongo: IMongo = {
         );
 
         if (!resolved || !resolved._id) continue;
-        if (resolved.entities.length === 0) continue;
+        if (Object.keys(resolved.entities).length === 0) continue;
 
         if (searchText !== '') {
           if (
@@ -1001,22 +1000,30 @@ const Mongo: IMongo = {
         if (isPWProtected && !isOwner && !isAnnotatable) continue;
         if (filters.restricted && isPWProtected) continue;
 
-        const isAnnotated = resolved.annotationList.length > 0;
+        const isAnnotated = Object.keys(resolved.annotations).length > 0;
         if (filters.annotated && !isAnnotated) continue;
+
+        for (const id in resolved.entities) {
+          const value = resolved.entities[id];
+          if (!isEntity(value)) {
+            delete resolved.entities[id];
+            continue;
+          }
+          const { mediaType, name, settings } = value;
+          resolved.entities[id] = { mediaType, name, settings } as IEntity;
+        }
+        for (const id in resolved.annotations) {
+          const value = resolved.annotations[id];
+          if (!isAnnotation(value)) {
+            delete resolved.annotations[id];
+            continue;
+          }
+          resolved.annotations[id] = { _id: value._id };
+        }
 
         compilations.push({
           ...resolved,
           password: isPWProtected,
-          annotationList: resolved.annotationList
-            .filter(ann => ann)
-            .map(ann => ({ _id: (ann as IAnnotation)._id })) as IAnnotation[],
-          entities: resolved.entities
-            .map(_e => {
-              if (!_e) return null;
-              const { mediaType, name, settings } = _e as IEntity;
-              return { mediaType, name, settings } as IEntity;
-            })
-            .filter(_e => _e),
         });
       }
 

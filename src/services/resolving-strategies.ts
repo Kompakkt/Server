@@ -102,19 +102,15 @@ export const resolveDigitalEntity = async (
 };
 
 export const resolveEntity = async (entity: IEntity) => {
-  if (entity.annotationList) {
-    for (let i = 0; i < entity.annotationList.length; i++) {
-      const annotation = entity.annotationList[i];
-      if (!annotation) continue;
-      const resolved = await Mongo.resolve<IAnnotation>(
-        annotation,
-        'annotation',
-      );
-      if (!resolved) continue;
-      entity.annotationList[i] = resolved;
+  for (const id in entity.annotations) {
+    const resolved = await Mongo.resolve<IAnnotation>(id, 'annotation');
+    if (!resolved) {
+      delete entity.annotations[id];
+      continue;
     }
-    entity.annotationList = entity.annotationList.filter(_ => _);
+    entity.annotations[id] = resolved;
   }
+
   if (
     entity.relatedDigitalEntity &&
     !isDigitalEntity(entity.relatedDigitalEntity)
@@ -131,30 +127,23 @@ export const resolveEntity = async (entity: IEntity) => {
 };
 
 export const resolveCompilation = async (compilation: ICompilation) => {
-  if (compilation.entities) {
-    const valid = new Array<IEntity>();
-    for (let i = 0; i < compilation.entities.length; i++) {
-      const entity = compilation.entities[i];
-      if (!entity) continue;
-      const resolved = await Mongo.resolve<IEntity>(entity, 'entity');
-      if (!resolved) continue;
-      valid.push(resolved);
+  for (const id in compilation.entities) {
+    const resolved = await Mongo.resolve<IEntity>(id, 'entity');
+    if (!resolved) {
+      delete compilation.entities[id];
+      continue;
     }
-    compilation.entities = valid;
+    compilation.entities[id] = resolved;
   }
-  if (compilation.annotationList) {
-    const valid = new Array<IAnnotation>();
-    for (let i = 0; i < compilation.annotationList.length; i++) {
-      const annotation = compilation.annotationList[i];
-      if (!annotation) continue;
-      const resolved = await Mongo.resolve<IAnnotation>(
-        annotation,
-        'annotation',
-      );
-      if (!resolved) continue;
-      valid.push(resolved);
+
+  for (const id in compilation.annotations) {
+    const resolved = await Mongo.resolve<IAnnotation>(id, 'annotation');
+    if (!resolved) {
+      delete compilation.annotations[id];
+      continue;
     }
-    compilation.annotationList = valid;
+    compilation.annotations[id] = resolved;
   }
+
   return compilation;
 };

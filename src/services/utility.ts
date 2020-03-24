@@ -76,20 +76,21 @@ const Utility: IUtility = {
       isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp);
 
     const includesEntity = (comp: ICompilation) =>
-      JSON.stringify(comp.entities).indexOf(entityId) !== -1;
+      comp.entities[entityId] !== undefined;
 
     const compilations = await Promise.all(
       (await collectionAsArray<ICompilation>('compilation'))
         .filter(isValid)
         .filter(includesEntity)
         .map(async comp => {
-          comp.annotationList = (
-            await Promise.all(
-              comp.annotationList.map(anno =>
-                Mongo.resolve<IAnnotation>(anno, 'annotation'),
-              ),
-            )
-          ).filter(anno => anno) as IAnnotation[];
+          for (const id in comp.annotations) {
+            const resolved = await Mongo.resolve<IAnnotation>(id, 'annotation');
+            if (!isAnnotation(resolved)) {
+              delete comp.annotations[id];
+              continue;
+            }
+            comp.annotations[id] = resolved;
+          }
           return comp;
         }),
     );
@@ -136,28 +137,18 @@ const Utility: IUtility = {
     if (insertResult.result.ok !== 1)
       return res.status(500).send('Failed inserting Annotations');
 
-    compilation.annotationList = compilation.annotationList
-      ? compilation.annotationList
-      : [];
-    compilation.annotationList = Array.from(
-      new Set(
-        (compilation.annotationList.filter(ann => ann) as Array<
-          IAnnotation | ObjectId
-        >)
-          .concat(validAnnotations)
-          .map(ann =>
-            isAnnotation(ann) ? new ObjectId(ann['_id']) : new ObjectId(ann),
-          ),
-      ),
-    );
+    for (const anno of validAnnotations) {
+      if (!isAnnotation(anno)) continue;
+      compilation.annotations[anno._id.toString()] = anno;
+    }
 
     const updateResult = await updateOne(
       CompColl,
       { _id: new ObjectId(compId) },
-      { $set: { annotationList: compilation['annotationList'] } },
+      { $set: { annotations: compilation.annotations } },
     );
     if (updateResult.result.ok !== 1)
-      return res.status(500).send('Failed updating annotationList');
+      return res.status(500).send('Failed updating annotations');
 
     // Add Annotations to LDAP user
     validAnnotations.forEach(ann =>

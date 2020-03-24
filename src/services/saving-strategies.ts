@@ -14,7 +14,7 @@ import {
   IMetaDataPerson,
   IMetaDataInstitution,
   IStrippedUserData,
-  IUnresolvedEntity,
+  isEntity,
   isAnnotation,
   isDigitalEntity,
 } from '@kompakkt/shared';
@@ -35,7 +35,7 @@ const stripUserData = (obj: IUserData): IStrippedUserData => ({
 const updateAnnotationList = async (
   entityOrCompId: string,
   add_to_coll: string,
-  annotationId: string,
+  annotationId: string | ObjectId,
 ) => {
   const obj = await Mongo.resolve<IEntity | ICompilation>(
     entityOrCompId,
@@ -43,53 +43,41 @@ const updateAnnotationList = async (
     0,
   );
   if (!obj) return undefined;
+  annotationId = annotationId.toString();
+  obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
-  let doesAnnotationExist = false;
-  const annotationList: Array<IAnnotation | ObjectId> = [];
-  for (const _ann of obj.annotationList) {
-    // Filter null
-    if (!_ann) continue;
-    // Add annotation id to final array
-    annotationList.push(isAnnotation(_ann) ? new ObjectId(_ann._id) : _ann);
-    // Skip checking if we already found annotation
-    if (doesAnnotationExist) continue;
-    if (isAnnotation(_ann)) {
-      doesAnnotationExist = _ann._id.toString() === annotationId;
-    } else {
-      doesAnnotationExist = _ann.toString() === annotationId;
-    }
-  }
+  const coll = Mongo.getEntitiesRepository().collection(add_to_coll);
+  const query = { _id: new ObjectId(entityOrCompId) };
+  const update = { $set: { annotations: obj.annotations } };
 
-  // Add annotation to list if it doesn't exist
-  if (!doesAnnotationExist) annotationList.push(new ObjectId(annotationId));
+  const updateResult = await updateOne(coll, query, update);
 
-  return { ...obj, annotationList };
+  return updateResult.result.ok === 1;
 };
 
 const saveCompilation = async (
   compilation: ICompilation,
   userData: IUserData,
 ) => {
-  // Clean annotationList
-  const annotationList: Array<IAnnotation | ObjectId> = [];
-  for (const _ann of compilation.annotationList) {
-    if (!_ann) continue;
-    annotationList.push(_ann);
+  // Remove invalid annotations
+  for (const id in compilation.annotations) {
+    const value = compilation.annotations[id];
+    if (isAnnotation(value)) continue;
+    delete compilation.annotations[id];
   }
 
   // Add creator
   if (!compilation.creator) compilation.creator = stripUserData(userData);
 
-  // Remove duplicates
-  const entities: IUnresolvedEntity[] = [];
-  for (const entity of compilation.entities) {
-    if (!entity) continue;
-    if (entities.find(_e => _e._id === entity._id)) continue;
-    entities.push({ _id: new ObjectId(entity._id) });
+  // Remove invalid and duplicate entities
+  for (const id in compilation.entities) {
+    const value = compilation.entities[id];
+    if (isEntity(value)) continue;
+    delete compilation.entities[id];
   }
 
   await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
-  return { ...compilation, annotationList, entities };
+  return { ...compilation };
 };
 
 const saveAnnotation = async (
@@ -139,47 +127,40 @@ const saveAnnotation = async (
       userData,
       relatedCompId,
     );
-    if (!isAnnotationOwner) {
-      if (isCompilationOwner) {
-        const oldAnnotation = await Mongo.resolve<IAnnotation>(
-          annotation,
-          'annotation',
-        );
-        // Compilation owner is not supposed to change the annotation body
-        if (oldAnnotation && oldAnnotation.body === annotation.body)
-          return reject('Permission denied');
-      } else {
+
+    if (!isAnnotationOwner && isCompilationOwner) {
+      const existing = await Mongo.resolve<IAnnotation>(
+        annotation,
+        'annotation',
+      );
+
+      // If not new and not existing then what are we even doing
+      if (!existing) return reject('Permission denied');
+
+      // Compilation owner is not supposed to change the annotation body
+      if (JSON.stringify(existing.body) === JSON.stringify(annotation.body))
         return reject('Permission denied');
-      }
     }
 
     // Update data inside of annotation
     annotation.generated = annotation.generated ?? new Date().toISOString();
     annotation.lastModificationDate = new Date().toISOString();
-    annotation.lastModifiedBy._id = userData._id;
-    annotation.lastModifiedBy.name = userData.fullname;
-    annotation.lastModifiedBy.type = 'person';
+    annotation.lastModifiedBy = {
+      _id: userData._id,
+      name: userData.fullname,
+      type: 'person',
+    };
 
     const entityOrCompId = !validCompilation ? relatedEntityId : relatedCompId;
     const reqedCollection = !validCompilation ? 'entity' : 'compilation';
-    const resultEntityOrComp = await updateAnnotationList(
+    const updateSuccess = await updateAnnotationList(
       entityOrCompId,
       reqedCollection,
-      annotation._id.toString(),
+      annotation._id,
     );
 
-    if (!resultEntityOrComp) return reject('Failed updating annotationList');
-
-    // Finally we update the annotationList in the compilation
-    const coll = Mongo.getEntitiesRepository().collection(reqedCollection);
-    const listUpdateResult = await updateOne(
-      coll,
-      { _id: new ObjectId(entityOrCompId) },
-      { $set: { annotationList: resultEntityOrComp.annotationList } },
-    );
-
-    if (listUpdateResult.result.ok !== 1) {
-      const message = `Failed updating annotationList of ${reqedCollection} ${entityOrCompId}`;
+    if (!updateSuccess) {
+      const message = `Failed updating annotations of ${reqedCollection} ${entityOrCompId}`;
       Logger.err(message);
       return reject(message);
     }
