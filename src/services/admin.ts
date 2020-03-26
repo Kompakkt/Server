@@ -58,7 +58,6 @@ const Admin: IAdmin = {
     filterProperties.forEach(prop => ((user as any)[prop] = undefined));
 
     for (const coll in user.data) {
-      if (!user.data.hasOwnProperty(coll)) continue;
       for (let i = 0; i < user.data[coll].length; i++) {
         const obj = user.data[coll][i];
         user.data[coll][i] = await Mongo.resolve(obj, coll, 0);
@@ -72,40 +71,37 @@ const Admin: IAdmin = {
     const _id = checkAndReturnObjectId(req.body.identifier);
     if (!_id) return res.status(400).send('Invalid identifier');
     const role = req.body.role;
-    switch (role) {
-      case EUserRank.user:
-      case EUserRank.uploadrequested:
-      case EUserRank.uploader:
-      case EUserRank.admin:
-        const AccDB: Db = Mongo.getAccountsRepository();
-        const users: Collection<IUserData> = AccDB.collection('users');
-        const user = await users.findOne({ _id });
-
-        if (!user) return res.status(500).send('Updating user role failed');
-
-        const updateResult = await updateOne(
-          users,
-          { _id },
-          { $set: { role } },
-        );
-        if (updateResult.result.ok !== 1)
-          return res.status(500).send('Updating user role failed');
-
-        if (Configuration.Mailer && Configuration.Mailer.Target) {
-          Mailer.sendMail({
-            from: Configuration.Mailer.Target['contact'],
-            to: user.mail,
-            subject: 'Your Kompakkt role has been updated',
-            text: `Hey ${user.fullname},\n\nYour role on Kompakkt has been changed from ${user.role} to ${role}\n\nVisit https://kompakkt.uni-koeln.de/profile to see what has changed`,
-          })
-            .then(result => Logger.log(`Mail sent`, result))
-            .catch(error => Logger.warn(`Failed to send mail`, error));
-        }
-        return res.status(200).end();
-        break;
-      default:
-        return res.status(400).send('Invalid role specified');
+    const validRoles = [
+      EUserRank.user,
+      EUserRank.uploadrequested,
+      EUserRank.uploader,
+      EUserRank.admin,
+    ];
+    if (!validRoles.includes(role)) {
+      return res.status(400).send('Invalid role specified');
     }
+
+    const AccDB: Db = Mongo.getAccountsRepository();
+    const users: Collection<IUserData> = AccDB.collection('users');
+    const user = await users.findOne({ _id });
+
+    if (!user) return res.status(500).send('Updating user role failed');
+
+    const updateResult = await updateOne(users, { _id }, { $set: { role } });
+    if (updateResult.result.ok !== 1)
+      return res.status(500).send('Updating user role failed');
+
+    if (Configuration.Mailer && Configuration.Mailer.Target) {
+      Mailer.sendMail({
+        from: Configuration.Mailer.Target['contact'],
+        to: user.mail,
+        subject: 'Your Kompakkt role has been updated',
+        text: `Hey ${user.fullname},\n\nYour role on Kompakkt has been changed from ${user.role} to ${role}\n\nVisit https://kompakkt.uni-koeln.de/profile to see what has changed`,
+      })
+        .then(result => Logger.log('Mail sent', result))
+        .catch(error => Logger.warn('Failed to send mail', error));
+    }
+    return res.status(200).end();
   },
   toggleEntityPublishedState: async (req, res) => {
     const _id = checkAndReturnObjectId(req.body.identifier);

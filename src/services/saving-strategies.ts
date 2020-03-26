@@ -10,7 +10,6 @@ import {
   IUserData,
   IMetaDataDigitalEntity,
   IMetaDataPhysicalEntity,
-  IMetaDataTag,
   IMetaDataPerson,
   IMetaDataInstitution,
   IStrippedUserData,
@@ -85,91 +84,86 @@ const saveAnnotation = async (
   userData: IUserData,
   doesEntityExist: boolean,
 ) => {
-  return new Promise<IAnnotation>(async (resolve, reject) => {
-    // If the Annotation already exists, check for owner
-    const isAnnotationOwner = doesEntityExist
-      ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
-      : true;
-    // Check if anything was missing for safety
-    if (!annotation || !annotation.target?.source)
-      return reject('Invalid annotation');
-    const source = annotation.target.source;
-    if (!source) return reject('Missing source');
-    if (!annotation.body?.content?.relatedPerspective)
-      return reject('Missing body.content.relatedPerspective');
-    annotation.body.content.relatedPerspective.preview = await Mongo.saveBase64toImage(
-      annotation.body.content.relatedPerspective.preview,
-      'annotation',
-      annotation._id,
-    );
+  // If the Annotation already exists, check for owner
+  const isAnnotationOwner = doesEntityExist
+    ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
+    : true;
+  // Check if anything was missing for safety
+  if (!annotation || !annotation.target?.source)
+    throw new Error('Invalid annotation');
+  const source = annotation.target.source;
+  if (!source) throw new Error('Missing source');
+  if (!annotation.body?.content?.relatedPerspective)
+    throw new Error('Missing body.content.relatedPerspective');
+  annotation.body.content.relatedPerspective.preview = await Mongo.saveBase64toImage(
+    annotation.body.content.relatedPerspective.preview,
+    'annotation',
+    annotation._id,
+  );
 
-    // Assume invalid data
-    const relatedEntityId = source.relatedEntity as string | undefined;
-    const relatedCompId = source.relatedCompilation;
-    // Check if === undefined because otherwise this quits on empty string
-    if (relatedEntityId === undefined || relatedCompId === undefined)
-      return reject('Related entity or compilation undefined');
+  // Assume invalid data
+  const relatedEntityId = source.relatedEntity as string | undefined;
+  const relatedCompId = source.relatedCompilation;
+  // Check if === undefined because otherwise this quits on empty string
+  if (relatedEntityId === undefined || relatedCompId === undefined)
+    throw new Error('Related entity or compilation undefined');
 
-    const validEntity = ObjectId.isValid(relatedEntityId);
-    const validCompilation = ObjectId.isValid(relatedCompId);
+  const validEntity = ObjectId.isValid(relatedEntityId);
+  const validCompilation = ObjectId.isValid(relatedCompId);
 
-    if (!validEntity) return reject('Invalid related entity id');
+  if (!validEntity) throw new Error('Invalid related entity id');
 
-    // Case: Trying to change Default Annotations
-    const isEntityOwner = await Mongo.isUserOwnerOfEntity(
-      userData,
-      relatedEntityId,
-    );
-    if (!validCompilation && !isEntityOwner) return reject('Permission denied');
+  // Case: Trying to change Default Annotations
+  const isEntityOwner = await Mongo.isUserOwnerOfEntity(
+    userData,
+    relatedEntityId,
+  );
+  if (!validCompilation && !isEntityOwner) throw new Error('Permission denied');
 
-    // Case: Compilation owner trying to re-rank annotations
-    const isCompilationOwner = await Mongo.isUserOwnerOfEntity(
-      userData,
-      relatedCompId,
-    );
+  // Case: Compilation owner trying to re-rank annotations
+  const isCompilationOwner = await Mongo.isUserOwnerOfEntity(
+    userData,
+    relatedCompId,
+  );
 
-    if (!isAnnotationOwner && isCompilationOwner) {
-      const existing = await Mongo.resolve<IAnnotation>(
-        annotation,
-        'annotation',
-      );
+  if (!isAnnotationOwner && isCompilationOwner) {
+    const existing = await Mongo.resolve<IAnnotation>(annotation, 'annotation');
 
-      // If not new and not existing then what are we even doing
-      if (!existing) return reject('Permission denied');
+    // If not new and not existing then what are we even doing
+    if (!existing) throw new Error('Permission denied');
 
-      // Compilation owner is not supposed to change the annotation body
-      if (JSON.stringify(existing.body) === JSON.stringify(annotation.body))
-        return reject('Permission denied');
-    }
+    // Compilation owner is not supposed to change the annotation body
+    if (JSON.stringify(existing.body) === JSON.stringify(annotation.body))
+      throw new Error('Permission denied');
+  }
 
-    // Update data inside of annotation
-    annotation.generated = annotation.generated ?? new Date().toISOString();
-    annotation.lastModificationDate = new Date().toISOString();
-    annotation.lastModifiedBy = {
-      _id: userData._id,
-      name: userData.fullname,
-      type: 'person',
-    };
+  // Update data inside of annotation
+  annotation.generated = annotation.generated ?? new Date().toISOString();
+  annotation.lastModificationDate = new Date().toISOString();
+  annotation.lastModifiedBy = {
+    _id: userData._id,
+    name: userData.fullname,
+    type: 'person',
+  };
 
-    const entityOrCompId = !validCompilation ? relatedEntityId : relatedCompId;
-    const reqedCollection = !validCompilation ? 'entity' : 'compilation';
-    const updateSuccess = await updateAnnotationList(
-      entityOrCompId,
-      reqedCollection,
-      annotation._id,
-    );
+  const entityOrCompId = !validCompilation ? relatedEntityId : relatedCompId;
+  const reqedCollection = !validCompilation ? 'entity' : 'compilation';
+  const updateSuccess = await updateAnnotationList(
+    entityOrCompId,
+    reqedCollection,
+    annotation._id,
+  );
 
-    if (!updateSuccess) {
-      const message = `Failed updating annotations of ${reqedCollection} ${entityOrCompId}`;
-      Logger.err(message);
-      return reject(message);
-    }
+  if (!updateSuccess) {
+    const message = `Failed updating annotations of ${reqedCollection} ${entityOrCompId}`;
+    Logger.err(message);
+    throw new Error(message);
+  }
 
-    if (isAnnotationOwner)
-      await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
+  if (isAnnotationOwner)
+    await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
 
-    resolve(annotation);
-  });
+  return annotation;
 };
 
 const saveEntity = async (entity: IEntity, userData: IUserData) => {
@@ -196,6 +190,43 @@ const saveGroup = async (group: IGroup, userData: IUserData) => {
   group.members = [strippedUserData];
   group.owners = [strippedUserData];
   return group;
+};
+
+const saveInstitution = async (
+  institution: IMetaDataInstitution,
+  userData: IUserData,
+  save = false,
+) => {
+  const resolved = await Mongo.resolve<IMetaDataInstitution>(
+    institution,
+    'institution',
+  );
+  institution._id = resolved?._id ?? new ObjectId().toString();
+
+  // If institution exists, combine roles
+  institution.roles = { ...resolved?.roles, ...institution?.roles };
+  institution.addresses = {
+    ...resolved?.addresses,
+    ...institution?.addresses,
+  };
+  institution.notes = { ...resolved?.notes, ...institution?.notes };
+
+  const _id = institution._id;
+  if (save) {
+    return updateOne(
+      Mongo.getEntitiesRepository().collection('institution'),
+      Mongo.query(_id),
+      { $set: { ...institution } },
+      { upsert: true },
+    ).then(res => {
+      const _id = res.upsertedId?._id ?? institution._id;
+      Mongo.insertCurrentUserData(userData, _id, 'institution');
+      return institution;
+    });
+  } else {
+    delete institution._id;
+    return institution;
+  }
 };
 
 const savePerson = async (
@@ -246,43 +277,6 @@ const savePerson = async (
   }
 };
 
-const saveInstitution = async (
-  institution: IMetaDataInstitution,
-  userData: IUserData,
-  save = false,
-) => {
-  const resolved = await Mongo.resolve<IMetaDataInstitution>(
-    institution,
-    'institution',
-  );
-  institution._id = resolved?._id ?? new ObjectId().toString();
-
-  // If institution exists, combine roles
-  institution.roles = { ...resolved?.roles, ...institution?.roles };
-  institution.addresses = {
-    ...resolved?.addresses,
-    ...institution?.addresses,
-  };
-  institution.notes = { ...resolved?.notes, ...institution?.notes };
-
-  const _id = institution._id;
-  if (save) {
-    return updateOne(
-      Mongo.getEntitiesRepository().collection('institution'),
-      Mongo.query(_id),
-      { $set: { ...institution } },
-      { upsert: true },
-    ).then(res => {
-      const _id = res.upsertedId?._id ?? institution._id;
-      Mongo.insertCurrentUserData(userData, _id, 'institution');
-      return institution;
-    });
-  } else {
-    delete institution._id;
-    return institution;
-  }
-};
-
 const saveMetaDataEntity = async (
   entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
   userData: IUserData,
@@ -328,10 +322,7 @@ const saveMetaDataEntity = async (
 
   if (isDigitalEntity(newEntity)) {
     for (let i = 0; i < newEntity.tags.length; i++) {
-      const tag: IMetaDataTag =
-        typeof newEntity.tags[i] === 'string'
-          ? { _id: new ObjectId(), value: newEntity.tags[i] as string }
-          : (newEntity.tags[i] as IMetaDataTag);
+      const tag = newEntity.tags[i];
 
       tag._id = ObjectId.isValid(tag._id) ? tag._id : new ObjectId();
 

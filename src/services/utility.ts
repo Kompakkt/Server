@@ -27,10 +27,7 @@ interface IUtility {
 }
 
 const collectionAsArray = <T extends unknown>(collection: string, query = {}) =>
-  Mongo.getEntitiesRepository()
-    .collection<T>(collection)
-    .find(query)
-    .toArray();
+  Mongo.getEntitiesRepository().collection<T>(collection).find(query).toArray();
 
 const Utility: IUtility = {
   findAllEntityOwnersRequest: async (req, res) => {
@@ -189,26 +186,22 @@ const Utility: IUtility = {
     account.data.entity = account.data.entity ? account.data.entity : [];
     account.data.entity = account.data.entity.filter(entity => entity);
 
-    switch (command) {
-      case 'add':
-        if (
-          !(account.data.entity as IEntity[]).find(
-            obj => obj.toString() === entityId.toString(),
-          )
-        ) {
-          account.data.entity.push(new ObjectId(entityId));
-        }
-        break;
-      case 'remove':
-        const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
-        if (entityUses === 1)
-          return res.status(403).send('Cannot remove last owner');
+    if (command === 'add') {
+      if (
+        !(account.data.entity as IEntity[]).find(
+          obj => obj.toString() === entityId.toString(),
+        )
+      ) {
+        account.data.entity.push(new ObjectId(entityId));
+      }
+    } else if (command === 'remove') {
+      const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
+      if (entityUses === 1)
+        return res.status(403).send('Cannot remove last owner');
 
-        account.data.entity = (account.data.entity as IEntity[]).filter(
-          entity => entity.toString() !== entityId.toString(),
-        );
-        break;
-      default:
+      account.data.entity = (account.data.entity as IEntity[]).filter(
+        entity => entity.toString() !== entityId.toString(),
+      );
     }
 
     const updateResult = await users.updateOne(findUserQuery, {

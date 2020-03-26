@@ -102,16 +102,18 @@ const Mailer: IMailer = {
 
     await Mailer.sendMail(mailOptions)
       .then(success => {
-        Logger.info(`Nodemailer sent mail:`, success);
+        Logger.info('Nodemailer sent mail:', success);
         res.status(200).end();
       })
       .catch(error => {
         result = false;
-        Logger.err(`Failed sending mail:`, error);
+        Logger.err('Failed sending mail:', error);
         res.status(500).send('Failed sending mail');
       });
 
-    Mailer.addUserToDatabase(req, result).catch(() => {});
+    Mailer.addUserToDatabase(req, result).catch((e: any) => {
+      Logger.err('Failed adding users mail request to DB', e);
+    });
   },
   addUserToDatabase: async (req, mailSent) => {
     const target = req.body.target;
@@ -147,7 +149,7 @@ const Mailer: IMailer = {
 
     const insertResult = await collection.insertOne(document);
     if (insertResult.result.ok !== 1) {
-      Logger.info(`Failed adding user to mail database`);
+      Logger.info('Failed adding user to mail database');
     } else {
       Logger.info(`Added user to DB ${document}`);
     }

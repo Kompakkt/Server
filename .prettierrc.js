@@ -7,7 +7,6 @@ module.exports = {
   trailingComma: 'all',
   bracketSpacing: true,
   arrowParens: 'avoid',
-  parser: 'typescript',
   requirePragma: false,
   insertPragma: false,
   endOfLine: 'lf',

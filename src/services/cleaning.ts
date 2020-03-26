@@ -135,7 +135,6 @@ const Cleaning: ICleaning = {
 
     const iterateOverUserData = async (user: any) => {
       for (const property in user.data) {
-        if (!user.data.hasOwnProperty(property)) continue;
         if (user.data[property] instanceof Array) {
           if (user.data[property].length <= 0) continue;
           const nullRefs = await checkReferences(user.data[property], property);

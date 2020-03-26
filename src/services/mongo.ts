@@ -65,20 +65,6 @@ interface IExploreRequest {
 const MongoConf = Configuration.Mongo;
 const UploadConf = Configuration.Uploads;
 
-const users = (): Collection<IUserData> =>
-  getAccountsRepository().collection('users');
-const getCurrentUserBySession = async (sessionID: string | undefined) => {
-  if (!sessionID) return null;
-  return users().findOne({ sessionID });
-};
-const getUserByUsername = async (username: string) =>
-  users().findOne({ username });
-const getAllItemsOfCollection = async (collection: string) =>
-  getEntitiesRepository()
-    .collection(collection)
-    .find({})
-    .toArray();
-
 // Wrapper to combine MongoDB updateOne & Cache
 const updateOne = async (
   coll: Collection<any>,
@@ -163,6 +149,16 @@ const Client = new MongoClient(MongoURL, {
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
+const users = (): Collection<IUserData> =>
+  getAccountsRepository().collection('users');
+const getCurrentUserBySession = async (sessionID: string | undefined) => {
+  if (!sessionID) return null;
+  return users().findOne({ sessionID });
+};
+const getUserByUsername = async (username: string) =>
+  users().findOne({ username });
+const getAllItemsOfCollection = async (collection: string) =>
+  getEntitiesRepository().collection(collection).find({}).toArray();
 
 interface IMongo {
   init(): Promise<void>;
@@ -220,7 +216,7 @@ interface IMongo {
 const Mongo: IMongo = {
   init: async () => {
     return new Promise<void>((resolve, reject) => {
-      Client.connect((error, _) => {
+      Client.connect(error => {
         if (!error) {
           resolve();
         } else {
@@ -313,7 +309,7 @@ const Mongo: IMongo = {
 
     return users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
-      .then(async _ => {
+      .then(async () => {
         // Logger.log(`User ${updatedUser.username} logged in`);
         res.status(200).send(await Mongo.resolveUserData(updatedUser));
       })
@@ -363,7 +359,6 @@ const Mongo: IMongo = {
 
     if (userData.data) {
       for (const property in userData.data) {
-        if (!userData.data.hasOwnProperty(property)) continue;
         userData.data[property] = await Promise.all(
           userData.data[property].map(async obj =>
             Mongo.resolve(obj, property),
@@ -672,7 +667,7 @@ const Mongo: IMongo = {
 
     if (req.body?.username !== find_result?.username) {
       Logger.err(
-        `Entity removal failed due to username & session not matching`,
+        'Entity removal failed due to username & session not matching',
       );
       return res
         .status(403)
@@ -685,7 +680,8 @@ const Mongo: IMongo = {
       .map(id => id.toString());
 
     if (!UserRelatedEntities.find(obj => obj === identifier.toString())) {
-      const message = `Entity removal failed because Entity does not belong to user`;
+      const message =
+        'Entity removal failed because Entity does not belong to user';
       Logger.err(message);
       return res.status(401).send(message);
     }
@@ -783,7 +779,6 @@ const Mongo: IMongo = {
     );
     allEntities = allEntities.filter(obj => {
       for (const prop in filter) {
-        if (!filter.hasOwnProperty(prop)) continue;
         if (!doesEntityPropertyMatch(obj, prop)) return false;
       }
       return true;
@@ -817,16 +812,15 @@ const Mongo: IMongo = {
       let result: string[] = [];
       for (const key of Object.keys(obj)) {
         const prop = obj[key];
-        if (obj.hasOwnProperty(key) && prop) {
-          if (typeof prop === 'object' && !Array.isArray(prop)) {
-            result = result.concat(getNestedValues(prop));
-          } else if (typeof prop === 'object' && Array.isArray(prop)) {
-            for (const p of prop) {
-              result = result.concat(getNestedValues(p));
-            }
-          } else if (typeof prop === 'string') {
-            result.push(prop);
+        if (!prop) continue;
+        if (typeof prop === 'object' && !Array.isArray(prop)) {
+          result = result.concat(getNestedValues(prop));
+        } else if (typeof prop === 'object' && Array.isArray(prop)) {
+          for (const p of prop) {
+            result = result.concat(getNestedValues(p));
           }
+        } else if (typeof prop === 'string') {
+          result.push(prop);
         }
       }
       return result;
@@ -835,9 +829,7 @@ const Mongo: IMongo = {
     const filterResults = (objs: any[]) => {
       const result: any[] = [];
       for (const obj of objs) {
-        const asText = getNestedValues(obj)
-          .join('')
-          .toLowerCase();
+        const asText = getNestedValues(obj).join('').toLowerCase();
         for (let j = 0; j < filter.length; j++) {
           if (asText.indexOf(filter[j]) === -1) {
             break;
@@ -988,13 +980,13 @@ const Mongo: IMongo = {
         const isPWProtected =
           resolved.password !== undefined && resolved.password !== '';
 
-        const isAnnotatable = isOwner
-          ? // owner can always annotate
-            true
-          : // only logged in and only if included in whitelist
-          resolved.whitelist.enabled && userData
-          ? JSON.stringify(resolved.whitelist).includes(userData._id.toString())
-          : false;
+        // owner can always annotate
+        // otherwise only logged in and only if included in whitelist
+        const isWhitelisted =
+          resolved.whitelist.enabled &&
+          userData &&
+          JSON.stringify(resolved.whitelist).includes(userData._id.toString());
+        const isAnnotatable = isOwner ? true : isWhitelisted;
         if (filters.annotatable && !isAnnotatable) continue;
 
         if (isPWProtected && !isOwner && !isAnnotatable) continue;

@@ -54,7 +54,7 @@ const Upload: IUpload = {
 
     ensureDir(dirname(newPath))
       .then(() => move(tempPath, newPath))
-      .then(_ => {
+      .then(() => {
         const resEntity = {
           metadata_file: filename,
           metadata_entity: req.headers['metadatakey'],

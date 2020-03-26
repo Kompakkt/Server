@@ -69,6 +69,9 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (_req, callback) => {
   }
 };
 
+const Listener = createServer();
+const WebSocket = SocketIo(Listener);
+
 const startListening = () => {
   Listener.listen(Conf.Express.Port, Conf.Express.Host);
   Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
@@ -77,8 +80,92 @@ const startListening = () => {
 const authenticate = (options: { session: boolean } = { session: false }) =>
   passport.authenticate(['local', 'ldapauth'], { session: options.session });
 
-const Listener = createServer();
-const WebSocket = SocketIo(Listener);
+// Local Auth Registration, Salting and Verification
+const generateSalt = (length = 16) => {
+  // tslint:disable-next-line
+  return randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
+};
+const sha512 = (password: string, salt: BinaryLike) => {
+  const hash = createHmac('sha512', salt);
+  hash.update(password);
+  const passwordHash = hash.digest('hex');
+  return { salt, passwordHash };
+};
+const SALT_LENGTH = 16;
+const saltHashPassword = (password: string) => {
+  return sha512(password, generateSalt(SALT_LENGTH));
+};
+
+const verifyUser = async (username: string, password: string) => {
+  const coll = Mongo.getAccountsRepository().collection('users');
+  const passwords = Mongo.getAccountsRepository().collection('passwords');
+  const userInDB = await coll.findOne({ username });
+  if (!userInDB) return false;
+  const pwOfUser = await passwords.findOne({ username });
+  if (!pwOfUser) return false;
+  const salt = pwOfUser.password.salt;
+  const hash = pwOfUser.password.passwordHash;
+  const newHash = sha512(password, salt).passwordHash;
+  return newHash === hash;
+};
+
+const registerUser = async (
+  req: express.Request,
+  res: express.Response,
+): Promise<any> => {
+  const coll = Mongo.getAccountsRepository().collection('users');
+  const passwords = Mongo.getAccountsRepository().collection('passwords');
+
+  const isUser = (obj: any): obj is IUserData => {
+    const person = obj as IUserData;
+    return (
+      person &&
+      person.fullname !== undefined &&
+      person.prename !== undefined &&
+      person.surname !== undefined &&
+      person.mail !== undefined &&
+      person.username !== undefined &&
+      (person as any)['password'] !== undefined
+    );
+  };
+
+  // First user gets admin
+  const isFirstUser = (await coll.findOne({})) === null;
+  const role = isFirstUser ? EUserRank.admin : EUserRank.user;
+
+  const user = req.body as IUserData & { password: string };
+  const adjustedUser = { ...user, role, data: {} };
+  const userExists = (await coll.findOne({ username: user.username })) !== null;
+  if (userExists) return res.status(409).send('User already exists');
+  if (isUser(adjustedUser)) {
+    // tslint:disable-next-line
+    delete adjustedUser['password'];
+    await passwords
+      .updateOne(
+        { username: user.username },
+        {
+          $set: {
+            username: user.username,
+            password: saltHashPassword(user.password),
+          },
+        },
+        { upsert: true },
+      )
+      .then()
+      .catch();
+    coll
+      .insertOne(adjustedUser)
+      .then(() => res.status(201).send('Registered'))
+      .catch(() => res.status(500).send('Failed inserting user'));
+  } else {
+    res.status(400).send('Incomplete user data');
+  }
+};
+
+const UUID_LENGTH = 64;
+const genid = () => randomBytes(UUID_LENGTH).toString('hex');
 
 // ExpressJS Middleware
 // Enable CORS
@@ -171,94 +258,7 @@ passport.serializeUser((user: any, done) => {
 });
 passport.deserializeUser((id, done) => done(undefined, id));
 
-// Local Auth Registration, Salting and Verification
-const generateSalt = (length = 16) => {
-  // tslint:disable-next-line
-  return randomBytes(Math.ceil(length / 2))
-    .toString('hex')
-    .slice(0, length);
-};
-const sha512 = (password: string, salt: BinaryLike) => {
-  const hash = createHmac('sha512', salt);
-  hash.update(password);
-  const passwordHash = hash.digest('hex');
-  return { salt, passwordHash };
-};
-const SALT_LENGTH = 16;
-const saltHashPassword = (password: string) => {
-  return sha512(password, generateSalt(SALT_LENGTH));
-};
-
-const registerUser = async (
-  req: express.Request,
-  res: express.Response,
-): Promise<any> => {
-  const coll = Mongo.getAccountsRepository().collection('users');
-  const passwords = Mongo.getAccountsRepository().collection('passwords');
-
-  const isUser = (obj: any): obj is IUserData => {
-    const person = obj as IUserData;
-    return (
-      person &&
-      person.fullname !== undefined &&
-      person.prename !== undefined &&
-      person.surname !== undefined &&
-      person.mail !== undefined &&
-      person.username !== undefined &&
-      (person as any)['password'] !== undefined
-    );
-  };
-
-  // First user gets admin
-  const isFirstUser = (await coll.findOne({})) === null;
-  const role = isFirstUser ? EUserRank.admin : EUserRank.user;
-
-  const user = req.body as IUserData & { password: string };
-  const adjustedUser = { ...user, role, data: {} };
-  const userExists = (await coll.findOne({ username: user.username })) !== null;
-  if (userExists) return res.status(409).send('User already exists');
-  if (isUser(adjustedUser)) {
-    // tslint:disable-next-line
-    delete adjustedUser['password'];
-    await passwords
-      .updateOne(
-        { username: user.username },
-        {
-          $set: {
-            username: user.username,
-            password: saltHashPassword(user.password),
-          },
-        },
-        { upsert: true },
-      )
-      .then()
-      .catch();
-    coll
-      .insertOne(adjustedUser)
-      .then(() => res.status(201).send('Registered'))
-      .catch(() => res.status(500).send('Failed inserting user'));
-  } else {
-    res.status(400).send('Incomplete user data');
-  }
-};
-
-const verifyUser = async (username: string, password: string) => {
-  const coll = Mongo.getAccountsRepository().collection('users');
-  const passwords = Mongo.getAccountsRepository().collection('passwords');
-  const userInDB = await coll.findOne({ username });
-  if (!userInDB) return false;
-  const pwOfUser = await passwords.findOne({ username });
-  if (!pwOfUser) return false;
-  const salt = pwOfUser.password.salt;
-  const hash = pwOfUser.password.passwordHash;
-  const newHash = sha512(password, salt).passwordHash;
-  return newHash === hash;
-};
-
 Server.use(passport.initialize());
-
-const UUID_LENGTH = 64;
-const genid = () => randomBytes(UUID_LENGTH).toString('hex');
 
 Server.use(
   expressSession({

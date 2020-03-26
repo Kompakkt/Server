@@ -97,7 +97,7 @@ const Logger: ILogger = {
       )}`,
     );
     if (written === Buffer.byteLength(lines)) {
-      console.log(`Log looks like a success. Clearing log stack`);
+      console.log('Log looks like a success. Clearing log stack');
       Logger.stack.clear();
     }
   },
