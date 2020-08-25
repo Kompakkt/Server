@@ -212,21 +212,18 @@ const saveInstitution = async (
   institution.notes = { ...resolved?.notes, ...institution?.notes };
 
   const _id = institution._id;
-  if (save) {
-    return updateOne(
-      Mongo.getEntitiesRepository().collection('institution'),
-      Mongo.query(_id),
-      { $set: { ...institution } },
-      { upsert: true },
-    ).then(res => {
-      const _id = res.upsertedId?._id ?? institution._id;
-      Mongo.insertCurrentUserData(userData, _id, 'institution');
-      return institution;
-    });
-  } else {
-    delete institution._id;
+  if (!save) return institution;
+
+  return updateOne(
+    Mongo.getEntitiesRepository().collection('institution'),
+    Mongo.query(_id),
+    { $set: { ...institution } },
+    { upsert: true },
+  ).then(res => {
+    const _id = res.upsertedId?._id ?? institution._id;
+    Mongo.insertCurrentUserData(userData, _id, 'institution');
     return institution;
-  }
+  });
 };
 
 const savePerson = async (
@@ -260,21 +257,18 @@ const savePerson = async (
   }
 
   const _id = person._id;
-  if (save) {
-    return updateOne(
-      Mongo.getEntitiesRepository().collection('person'),
-      Mongo.query(_id),
-      { $set: { ...person } },
-      { upsert: true },
-    ).then(res => {
-      const _id = res.upsertedId?._id ?? person._id;
-      Mongo.insertCurrentUserData(userData, _id, 'person');
-      return person;
-    });
-  } else {
-    delete person._id;
+  if (!save) return person;
+
+  return updateOne(
+    Mongo.getEntitiesRepository().collection('person'),
+    Mongo.query(_id),
+    { $set: { ...person } },
+    { upsert: true },
+  ).then(res => {
+    const _id = res.upsertedId?._id ?? person._id;
+    Mongo.insertCurrentUserData(userData, _id, 'person');
     return person;
-  }
+  });
 };
 
 const saveMetaDataEntity = async (

@@ -303,14 +303,10 @@ const Mongo: IMongo = {
       role: userData ? userData.role : EUserRank.user,
     };
 
-    // Users returned by local strategy might have _id field
-    // _id is immutable in MongoDB, so we can't update the field
-    delete updatedUser['_id'];
-
     return users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
       .then(async () => {
-        // Logger.log(`User ${updatedUser.username} logged in`);
+        Logger.log(`User ${updatedUser.username} logged in`);
         res.status(200).send(await Mongo.resolveUserData(updatedUser));
       })
       .catch(error => {

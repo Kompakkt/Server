@@ -223,8 +223,8 @@ const Utility: IUtility = {
       .send(
         groups.filter(
           group =>
-            JSON.stringify(group.members).includes(user._id.toString()) ||
-            JSON.stringify(group.owners).includes(user._id.toString()),
+            JSON.stringify(group.members).includes(`${user._id}`) ||
+            JSON.stringify(group.owners).includes(`${user._id}`),
         ),
       );
   },
@@ -249,12 +249,8 @@ const Utility: IUtility = {
 
     const filteredCompilations = compilations.filter(
       compilation =>
-        JSON.stringify(compilation.whitelist.groups).includes(
-          user._id.toString(),
-        ) ||
-        JSON.stringify(compilation.whitelist.persons).includes(
-          user._id.toString(),
-        ),
+        JSON.stringify(compilation.whitelist.groups).includes(`${user._id}`) ||
+        JSON.stringify(compilation.whitelist.persons).includes(`${user._id}`),
     );
 
     const resolvedCompilations = (

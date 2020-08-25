@@ -238,7 +238,9 @@ const Cleaning: ICleaning = {
 
       for (const _id in inst.addresses) {
         const addr = inst.addresses[_id];
-        delete addr.creation_date;
+        // cast as any to remove non-optional creation_date
+        // this way we can easily check all properties except creation_date
+        delete (addr as any).creation_date;
 
         if (Object.values(addr).join('').length === 0) {
           delete inst.addresses[_id];

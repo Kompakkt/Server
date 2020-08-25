@@ -140,8 +140,9 @@ const registerUser = async (
   const userExists = (await coll.findOne({ username: user.username })) !== null;
   if (userExists) return res.status(409).send('User already exists');
   if (isUser(adjustedUser)) {
-    // tslint:disable-next-line
-    delete adjustedUser['password'];
+    // cast as any to delete non-optional property password
+    // we don't want the password to be written to the database in clear text
+    delete (adjustedUser as any).password;
     await passwords
       .updateOne(
         { username: user.username },
