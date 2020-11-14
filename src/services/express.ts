@@ -261,6 +261,7 @@ passport.deserializeUser((id, done) => done(undefined, id));
 
 Server.use(passport.initialize());
 
+Server.set('trust proxy', 1);
 Server.use(
   expressSession({
     genid,
@@ -269,7 +270,8 @@ Server.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: false,
-      sameSite: false,
+      sameSite: 'none',
+      secure: true,
     },
   }),
 );
