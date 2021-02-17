@@ -83,10 +83,8 @@ const updateOne = async (
   return coll.updateOne(query, update, options);
 };
 
-const areObjectIdsEqual = (
-  firstId: string | ObjectId,
-  secondId: string | ObjectId,
-) => new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
+const areObjectIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) =>
+  new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
 
 const saveBase64toImage = async (
   base64input: string,
@@ -99,10 +97,7 @@ const saveBase64toImage = async (
   // TODO: Convert to progressive JPEG?
   try {
     if (base64input.indexOf('data:image') !== -1) {
-      const replaced = base64input.replace(
-        /^data:image\/(png|gif|jpeg);base64,/,
-        '',
-      );
+      const replaced = base64input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
       const tempBuff = Buffer.from(replaced, 'base64');
       await imagemin
         .buffer(tempBuff, {
@@ -115,9 +110,7 @@ const saveBase64toImage = async (
           ],
         })
         .then(res => {
-          ensureDirSync(
-            `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`,
-          );
+          ensureDirSync(`${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`);
           writeFileSync(
             `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/${saveId}.png`,
             res,
@@ -149,14 +142,12 @@ const Client = new MongoClient(MongoURL, {
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
-const users = (): Collection<IUserData> =>
-  getAccountsRepository().collection('users');
+const users = (): Collection<IUserData> => getAccountsRepository().collection('users');
 const getCurrentUserBySession = async (sessionID: string | undefined) => {
   if (!sessionID) return null;
   return users().findOne({ sessionID });
 };
-const getUserByUsername = async (username: string) =>
-  users().findOne({ username });
+const getUserByUsername = async (username: string) => users().findOne({ username });
 const getAllItemsOfCollection = async (collection: string) =>
   getEntitiesRepository().collection(collection).find({}).toArray();
 
@@ -173,11 +164,7 @@ interface IMongo {
   fixObjectId(req: Request, _: Response, next: NextFunction): void;
   getUnusedObjectId(_: Request, res: Response): void;
   invalidateSession(req: Request, res: Response): void;
-  updateSessionId(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<any>;
+  updateSessionId(req: Request, res: Response, next: NextFunction): Promise<any>;
   addToAccounts(req: Request, res: Response): any;
   insertCurrentUserData(
     req: Request | IUserData,
@@ -186,25 +173,14 @@ interface IMongo {
   ): Promise<any>;
   resolveUserData(_userData: IUserData): Promise<IUserData>;
   getCurrentUserData(req: Request, res: Response): Promise<any>;
-  validateLoginSession(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<any>;
+  validateLoginSession(req: Request, res: Response, next: NextFunction): Promise<any>;
   submit(req: Request, res: Response): Promise<any>;
   addEntityToCollection(req: Request, res: Response): Promise<any>;
   updateEntitySettings(req: Request, res: Response): Promise<any>;
-  isUserOwnerOfEntity(
-    req: Request | IUserData,
-    identifier: string | ObjectId,
-  ): Promise<any>;
+  isUserOwnerOfEntity(req: Request | IUserData, identifier: string | ObjectId): Promise<any>;
   isUserAdmin(req: Request): Promise<boolean>;
   query(_id: string | ObjectId): any;
-  resolve<T>(
-    obj: any,
-    collection_name: string,
-    depth?: number,
-  ): Promise<T | null | undefined>;
+  resolve<T>(obj: any, collection_name: string, depth?: number): Promise<T | null | undefined>;
   getEntityFromCollection(req: Request, res: Response): Promise<any>;
   getAllEntitiesFromCollection(req: Request, res: Response): Promise<any>;
   removeEntityFromCollection(req: Request, res: Response): any;
@@ -231,9 +207,7 @@ const Mongo: IMongo = {
   isMongoDBConnected: (_, res, next) => {
     if (!Client.isConnected()) {
       Logger.warn('Incoming req while not connected to MongoDB');
-      return res
-        .status(500)
-        .send('Cannot connect to Database. Contact sysadmin');
+      return res.status(500).send('Cannot connect to Database. Contact sysadmin');
     }
     return next();
   },
@@ -266,8 +240,7 @@ const Mongo: IMongo = {
     const username = req.body.username.toLowerCase();
     const userData = await getUserByUsername(username);
 
-    if (!userData)
-      return res.status(404).send('Failed finding user with username');
+    if (!userData) return res.status(404).send('Failed finding user with username');
 
     const sessionID = req.sessionID;
 
@@ -314,19 +287,13 @@ const Mongo: IMongo = {
         res.status(500).send('Failed updating user entry in database');
       });
   },
-  insertCurrentUserData: async (
-    req,
-    identifier: string | ObjectId,
-    collection: string,
-  ) => {
+  insertCurrentUserData: async (req, identifier: string | ObjectId, collection: string) => {
     const sessionID = req.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
 
     if (!ObjectId.isValid(identifier) || !userData) return false;
 
-    userData.data[collection] = userData.data[collection]
-      ? userData.data[collection]
-      : [];
+    userData.data[collection] = userData.data[collection] ? userData.data[collection] : [];
 
     const doesExist = userData.data[collection]
       .filter(obj => obj)
@@ -335,10 +302,7 @@ const Mongo: IMongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await users().updateOne(
-      { sessionID },
-      { $set: { data: userData.data } },
-    );
+    const updateResult = await users().updateOne({ sessionID }, { $set: { data: userData.data } });
 
     if (updateResult.result.ok !== 1) return false;
     return true;
@@ -356,9 +320,7 @@ const Mongo: IMongo = {
     if (userData.data) {
       for (const property in userData.data) {
         userData.data[property] = await Promise.all(
-          userData.data[property].map(async obj =>
-            Mongo.resolve(obj, property),
-          ),
+          userData.data[property].map(async obj => Mongo.resolve(obj, property)),
         );
         // Filter possible null's
         userData.data[property] = userData.data[property].filter(
@@ -374,8 +336,7 @@ const Mongo: IMongo = {
   getCurrentUserData: async (req, res) => {
     const sessionID = req.sessionID;
     const userData = await getCurrentUserBySession(sessionID);
-    if (!userData)
-      return res.status(404).send('User not found by sessionID. Try relogging');
+    if (!userData) return res.status(404).send('User not found by sessionID. Try relogging');
 
     return res.status(200).send(await Mongo.resolveUserData(userData));
   },
@@ -411,9 +372,7 @@ const Mongo: IMongo = {
 
     Logger.info(`Adding to the following collection: ${RequestCollection}`);
 
-    const collection: Collection = getEntitiesRepository().collection(
-      RequestCollection,
-    );
+    const collection: Collection = getEntitiesRepository().collection(RequestCollection);
 
     let resultEntity = req.body;
     const userData = await getCurrentUserBySession(req.sessionID);
@@ -421,8 +380,7 @@ const Mongo: IMongo = {
 
     const isValidObjectId = ObjectId.isValid(resultEntity['_id']);
     // tslint:disable-next-line:triple-equals
-    const doesEntityExist =
-      (await Mongo.resolve(resultEntity, RequestCollection, 0)) != undefined;
+    const doesEntityExist = (await Mongo.resolve(resultEntity, RequestCollection, 0)) != undefined;
 
     /**
      * If the entity already exists we need to check for owner status
@@ -431,16 +389,13 @@ const Mongo: IMongo = {
      * We also skip this for persons and institutions since their nested content
      * (addresses, contact_references, etc.) can also be updated
      */
-    const isAllowedType = (_e: any) =>
-      isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
+    const isAllowedType = (_e: any) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
     if (isValidObjectId && doesEntityExist && !isAllowedType(resultEntity))
       if (!(await Mongo.isUserOwnerOfEntity(req, resultEntity['_id'])))
         return res.status(401).send('User is not owner');
 
-    const _id = isValidObjectId
-      ? new ObjectId(resultEntity._id)
-      : new ObjectId();
+    const _id = isValidObjectId ? new ObjectId(resultEntity._id) : new ObjectId();
     resultEntity._id = _id;
 
     if (isCompilation(resultEntity)) {
@@ -467,11 +422,7 @@ const Mongo: IMongo = {
       await saveDigitalEntity(resultEntity, userData)
         .then(async digitalentity => {
           resultEntity = digitalentity;
-          await Mongo.insertCurrentUserData(
-            req,
-            resultEntity._id,
-            'digitalentity',
-          );
+          await Mongo.insertCurrentUserData(req, resultEntity._id, 'digitalentity');
         })
         .catch(rejected => res.status(500).send(rejected));
     } else {
@@ -490,18 +441,12 @@ const Mongo: IMongo = {
 
     if (updateResult.result.ok !== 1) {
       Logger.err(`Failed updating ${RequestCollection} ${_id}`);
-      return res
-        .status(500)
-        .send(`Failed updating ${RequestCollection} ${_id}`);
+      return res.status(500).send(`Failed updating ${RequestCollection} ${_id}`);
     }
 
-    const resultId = updateResult.upsertedId
-      ? updateResult.upsertedId._id
-      : _id;
+    const resultId = updateResult.upsertedId ? updateResult.upsertedId._id : _id;
     Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
-    return res
-      .status(200)
-      .send(await Mongo.resolve<any>(resultId, RequestCollection));
+    return res.status(200).send(await Mongo.resolve<any>(resultId, RequestCollection));
   },
   updateEntitySettings: async (req, res) => {
     const preview = req.body.preview;
@@ -511,31 +456,19 @@ const Mongo: IMongo = {
     const collection: Collection = getEntitiesRepository().collection('entity');
     const subfolder = 'entity';
 
-    const finalImagePath = await saveBase64toImage(
-      preview,
-      subfolder,
-      identifier,
-    );
-    if (finalImagePath === '')
-      return res.status(500).send('Failed saving preview image');
+    const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
+    if (finalImagePath === '') return res.status(500).send('Failed saving preview image');
 
     // Overwrite old settings
     const settings = { ...req.body, preview: finalImagePath };
-    const result = await updateOne(
-      collection,
-      { _id: identifier },
-      { $set: { settings } },
-    );
+    const result = await updateOne(collection, { _id: identifier }, { $set: { settings } });
 
-    if (result.result.ok !== 1)
-      return res.status(500).send('Failed updating settings');
+    if (result.result.ok !== 1) return res.status(500).send('Failed updating settings');
 
     return res.status(200).send(settings);
   },
   isUserOwnerOfEntity: async (req, identifier: string | ObjectId) => {
-    const _id = ObjectId.isValid(identifier)
-      ? new ObjectId(identifier)
-      : identifier;
+    const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier) : identifier;
     const userData = await getCurrentUserBySession(req.sessionID);
     if (!userData) {
       return false;
@@ -552,18 +485,12 @@ const Mongo: IMongo = {
       $or: [{ _id }, { _id: new ObjectId(_id) }, { _id: _id.toString() }],
     };
   },
-  resolve: async <T extends unknown>(
-    obj: any,
-    collection_name: string,
-    depth?: number,
-  ) => {
+  resolve: async <T extends unknown>(obj: any, collection_name: string, depth?: number) => {
     if (!obj) return undefined;
     const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
-    const resolve_collection = getEntitiesRepository().collection<T>(
-      collection_name,
-    );
+    const resolve_collection = getEntitiesRepository().collection<T>(collection_name);
 
     const temp = await Cache.get<T>(parsedId);
     if (temp) {
@@ -573,8 +500,7 @@ const Mongo: IMongo = {
       }
       // Flush invalid object from cache
       Cache.del(parsedId).then(numDelKeys => {
-        if (numDelKeys > 0)
-          Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
+        if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
       });
     }
     return resolve_collection
@@ -582,13 +508,11 @@ const Mongo: IMongo = {
       .then(async resolve_result => {
         if (depth && depth === 0) return resolve_result;
 
-        if (isDigitalEntity(resolve_result))
-          return resolveDigitalEntity(resolve_result);
+        if (isDigitalEntity(resolve_result)) return resolveDigitalEntity(resolve_result);
 
         if (isEntity(resolve_result)) return resolveEntity(resolve_result);
 
-        if (isCompilation(resolve_result))
-          return resolveCompilation(resolve_result);
+        if (isCompilation(resolve_result)) return resolveCompilation(resolve_result);
 
         if (isPerson(resolve_result)) return resolvePerson(resolve_result);
 
@@ -599,9 +523,7 @@ const Mongo: IMongo = {
         return result as T | null;
       })
       .catch(err => {
-        Logger.warn(
-          `Encountered error trying to resolve ${parsedId} in ${collection_name}`,
-        );
+        Logger.warn(`Encountered error trying to resolve ${parsedId} in ${collection_name}`);
         Logger.err(err);
         return undefined;
       });
@@ -614,10 +536,7 @@ const Mongo: IMongo = {
       : req.params.identifier;
     const password = req.params.password ? req.params.password : '';
     const entity = await Mongo.resolve<any>(_id, RequestCollection);
-    if (!entity)
-      return res
-        .status(404)
-        .send(`No ${RequestCollection} found with given identifier`);
+    if (!entity) return res.status(404).send(`No ${RequestCollection} found with given identifier`);
 
     if (isCompilation(entity)) {
       const compilation = entity;
@@ -662,12 +581,8 @@ const Mongo: IMongo = {
     if (!find_result) return res.status(404).send('User not found');
 
     if (req.body?.username !== find_result?.username) {
-      Logger.err(
-        'Entity removal failed due to username & session not matching',
-      );
-      return res
-        .status(403)
-        .send('Input username does not match username with current sessionID');
+      Logger.err('Entity removal failed due to username & session not matching');
+      return res.status(403).send('Input username does not match username with current sessionID');
     }
 
     // Flatten account.data so its an array of ObjectId.toString()
@@ -676,16 +591,15 @@ const Mongo: IMongo = {
       .map(id => id.toString());
 
     if (!UserRelatedEntities.find(obj => obj === identifier.toString())) {
-      const message =
-        'Entity removal failed because Entity does not belong to user';
+      const message = 'Entity removal failed because Entity does not belong to user';
       Logger.err(message);
       return res.status(401).send(message);
     }
     const delete_result = await collection.deleteOne({ _id: identifier });
     if (delete_result.result.ok === 1) {
-      find_result.data[RequestCollection] = find_result.data[
-        RequestCollection
-      ].filter(id => id !== identifier.toString());
+      find_result.data[RequestCollection] = find_result.data[RequestCollection].filter(
+        id => id !== identifier.toString(),
+      );
 
       const update_result = await users().updateOne(
         { sessionID },
@@ -714,11 +628,7 @@ const Mongo: IMongo = {
     const body: any = req.body ? req.body : {};
     const filter: any = body.filter ? body.filter : {};
 
-    const doesEntityPropertyMatch = (
-      obj: any,
-      propName: string,
-      _filter = filter,
-    ) => {
+    const doesEntityPropertyMatch = (obj: any, propName: string, _filter = filter) => {
       if (obj[propName] === null || obj[propName] === undefined) return false;
       switch (typeof obj[propName]) {
         case 'string':
@@ -728,10 +638,7 @@ const Mongo: IMongo = {
           switch (typeof _filter[propName]) {
             case 'string':
               // Case: search for string inside of entity
-              if (
-                JSON.stringify(obj[propName]).indexOf(_filter[propName]) === -1
-              )
-                return false;
+              if (JSON.stringify(obj[propName]).indexOf(_filter[propName]) === -1) return false;
               break;
             case 'object':
               // Case: recursive search inside of entity + array of entities
@@ -739,21 +646,13 @@ const Mongo: IMongo = {
                 if (Array.isArray(obj[propName])) {
                   let resultInArray = false;
                   for (const innerObj of obj[propName]) {
-                    if (
-                      doesEntityPropertyMatch(innerObj, prop, _filter[propName])
-                    ) {
+                    if (doesEntityPropertyMatch(innerObj, prop, _filter[propName])) {
                       resultInArray = true;
                     }
                   }
                   if (!resultInArray) return false;
                 } else {
-                  if (
-                    !doesEntityPropertyMatch(
-                      obj[propName],
-                      prop,
-                      _filter[propName],
-                    )
-                  ) {
+                  if (!doesEntityPropertyMatch(obj[propName], prop, _filter[propName])) {
                     return false;
                   }
                 }
@@ -770,9 +669,7 @@ const Mongo: IMongo = {
     };
 
     let allEntities = await getAllItemsOfCollection(RequestCollection);
-    allEntities = await Promise.all(
-      allEntities.map(obj => Mongo.resolve(obj, RequestCollection)),
-    );
+    allEntities = await Promise.all(allEntities.map(obj => Mongo.resolve(obj, RequestCollection)));
     allEntities = allEntities.filter(obj => {
       for (const prop in filter) {
         if (!doesEntityPropertyMatch(obj, prop)) return false;
@@ -785,14 +682,11 @@ const Mongo: IMongo = {
   searchByTextFilter: async (req, res) => {
     const RequestCollection = req.params.collection.toLowerCase();
 
-    const filter = req.body.filter
-      ? req.body.filter.map((_: any) => _.toLowerCase())
-      : [''];
+    const filter = req.body.filter ? req.body.filter.map((_: any) => _.toLowerCase()) : [''];
     const offset = req.body.offset ? parseInt(req.body.offset, 10) : 0;
     const length = 20;
 
-    if (typeof offset !== 'number')
-      return res.status(400).send('Offset is not a number');
+    if (typeof offset !== 'number') return res.status(400).send('Offset is not a number');
 
     if (offset < 0) return res.status(400).send('Offset is smaller than 0');
 
@@ -800,9 +694,7 @@ const Mongo: IMongo = {
       offset,
       offset + length,
     );
-    allEntities = await Promise.all(
-      allEntities.map(obj => Mongo.resolve(obj, RequestCollection)),
-    );
+    allEntities = await Promise.all(allEntities.map(obj => Mongo.resolve(obj, RequestCollection)));
 
     const getNestedValues = (obj: any) => {
       let result: string[] = [];
@@ -841,13 +733,7 @@ const Mongo: IMongo = {
     return res.status(200).send(filterResults(allEntities));
   },
   explore: async (req, res) => {
-    const {
-      types,
-      offset,
-      searchEntity,
-      filters,
-      searchText,
-    } = req.body as IExploreRequest;
+    const { types, offset, searchEntity, filters, searchText } = req.body as IExploreRequest;
     const items = new Array<IEntity | ICompilation>();
     const limit = 30;
     const userData = await getCurrentUserBySession(req.sessionID);
@@ -921,10 +807,7 @@ const Mongo: IMongo = {
           continue;
         }
 
-        const {
-          description,
-          licence,
-        } = resolved.relatedDigitalEntity as IMetaDataDigitalEntity;
+        const { description, licence } = resolved.relatedDigitalEntity as IMetaDataDigitalEntity;
         entities.push({
           ...resolved,
           relatedDigitalEntity: {
@@ -954,10 +837,7 @@ const Mongo: IMongo = {
       while (await canContinue()) {
         const _comp = await cursor.next();
         if (!_comp) continue;
-        const resolved = await Mongo.resolve<ICompilation>(
-          _comp,
-          'compilation',
-        );
+        const resolved = await Mongo.resolve<ICompilation>(_comp, 'compilation');
 
         if (!resolved || !resolved._id) continue;
         if (Object.keys(resolved.entities).length === 0) continue;
@@ -973,8 +853,7 @@ const Mongo: IMongo = {
 
         const isOwner = userOwned.includes(resolved._id.toString());
 
-        const isPWProtected =
-          resolved.password !== undefined && resolved.password !== '';
+        const isPWProtected = resolved.password !== undefined && resolved.password !== '';
 
         // owner can always annotate
         // otherwise only logged in and only if included in whitelist

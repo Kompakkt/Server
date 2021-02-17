@@ -21,21 +21,13 @@ interface IUpload {
 
 const tempDir = `${RootDirectory}/${Configuration.Uploads.TempDirectory}`;
 const uploadDir = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/`;
-const subfolders = [
-  'model',
-  'audio',
-  'video',
-  'image',
-  'previews',
-  'metadata_files',
-];
+const subfolders = ['model', 'audio', 'video', 'image', 'previews', 'metadata_files'];
 
 ensureDir(tempDir);
 ensureDir(uploadDir);
 subfolders.forEach(folder => ensureDir(`${uploadDir}${folder}`));
 
-const slug = (text: string) =>
-  slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
+const slug = (text: string) => slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
 
 const Upload: IUpload = {
   Multer: multer({
@@ -79,9 +71,7 @@ const Upload: IUpload = {
     const relPath = req.headers['relpath'] as string | undefined;
     console.log(relPath);
     const folderOrFilePath =
-      relPath && relPath.length > 0
-        ? slug(relPath)
-        : slug(req['file'].originalname);
+      relPath && relPath.length > 0 ? slug(relPath) : slug(req['file'].originalname);
     const destPath = join(
       uploadDir,
       `${req.headers['filetype']}`,
@@ -139,18 +129,14 @@ const Upload: IUpload = {
           file_format: '',
         };
 
-        const prepareResponseFiles = (
-          fileArray: ReadonlyArray<klawSync.Item>,
-        ) => {
+        const prepareResponseFiles = (fileArray: ReadonlyArray<klawSync.Item>) => {
           return fileArray
             .map(file => {
               const result = { ...ResponseFile };
               result.file_format = extname(file.path);
               let _relativePath = file.path.replace(RootDirectory, '');
               _relativePath =
-                _relativePath.charAt(0) === '/'
-                  ? _relativePath.substr(1)
-                  : _relativePath;
+                _relativePath.charAt(0) === '/' ? _relativePath.substr(1) : _relativePath;
 
               result.file_link = `${_relativePath}`;
               result.file_name = `${basename(file.path)}`;

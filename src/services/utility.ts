@@ -32,8 +32,7 @@ const collectionAsArray = <T extends unknown>(collection: string, query = {}) =>
 const Utility: IUtility = {
   findAllEntityOwnersRequest: async (req, res) => {
     const entityId = req.params.identifier;
-    if (!ObjectId.isValid(entityId))
-      return res.status(400).send('Invalid entity _id ');
+    if (!ObjectId.isValid(entityId)) return res.status(400).send('Invalid entity _id ');
 
     const accounts = await Utility.findAllEntityOwners(entityId);
     return res.status(200).send(accounts);
@@ -58,8 +57,7 @@ const Utility: IUtility = {
   },
   countEntityUses: async (req, res) => {
     const entityId = req.params.identifier;
-    if (!ObjectId.isValid(entityId))
-      return res.status(404).send('Invalid entity _id ');
+    if (!ObjectId.isValid(entityId)) return res.status(404).send('Invalid entity _id ');
 
     const user = await getCurrentUserBySession(req.sessionID);
 
@@ -72,8 +70,7 @@ const Utility: IUtility = {
     const isValid = (comp: ICompilation) =>
       isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp);
 
-    const includesEntity = (comp: ICompilation) =>
-      comp.entities[entityId] !== undefined;
+    const includesEntity = (comp: ICompilation) => comp.entities[entityId] !== undefined;
 
     const compilations = await Promise.all(
       (await collectionAsArray<ICompilation>('compilation'))
@@ -131,8 +128,7 @@ const Utility: IUtility = {
       });
     const AnnColl = ObjDB.collection<IAnnotation>('annotation');
     const insertResult = await AnnColl.insertMany(validAnnotations);
-    if (insertResult.result.ok !== 1)
-      return res.status(500).send('Failed inserting Annotations');
+    if (insertResult.result.ok !== 1) return res.status(500).send('Failed inserting Annotations');
 
     for (const anno of validAnnotations) {
       if (!isAnnotation(anno)) continue;
@@ -144,16 +140,11 @@ const Utility: IUtility = {
       { _id: new ObjectId(compId) },
       { $set: { annotations: compilation.annotations } },
     );
-    if (updateResult.result.ok !== 1)
-      return res.status(500).send('Failed updating annotations');
+    if (updateResult.result.ok !== 1) return res.status(500).send('Failed updating annotations');
 
     // Add Annotations to LDAP user
-    validAnnotations.forEach(ann =>
-      Mongo.insertCurrentUserData(req, ann['_id'], 'annotation'),
-    );
-    return res
-      .status(200)
-      .send(await Mongo.resolve<ICompilation>(compId, 'compilation'));
+    validAnnotations.forEach(ann => Mongo.insertCurrentUserData(req, ann['_id'], 'annotation'));
+    return res.status(200).send(await Mongo.resolve<ICompilation>(compId, 'compilation'));
   },
   applyActionToEntityOwner: async (req, res) => {
     const command = req.body.command;
@@ -161,8 +152,7 @@ const Utility: IUtility = {
       return res.status(400).send('Invalid command. Use "add" or "remove"');
     const ownerUsername = req.body.ownerUsername;
     const ownerId = req.body.ownerId;
-    if (!ownerId && !ownerUsername)
-      return res.status(400).send('No owner _id or username given');
+    if (!ownerId && !ownerUsername) return res.status(400).send('No owner _id or username given');
     if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId))
       return res.status(400).send('Incorrect owner _id given');
     const entityId = req.body.entityId;
@@ -175,9 +165,7 @@ const Utility: IUtility = {
     }
     const AccDB = Mongo.getAccountsRepository();
     const users = AccDB.collection<IUserData>('users');
-    const findUserQuery = ownerId
-      ? { _id: new ObjectId(ownerId) }
-      : { username: ownerUsername };
+    const findUserQuery = ownerId ? { _id: new ObjectId(ownerId) } : { username: ownerUsername };
     const account = await users.findOne(findUserQuery);
     if (!account) {
       return res.status(400).send('Incorrect owner _id or username given');
@@ -187,17 +175,12 @@ const Utility: IUtility = {
     account.data.entity = account.data.entity.filter(entity => entity);
 
     if (command === 'add') {
-      if (
-        !(account.data.entity as IEntity[]).find(
-          obj => obj.toString() === entityId.toString(),
-        )
-      ) {
+      if (!(account.data.entity as IEntity[]).find(obj => obj.toString() === entityId.toString())) {
         account.data.entity.push(new ObjectId(entityId));
       }
     } else if (command === 'remove') {
       const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
-      if (entityUses === 1)
-        return res.status(403).send('Cannot remove last owner');
+      if (entityUses === 1) return res.status(403).send('Cannot remove last owner');
 
       account.data.entity = (account.data.entity as IEntity[]).filter(
         entity => entity.toString() !== entityId.toString(),
@@ -208,8 +191,7 @@ const Utility: IUtility = {
       $set: { data: account.data },
     });
 
-    if (updateResult.result.ok !== 1)
-      return res.status(500).send('Failed updating entity array');
+    if (updateResult.result.ok !== 1) return res.status(500).send('Failed updating entity array');
 
     return res.status(200);
   },
@@ -238,9 +220,7 @@ const Utility: IUtility = {
           // Get latest versions of groups
           comp.whitelist.groups = (
             await Promise.all(
-              comp.whitelist.groups.map(group =>
-                Mongo.resolve<IGroup>(group, 'group'),
-              ),
+              comp.whitelist.groups.map(group => Mongo.resolve<IGroup>(group, 'group')),
             )
           ).filter(group => group) as IGroup[];
           return comp;
@@ -255,9 +235,7 @@ const Utility: IUtility = {
 
     const resolvedCompilations = (
       await Promise.all(
-        filteredCompilations.map(comp =>
-          Mongo.resolve<ICompilation>(comp, 'compilation'),
-        ),
+        filteredCompilations.map(comp => Mongo.resolve<ICompilation>(comp, 'compilation')),
       )
     ).filter(comp => comp) as ICompilation[];
 
@@ -269,15 +247,11 @@ const Utility: IUtility = {
     const entities = await collectionAsArray<IEntity>('entity');
 
     const resolvedEntities = (
-      await Promise.all(
-        entities.map(entity => Mongo.resolve<IEntity>(entity, 'entity')),
-      )
+      await Promise.all(entities.map(entity => Mongo.resolve<IEntity>(entity, 'entity')))
     ).filter(entity => {
       if (!entity) return false;
       const stringified = JSON.stringify(entity.relatedDigitalEntity);
-      return (
-        stringified.includes(user.fullname) || stringified.includes(user.mail)
-      );
+      return stringified.includes(user.fullname) || stringified.includes(user.mail);
     });
 
     return res.status(200).send(resolvedEntities);

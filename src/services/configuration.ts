@@ -91,18 +91,13 @@ const LoadConfig = () => {
   try {
     Logger.info(`Config file path: ${ConfigFile}`);
 
-    const confObj = deepmerge<IConfiguration>(
-      DefaultConfiguration,
-      readJsonSync(`${ConfigFile}`),
-    );
+    const confObj = deepmerge<IConfiguration>(DefaultConfiguration, readJsonSync(`${ConfigFile}`));
 
     if (
       confObj.Uploads.TempDirectory.includes('../') ||
       confObj.Uploads.UploadDirectory.includes('../')
     ) {
-      throw new Error(
-        'Upload path contains ../, but traversing up is not supported',
-      );
+      throw new Error('Upload path contains ../, but traversing up is not supported');
     }
 
     Logger.info('Configuration loaded from file');
@@ -111,13 +106,9 @@ const LoadConfig = () => {
   } catch (error) {
     if (isMaster) {
       if (error.code === 'ENOENT') {
-        Logger.err(
-          'Config file not found. Falling back to default configuration',
-        );
+        Logger.err('Config file not found. Falling back to default configuration');
       } else {
-        Logger.err(
-          'Failed loading configuration file. Falling back to default configuration',
-        );
+        Logger.err('Failed loading configuration file. Falling back to default configuration');
         Logger.err(error);
       }
       Logger.log('Configuration loaded from defaults');

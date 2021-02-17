@@ -8,11 +8,7 @@ import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo, updateOne } from './mongo';
 import { RootDirectory } from '../environment';
-import {
-  IMetaDataPerson,
-  IMetaDataInstitution,
-  IEntity,
-} from '@kompakkt/shared';
+import { IMetaDataPerson, IMetaDataInstitution, IEntity } from '@kompakkt/shared';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -54,9 +50,7 @@ const Cleaning: ICleaning = {
 
     // TODO: Delete Tags
 
-    const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(
-      allPhyObjs,
-    )}`;
+    const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(allPhyObjs)}`;
     for (const person of allPersons) {
       const _id = person._id;
       const index = fullJSON.indexOf(_id);
@@ -110,26 +104,18 @@ const Cleaning: ICleaning = {
       return deletedReferences;
     };
 
-    const deleteUserNullRefs = async (
-      user: any,
-      nullrefs: any[],
-    ): Promise<boolean> => {
+    const deleteUserNullRefs = async (user: any, nullrefs: any[]): Promise<boolean> => {
       for (const ref of nullrefs) {
         const index = user.data[ref.field].indexOf(ref._id);
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await users.updateOne(
-        { _id: user._id },
-        { $set: { data: user.data } },
-      );
+      const updateResult = await users.updateOne({ _id: user._id }, { $set: { data: user.data } });
       if (updateResult.result.ok !== 1) {
         Logger.err(`Failed deleting missing references of user ${user._id}`);
         return false;
       }
-      Logger.info(
-        `Deleted ${nullrefs.length} missing references from user ${user._id}`,
-      );
+      Logger.info(`Deleted ${nullrefs.length} missing references from user ${user._id}`);
       return true;
     };
 
@@ -157,8 +143,7 @@ const Cleaning: ICleaning = {
 
     const confirm = req.params.confirm || false;
 
-    const canContinue = async () =>
-      (await cursor.hasNext()) && !cursor.isClosed();
+    const canContinue = async () => (await cursor.hasNext()) && !cursor.isClosed();
 
     let totalSaved = 0;
     const personsChanged = new Array<IMetaDataPerson>();
@@ -194,11 +179,7 @@ const Cleaning: ICleaning = {
 
       if (changedPerson) {
         if (confirm) {
-          const result = await updateOne(
-            personCollection,
-            { _id: person._id },
-            { $set: person },
-          );
+          const result = await updateOne(personCollection, { _id: person._id }, { $set: person });
           if (result.result.ok !== 1) {
             Logger.err('Failed updating cleaned person', person, result);
           }
@@ -208,23 +189,18 @@ const Cleaning: ICleaning = {
       }
     }
 
-    Logger.log(
-      `Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`,
-    );
+    Logger.log(`Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`);
 
     res.status(200).send({ confirm, personsChanged, totalSaved });
   },
   cleanInstitutionFields: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
-    const instCollection = ObjDB.collection<IMetaDataInstitution>(
-      'institution',
-    );
+    const instCollection = ObjDB.collection<IMetaDataInstitution>('institution');
     const cursor = instCollection.find({});
 
     const confirm = req.params.confirm || false;
 
-    const canContinue = async () =>
-      (await cursor.hasNext()) && !cursor.isClosed();
+    const canContinue = async () => (await cursor.hasNext()) && !cursor.isClosed();
 
     const changedInsts = new Array<IMetaDataInstitution>();
     let totalSaved = 0;
@@ -271,11 +247,7 @@ const Cleaning: ICleaning = {
         totalSaved += sizeBefore - sizeAfter;
 
         if (confirm) {
-          const result = await updateOne(
-            instCollection,
-            { _id: inst._id },
-            { $set: inst },
-          );
+          const result = await updateOne(instCollection, { _id: inst._id }, { $set: inst });
           if (result.result.ok !== 1) {
             Logger.err('Failed updating cleaned inst', inst, result);
           }
@@ -287,9 +259,7 @@ const Cleaning: ICleaning = {
   },
   cleanUploadedFiles: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();
-    const entities = await ObjDB.collection<IEntity>('entity')
-      .find({})
-      .toArray();
+    const entities = await ObjDB.collection<IEntity>('entity').find({}).toArray();
     // Get all file paths from entities and flatten the array
     const files = ([] as string[]).concat(
       ...entities.map(entity => entity.files.map(file => file.file_link)),

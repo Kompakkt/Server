@@ -10,12 +10,7 @@ import { Mongo, updateOne } from './mongo';
 interface IMailer {
   isConfigValid(): any;
   sendMailRequest(req: Request, res: Response): Promise<any>;
-  sendMail(mail: {
-    from: string;
-    to: string;
-    subject: string;
-    text: string;
-  }): Promise<any>;
+  sendMail(mail: { from: string; to: string; subject: string; text: string }): Promise<any>;
   addUserToDatabase(req: Request, mailSent: boolean): any;
   countUserMails(req: Request, destination: string): Promise<number>;
   getMailRelatedDatabaseEntries(_: Request, res: Response): Promise<any>;
@@ -117,10 +112,7 @@ const Mailer: IMailer = {
   },
   addUserToDatabase: async (req, mailSent) => {
     const target = req.body.target;
-    if (
-      !Configuration.Mailer.Target ||
-      !Object.keys(Configuration.Mailer.Target).includes(target)
-    )
+    if (!Configuration.Mailer.Target || !Object.keys(Configuration.Mailer.Target).includes(target))
       return;
 
     const AccDb: Db = Mongo.getAccountsRepository();
@@ -160,15 +152,13 @@ const Mailer: IMailer = {
     const user = await users.findOne({ sessionID: req.sessionID });
     const collection = AccDb.collection<IMailEntry>(destination);
     const entries = (await collection.find({}).toArray()).filter(
-      entry =>
-        !entry.answered && entry.user._id.toString() === user._id.toString(),
+      entry => !entry.answered && entry.user._id.toString() === user._id.toString(),
     );
     return entries.length;
   },
   getMailRelatedDatabaseEntries: async (_, res): Promise<any> => {
     const AccDb: Db = Mongo.getAccountsRepository();
-    if (!Configuration.Mailer.Target)
-      return res.status(500).send('Mailing service not configured');
+    if (!Configuration.Mailer.Target) return res.status(500).send('Mailing service not configured');
 
     const targets = Object.keys(Configuration.Mailer.Target);
     const result: any = {};
@@ -182,12 +172,10 @@ const Mailer: IMailer = {
   toggleMailAnswered: async (req, res): Promise<any> => {
     const target = req.params.target;
     const identifier = req.params.identifier;
-    if (!Configuration.Mailer.Target)
-      return res.status(500).send('Mailing service not configured');
+    if (!Configuration.Mailer.Target) return res.status(500).send('Mailing service not configured');
     if (!Object.keys(Configuration.Mailer.Target).includes(target))
       return res.status(400).send('Invalid target');
-    if (!ObjectId.isValid(identifier))
-      return res.status(400).send('Invalid mail identifier');
+    if (!ObjectId.isValid(identifier)) return res.status(400).send('Invalid mail identifier');
 
     const _id = new ObjectId(identifier);
     const AccDB: Db = Mongo.getAccountsRepository();
@@ -197,13 +185,8 @@ const Mailer: IMailer = {
       return res.status(409).send('Invalid mail entry in database');
 
     const isAnswered = oldEntry.answered;
-    const updateResult = await updateOne(
-      targetColl,
-      { _id },
-      { $set: { answered: !isAnswered } },
-    );
-    if (updateResult.result.ok !== 1)
-      return res.status(500).send('Failed updating entry');
+    const updateResult = await updateOne(targetColl, { _id }, { $set: { answered: !isAnswered } });
+    if (updateResult.result.ok !== 1) return res.status(500).send('Failed updating entry');
 
     res.status(200).send(await targetColl.findOne({ _id }));
   },

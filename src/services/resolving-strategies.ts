@@ -32,19 +32,14 @@ export const resolvePerson = async (person: IMetaDataPerson) => {
   return person;
 };
 
-const resolveMetaDataEntity = async (
-  entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
-) => {
+const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity) => {
   if (!entity || !entity._id) {
     return entity;
   }
   const _id = entity._id.toString();
 
   for (let i = 0; i < entity.persons.length; i++) {
-    const resolved = await Mongo.resolve<IMetaDataPerson>(
-      entity.persons[i],
-      'person',
-    );
+    const resolved = await Mongo.resolve<IMetaDataPerson>(entity.persons[i], 'person');
     if (!resolved) continue;
     entity.persons[i] = await resolvePerson(resolved);
 
@@ -76,12 +71,8 @@ const resolveMetaDataEntity = async (
   return entity;
 };
 
-export const resolveDigitalEntity = async (
-  digitalEntity: IMetaDataDigitalEntity,
-) => {
-  const resolvedDigital = (await resolveMetaDataEntity(
-    digitalEntity,
-  )) as IMetaDataDigitalEntity;
+export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
+  const resolvedDigital = (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
 
   if (resolvedDigital.phyObjs) {
     for (let i = 0; i < resolvedDigital.phyObjs.length; i++) {
@@ -111,10 +102,7 @@ export const resolveEntity = async (entity: IEntity) => {
     entity.annotations[id] = resolved;
   }
 
-  if (
-    entity.relatedDigitalEntity &&
-    !isDigitalEntity(entity.relatedDigitalEntity)
-  ) {
+  if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
     const resolved = await Mongo.resolve<IMetaDataDigitalEntity>(
       entity.relatedDigitalEntity,
       'digitalentity',

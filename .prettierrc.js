@@ -10,5 +10,5 @@ module.exports = {
   requirePragma: false,
   insertPragma: false,
   endOfLine: 'lf',
-  printWidth: 80,
+  printWidth: 100,
 };

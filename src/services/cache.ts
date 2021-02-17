@@ -11,8 +11,7 @@ const Cache = {
   del: async (key: string) => redis.del(key).then(res => res),
   get: async <T extends unknown>(key: string): Promise<T | undefined> =>
     redis.get(key).then(value => (value ? JSON.parse(value) : undefined)),
-  set: async (key: string, value: any) =>
-    redis.set(key, JSON.stringify(value), 'EX', 3600),
+  set: async (key: string, value: any) => redis.set(key, JSON.stringify(value), 'EX', 3600),
   hash,
 };
 

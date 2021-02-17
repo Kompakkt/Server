@@ -70,9 +70,7 @@ const Socket = {
 
     // Custom Events
     socket.on('message', (data: IMessage) => {
-      socket
-        .to(Users[socket.id].room)
-        .emit('message', { ...data, user: Users[socket.id] });
+      socket.to(Users[socket.id].room).emit('message', { ...data, user: Users[socket.id] });
     });
 
     socket.on('newUser', (data: IUserInfo) => {
@@ -109,9 +107,7 @@ const Socket = {
     });
 
     socket.on('editAnnotation', (data: IAnnotation) => {
-      socket
-        .to(Users[socket.id].room)
-        .emit('editAnnotation', { ...data, user: Users[socket.id] });
+      socket.to(Users[socket.id].room).emit('editAnnotation', { ...data, user: Users[socket.id] });
     });
 
     socket.on('deleteAnnotation', (data: IAnnotation) => {
@@ -121,9 +117,7 @@ const Socket = {
     });
 
     socket.on('changeRanking', (data: IChangeRanking) => {
-      socket
-        .to(Users[socket.id].room)
-        .emit('changeRanking', { ...data, user: Users[socket.id] });
+      socket.to(Users[socket.id].room).emit('changeRanking', { ...data, user: Users[socket.id] });
     });
 
     socket.on('changeRoom', (data: IChangeRoom) => {
@@ -136,9 +130,7 @@ const Socket = {
     });
 
     socket.on('logout', (data: IUserInfo) => {
-      socket
-        .to(Users[socket.id].room)
-        .emit('lostConnection', { ...data, user: Users[socket.id] });
+      socket.to(Users[socket.id].room).emit('lostConnection', { ...data, user: Users[socket.id] });
     });
   },
 };

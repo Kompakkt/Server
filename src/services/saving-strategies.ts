@@ -36,11 +36,7 @@ const updateAnnotationList = async (
   add_to_coll: string,
   annotationId: string | ObjectId,
 ) => {
-  const obj = await Mongo.resolve<IEntity | ICompilation>(
-    entityOrCompId,
-    add_to_coll,
-    0,
-  );
+  const obj = await Mongo.resolve<IEntity | ICompilation>(entityOrCompId, add_to_coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
@@ -54,10 +50,7 @@ const updateAnnotationList = async (
   return updateResult.result.ok === 1;
 };
 
-const saveCompilation = async (
-  compilation: ICompilation,
-  userData: IUserData,
-) => {
+const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
   // Remove invalid annotations
   for (const id in compilation.annotations) {
     const value = compilation.annotations[id];
@@ -89,8 +82,7 @@ const saveAnnotation = async (
     ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
     : true;
   // Check if anything was missing for safety
-  if (!annotation || !annotation.target?.source)
-    throw new Error('Invalid annotation');
+  if (!annotation || !annotation.target?.source) throw new Error('Invalid annotation');
   const source = annotation.target.source;
   if (!source) throw new Error('Missing source');
   if (!annotation.body?.content?.relatedPerspective)
@@ -114,17 +106,11 @@ const saveAnnotation = async (
   if (!validEntity) throw new Error('Invalid related entity id');
 
   // Case: Trying to change Default Annotations
-  const isEntityOwner = await Mongo.isUserOwnerOfEntity(
-    userData,
-    relatedEntityId,
-  );
+  const isEntityOwner = await Mongo.isUserOwnerOfEntity(userData, relatedEntityId);
   if (!validCompilation && !isEntityOwner) throw new Error('Permission denied');
 
   // Case: Compilation owner trying to re-rank annotations
-  const isCompilationOwner = await Mongo.isUserOwnerOfEntity(
-    userData,
-    relatedCompId,
-  );
+  const isCompilationOwner = await Mongo.isUserOwnerOfEntity(userData, relatedCompId);
 
   if (!isAnnotationOwner && isCompilationOwner) {
     const existing = await Mongo.resolve<IAnnotation>(annotation, 'annotation');
@@ -148,11 +134,7 @@ const saveAnnotation = async (
 
   const entityOrCompId = !validCompilation ? relatedEntityId : relatedCompId;
   const reqedCollection = !validCompilation ? 'entity' : 'compilation';
-  const updateSuccess = await updateAnnotationList(
-    entityOrCompId,
-    reqedCollection,
-    annotation._id,
-  );
+  const updateSuccess = await updateAnnotationList(entityOrCompId, reqedCollection, annotation._id);
 
   if (!updateSuccess) {
     const message = `Failed updating annotations of ${reqedCollection} ${entityOrCompId}`;
@@ -160,8 +142,7 @@ const saveAnnotation = async (
     throw new Error(message);
   }
 
-  if (isAnnotationOwner)
-    await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
+  if (isAnnotationOwner) await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
 
   return annotation;
 };
@@ -197,10 +178,7 @@ const saveInstitution = async (
   userData: IUserData,
   save = false,
 ) => {
-  const resolved = await Mongo.resolve<IMetaDataInstitution>(
-    institution,
-    'institution',
-  );
+  const resolved = await Mongo.resolve<IMetaDataInstitution>(institution, 'institution');
   institution._id = resolved?._id ?? new ObjectId().toString();
 
   // If institution exists, combine roles
@@ -226,11 +204,7 @@ const saveInstitution = async (
   });
 };
 
-const savePerson = async (
-  person: IMetaDataPerson,
-  userData: IUserData,
-  save = false,
-) => {
+const savePerson = async (person: IMetaDataPerson, userData: IUserData, save = false) => {
   const resolved = await Mongo.resolve<IMetaDataPerson>(person, 'person');
   person._id = resolved?._id ?? new ObjectId().toString();
 
@@ -278,11 +252,7 @@ const saveMetaDataEntity = async (
   const newEntity = { ...entity };
 
   for (let i = 0; i < newEntity.persons.length; i++) {
-    newEntity.persons[i] = ((await savePerson(
-      newEntity.persons[i],
-      userData,
-      true,
-    )) as any)._id;
+    newEntity.persons[i] = ((await savePerson(newEntity.persons[i], userData, true)) as any)._id;
   }
 
   for (let i = 0; i < newEntity.institutions.length; i++) {
@@ -303,10 +273,7 @@ const saveMetaDataEntity = async (
     if (file.file_link.startsWith('http')) continue;
     const filename = `${newEntity._id}_${file.file_name}`;
 
-    await writeFile(
-      join(upDir, '/metadata_files/', `${filename}`),
-      file.file_link,
-    );
+    await writeFile(join(upDir, '/metadata_files/', `${filename}`), file.file_link);
 
     const final = `${https}://${pubip}:${port}/uploads/metadata_files/${filename}`;
     file.file_link = final;
@@ -336,14 +303,8 @@ const saveMetaDataEntity = async (
   return newEntity;
 };
 
-const saveDigitalEntity = async (
-  digitalentity: IMetaDataDigitalEntity,
-  userData: IUserData,
-) => {
-  const newEntity = (await saveMetaDataEntity(
-    digitalentity,
-    userData,
-  )) as IMetaDataDigitalEntity;
+const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity, userData: IUserData) => {
+  const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IMetaDataDigitalEntity;
 
   for (let i = 0; i < newEntity.phyObjs.length; i++) {
     newEntity.phyObjs[i]._id = ObjectId.isValid(newEntity.phyObjs[i]._id)

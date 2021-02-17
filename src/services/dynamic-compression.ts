@@ -35,9 +35,7 @@ const getBrotli = async (file: Buffer) =>
 
 const getGZip = async (file: Buffer) =>
   new Promise<Buffer | undefined>((resolve, reject) =>
-    gzip(file, { level: 6 }, (err, res) =>
-      err ? reject(undefined) : resolve(res),
-    ),
+    gzip(file, { level: 6 }, (err, res) => (err ? reject(undefined) : resolve(res))),
   );
 
 const saveCompressed = async (file: Buffer, filename: string) => {
@@ -54,14 +52,9 @@ const saveCompressed = async (file: Buffer, filename: string) => {
     });
 };
 
-export const serveFile = (directory: string) => async (
-  req: Request,
-  res: Response,
-) => {
+export const serveFile = (directory: string) => async (req: Request, res: Response) => {
   const filename = join(directory, req.path);
-  const acceptedEncodings = req.headers['accept-encoding'] as
-    | string
-    | undefined;
+  const acceptedEncodings = req.headers['accept-encoding'] as string | undefined;
 
   const doesFileExist = await wrapperExists(filename);
 
@@ -93,10 +86,7 @@ export const serveFile = (directory: string) => async (
     if (result) {
       compressedFile = result;
       res.setHeader('Content-Encoding', 'br');
-      if (
-        !doesCompressedExist &&
-        !(await wrapperExists(`${compressedFilename}.tmp`))
-      ) {
+      if (!doesCompressedExist && !(await wrapperExists(`${compressedFilename}.tmp`))) {
         saveCompressed(result, compressedFilename);
       }
     }
@@ -109,10 +99,7 @@ export const serveFile = (directory: string) => async (
     if (result) {
       compressedFile = result;
       res.setHeader('Content-Encoding', 'gzip');
-      if (
-        !doesCompressedExist &&
-        !(await wrapperExists(`${compressedFilename}.tmp`))
-      ) {
+      if (!doesCompressedExist && !(await wrapperExists(`${compressedFilename}.tmp`))) {
         saveCompressed(result, compressedFilename);
       }
     }
