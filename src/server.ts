@@ -42,24 +42,14 @@ Server.get(
   Mongo.getEntityFromCollection,
 );
 // Return all documents of a collection
-Server.get(
-  '/api/v1/get/findall/:collection',
-  Mongo.getAllEntitiesFromCollection,
-);
+Server.get('/api/v1/get/findall/:collection', Mongo.getAllEntitiesFromCollection);
 // Return data linked to currently logged in LDAP Account
-Server.get(
-  ['/api/v1/get/ldata', '/auth'],
-  Mongo.validateLoginSession,
-  Mongo.getCurrentUserData,
-);
+Server.get(['/api/v1/get/ldata', '/auth'], Mongo.validateLoginSession, Mongo.getCurrentUserData);
 // Return a MongoDB ObjectId
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
 Server.get('/api/v1/get/users', Mongo.validateLoginSession, async (_, res) => {
-  const users = await Mongo.getAccountsRepository()
-    .collection('users')
-    .find({})
-    .toArray();
+  const users = await Mongo.getAccountsRepository().collection('users').find({}).toArray();
   res.status(200).send(
     users.map(user => ({
       username: user.username,
@@ -70,10 +60,7 @@ Server.get('/api/v1/get/users', Mongo.validateLoginSession, async (_, res) => {
 });
 
 Server.get('/api/v1/get/groups', Mongo.validateLoginSession, async (_, res) => {
-  const groups = await Mongo.getEntitiesRepository()
-    .collection('group')
-    .find({})
-    .toArray();
+  const groups = await Mongo.getEntitiesRepository().collection('group').find({}).toArray();
   res.status(200).send(groups);
 });
 
@@ -103,10 +90,7 @@ Server.post(
 );
 // Return search data
 Server.post('/api/v1/post/search/:collection', Mongo.searchByTextFilter);
-Server.post(
-  '/api/v1/post/searchentity/:collection',
-  Mongo.searchByEntityFilter,
-);
+Server.post('/api/v1/post/searchentity/:collection', Mongo.searchByEntityFilter);
 // Explore req
 Server.post('/api/v1/post/explore', Mongo.explore);
 
@@ -154,11 +138,7 @@ Server.post(
 );
 
 // General authentication route
-Server.post(
-  ['/login', '/login/*'],
-  Express.authenticate({ session: true }),
-  Mongo.addToAccounts,
-);
+Server.post(['/login', '/login/*'], Express.authenticate({ session: true }), Mongo.addToAccounts);
 // Authentication
 Server.post('/register', Express.registerUser);
 Server.get('/logout', Mongo.validateLoginSession, Mongo.invalidateSession);
@@ -194,6 +174,14 @@ Server.post(
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
   Admin.toggleEntityPublishedState,
+);
+
+Server.post(
+  '/admin/resetpassword/:username',
+  Express.authenticate(),
+  Mongo.updateSessionId,
+  Admin.checkIsAdmin,
+  Admin.resetUserPassword,
 );
 
 // Mailer
@@ -244,10 +232,7 @@ Server.post(
 );
 
 Server.post(
-  [
-    '/cleaning/cleaninstitutionfields',
-    '/cleaning/cleaninstitutionfields/:confirm',
-  ],
+  ['/cleaning/cleaninstitutionfields', '/cleaning/cleaninstitutionfields/:confirm'],
   Express.authenticate(),
   Mongo.updateSessionId,
   Admin.checkIsAdmin,
@@ -286,11 +271,7 @@ Server.post(
   Utility.applyActionToEntityOwner,
 );
 
-Server.get(
-  '/utility/finduseringroups',
-  Mongo.validateLoginSession,
-  Utility.findUserInGroups,
-);
+Server.get('/utility/finduseringroups', Mongo.validateLoginSession, Utility.findUserInGroups);
 
 Server.get(
   '/utility/finduserincompilations',
@@ -298,10 +279,6 @@ Server.get(
   Utility.findUserInCompilations,
 );
 
-Server.get(
-  '/utility/finduserinmetadata',
-  Mongo.validateLoginSession,
-  Utility.findUserInMetadata,
-);
+Server.get('/utility/finduserinmetadata', Mongo.validateLoginSession, Utility.findUserInMetadata);
 
 Express.startListening();

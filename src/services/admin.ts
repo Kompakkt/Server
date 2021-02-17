@@ -3,6 +3,8 @@ import { Collection, Db, ObjectId } from 'mongodb';
 
 import { EUserRank, IEntity, IUserData } from '@kompakkt/shared';
 
+import { updateUserPassword, IPasswordEntry } from './express';
+import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
 import { Mongo, updateOne } from './mongo';
 import { Mailer } from './mailer';
@@ -17,6 +19,7 @@ interface IAdmin {
   getUser(req: Request, res: Response): any | void;
   promoteUserToRole(req: Request, res: Response): Promise<any>;
   toggleEntityPublishedState(req: Request, res: Response): Promise<any>;
+  resetUserPassword(req: Request, res: Response): Promise<any>;
 }
 
 const Admin: IAdmin = {
@@ -88,8 +91,7 @@ const Admin: IAdmin = {
     if (!user) return res.status(500).send('Updating user role failed');
 
     const updateResult = await updateOne(users, { _id }, { $set: { role } });
-    if (updateResult.result.ok !== 1)
-      return res.status(500).send('Updating user role failed');
+    if (updateResult.result.ok !== 1) return res.status(500).send('Updating user role failed');
 
     if (Configuration.Mailer && Configuration.Mailer.Target) {
       Mailer.sendMail({
@@ -110,8 +112,7 @@ const Admin: IAdmin = {
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const EntityCollection: Collection<IEntity> = ObjDB.collection('entity');
     const found = await EntityCollection.findOne({ _id });
-    if (!found)
-      return res.status(404).send('No entity with this identifier found');
+    if (!found) return res.status(404).send('No entity with this identifier found');
 
     const isEntityOnline: boolean = found.online;
     const updateResult = await updateOne(
@@ -123,6 +124,52 @@ const Admin: IAdmin = {
       return res.status(500).send('Failed updating published state');
     }
     return res.status(200).send(await Mongo.resolve<IEntity>(_id, 'entity'));
+  },
+  resetUserPassword: async (req, res) => {
+    const username = req.params.username;
+    if (!username) return res.status(400).send('Invalid username');
+
+    const AccDB: Db = Mongo.getAccountsRepository();
+    const users: Collection<IUserData> = AccDB.collection('users');
+    const passwords: Collection<IPasswordEntry> = AccDB.collection('passwords');
+    const user = await users.findOne({ username });
+    const pwEntry = await passwords.findOne({ username });
+    if (!user) return res.status(400).send('User not found');
+    if (!pwEntry) return res.status(400).send('User has no existing password entry');
+
+    const newPassword = generateSecurePassword();
+
+    const success = await updateUserPassword(username, newPassword);
+
+    if (success) {
+      Logger.info(`Updated password for ${username}`);
+      Mailer.sendMail({
+        from: Configuration.Mailer.Target?.contact ?? 'kompakkt-contact@uni-koeln.de',
+        to: user.mail,
+        subject: '[Kompakkt] Your password has been reset',
+        text: `
+Dear ${user.fullname},
+
+This is an automated message by Kompakkt.
+
+Your password has been reset by an administrator.
+Username:
+${user.username}
+Password:
+${newPassword}
+
+This change can not be reverted. If you did not request a password reset
+and suspect suspicious activity, please reply to this mail.
+
+Kind regards,
+Kompakkt Team
+`.trim(),
+      });
+      return res.status(200).end();
+    } else {
+      Logger.err(`Failed updating password for ${username}`);
+      return res.status(400).send('Failed updating password');
+    }
   },
 };
 

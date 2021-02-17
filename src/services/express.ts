@@ -23,6 +23,14 @@ import { Logger } from './logger';
 import { Mongo } from './mongo';
 import { serveFile } from './dynamic-compression';
 
+export interface IPasswordEntry {
+  username: string;
+  password: {
+    salt: BinaryLike;
+    passwordHash: string;
+  };
+}
+
 const Server = express();
 const createServer = () => {
   if (Conf.Express.enableHTTPS) {
@@ -30,10 +38,7 @@ const createServer = () => {
     const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
 
     const options = { key: privateKey, cert: certificate };
-    if (
-      Conf.Express.SSLPaths.Passphrase &&
-      Conf.Express.SSLPaths.Passphrase.length > 0
-    ) {
+    if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
       (options as any)['passphrase'] = Conf.Express.SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
@@ -111,12 +116,8 @@ const verifyUser = async (username: string, password: string) => {
   return newHash === hash;
 };
 
-const registerUser = async (
-  req: express.Request,
-  res: express.Response,
-): Promise<any> => {
+const registerUser = async (req: express.Request, res: express.Response): Promise<any> => {
   const coll = Mongo.getAccountsRepository().collection('users');
-  const passwords = Mongo.getAccountsRepository().collection('passwords');
 
   const isUser = (obj: any): obj is IUserData => {
     const person = obj as IUserData;
@@ -143,26 +144,34 @@ const registerUser = async (
     // cast as any to delete non-optional property password
     // we don't want the password to be written to the database in clear text
     delete (adjustedUser as any).password;
-    await passwords
-      .updateOne(
-        { username: user.username },
-        {
-          $set: {
-            username: user.username,
-            password: saltHashPassword(user.password),
-          },
-        },
-        { upsert: true },
-      )
-      .then()
-      .catch();
-    coll
-      .insertOne(adjustedUser)
-      .then(() => res.status(201).send('Registered'))
-      .catch(() => res.status(500).send('Failed inserting user'));
+    const success = await updateUserPassword(user.username, user.password);
+    if (success) {
+      coll
+        .insertOne(adjustedUser)
+        .then(() => res.status(201).send('Registered'))
+        .catch(() => res.status(500).send('Failed inserting user'));
+    } else {
+      res.status(500).send('Failed inserting user');
+    }
   } else {
     res.status(400).send('Incomplete user data');
   }
+};
+
+const updateUserPassword = async (username: string, password: string): Promise<boolean> => {
+  const passwords = Mongo.getAccountsRepository().collection<IPasswordEntry>('passwords');
+  const result = await passwords.updateOne(
+    { username: username },
+    {
+      $set: {
+        username: username,
+        password: saltHashPassword(password),
+      },
+    },
+    { upsert: true },
+  );
+  const success = result.result.ok === 1;
+  return success;
 };
 
 const UUID_LENGTH = 64;
@@ -205,11 +214,7 @@ Server.use('/previews', express.static(`${upDir}/previews`));
 
 // Create preview directory and default preview file
 ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
-if (
-  !pathExistsSync(
-    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`,
-  )
-) {
+if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
   copySync(
     `${RootDirectory}/assets/noimage.png`,
     `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`,
@@ -287,4 +292,4 @@ const Express = {
   registerUser,
 };
 
-export { Express, Server, WebSocket };
+export { Express, Server, WebSocket, updateUserPassword };
