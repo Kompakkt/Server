@@ -275,6 +275,7 @@ const Mongo: IMongo = {
       data: userData ? userData.data : {},
       role: userData ? userData.role : EUserRank.user,
     };
+    delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
     return users()
       .updateOne({ username }, { $set: updatedUser }, { upsert: true })
