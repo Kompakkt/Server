@@ -36,29 +36,6 @@ const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataP
   if (!entity || !entity._id) {
     return entity;
   }
-  const _id = entity._id.toString();
-
-  for (let i = 0; i < entity.persons.length; i++) {
-    const resolved = await Mongo.resolve<IMetaDataPerson>(entity.persons[i], 'person');
-    if (!resolved) continue;
-    entity.persons[i] = await resolvePerson(resolved);
-
-    if (!entity.persons[i].roles) {
-      entity.persons[i].roles = {};
-    }
-    if (!entity.persons[i].roles[_id]) {
-      entity.persons[i].roles[_id] = [];
-    }
-  }
-
-  for (let i = 0; i < entity.institutions.length; i++) {
-    const resolved = await Mongo.resolve<IMetaDataInstitution>(
-      entity.institutions[i],
-      'institution',
-    );
-    if (!resolved) continue;
-    entity.institutions[i] = resolved;
-  }
 
   if (isDigitalEntity(entity)) {
     for (let i = 0; i < entity.tags.length; i++) {
@@ -72,24 +49,49 @@ const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataP
 };
 
 export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
-  const resolvedDigital = (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
+  const entity = (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
+  const _id = entity._id.toString();
 
-  if (resolvedDigital.phyObjs) {
-    for (let i = 0; i < resolvedDigital.phyObjs.length; i++) {
+  if (entity.persons) {
+    for (let i = 0; i < entity.persons.length; i++) {
+      const resolved = await Mongo.resolve<IMetaDataPerson>(entity.persons[i], 'person');
+      if (!resolved) continue;
+      entity.persons[i] = await resolvePerson(resolved);
+
+      if (!entity.persons[i].roles) {
+        entity.persons[i].roles = {};
+      }
+      if (!entity.persons[i].roles[_id]) {
+        entity.persons[i].roles[_id] = [];
+      }
+    }
+  }
+
+  if (entity.institutions) {
+    for (let i = 0; i < entity.institutions.length; i++) {
+      const resolved = await Mongo.resolve<IMetaDataInstitution>(
+        entity.institutions[i],
+        'institution',
+      );
+      if (!resolved) continue;
+      entity.institutions[i] = resolved;
+    }
+  }
+
+  if (entity.phyObjs) {
+    for (let i = 0; i < entity.phyObjs.length; i++) {
       const resolved = await Mongo.resolve<IMetaDataPhysicalEntity>(
-        resolvedDigital.phyObjs[i],
+        entity.phyObjs[i],
         'physicalentity',
       );
       if (!resolved) {
         continue;
       }
-      resolvedDigital.phyObjs[i] = (await resolveMetaDataEntity(
-        resolved,
-      )) as IMetaDataPhysicalEntity;
+      entity.phyObjs[i] = (await resolveMetaDataEntity(resolved)) as IMetaDataPhysicalEntity;
     }
   }
 
-  return resolvedDigital;
+  return entity;
 };
 
 export const resolveEntity = async (entity: IEntity) => {

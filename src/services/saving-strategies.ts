@@ -251,18 +251,6 @@ const saveMetaDataEntity = async (
 ) => {
   const newEntity = { ...entity };
 
-  for (let i = 0; i < newEntity.persons.length; i++) {
-    newEntity.persons[i] = ((await savePerson(newEntity.persons[i], userData, true)) as any)._id;
-  }
-
-  for (let i = 0; i < newEntity.institutions.length; i++) {
-    newEntity.institutions[i] = ((await saveInstitution(
-      newEntity.institutions[i],
-      userData,
-      true,
-    )) as any)._id;
-  }
-
   // Save unsaved metadata files and return link
   const https = Conf.Express.enableHTTPS ? 'https' : 'http';
   const pubip = Conf.Express.PublicIP;
@@ -305,6 +293,18 @@ const saveMetaDataEntity = async (
 
 const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity, userData: IUserData) => {
   const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IMetaDataDigitalEntity;
+
+  for (let i = 0; i < newEntity.persons.length; i++) {
+    newEntity.persons[i] = ((await savePerson(newEntity.persons[i], userData, true)) as any)._id;
+  }
+
+  for (let i = 0; i < newEntity.institutions.length; i++) {
+    newEntity.institutions[i] = ((await saveInstitution(
+      newEntity.institutions[i],
+      userData,
+      true,
+    )) as any)._id;
+  }
 
   for (let i = 0; i < newEntity.phyObjs.length; i++) {
     newEntity.phyObjs[i]._id = ObjectId.isValid(newEntity.phyObjs[i]._id)

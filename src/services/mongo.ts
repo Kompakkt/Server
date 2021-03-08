@@ -402,30 +402,30 @@ const Mongo: IMongo = {
     if (isCompilation(resultEntity)) {
       await saveCompilation(resultEntity, userData)
         .then(compilation => (resultEntity = compilation))
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else if (isEntity(resultEntity)) {
       await saveEntity(resultEntity, userData)
         .then(entity => (resultEntity = entity))
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else if (isAnnotation(resultEntity)) {
       await saveAnnotation(resultEntity, userData, doesEntityExist)
         .then(annotation => (resultEntity = annotation))
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else if (isPerson(resultEntity)) {
       await savePerson(resultEntity, userData)
         .then(person => (resultEntity = person))
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else if (isInstitution(resultEntity)) {
       await saveInstitution(resultEntity, userData)
         .then(institution => (resultEntity = institution))
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else if (isDigitalEntity(resultEntity)) {
       await saveDigitalEntity(resultEntity, userData)
         .then(async digitalentity => {
           resultEntity = digitalentity;
           await Mongo.insertCurrentUserData(req, resultEntity._id, 'digitalentity');
         })
-        .catch(rejected => res.status(500).send(rejected));
+        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
     } else {
       await Mongo.insertCurrentUserData(req, _id, RequestCollection);
     }
