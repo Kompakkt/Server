@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Db, ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
 
-import { IUserData, EUserRank } from '@kompakkt/shared';
+import { IUserData, EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo, updateOne } from './mongo';

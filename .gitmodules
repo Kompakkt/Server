@@ -1,3 +1,6 @@
 [submodule "ConvertToBabylon"]
 	path = ConvertToBabylon
 	url = https://github.com/HeyItsBATMAN/ConvertToBabylon
+[submodule "src/common"]
+	path = src/common
+	url = https://github.com/Kompakkt/Common

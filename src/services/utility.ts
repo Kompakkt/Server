@@ -9,7 +9,7 @@ import {
   IStrippedUserData,
   IGroup,
   isAnnotation,
-} from '@kompakkt/shared';
+} from '../common/interfaces';
 
 import { Mongo, getCurrentUserBySession, updateOne } from './mongo';
 

@@ -83,9 +83,9 @@ const Logger: ILogger = {
     const written = statSync(Logger.path).size - sizeBefore;
 
     if (written <= 0) return;
-    console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
+    // console.log(`${written} bytes written to log. String bytelength: ${Buffer.byteLength(lines)}`);
     if (written === Buffer.byteLength(lines)) {
-      console.log('Log looks like a success. Clearing log stack');
+      // console.log('Log looks like a success. Clearing log stack');
       Logger.stack.clear();
     }
   },

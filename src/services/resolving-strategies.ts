@@ -1,62 +1,101 @@
-import { ObjectId } from 'mongodb';
-
 import {
   ICompilation,
+  IAddress,
   IEntity,
-  IMetaDataDigitalEntity,
-  IMetaDataPerson,
-  IMetaDataInstitution,
-  IMetaDataPhysicalEntity,
-  IMetaDataTag,
+  IContact,
+  IDigitalEntity,
+  IPerson,
+  IInstitution,
+  IPhysicalEntity,
+  ITag,
   IAnnotation,
   isDigitalEntity,
-} from '@kompakkt/shared';
+  isPerson,
+  isInstitution,
+  isUnresolved,
+} from '../common/interfaces';
 
 import { Mongo } from './mongo';
 
-export const resolvePerson = async (person: IMetaDataPerson) => {
-  if (person.institutions) {
-    for (const id in person.institutions) {
-      if (!person.institutions[id]) continue;
-      if (!ObjectId.isValid(id)) continue;
-      for (let i = 0; i < person.institutions[id].length; i++) {
-        const resolved = await Mongo.resolve<IMetaDataInstitution>(
-          person.institutions[id][i],
-          'institution',
-        );
-        if (!resolved) continue;
-        person.institutions[id][i] = resolved;
-      }
-    }
+const removeUnrelatedEntities = <T extends unknown>(
+  obj: IPerson | IInstitution,
+  entityId: string,
+) => {
+  const relatedRole = obj.roles[entityId];
+  obj.roles = {};
+  obj.roles[entityId] = relatedRole;
+  if (isPerson(obj)) {
+    const relatedInst = obj.institutions[entityId];
+    obj.institutions = {};
+    obj.institutions[entityId] = relatedInst;
+    const relatedContact = obj.contact_references[entityId];
+    obj.contact_references = {};
+    obj.contact_references[entityId] = relatedContact;
+  } else if (isInstitution(obj)) {
+    const relatedAddress = obj.addresses[entityId];
+    obj.addresses = {};
+    obj.addresses[entityId] = relatedAddress;
+    const relatedNote = obj.notes[entityId];
+    obj.notes = {};
+    obj.notes[entityId] = relatedNote;
   }
+  return obj as T;
+};
+
+const exists = (obj: any) => !!obj;
+
+export const resolveInstitution = async (institution: IInstitution, entityId?: string) => {
+  if (entityId) institution = removeUnrelatedEntities<IInstitution>(institution, entityId);
+
+  for (const [id, address] of Object.entries(institution.addresses)) {
+    // Next line is due to migration 0001
+    // Can be removed once all institutions are migrated using 0001
+    if (!isUnresolved(address)) continue;
+    const resolved = await Mongo.resolve<IAddress>(address, 'address');
+    if (resolved) institution.addresses[id] = resolved;
+    else delete institution.addresses[id];
+  }
+
+  return institution;
+};
+
+export const resolvePerson = async (person: IPerson, entityId?: string) => {
+  if (entityId) person = removeUnrelatedEntities<IPerson>(person, entityId);
+
+  for (const [id, contact] of Object.entries(person.contact_references)) {
+    // Next line is due to migration 0001
+    // Can be removed once all persons are migrated using 0001
+    if (!isUnresolved(contact)) continue;
+    const resolved = await Mongo.resolve<IContact>(contact, 'contact');
+    if (resolved) person.contact_references[id] = resolved;
+    else delete person.contact_references[id];
+  }
+
+  for (const [id, institutions] of Object.entries(person.institutions)) {
+    const resolvedInstitutions = await Promise.all(
+      institutions.map(async i =>
+        Mongo.resolve<IInstitution>(i, 'institution').then(resolved => {
+          if (!resolved) return undefined;
+          return resolveInstitution(resolved, entityId);
+        }),
+      ),
+    );
+    person.institutions[id] = resolvedInstitutions.filter(i => isInstitution(i)) as IInstitution[];
+  }
+
   return person;
 };
 
-const resolveMetaDataEntity = async (entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity) => {
-  if (!entity || !entity._id) {
-    return entity;
-  }
+const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) => {
+  if (!entity || !entity._id) return entity;
 
-  if (isDigitalEntity(entity)) {
-    for (let i = 0; i < entity.tags.length; i++) {
-      const resolved = await Mongo.resolve<IMetaDataTag>(entity.tags[i], 'tag');
-      if (!resolved) continue;
-      entity.tags[i] = resolved;
-    }
-  }
-
-  return entity;
-};
-
-export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity) => {
-  const entity = (await resolveMetaDataEntity(digitalEntity)) as IMetaDataDigitalEntity;
   const _id = entity._id.toString();
 
   if (entity.persons) {
     for (let i = 0; i < entity.persons.length; i++) {
-      const resolved = await Mongo.resolve<IMetaDataPerson>(entity.persons[i], 'person');
+      const resolved = await Mongo.resolve<IPerson>(entity.persons[i], 'person');
       if (!resolved) continue;
-      entity.persons[i] = await resolvePerson(resolved);
+      entity.persons[i] = removeUnrelatedEntities(resolved, _id);
 
       if (!entity.persons[i].roles) {
         entity.persons[i].roles = {};
@@ -69,25 +108,29 @@ export const resolveDigitalEntity = async (digitalEntity: IMetaDataDigitalEntity
 
   if (entity.institutions) {
     for (let i = 0; i < entity.institutions.length; i++) {
-      const resolved = await Mongo.resolve<IMetaDataInstitution>(
-        entity.institutions[i],
-        'institution',
-      );
+      const resolved = await resolveInstitution(entity.institutions[i], _id);
       if (!resolved) continue;
-      entity.institutions[i] = resolved;
+      entity.institutions[i] = removeUnrelatedEntities(resolved, _id);
     }
   }
 
+  return entity;
+};
+
+export const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
+  const entity = (await resolveMetaDataEntity(digitalEntity)) as IDigitalEntity;
+
+  entity.tags = (
+    await Promise.all((entity.tags ?? []).map(tag => Mongo.resolve<ITag>(tag, 'tag')))
+  ).filter(exists) as ITag[];
+
   if (entity.phyObjs) {
     for (let i = 0; i < entity.phyObjs.length; i++) {
-      const resolved = await Mongo.resolve<IMetaDataPhysicalEntity>(
-        entity.phyObjs[i],
-        'physicalentity',
-      );
+      const resolved = await Mongo.resolve<IPhysicalEntity>(entity.phyObjs[i], 'physicalentity');
       if (!resolved) {
         continue;
       }
-      entity.phyObjs[i] = (await resolveMetaDataEntity(resolved)) as IMetaDataPhysicalEntity;
+      entity.phyObjs[i] = (await resolveMetaDataEntity(resolved)) as IPhysicalEntity;
     }
   }
 
@@ -104,14 +147,12 @@ export const resolveEntity = async (entity: IEntity) => {
     entity.annotations[id] = resolved;
   }
 
-  if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
-    const resolved = await Mongo.resolve<IMetaDataDigitalEntity>(
+  if (!isDigitalEntity(entity.relatedDigitalEntity)) {
+    const resolved = await Mongo.resolve<IDigitalEntity>(
       entity.relatedDigitalEntity,
       'digitalentity',
     );
-    if (resolved) {
-      entity.relatedDigitalEntity = resolved;
-    }
+    if (resolved) entity.relatedDigitalEntity = resolved;
   }
   return entity;
 };

@@ -4,19 +4,22 @@ import { join } from 'path';
 
 import {
   IAnnotation,
+  IAddress,
   ICompilation,
+  IContact,
   IEntity,
   IGroup,
   IUserData,
-  IMetaDataDigitalEntity,
-  IMetaDataPhysicalEntity,
-  IMetaDataPerson,
-  IMetaDataInstitution,
+  IDigitalEntity,
+  IPhysicalEntity,
+  IPerson,
+  IInstitution,
   IStrippedUserData,
   isEntity,
   isAnnotation,
   isDigitalEntity,
-} from '@kompakkt/shared';
+  isUnresolved,
+} from '../common/interfaces';
 import { RootDirectory } from '../environment';
 
 import { Logger } from './logger';
@@ -50,7 +53,7 @@ const updateAnnotationList = async (
   return updateResult.result.ok === 1;
 };
 
-const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
+export const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
   // Remove invalid annotations
   for (const id in compilation.annotations) {
     const value = compilation.annotations[id];
@@ -72,7 +75,7 @@ const saveCompilation = async (compilation: ICompilation, userData: IUserData) =
   return { ...compilation };
 };
 
-const saveAnnotation = async (
+export const saveAnnotation = async (
   annotation: IAnnotation,
   userData: IUserData,
   doesEntityExist: boolean,
@@ -147,7 +150,7 @@ const saveAnnotation = async (
   return annotation;
 };
 
-const saveEntity = async (entity: IEntity, userData: IUserData) => {
+export const saveEntity = async (entity: IEntity, userData: IUserData) => {
   if (!entity.creator) entity.creator = stripUserData(userData);
 
   /* Preview image URLs might have a corrupted address
@@ -165,7 +168,7 @@ const saveEntity = async (entity: IEntity, userData: IUserData) => {
   return entity;
 };
 
-const saveGroup = async (group: IGroup, userData: IUserData) => {
+export const saveGroup = async (group: IGroup, userData: IUserData) => {
   const strippedUserData = stripUserData(userData);
   group.creator = strippedUserData;
   group.members = [strippedUserData];
@@ -173,21 +176,40 @@ const saveGroup = async (group: IGroup, userData: IUserData) => {
   return group;
 };
 
-const saveInstitution = async (
-  institution: IMetaDataInstitution,
-  userData: IUserData,
+export const saveAddress = async (address: IAddress, userData?: IUserData) => {
+  const resolved = await Mongo.resolve<IAddress>(address, 'address');
+  address._id = resolved?._id ?? new ObjectId().toString();
+  const { _id } = address;
+
+  return updateOne(
+    Mongo.getEntitiesRepository().collection('address'),
+    Mongo.query(_id),
+    { $set: { ...address } },
+    { upsert: true },
+  ).then(res => {
+    const _id = res.upsertedId?._id ?? address._id;
+    if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
+    return address;
+  });
+};
+
+export const saveInstitution = async (
+  institution: IInstitution,
+  userData?: IUserData,
   save = false,
 ) => {
-  const resolved = await Mongo.resolve<IMetaDataInstitution>(institution, 'institution');
+  const resolved = await Mongo.resolve<IInstitution>(institution, 'institution');
   institution._id = resolved?._id ?? new ObjectId().toString();
 
   // If institution exists, combine roles
   institution.roles = { ...resolved?.roles, ...institution?.roles };
-  institution.addresses = {
-    ...resolved?.addresses,
-    ...institution?.addresses,
-  };
+  institution.addresses = { ...resolved?.addresses, ...institution?.addresses };
   institution.notes = { ...resolved?.notes, ...institution?.notes };
+
+  for (const [id, address] of Object.entries(institution.addresses)) {
+    if (isUnresolved(address)) continue;
+    institution.addresses[id] = await saveAddress(address, userData);
+  }
 
   const _id = institution._id;
   if (!save) return institution;
@@ -199,35 +221,53 @@ const saveInstitution = async (
     { upsert: true },
   ).then(res => {
     const _id = res.upsertedId?._id ?? institution._id;
-    Mongo.insertCurrentUserData(userData, _id, 'institution');
+    if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
     return institution;
   });
 };
 
-const savePerson = async (person: IMetaDataPerson, userData: IUserData, save = false) => {
-  const resolved = await Mongo.resolve<IMetaDataPerson>(person, 'person');
+export const saveContact = async (contact: IContact, userData?: IUserData) => {
+  const resolved = await Mongo.resolve<IContact>(contact, 'contact');
+  contact._id = resolved?._id ?? new ObjectId().toString();
+  const { _id } = contact;
+
+  return updateOne(
+    Mongo.getEntitiesRepository().collection('contact'),
+    Mongo.query(_id),
+    { $set: { ...contact } },
+    { upsert: true },
+  ).then(res => {
+    const _id = res.upsertedId?._id ?? contact._id;
+    if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
+    return contact;
+  });
+};
+
+export const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
+  const resolved = await Mongo.resolve<IPerson>(person, 'person');
   person._id = resolved?._id ?? new ObjectId().toString();
 
   // If person exists, combine roles
   person.roles = { ...resolved?.roles, ...person?.roles };
-  person.institutions = {
-    ...resolved?.institutions,
-    ...person?.institutions,
-  };
-  person.contact_references = {
-    ...resolved?.contact_references,
-    ...person?.contact_references,
-  };
+  person.institutions = { ...resolved?.institutions, ...person?.institutions };
+  person.contact_references = { ...resolved?.contact_references, ...person?.contact_references };
 
   for (const id in person.institutions) {
     for (let i = 0; i < person.institutions[id].length; i++) {
       if (!person.institutions[id][i]) continue;
+      if (isUnresolved(person.institutions[id][i])) continue;
       person.institutions[id][i] = (await saveInstitution(
-        person.institutions[id][i],
+        person.institutions[id][i] as IInstitution,
         userData,
         true,
       )) as any;
     }
+  }
+
+  for (const [id, contact] of Object.entries(person.contact_references)) {
+    if (isUnresolved(contact)) continue;
+    if ((contact as IContact)?.mail?.length <= 0) continue;
+    person.contact_references[id] = await saveContact(contact, userData);
   }
 
   const _id = person._id;
@@ -240,13 +280,13 @@ const savePerson = async (person: IMetaDataPerson, userData: IUserData, save = f
     { upsert: true },
   ).then(res => {
     const _id = res.upsertedId?._id ?? person._id;
-    Mongo.insertCurrentUserData(userData, _id, 'person');
+    if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
     return person;
   });
 };
 
-const saveMetaDataEntity = async (
-  entity: IMetaDataDigitalEntity | IMetaDataPhysicalEntity,
+export const saveMetaDataEntity = async (
+  entity: IDigitalEntity | IPhysicalEntity,
   userData: IUserData,
 ) => {
   const newEntity = { ...entity };
@@ -291,8 +331,8 @@ const saveMetaDataEntity = async (
   return newEntity;
 };
 
-const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity, userData: IUserData) => {
-  const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IMetaDataDigitalEntity;
+export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
+  const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IDigitalEntity;
 
   for (let i = 0; i < newEntity.persons.length; i++) {
     newEntity.persons[i] = ((await savePerson(newEntity.persons[i], userData, true)) as any)._id;
@@ -313,7 +353,7 @@ const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity, userData
     const savedEntity = (await saveMetaDataEntity(
       newEntity.phyObjs[i],
       userData,
-    )) as IMetaDataPhysicalEntity;
+    )) as IPhysicalEntity;
     newEntity.phyObjs[i] = (await updateOne(
       Mongo.getEntitiesRepository().collection('physicalentity'),
       Mongo.query(savedEntity._id),
@@ -327,14 +367,4 @@ const saveDigitalEntity = async (digitalentity: IMetaDataDigitalEntity, userData
   }
 
   return newEntity;
-};
-
-export {
-  saveAnnotation,
-  saveCompilation,
-  saveDigitalEntity,
-  saveGroup,
-  saveEntity,
-  savePerson,
-  saveInstitution,
 };

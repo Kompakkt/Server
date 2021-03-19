@@ -16,7 +16,7 @@ import SocketIo from 'socket.io';
 import resTime from 'response-time';
 
 import { RootDirectory } from '../environment';
-import { IUserData, EUserRank } from '@kompakkt/shared';
+import { IUserData, EUserRank } from '../common/interfaces';
 
 import { Configuration as Conf } from './configuration';
 import { Logger } from './logger';

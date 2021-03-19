@@ -28,7 +28,7 @@ import {
   isEntity,
   isPerson,
   isInstitution,
-} from '@kompakkt/shared';
+} from '../common/interfaces';
 
 import { Configuration } from './configuration';
 import { Cache } from './cache';
@@ -38,6 +38,7 @@ import {
   resolveDigitalEntity,
   resolveEntity,
   resolvePerson,
+  resolveInstitution,
 } from './resolving-strategies';
 import {
   saveAnnotation,
@@ -152,7 +153,7 @@ const getAllItemsOfCollection = async (collection: string) =>
   getEntitiesRepository().collection(collection).find({}).toArray();
 
 interface IMongo {
-  init(): Promise<void>;
+  init(): Promise<MongoClient>;
   isMongoDBConnected(_: Request, res: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
   getEntitiesRepository(): Db;
@@ -175,6 +176,7 @@ interface IMongo {
   getCurrentUserData(req: Request, res: Response): Promise<any>;
   validateLoginSession(req: Request, res: Response, next: NextFunction): Promise<any>;
   submit(req: Request, res: Response): Promise<any>;
+  isAllowedToEdit(req: Request, res: Response, next: NextFunction): Promise<any>;
   addEntityToCollection(req: Request, res: Response): Promise<any>;
   updateEntitySettings(req: Request, res: Response): Promise<any>;
   isUserOwnerOfEntity(req: Request | IUserData, identifier: string | ObjectId): Promise<any>;
@@ -187,14 +189,16 @@ interface IMongo {
   searchByEntityFilter(req: Request, res: Response): Promise<any>;
   searchByTextFilter(req: Request, res: Response): Promise<any>;
   explore(req: Request, res: Response): Promise<any>;
+  test(req: Request, res: Response): Promise<any>;
 }
 
 const Mongo: IMongo = {
   init: async () => {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<MongoClient>((resolve, reject) => {
+      if (Client.isConnected()) return resolve(Client);
       Client.connect(error => {
         if (!error) {
-          resolve();
+          resolve(Client);
         } else {
           reject();
           Logger.err(`Couldn't connect to MongoDB.
@@ -366,22 +370,15 @@ const Mongo: IMongo = {
     req.params.collection = 'digitalentity';
     await Mongo.addEntityToCollection(req, res);
   },
-  addEntityToCollection: async (req, res) => {
-    Cache.flush();
-
-    const RequestCollection = req.params.collection.toLowerCase();
-
-    Logger.info(`Adding to the following collection: ${RequestCollection}`);
-
-    const collection: Collection = getEntitiesRepository().collection(RequestCollection);
-
-    let resultEntity = req.body;
+  isAllowedToEdit: async (req, res, next) => {
     const userData = await getCurrentUserBySession(req.sessionID);
     if (!userData) return res.status(404).send('User not found by session');
 
-    const isValidObjectId = ObjectId.isValid(resultEntity['_id']);
-    // tslint:disable-next-line:triple-equals
-    const doesEntityExist = (await Mongo.resolve(resultEntity, RequestCollection, 0)) != undefined;
+    const collectionName = req.params.collection.toLowerCase();
+    const entity = req.body;
+
+    const isValidObjectId = ObjectId.isValid(entity['_id']);
+    const doesEntityExist = !!(await Mongo.resolve(entity, collectionName, 0));
 
     /**
      * If the entity already exists we need to check for owner status
@@ -390,64 +387,81 @@ const Mongo: IMongo = {
      * We also skip this for persons and institutions since their nested content
      * (addresses, contact_references, etc.) can also be updated
      */
-    const isAllowedType = (_e: any) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
+    const isEditableType = (_e: any) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
-    if (isValidObjectId && doesEntityExist && !isAllowedType(resultEntity))
-      if (!(await Mongo.isUserOwnerOfEntity(req, resultEntity['_id'])))
+    if (isValidObjectId && doesEntityExist && !isEditableType(entity))
+      if (!(await Mongo.isUserOwnerOfEntity(req, entity['_id'])))
         return res.status(401).send('User is not owner');
 
-    const _id = isValidObjectId ? new ObjectId(resultEntity._id) : new ObjectId();
-    resultEntity._id = _id;
+    (req as any).data = {
+      userData,
+      doesEntityExist,
+      isValidObjectId,
+      collectionName,
+    };
 
-    if (isCompilation(resultEntity)) {
-      await saveCompilation(resultEntity, userData)
-        .then(compilation => (resultEntity = compilation))
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else if (isEntity(resultEntity)) {
-      await saveEntity(resultEntity, userData)
-        .then(entity => (resultEntity = entity))
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else if (isAnnotation(resultEntity)) {
-      await saveAnnotation(resultEntity, userData, doesEntityExist)
-        .then(annotation => (resultEntity = annotation))
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else if (isPerson(resultEntity)) {
-      await savePerson(resultEntity, userData)
-        .then(person => (resultEntity = person))
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else if (isInstitution(resultEntity)) {
-      await saveInstitution(resultEntity, userData)
-        .then(institution => (resultEntity = institution))
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else if (isDigitalEntity(resultEntity)) {
-      await saveDigitalEntity(resultEntity, userData)
-        .then(async digitalentity => {
-          resultEntity = digitalentity;
-          await Mongo.insertCurrentUserData(req, resultEntity._id, 'digitalentity');
-        })
-        .catch(rejected => Logger.err(rejected) && res.status(500).send(rejected));
-    } else {
-      await Mongo.insertCurrentUserData(req, _id, RequestCollection);
+    return next();
+  },
+  addEntityToCollection: async (req, res) => {
+    Cache.flush();
+
+    const { userData, doesEntityExist, isValidObjectId, collectionName } = (req as any).data as {
+      userData: IUserData;
+      doesEntityExist: boolean;
+      isValidObjectId: boolean;
+      collectionName: string;
+    };
+
+    const collection: Collection = getEntitiesRepository().collection(collectionName);
+    let entity = req.body;
+    const _id = isValidObjectId ? new ObjectId(entity._id) : new ObjectId();
+    entity._id = _id;
+
+    let savingPromise: Promise<any> | undefined;
+    switch (true) {
+      case isCompilation(entity):
+        savingPromise = saveCompilation(entity, userData);
+        break;
+      case isEntity(entity):
+        savingPromise = saveEntity(entity, userData);
+        break;
+      case isAnnotation(entity):
+        savingPromise = saveAnnotation(entity, userData, doesEntityExist);
+        break;
+      case isPerson(entity):
+        savingPromise = savePerson(entity, userData);
+        break;
+      case isInstitution(entity):
+        savingPromise = saveInstitution(entity, userData);
+        break;
+      case isDigitalEntity(entity):
+        savingPromise = saveDigitalEntity(entity, userData);
+        break;
+      default:
+        await Mongo.insertCurrentUserData(req, _id, collectionName);
+        break;
     }
+    await savingPromise
+      ?.then(async res => {
+        entity = res;
+        if (isDigitalEntity(entity))
+          await Mongo.insertCurrentUserData(req, entity._id, 'digitalentity');
+      })
+      .catch(err => Logger.err(err) && res.status(500).send(err));
 
-    // We already got rejected. Don't update resultEntity in DB
+    // We already got rejected. Don't update entity in DB
     if (res.headersSent) return undefined;
 
-    const updateResult = await updateOne(
-      collection,
-      { _id },
-      { $set: resultEntity },
-      { upsert: true },
-    );
+    const updateResult = await updateOne(collection, { _id }, { $set: entity }, { upsert: true });
 
     if (updateResult.result.ok !== 1) {
-      Logger.err(`Failed updating ${RequestCollection} ${_id}`);
-      return res.status(500).send(`Failed updating ${RequestCollection} ${_id}`);
+      Logger.err(`Failed updating ${collectionName} ${_id}`);
+      return res.status(500).send(`Failed updating ${collectionName} ${_id}`);
     }
 
     const resultId = updateResult.upsertedId ? updateResult.upsertedId._id : _id;
-    Logger.info(`Success! Updated ${RequestCollection} ${_id}`);
-    return res.status(200).send(await Mongo.resolve<any>(resultId, RequestCollection));
+    Logger.info(`Success! Updated ${collectionName} ${_id}`);
+    return res.status(200).send(await Mongo.resolve<any>(resultId, collectionName));
   },
   updateEntitySettings: async (req, res) => {
     const preview = req.body.preview;
@@ -516,6 +530,8 @@ const Mongo: IMongo = {
         if (isCompilation(resolve_result)) return resolveCompilation(resolve_result);
 
         if (isPerson(resolve_result)) return resolvePerson(resolve_result);
+
+        if (isInstitution(resolve_result)) return resolveInstitution(resolve_result);
 
         return resolve_result;
       })
@@ -902,6 +918,18 @@ const Mongo: IMongo = {
 
     // Cache full req
     Cache.set(reqHash, items);
+  },
+  test: async (req, res) => {
+    //console.log(req.ip, req.ips);
+    const RequestCollection = req.params.collection.toLowerCase();
+    let results = await getAllItemsOfCollection(RequestCollection);
+    const maxRand = 5;
+    const randIndex = Math.floor(Math.random() * (results.length - maxRand));
+    results = results.slice(randIndex, randIndex + maxRand);
+    results = await Promise.all(results.map(res => Mongo.resolve(res, RequestCollection)));
+    results = results.filter(_ => _);
+    return res.status(200).send(results.slice(0, 5));
+    return res.status(200).send({});
   },
 };
 

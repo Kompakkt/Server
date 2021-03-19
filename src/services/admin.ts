@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { Collection, Db, ObjectId } from 'mongodb';
 
-import { EUserRank, IEntity, IUserData } from '@kompakkt/shared';
+import { EUserRank, IEntity, IUserData } from '../common/interfaces';
 
 import { updateUserPassword, IPasswordEntry } from './express';
 import { generateSecurePassword } from './generate-password';

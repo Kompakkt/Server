@@ -6,9 +6,9 @@ import klawSync from 'klaw-sync';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo, updateOne } from './mongo';
+import { Mongo } from './mongo';
 import { RootDirectory } from '../environment';
-import { IMetaDataPerson, IMetaDataInstitution, IEntity } from '@kompakkt/shared';
+import { IEntity } from '../common/interfaces';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -24,11 +24,6 @@ const deleteFile = async (path: string) =>
 interface ICleaning {
   deleteUnusedPersonsAndInstitutions(req: Request, res: Response): Promise<any>;
   deleteNullRefs(req: Request, res: Response): Promise<any>;
-
-  cleanPersonFields(req: Request, res: Response): Promise<any>;
-
-  cleanInstitutionFields(req: Request, res: Response): Promise<any>;
-
   cleanUploadedFiles(req: Request, res: Response): Promise<any>;
 }
 
@@ -135,127 +130,6 @@ const Cleaning: ICleaning = {
       await iterateOverUserData(user);
     }
     res.status(200).send({ confirm, total });
-  },
-  cleanPersonFields: async (req, res) => {
-    const ObjDB: Db = Mongo.getEntitiesRepository();
-    const personCollection = ObjDB.collection<IMetaDataPerson>('person');
-    const cursor = personCollection.find({});
-
-    const confirm = req.params.confirm || false;
-
-    const canContinue = async () => (await cursor.hasNext()) && !cursor.isClosed();
-
-    let totalSaved = 0;
-    const personsChanged = new Array<IMetaDataPerson>();
-
-    while (await canContinue()) {
-      const person = await cursor.next();
-      if (!person) break;
-
-      const sizeBefore = JSON.stringify(person).length;
-
-      let changedPerson = false;
-      for (const _id in person.institutions) {
-        if (person.institutions[_id].length === 0) {
-          delete person.institutions[_id];
-          changedPerson = true;
-        }
-      }
-      for (const _id in person.roles) {
-        if (person.roles[_id].length === 0) {
-          delete person.roles[_id];
-          changedPerson = true;
-        }
-      }
-      for (const _id in person.contact_references) {
-        const ref = person.contact_references[_id];
-        if (ref.mail === '' && ref.phonenumber === '') {
-          delete person.contact_references[_id];
-          changedPerson = true;
-        }
-      }
-
-      const sizeAfter = JSON.stringify(person).length;
-
-      if (changedPerson) {
-        if (confirm) {
-          const result = await updateOne(personCollection, { _id: person._id }, { $set: person });
-          if (result.result.ok !== 1) {
-            Logger.err('Failed updating cleaned person', person, result);
-          }
-        }
-        personsChanged.push(person);
-        totalSaved += sizeBefore - sizeAfter;
-      }
-    }
-
-    Logger.log(`Cleaned ${personsChanged.length} persons and saved ${totalSaved} characters`);
-
-    res.status(200).send({ confirm, personsChanged, totalSaved });
-  },
-  cleanInstitutionFields: async (req, res) => {
-    const ObjDB: Db = Mongo.getEntitiesRepository();
-    const instCollection = ObjDB.collection<IMetaDataInstitution>('institution');
-    const cursor = instCollection.find({});
-
-    const confirm = req.params.confirm || false;
-
-    const canContinue = async () => (await cursor.hasNext()) && !cursor.isClosed();
-
-    const changedInsts = new Array<IMetaDataInstitution>();
-    let totalSaved = 0;
-
-    while (await canContinue()) {
-      const inst = await cursor.next();
-      if (!inst) continue;
-
-      let changed = false;
-      const sizeBefore = JSON.stringify(inst).length;
-
-      for (const _id in inst.addresses) {
-        const addr = inst.addresses[_id];
-        // cast as any to remove non-optional creation_date
-        // this way we can easily check all properties except creation_date
-        delete (addr as any).creation_date;
-
-        if (Object.values(addr).join('').length === 0) {
-          delete inst.addresses[_id];
-          changed = true;
-        }
-      }
-
-      for (const _id in inst.notes) {
-        const note = inst.notes[_id];
-        if (note.length === 0) {
-          delete inst.notes[_id];
-          changed = true;
-        }
-      }
-
-      for (const _id in inst.roles) {
-        const role = inst.roles[_id];
-        if (role.length === 0) {
-          delete inst.roles[_id];
-          changed = true;
-        }
-      }
-
-      const sizeAfter = JSON.stringify(inst).length;
-
-      if (changed) {
-        changedInsts.push(inst);
-        totalSaved += sizeBefore - sizeAfter;
-
-        if (confirm) {
-          const result = await updateOne(instCollection, { _id: inst._id }, { $set: inst });
-          if (result.result.ok !== 1) {
-            Logger.err('Failed updating cleaned inst', inst, result);
-          }
-        }
-      }
-    }
-
-    res.status(200).send({ confirm, changedInsts, totalSaved });
   },
   cleanUploadedFiles: async (req, res) => {
     const ObjDB: Db = Mongo.getEntitiesRepository();

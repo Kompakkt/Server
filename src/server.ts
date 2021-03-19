@@ -70,6 +70,7 @@ Server.get('/api/v1/get/groups', Mongo.validateLoginSession, async (_, res) => {
 Server.post(
   '/api/v1/post/push/:collection',
   Mongo.validateLoginSession,
+  Mongo.isAllowedToEdit,
   Mongo.addEntityToCollection,
 );
 // On user submit
@@ -224,22 +225,6 @@ Server.post(
 );
 
 Server.post(
-  ['/cleaning/cleanpersonfields', '/cleaning/cleanpersonfields/:confirm'],
-  Express.authenticate(),
-  Mongo.updateSessionId,
-  Admin.checkIsAdmin,
-  Cleaning.cleanPersonFields,
-);
-
-Server.post(
-  ['/cleaning/cleaninstitutionfields', '/cleaning/cleaninstitutionfields/:confirm'],
-  Express.authenticate(),
-  Mongo.updateSessionId,
-  Admin.checkIsAdmin,
-  Cleaning.cleanInstitutionFields,
-);
-
-Server.post(
   ['/cleaning/cleanuploadedfiles', '/cleaning/cleanuploadedfiles/:confirm'],
   Express.authenticate(),
   Mongo.updateSessionId,
@@ -280,5 +265,8 @@ Server.get(
 );
 
 Server.get('/utility/finduserinmetadata', Mongo.validateLoginSession, Utility.findUserInMetadata);
+
+// Test Route
+Server.get('/test/:collection', Mongo.test);
 
 Express.startListening();
