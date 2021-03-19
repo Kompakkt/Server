@@ -23,21 +23,21 @@ const removeUnrelatedEntities = <T extends unknown>(
 ) => {
   const relatedRole = obj.roles[entityId];
   obj.roles = {};
-  obj.roles[entityId] = relatedRole;
+  if (relatedRole) obj.roles[entityId] = relatedRole;
   if (isPerson(obj)) {
     const relatedInst = obj.institutions[entityId];
     obj.institutions = {};
-    obj.institutions[entityId] = relatedInst;
+    if (relatedInst) obj.institutions[entityId] = relatedInst;
     const relatedContact = obj.contact_references[entityId];
     obj.contact_references = {};
-    obj.contact_references[entityId] = relatedContact;
+    if (relatedContact) obj.contact_references[entityId] = relatedContact;
   } else if (isInstitution(obj)) {
     const relatedAddress = obj.addresses[entityId];
     obj.addresses = {};
-    obj.addresses[entityId] = relatedAddress;
+    if (relatedAddress) obj.addresses[entityId] = relatedAddress;
     const relatedNote = obj.notes[entityId];
     obj.notes = {};
-    obj.notes[entityId] = relatedNote;
+    if (relatedNote) obj.notes[entityId] = relatedNote;
   }
   return obj as T;
 };
@@ -73,7 +73,7 @@ export const resolvePerson = async (person: IPerson, entityId?: string) => {
 
   for (const [id, institutions] of Object.entries(person.institutions)) {
     const resolvedInstitutions = await Promise.all(
-      institutions.map(async i =>
+      (institutions ?? []).map(async i =>
         Mongo.resolve<IInstitution>(i, 'institution').then(resolved => {
           if (!resolved) return undefined;
           return resolveInstitution(resolved, entityId);
@@ -93,9 +93,11 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
 
   if (entity.persons) {
     for (let i = 0; i < entity.persons.length; i++) {
-      const resolved = await Mongo.resolve<IPerson>(entity.persons[i], 'person');
-      if (!resolved) continue;
-      entity.persons[i] = removeUnrelatedEntities(resolved, _id);
+      const shallow = await Mongo.resolve<IPerson>(entity.persons[i], 'person');
+      if (!shallow) continue;
+      const deep = await resolvePerson(shallow, _id);
+      if (!deep) continue;
+      entity.persons[i] = removeUnrelatedEntities(deep, _id);
 
       if (!entity.persons[i].roles) {
         entity.persons[i].roles = {};
@@ -108,9 +110,11 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
 
   if (entity.institutions) {
     for (let i = 0; i < entity.institutions.length; i++) {
-      const resolved = await resolveInstitution(entity.institutions[i], _id);
-      if (!resolved) continue;
-      entity.institutions[i] = removeUnrelatedEntities(resolved, _id);
+      const shallow = await Mongo.resolve<IInstitution>(entity.institutions[i], 'institution');
+      if (!shallow) continue;
+      const deep = await resolveInstitution(shallow, _id);
+      if (!deep) continue;
+      entity.institutions[i] = removeUnrelatedEntities(deep, _id);
     }
   }
 

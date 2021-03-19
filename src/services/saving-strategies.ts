@@ -178,7 +178,7 @@ export const saveGroup = async (group: IGroup, userData: IUserData) => {
 
 export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   const resolved = await Mongo.resolve<IAddress>(address, 'address');
-  address._id = resolved?._id ?? new ObjectId().toString();
+  address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
   const { _id } = address;
 
   return updateOne(
@@ -189,7 +189,7 @@ export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   ).then(res => {
     const _id = res.upsertedId?._id ?? address._id;
     if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
-    return address;
+    return { ...address, _id };
   });
 };
 
@@ -199,7 +199,7 @@ export const saveInstitution = async (
   save = false,
 ) => {
   const resolved = await Mongo.resolve<IInstitution>(institution, 'institution');
-  institution._id = resolved?._id ?? new ObjectId().toString();
+  institution._id = institution?._id ?? resolved?._id ?? new ObjectId().toString();
 
   // If institution exists, combine roles
   institution.roles = { ...resolved?.roles, ...institution?.roles };
@@ -208,7 +208,8 @@ export const saveInstitution = async (
 
   for (const [id, address] of Object.entries(institution.addresses)) {
     if (isUnresolved(address)) continue;
-    institution.addresses[id] = await saveAddress(address, userData);
+    if (!address) continue;
+    institution.addresses[id] = await saveAddress(address as IAddress, userData);
   }
 
   const _id = institution._id;
@@ -222,13 +223,13 @@ export const saveInstitution = async (
   ).then(res => {
     const _id = res.upsertedId?._id ?? institution._id;
     if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
-    return institution;
+    return { ...institution, _id };
   });
 };
 
 export const saveContact = async (contact: IContact, userData?: IUserData) => {
   const resolved = await Mongo.resolve<IContact>(contact, 'contact');
-  contact._id = resolved?._id ?? new ObjectId().toString();
+  contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
   const { _id } = contact;
 
   return updateOne(
@@ -239,13 +240,13 @@ export const saveContact = async (contact: IContact, userData?: IUserData) => {
   ).then(res => {
     const _id = res.upsertedId?._id ?? contact._id;
     if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
-    return contact;
+    return { ...contact, _id };
   });
 };
 
 export const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
   const resolved = await Mongo.resolve<IPerson>(person, 'person');
-  person._id = resolved?._id ?? new ObjectId().toString();
+  person._id = person?._id ?? resolved?._id ?? new ObjectId().toString();
 
   // If person exists, combine roles
   person.roles = { ...resolved?.roles, ...person?.roles };
@@ -253,19 +254,18 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
   person.contact_references = { ...resolved?.contact_references, ...person?.contact_references };
 
   for (const id in person.institutions) {
-    for (let i = 0; i < person.institutions[id].length; i++) {
-      if (!person.institutions[id][i]) continue;
-      if (isUnresolved(person.institutions[id][i])) continue;
-      person.institutions[id][i] = (await saveInstitution(
-        person.institutions[id][i] as IInstitution,
-        userData,
-        true,
-      )) as any;
-    }
+    const institutions =
+      (person.institutions[id]?.filter(i => i && !isUnresolved(i)) as IInstitution[]) ?? [];
+    if (!institutions) continue;
+    const savedInstitutions = await Promise.all(
+      institutions.map(i => saveInstitution(i, userData, true)),
+    );
+    person.institutions[id] = savedInstitutions.map(i => ({ _id: i._id }));
   }
 
   for (const [id, contact] of Object.entries(person.contact_references)) {
     if (isUnresolved(contact)) continue;
+    if (!contact) continue;
     if ((contact as IContact)?.mail?.length <= 0) continue;
     person.contact_references[id] = await saveContact(contact, userData);
   }
@@ -281,7 +281,7 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
   ).then(res => {
     const _id = res.upsertedId?._id ?? person._id;
     if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
-    return person;
+    return { ...person, _id };
   });
 };
 

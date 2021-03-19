@@ -9,6 +9,8 @@ import { Socket } from './services/socket';
 import { Upload } from './services/upload';
 import { Utility } from './services/utility';
 
+Mongo.init();
+
 // Check if MongoDB is connected
 Server.use(Mongo.isMongoDBConnected);
 Server.use(Mongo.fixObjectId);

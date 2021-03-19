@@ -116,4 +116,6 @@ import {
     ).catch(console.log);
     console.log(result ? result.result.ok === 1 : `Failed saving ${prename} ${name}`);
   }
+
+  process.exit(0);
 })();

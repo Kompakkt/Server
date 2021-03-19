@@ -199,6 +199,8 @@ const Mongo: IMongo = {
       Client.connect(error => {
         if (!error) {
           resolve(Client);
+          Logger.info('Connected to MongoDB. Cleaning SessionIDs');
+          users().updateMany({}, { $set: { sessionID: '' } });
         } else {
           reject();
           Logger.err(`Couldn't connect to MongoDB.
@@ -932,12 +934,5 @@ const Mongo: IMongo = {
     return res.status(200).send({});
   },
 };
-
-Mongo.init()
-  .then(() => {
-    Logger.info('Connected to MongoDB. Cleaning SessionIDs');
-    users().updateMany({}, { $set: { sessionID: '' } });
-  })
-  .catch(e => Logger.err(e));
 
 export { Mongo, getCurrentUserBySession, areObjectIdsEqual, updateOne };
