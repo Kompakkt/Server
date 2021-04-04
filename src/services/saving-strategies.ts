@@ -206,6 +206,10 @@ export const saveInstitution = async (
   institution.addresses = { ...resolved?.addresses, ...institution?.addresses };
   institution.notes = { ...resolved?.notes, ...institution?.notes };
 
+  // Always take existing name and university
+  institution.name = resolved?.name ?? institution.name;
+  institution.university = resolved?.university ?? institution.university;
+
   for (const [id, address] of Object.entries(institution.addresses)) {
     if (isUnresolved(address)) continue;
     if (!address) continue;
@@ -252,6 +256,10 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
   person.roles = { ...resolved?.roles, ...person?.roles };
   person.institutions = { ...resolved?.institutions, ...person?.institutions };
   person.contact_references = { ...resolved?.contact_references, ...person?.contact_references };
+
+  // Always take existing name
+  person.prename = resolved?.prename ?? person.prename;
+  person.name = resolved?.name ?? person.name;
 
   for (const id in person.institutions) {
     const institutions =
