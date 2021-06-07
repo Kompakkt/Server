@@ -94,6 +94,7 @@ import {
     }
 
     for (const [id, institutions] of Object.entries(person.institutions)) {
+      if (!institutions) continue;
       person.institutions[id] = institutions
         .filter(i => !!i._id)
         .map(i => ({ _id: i._id.toString() })) as IDocument[];
