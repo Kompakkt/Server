@@ -1,5 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
+import { IUserData } from './common/interfaces';
+
 import { Admin } from './services/admin';
 import { Cleaning } from './services/cleaning';
 import { Express, Server, WebSocket } from './services/express';
@@ -51,11 +53,14 @@ Server.get(['/api/v1/get/ldata', '/auth'], Mongo.validateLoginSession, Mongo.get
 Server.get('/api/v1/get/id', Mongo.getUnusedObjectId);
 
 Server.get('/api/v1/get/users', Mongo.validateLoginSession, async (_, res) => {
-  const users = await Mongo.getAccountsRepository().collection('users').find({}).toArray();
+  const users = await Mongo.getAccountsRepository()
+    .collection<IUserData>('users')
+    .find({})
+    .toArray();
   res.status(200).send(
     users.map(user => ({
       username: user.username,
-      fullname: user.fullname,
+      fullname: `${user.prename} ${user.surname}`,
       _id: user._id,
     })),
   );

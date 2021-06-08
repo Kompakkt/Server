@@ -221,16 +221,31 @@ if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/n
   );
 }
 
+interface LDAPUserResponse {
+  dn: string;
+  controls: any[];
+  objectClass: string[];
+  schacGender: string;
+  givenName: string;
+  uid: string;
+  mail: string;
+  sn: string;
+  description: string;
+  userPassword: string;
+  UniColognePersonStatus: string;
+}
+
 // Passport
 passport.use(
   new LdapStrategy(
     getLDAPConfig,
-    (user: any, done: any): LdapStrategy.VerifyCallback => {
+    (user: LDAPUserResponse, done: any): LdapStrategy.VerifyCallback => {
+      const { givenName: prename, sn: surname, mail } = user;
       const adjustedUser = {
-        fullname: user['cn'],
-        prename: user['givenName'],
-        surname: user['sn'],
-        mail: user['mail'],
+        fullname: `${user['givenName']} ${user['sn']}`,
+        prename,
+        surname,
+        mail,
         role: EUserRank.user,
       };
       return done(undefined, adjustedUser);
