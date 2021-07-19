@@ -2,8 +2,12 @@ import Redis from 'ioredis';
 import hash from 'object-hash';
 
 import { Logger } from './logger';
+import { Configuration } from './configuration';
 
-const redis = new Redis();
+const redis = new Redis({
+  host: Configuration.Redis.Hostname,
+  port: Configuration.Redis.Port,
+});
 redis.flushall().then(() => Logger.log('Flushed Redis'));
 
 const Cache = {

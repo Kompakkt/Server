@@ -13,6 +13,10 @@ interface IConfiguration {
     Port: number;
     Hostname: string;
   };
+  Redis: {
+    Hostname: string;
+    Port: number;
+  };
   Uploads: {
     TempDirectory: string;
     UploadDirectory: string;
@@ -60,6 +64,10 @@ const LoadConfig = () => {
       AccountsDB: 'accounts',
       Port: 27017,
       Hostname: 'localhost',
+    },
+    Redis: {
+      Hostname: 'localhost',
+      Port: 6379,
     },
     Uploads: {
       TempDirectory: 'temp',
