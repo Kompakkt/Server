@@ -31,7 +31,7 @@ import {
 } from '../common/interfaces';
 
 import { Configuration } from './configuration';
-import { Cache } from './cache';
+import { RepoCache, UserCache } from './cache';
 import { Logger } from './logger';
 import {
   resolveCompilation,
@@ -73,7 +73,8 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  await Cache.flush();
+  // TODO: Only invalidate keys that need invalidation
+  await Promise.all([RepoCache.flush(), UserCache.flush()]);
   // Mongo does not allow mutation of the _id property.
   // Deletes _id from all $set queries
   if (update.$set) {
@@ -133,12 +134,9 @@ const saveBase64toImage = async (
   return `${https}://${pubip}:${port}/${finalImagePath}`;
 };
 
-const MongoURL = `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
+const MongoURL = MongoConf.ClientURL ?? `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
 const Client = new MongoClient(MongoURL, {
   useNewUrlParser: true,
-  // DEPRECATED:
-  // reconnectTries: Number.POSITIVE_INFINITY,
-  // reconnectInterval: 1000,
   useUnifiedTopology: true,
 });
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
@@ -250,7 +248,8 @@ const Mongo: IMongo = {
 
     const sessionID = req.sessionID;
 
-    const updateResult = await users().updateOne(
+    const updateResult = await updateOne(
+      users(),
       { username },
       {
         $set: {
@@ -283,8 +282,7 @@ const Mongo: IMongo = {
     };
     delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
-    return users()
-      .updateOne({ username }, { $set: updatedUser }, { upsert: true })
+    return updateOne(users(), { username }, { $set: updatedUser }, { upsert: true })
       .then(async () => {
         Logger.log(`User ${updatedUser.username} logged in`);
         res.status(200).send(await Mongo.resolveUserData(updatedUser));
@@ -309,7 +307,7 @@ const Mongo: IMongo = {
     if (doesExist) return true;
 
     userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await users().updateOne({ sessionID }, { $set: { data: userData.data } });
+    const updateResult = await updateOne(users(), { sessionID }, { $set: { data: userData.data } });
 
     if (updateResult.result.ok !== 1) return false;
     return true;
@@ -317,8 +315,8 @@ const Mongo: IMongo = {
   resolveUserData: async _userData => {
     const userData = { ..._userData } as IUserData;
 
-    const hash = Cache.hash(userData.username);
-    const temp = await Cache.get<IUserData>(hash);
+    const hash = UserCache.hash(userData.username);
+    const temp = await UserCache.get<IUserData>(hash);
 
     if (temp) {
       return temp;
@@ -336,7 +334,7 @@ const Mongo: IMongo = {
       }
     }
 
-    Cache.set(hash, userData);
+    UserCache.set(hash, userData);
 
     return userData;
   },
@@ -355,7 +353,7 @@ const Mongo: IMongo = {
       const endIndex = cookieSID.indexOf('.');
       cookieSID = cookieSID.substring(startIndex, endIndex);
     }
-    const sessionID = (req.sessionID = cookieSID ? cookieSID : req.sessionID);
+    const sessionID = req.sessionID === cookieSID ? cookieSID : req.sessionID;
 
     const userData = await getCurrentUserBySession(sessionID);
     if (!userData) return res.status(404).send('User not found by session');
@@ -405,7 +403,7 @@ const Mongo: IMongo = {
     return next();
   },
   addEntityToCollection: async (req, res) => {
-    Cache.flush();
+    RepoCache.flush();
 
     const { userData, doesEntityExist, isValidObjectId, collectionName } = (req as any).data as {
       userData: IUserData;
@@ -509,14 +507,14 @@ const Mongo: IMongo = {
     const _id = new ObjectId(parsedId);
     const resolve_collection = getEntitiesRepository().collection<T>(collection_name);
 
-    const temp = await Cache.get<T>(parsedId);
+    const temp = await RepoCache.get<T>(parsedId);
     if (temp) {
       // Make sure returned object is valid and not {}
       if ((temp as any)._id) {
         return temp as T;
       }
       // Flush invalid object from cache
-      Cache.del(parsedId).then(numDelKeys => {
+      RepoCache.del(parsedId).then(numDelKeys => {
         if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
       });
     }
@@ -538,7 +536,7 @@ const Mongo: IMongo = {
         return resolve_result;
       })
       .then(async result => {
-        if (result) await Cache.set(parsedId, result);
+        if (result) await RepoCache.set(parsedId, result);
         return result as T | null;
       })
       .catch(err => {
@@ -620,7 +618,8 @@ const Mongo: IMongo = {
         id => id !== identifier.toString(),
       );
 
-      const update_result = await users().updateOne(
+      const update_result = await updateOne(
+        users(),
         { sessionID },
         { $set: { data: find_result.data } },
       );
@@ -640,7 +639,7 @@ const Mongo: IMongo = {
       Logger.warn(delete_result);
       res.status(500).send(message);
     }
-    return Cache.flush();
+    return RepoCache.flush();
   },
   searchByEntityFilter: async (req, res) => {
     const RequestCollection = req.params.collection.toLowerCase();
@@ -759,8 +758,8 @@ const Mongo: IMongo = {
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
     // Check if req is cached
-    const reqHash = Cache.hash(req.body);
-    const temp = await Cache.get<IEntity[] | ICompilation[]>(reqHash);
+    const reqHash = RepoCache.hash(req.body);
+    const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
     if (temp) {
       items.push(...temp);
@@ -919,7 +918,7 @@ const Mongo: IMongo = {
     res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
     // Cache full req
-    Cache.set(reqHash, items);
+    RepoCache.set(reqHash, items);
   },
   test: async (req, res) => {
     //console.log(req.ip, req.ips);

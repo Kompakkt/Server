@@ -183,7 +183,9 @@ const genid = () => randomBytes(UUID_LENGTH).toString('hex');
 Server.use(
   '*',
   cors({
-    origin: true,
+    origin: (_, callback) => {
+      return callback(null, true);
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE'.split(','),
     allowedHeaders: [
@@ -291,7 +293,7 @@ Server.use(
     cookie: {
       httpOnly: false,
       sameSite: 'none',
-      secure: true,
+      secure: Conf.Express.enableHTTPS,
     },
   }),
 );

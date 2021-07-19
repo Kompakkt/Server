@@ -12,6 +12,7 @@ interface IConfiguration {
     AccountsDB: string;
     Port: number;
     Hostname: string;
+    ClientURL?: string;
   };
   Redis: {
     Hostname: string;

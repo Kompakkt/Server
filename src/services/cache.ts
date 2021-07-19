@@ -4,19 +4,39 @@ import hash from 'object-hash';
 import { Logger } from './logger';
 import { Configuration } from './configuration';
 
-const redis = new Redis({
-  host: Configuration.Redis.Hostname,
-  port: Configuration.Redis.Port,
-});
-redis.flushall().then(() => Logger.log('Flushed Redis'));
+class CacheClient {
+  private redis: Redis.Redis;
+  private db: number;
+  public hash = hash;
 
-const Cache = {
-  flush: async () => redis.flushall(),
-  del: async (key: string) => redis.del(key).then(res => res),
-  get: async <T extends unknown>(key: string): Promise<T | undefined> =>
-    redis.get(key).then(value => (value ? JSON.parse(value) : undefined)),
-  set: async (key: string, value: any) => redis.set(key, JSON.stringify(value), 'EX', 3600),
-  hash,
-};
+  constructor(db: number) {
+    this.db = db;
+    this.redis = new Redis({
+      db,
+      host: Configuration.Redis.Hostname,
+      port: Configuration.Redis.Port,
+    });
+    Logger.log(`Initialized Redis using DB ${db}`);
+  }
 
-export { Cache };
+  public async flush() {
+    return this.redis.flushdb().then(() => Logger.log(`Flushed Redis DB ${this.db}`));
+  }
+
+  public async del(key: string) {
+    return this.redis.del(key);
+  }
+
+  public async get<T extends unknown>(key: string) {
+    return this.redis.get(key).then(value => (value ? (JSON.parse(value) as T) : undefined));
+  }
+
+  public async set(key: string, value: any) {
+    return this.redis.set(key, JSON.stringify(value), 'EX', 3600);
+  }
+}
+
+const RepoCache = new CacheClient(1);
+const UserCache = new CacheClient(2);
+
+export { RepoCache, UserCache };
