@@ -78,12 +78,7 @@ const LoadConfig = () => {
       Host: '127.0.0.1',
       PublicIP: 'localhost',
       Port: 8080,
-      OriginWhitelist: [
-        'http://localhost:4200',
-        'http://localhost:8080',
-        'http://localhost:8080/upload',
-        'http://localhost:8080/uploadfinished',
-      ],
+      OriginWhitelist: [],
       enableHTTPS: false,
       SSLPaths: {
         PrivateKey: '',

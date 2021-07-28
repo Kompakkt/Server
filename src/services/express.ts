@@ -1,4 +1,4 @@
-import * as bodyParser from 'body-parser';
+import { json as bodyParser } from 'body-parser';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { BinaryLike, createHmac, randomBytes } from 'crypto';
@@ -18,7 +18,7 @@ import resTime from 'response-time';
 import { RootDirectory } from '../environment';
 import { IUserData, EUserRank } from '../common/interfaces';
 
-import { Configuration as Conf } from './configuration';
+import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
 import { serveFile } from './dynamic-compression';
@@ -31,15 +31,26 @@ export interface IPasswordEntry {
   };
 }
 
+const {
+  enableHTTPS,
+  SSLPaths,
+  LDAP,
+  Port,
+  Host,
+  PassportSecret,
+  OriginWhitelist,
+} = Configuration.Express;
+const { UploadDirectory } = Configuration.Uploads;
+
 const Server = express();
 const createServer = () => {
-  if (Conf.Express.enableHTTPS) {
-    const privateKey = readFileSync(Conf.Express.SSLPaths.PrivateKey);
-    const certificate = readFileSync(Conf.Express.SSLPaths.Certificate);
+  if (enableHTTPS) {
+    const privateKey = readFileSync(SSLPaths.PrivateKey);
+    const certificate = readFileSync(SSLPaths.Certificate);
 
     const options = { key: privateKey, cert: certificate };
-    if (Conf.Express.SSLPaths.Passphrase && Conf.Express.SSLPaths.Passphrase.length > 0) {
-      (options as any)['passphrase'] = Conf.Express.SSLPaths.Passphrase;
+    if (SSLPaths.Passphrase && SSLPaths.Passphrase.length > 0) {
+      (options as any)['passphrase'] = SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
   }
@@ -47,7 +58,7 @@ const createServer = () => {
 };
 
 const getLDAPConfig: LdapStrategy.OptionsFunction = (_req, callback) => {
-  if (!Conf.Express.LDAP) {
+  if (!LDAP) {
     Logger.warn('LDAP not configured but strategy was called');
     callback('LDAP not configured', {
       server: {
@@ -58,15 +69,13 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (_req, callback) => {
     });
   } else {
     const req = _req as express.Request;
-    const DN = Conf.Express.LDAP.DNauthUID
-      ? `uid=${req.body.username},${Conf.Express.LDAP.DN}`
-      : Conf.Express.LDAP.DN;
+    const DN = LDAP.DNauthUID ? `uid=${req.body.username},${LDAP.DN}` : LDAP.DN;
     callback(undefined, {
       server: {
-        url: Conf.Express.LDAP.Host,
+        url: LDAP.Host,
         bindDN: DN,
         bindCredentials: `${req.body.password}`,
-        searchBase: Conf.Express.LDAP.searchBase,
+        searchBase: LDAP.searchBase,
         searchFilter: `(uid=${req.body.username})`,
         reconnect: true,
       },
@@ -78,8 +87,8 @@ const Listener = createServer();
 const WebSocket = SocketIo(Listener);
 
 const startListening = () => {
-  Listener.listen(Conf.Express.Port, Conf.Express.Host);
-  Logger.log(`HTTPS Server started and listening on port ${Conf.Express.Port}`);
+  Listener.listen(Port, Host);
+  Logger.log(`HTTPS Server started and listening on port ${Port}`);
 };
 
 const authenticate = (options: { session: boolean } = { session: false }) =>
@@ -116,11 +125,15 @@ const verifyUser = async (username: string, password: string) => {
   return newHash === hash;
 };
 
+interface IRegisterRequest extends IUserData {
+  password: string;
+}
+
 const registerUser = async (req: express.Request, res: express.Response): Promise<any> => {
   const coll = Mongo.getAccountsRepository().collection('users');
 
-  const isUser = (obj: any): obj is IUserData => {
-    const person = obj as IUserData;
+  const isUser = (obj: any): obj is IRegisterRequest => {
+    const person = obj as IRegisterRequest;
     return (
       person &&
       person.fullname !== undefined &&
@@ -128,7 +141,7 @@ const registerUser = async (req: express.Request, res: express.Response): Promis
       person.surname !== undefined &&
       person.mail !== undefined &&
       person.username !== undefined &&
-      (person as any)['password'] !== undefined
+      person.password !== undefined
     );
   };
 
@@ -179,11 +192,13 @@ const genid = () => randomBytes(UUID_LENGTH).toString('hex');
 
 // ExpressJS Middleware
 // Enable CORS
-// TODO: Find out which routes need CORS
 Server.use(
   '*',
   cors({
-    origin: (_, callback) => {
+    origin: (origin, callback) => {
+      if (origin && OriginWhitelist.length > 0 && OriginWhitelist.indexOf(origin) === -1) {
+        return callback(new Error('Origin not allowed'), false);
+      }
       return callback(null, true);
     },
     credentials: true,
@@ -201,7 +216,7 @@ Server.use(
   }),
 );
 // This turns req.body from application/json reqs into readable JSON
-Server.use(bodyParser.json({ limit: '50mb' }));
+Server.use(bodyParser({ limit: '50mb' }));
 // Same for cookies
 Server.use(cookieParser());
 // Compression: Brotli -> Fallback GZIP
@@ -209,17 +224,17 @@ Server.use(shrinkRay());
 // Measure res time of req
 Server.use(resTime());
 // Static
-const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
+const upDir = `${RootDirectory}/${UploadDirectory}/`;
 //Server.use('/uploads', express.static(upDir));
 Server.use('/uploads', serveFile(upDir));
 Server.use('/previews', express.static(`${upDir}/previews`));
 
 // Create preview directory and default preview file
-ensureDirSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews`);
-if (!pathExistsSync(`${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`)) {
+ensureDirSync(`${RootDirectory}/${UploadDirectory}/previews`);
+if (!pathExistsSync(`${RootDirectory}/${UploadDirectory}/previews/noimage.png`)) {
   copySync(
     `${RootDirectory}/assets/noimage.png`,
-    `${RootDirectory}/${Conf.Uploads.UploadDirectory}/previews/noimage.png`,
+    `${RootDirectory}/${UploadDirectory}/previews/noimage.png`,
   );
 }
 
@@ -262,10 +277,7 @@ passport.use(
       if (err) {
         return done(err);
       }
-      if (!user) {
-        return done(undefined, false);
-      }
-      if (!(await verifyUser(username, password))) {
+      if (!user || !(await verifyUser(username, password))) {
         return done(undefined, false);
       }
       return done(undefined, user);
@@ -287,13 +299,13 @@ Server.set('trust proxy', 1);
 Server.use(
   expressSession({
     genid,
-    secret: Conf.Express.PassportSecret,
+    secret: PassportSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: false,
       sameSite: 'none',
-      secure: Conf.Express.enableHTTPS,
+      secure: enableHTTPS,
     },
   }),
 );

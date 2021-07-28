@@ -4,6 +4,8 @@ import hash from 'object-hash';
 import { Logger } from './logger';
 import { Configuration } from './configuration';
 
+const { Hostname: host, Port: port } = Configuration.Redis;
+
 class CacheClient {
   private redis: Redis.Redis;
   private db: number;
@@ -11,11 +13,7 @@ class CacheClient {
 
   constructor(db: number) {
     this.db = db;
-    this.redis = new Redis({
-      db,
-      host: Configuration.Redis.Hostname,
-      port: Configuration.Redis.Port,
-    });
+    this.redis = new Redis({ db, host, port });
     Logger.log(`Initialized Redis using DB ${db}`);
   }
 
