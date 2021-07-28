@@ -17,6 +17,10 @@ class CacheClient {
     Logger.log(`Initialized Redis using DB ${db}`);
   }
 
+  get client() {
+    return this.redis;
+  }
+
   public async flush() {
     return this.redis.flushdb().then(() => Logger.log(`Flushed Redis DB ${this.db}`));
   }
@@ -36,5 +40,6 @@ class CacheClient {
 
 const RepoCache = new CacheClient(1);
 const UserCache = new CacheClient(2);
+const SessionCache = new CacheClient(3);
 
-export { RepoCache, UserCache };
+export { RepoCache, UserCache, SessionCache };

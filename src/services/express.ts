@@ -1,9 +1,9 @@
 import { json as bodyParser } from 'body-parser';
-import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { BinaryLike, createHmac, randomBytes } from 'crypto';
 import express from 'express';
 import expressSession from 'express-session';
+import connectRedis from 'connect-redis';
 import shrinkRay from 'shrink-ray-current';
 import { readFileSync } from 'fs';
 import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
@@ -19,6 +19,7 @@ import { RootDirectory } from '../environment';
 import { IUserData, EUserRank } from '../common/interfaces';
 
 import { Configuration } from './configuration';
+import { SessionCache } from './cache';
 import { Logger } from './logger';
 import { Mongo } from './mongo';
 import { serveFile } from './dynamic-compression';
@@ -187,9 +188,6 @@ const updateUserPassword = async (username: string, password: string): Promise<b
   return success;
 };
 
-const UUID_LENGTH = 64;
-const genid = () => randomBytes(UUID_LENGTH).toString('hex');
-
 // ExpressJS Middleware
 // Enable CORS
 Server.use(
@@ -217,8 +215,6 @@ Server.use(
 );
 // This turns req.body from application/json reqs into readable JSON
 Server.use(bodyParser({ limit: '50mb' }));
-// Same for cookies
-Server.use(cookieParser());
 // Compression: Brotli -> Fallback GZIP
 Server.use(shrinkRay());
 // Measure res time of req
@@ -285,12 +281,7 @@ passport.use(
   }),
 );
 
-passport.serializeUser((user: any, done) => {
-  const serialValue = Object.keys(user)
-    .reduce((acc, val) => `${acc}${val}${user[val]}`, '')
-    .replace(/[.]*[_]*[-]*/g, '');
-  done(undefined, serialValue);
-});
+passport.serializeUser((user: IUserData, done) => done(undefined, user._id));
 passport.deserializeUser((id, done) => done(undefined, id));
 
 Server.use(passport.initialize());
@@ -298,10 +289,11 @@ Server.use(passport.initialize());
 Server.set('trust proxy', 1);
 Server.use(
   expressSession({
-    genid,
+    store: new (connectRedis(expressSession))({ client: SessionCache.client }),
     secret: PassportSecret,
     resave: false,
     saveUninitialized: false,
+    name: 'session',
     cookie: {
       httpOnly: false,
       sameSite: 'none',
