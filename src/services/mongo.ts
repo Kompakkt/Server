@@ -1,7 +1,6 @@
 /* tslint:disable:max-line-length */
 import { NextFunction, Request, Response } from 'express';
-import { writeFileSync } from 'fs';
-import { ensureDirSync } from 'fs-extra';
+import { ensureDir, writeFile } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
 import {
@@ -88,49 +87,53 @@ const updateOne = async (
 const areObjectIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) =>
   new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
 
-const saveBase64toImage = async (
-  base64input: string,
+// TODO: (Optional) Convert to progressive JPEG?
+const updatePreviewImage = async (
+  base64OrUrl: string,
   subfolder: string,
   identifier: string | ObjectId,
 ) => {
-  const saveId = identifier.toString();
-  let finalImagePath = '';
-  // TODO: Solve without try-catch block
-  // TODO: Convert to progressive JPEG?
-  try {
-    if (base64input.indexOf('data:image') !== -1) {
-      const replaced = base64input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
-      const tempBuff = Buffer.from(replaced, 'base64');
-      await imagemin
-        .buffer(tempBuff, {
-          plugins: [
-            pngquant.default({
-              speed: 1,
-              strip: true,
-              dithering: 1,
-            }),
-          ],
-        })
-        .then(res => {
-          ensureDirSync(`${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`);
-          writeFileSync(
-            `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/${saveId}.png`,
-            res,
-          );
+  const convertBase64ToBuffer = (input: string) => {
+    const replaced = input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
+    return Buffer.from(replaced, 'base64');
+  };
 
-          finalImagePath = `previews/${subfolder}/${saveId}.png`;
-        })
-        .catch(e => Logger.err(e));
-    } else {
-      finalImagePath = `previews/${base64input.split('previews/')[1]}`;
-    }
-  } catch (e) {
-    Logger.err(e);
-    return finalImagePath;
-  }
+  const minifyBuffer = (buffer: Buffer) =>
+    imagemin.buffer(buffer, {
+      plugins: [
+        pngquant.default({
+          speed: 1,
+          strip: true,
+          dithering: 1,
+        }),
+      ],
+    });
+
+  const writeBufferToFile = async (buffer: Buffer) => {
+    const subfolderPath = `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`;
+    const filePath = `${subfolderPath}${identifier}.png`;
+    return ensureDir(subfolderPath)
+      .then(() => writeFile(filePath, buffer))
+      .then(() => `previews/${subfolder}/${identifier}.png`);
+  };
+
+  const getPreviewImagePath = async (input: string) => {
+    // If the image is not a base64 image we assume it has already been converted and saved to disk
+    if (!input.includes('data:image')) return `previews/${input.split('previews/')[1]}`;
+
+    // Otherwise we save it to a new file
+    const converted = convertBase64ToBuffer(input);
+    const minified = await minifyBuffer(converted);
+
+    return await writeBufferToFile(minified);
+  };
+
+  const finalImagePath = await getPreviewImagePath(base64OrUrl).catch(() => 'previews/noimage.png');
+
   const https = Configuration.Express.enableHTTPS ? 'https' : 'http';
   const pubip = Configuration.Express.PublicIP;
   const port = Configuration.Express.Port;
+
   return `${https}://${pubip}:${port}/${finalImagePath}`;
 };
 
@@ -155,7 +158,7 @@ interface IMongo {
   isMongoDBConnected(_: Request, res: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
   getEntitiesRepository(): Db;
-  saveBase64toImage(
+  updatePreviewImage(
     base64input: string,
     subfolder: string,
     identifier: string | ObjectId,
@@ -217,7 +220,7 @@ const Mongo: IMongo = {
   },
   getAccountsRepository,
   getEntitiesRepository,
-  saveBase64toImage,
+  updatePreviewImage,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -471,7 +474,7 @@ const Mongo: IMongo = {
     const collection: Collection = getEntitiesRepository().collection('entity');
     const subfolder = 'entity';
 
-    const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
+    const finalImagePath = await updatePreviewImage(preview, subfolder, identifier);
     if (finalImagePath === '') return res.status(500).send('Failed saving preview image');
 
     // Overwrite old settings
