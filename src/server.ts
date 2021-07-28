@@ -120,30 +120,12 @@ Server.post(
 
 // Upload API
 // Upload a file to the server
-Server.post(
-  '/upload',
-  Mongo.validateLoginSession,
-  Upload.Multer.single('file'),
-  Upload.UploadRequest,
-);
+Server.post('/upload', Mongo.validateLoginSession, Upload.fileUploadRequestHandler, Upload.send);
 // User signals that all necessary files are uploaded
 // TODO: Post Upload Cleanup
-Server.post('/uploadfinished', Mongo.validateLoginSession, Upload.UploadFinish);
+Server.post('/uploadfinished', Mongo.validateLoginSession, Upload.finish);
 // User signals that upload was cancelled
-Server.post('/uploadcancel', Mongo.validateLoginSession, Upload.UploadCancel);
-// Metadata
-Server.post(
-  '/addmetadata',
-  Mongo.validateLoginSession,
-  Upload.Multer.single('file'),
-  Upload.AddMetadata,
-);
-Server.post(
-  '/cancelmetadata',
-  Mongo.validateLoginSession,
-  Upload.Multer.single('file'),
-  Upload.CancelMetadata,
-);
+Server.post('/uploadcancel', Mongo.validateLoginSession, Upload.cancel);
 
 // General authentication route
 Server.post(['/login', '/login/*'], Express.authenticate({ session: true }), Mongo.addToAccounts);
