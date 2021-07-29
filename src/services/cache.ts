@@ -4,7 +4,7 @@ import hash from 'object-hash';
 import { Logger } from './logger';
 import { Configuration } from './configuration';
 
-const { Hostname: host, Port: port } = Configuration.Redis;
+const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
 class CacheClient {
   private redis: Redis.Redis;
@@ -38,8 +38,13 @@ class CacheClient {
   }
 }
 
-const RepoCache = new CacheClient(1);
-const UserCache = new CacheClient(2);
-const SessionCache = new CacheClient(3);
+// Repo/Entity MongoDB Cache
+const RepoCache = new CacheClient(offset + 1);
+// User/Account MongoDB Cache
+const UserCache = new CacheClient(offset + 2);
+// User/Account Session Cache
+const SessionCache = new CacheClient(offset + 3);
+// Cache information about who uploaded files
+const UploadCache = new CacheClient(offset + 4);
 
-export { RepoCache, UserCache, SessionCache };
+export { RepoCache, UserCache, SessionCache, UploadCache };

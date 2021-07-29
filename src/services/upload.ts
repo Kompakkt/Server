@@ -7,7 +7,7 @@ import slugify from 'slugify';
 import { createHash } from 'crypto';
 
 import { RootDirectory } from '../environment';
-
+import { UploadCache } from './cache';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 
@@ -41,11 +41,18 @@ const Multer = multer({
 const fileUploadRequestHandler = Multer.single('file');
 
 // Request methods
-const cancel = (req: Request, res: Response) => {
+const cancel = async (req: Request, res: Response) => {
   const { uuid: token, type } = req.body as any;
   const destPath = join(uploadDir, `${type}`, `${token}/`);
 
-  remove(destPath)
+  if (req.sessionID !== (await UploadCache.get(token))) {
+    return res.status(403).send({
+      status: 'error',
+      message: 'Cancelling is only permitted during the upload session',
+    });
+  }
+
+  return remove(destPath)
     .then(() => {
       Logger.log('Removed file/folder', token, type);
       res.status(200).send({ status: 'OK' });
@@ -59,18 +66,23 @@ const cancel = (req: Request, res: Response) => {
 const send = async (req: Request, res: Response) => {
   const { file } = req as any;
   const { type, token, relativePath, checksum } = req.body as any;
-  // TODO: Checksum
   const tempPath = `${file.destination}/${file.filename}`;
   const relPath = relativePath || file.originalname;
   const folderOrFilePath = slug(relPath);
   const destPath = join(uploadDir, `${type}`, `${token}/`, `${folderOrFilePath}`);
 
+  // TODO: Handle Checksum not matching
   const localChecksum = await calculateMD5(tempPath);
   console.log('Client checksum:\n', checksum, '\nServer checksum:\n', localChecksum);
 
+  // Remember session ID of uploader. Used for cancellation
+  await UploadCache.set(token, req.sessionID);
+
   ensureDir(dirname(destPath))
     .then(() => move(tempPath, destPath))
-    .then(() => res.status(200).send({ status: 'OK' }))
+    .then(() => {
+      res.status(200).send({ status: 'OK' });
+    })
     .catch(err => {
       Logger.err(err);
       res.status(500).send({ status: 'error', message: 'Upload req failed' });
@@ -79,13 +91,12 @@ const send = async (req: Request, res: Response) => {
 
 const finish = async (req: Request, res: Response) => {
   Logger.info(req.body);
-  const Token = req.body.uuid;
-  const Type = req.body.type;
-  if (!Token || !Type) {
-    Logger.err(`Upload cancel req failed. Token: ${Token}, Type: ${Type}`);
+  const { uuid: token, type } = req.body as any;
+  if (!token || !type) {
+    Logger.err(`Upload cancel req failed. Token: ${token}, type: ${type}`);
     return res.status(400).send({ status: 'error', message: 'Missing type or token' });
   }
-  const path = `${RootDirectory}/${UploadDirectory}/${Type}/${Token}`;
+  const path = `${RootDirectory}/${UploadDirectory}/${type}/${token}`;
 
   return pathExists(path)
     .catch(err => {
@@ -97,7 +108,7 @@ const finish = async (req: Request, res: Response) => {
 
       // TODO: Add more filters
       const filter: string[] = [];
-      switch (Type) {
+      switch (type) {
         case 'entity':
           filter.push('.obj', '.babylon', '.gltf', '.stl');
           break;

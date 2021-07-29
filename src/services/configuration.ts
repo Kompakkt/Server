@@ -17,6 +17,7 @@ interface IConfiguration {
   Redis: {
     Hostname: string;
     Port: number;
+    DBOffset: number;
   };
   Uploads: {
     TempDirectory: string;
@@ -69,6 +70,7 @@ const LoadConfig = () => {
     Redis: {
       Hostname: 'localhost',
       Port: 6379,
+      DBOffset: 1,
     },
     Uploads: {
       TempDirectory: 'temp',
