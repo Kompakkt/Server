@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ensureDir, move, pathExists, unlink } from 'fs-extra';
+import { ensureDir, move, pathExists, remove } from 'fs-extra';
 import klawSync from 'klaw-sync';
 import multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
@@ -35,13 +35,14 @@ const fileUploadRequestHandler = Multer.single('file');
 const cancel = (req: Request, res: Response) => {
   const { uuid: token, type } = req.body as any;
   const destPath = join(uploadDir, `${type}`, `${token}/`);
-  unlink(destPath)
+
+  remove(destPath)
     .then(() => {
-      Logger.log('Removed folder', token, type);
+      Logger.log('Removed file/folder', token, type);
       res.status(200).send({ status: 'OK' });
     })
     .catch(err => {
-      Logger.log('Failed removing folder', token, type, err);
+      Logger.log('Failed removing file/folder', token, type, err);
       res.status(500).send({ status: 'error', message: 'Failed deleting folder' });
     });
 };
