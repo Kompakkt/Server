@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import { ensureDir, move, pathExists, remove } from 'fs-extra';
+import { ensureDir, move, pathExists, remove, createReadStream } from 'fs-extra';
 import klawSync from 'klaw-sync';
 import multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
 import slugify from 'slugify';
+import { createHash } from 'crypto';
 
 import { RootDirectory } from '../environment';
 
@@ -12,8 +13,16 @@ import { Logger } from './logger';
 
 const { TempDirectory, UploadDirectory } = Configuration.Uploads;
 
-// Helper function
+// Helper functions
 const slug = (text: string) => slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
+
+const calculateMD5 = (filePath: string) =>
+  new Promise<string>(resolve => {
+    const hash = createHash('md5');
+    createReadStream(filePath)
+      .on('data', data => hash.update(data))
+      .on('end', () => resolve(hash.digest('hex')));
+  });
 
 // Prepare folder structure
 const tempDir = `${RootDirectory}/${TempDirectory}`;
@@ -47,14 +56,17 @@ const cancel = (req: Request, res: Response) => {
     });
 };
 
-const send = (req: Request, res: Response) => {
+const send = async (req: Request, res: Response) => {
   const { file } = req as any;
-  const { type, token, relativePath } = req.body as any;
+  const { type, token, relativePath, checksum } = req.body as any;
   // TODO: Checksum
   const tempPath = `${file.destination}/${file.filename}`;
   const relPath = relativePath || file.originalname;
   const folderOrFilePath = slug(relPath);
   const destPath = join(uploadDir, `${type}`, `${token}/`, `${folderOrFilePath}`);
+
+  const localChecksum = await calculateMD5(tempPath);
+  console.log('Client checksum:\n', checksum, '\nServer checksum:\n', localChecksum);
 
   ensureDir(dirname(destPath))
     .then(() => move(tempPath, destPath))
