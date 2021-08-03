@@ -282,8 +282,8 @@ Server.use(
     saveUninitialized: false,
     name: 'session',
     cookie: {
-      httpOnly: false,
-      sameSite: 'none',
+      httpOnly: true,
+      sameSite: 'lax',
       secure: enableHTTPS,
     },
   }),
