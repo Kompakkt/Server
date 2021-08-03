@@ -5,7 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { IUserData, EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo, updateOne } from './mongo';
+import { Mongo, updateOne, insertOne, users, getCurrentUserBySession } from './mongo';
 
 interface IMailer {
   isConfigValid(): any;
@@ -117,13 +117,12 @@ const Mailer: IMailer = {
       return;
 
     const AccDb: Db = Mongo.getAccountsRepository();
-    const users = AccDb.collection('users');
-    const user = await users.findOne({ sessionID: req.sessionID });
+    const user = await getCurrentUserBySession(req);
     const collection = AccDb.collection(target);
 
-    if (target === ETarget.upload && user.role === EUserRank.user) {
+    if (target === ETarget.upload && user?.role === EUserRank.user) {
       await updateOne(
-        users,
+        users(),
         { sessionID: req.sessionID },
         { $set: { role: EUserRank.uploadrequested } },
       );
@@ -140,8 +139,8 @@ const Mailer: IMailer = {
       mailSent,
     };
 
-    const insertResult = await collection.insertOne(document);
-    if (insertResult.result.ok !== 1) {
+    const insertResult = await insertOne(collection, document);
+    if (!insertResult) {
       Logger.info('Failed adding user to mail database');
     } else {
       Logger.info(`Added user to DB ${document}`);
@@ -149,8 +148,10 @@ const Mailer: IMailer = {
   },
   countUserMails: async (req, destination) => {
     const AccDb: Db = Mongo.getAccountsRepository();
-    const users = AccDb.collection('users');
-    const user = await users.findOne({ sessionID: req.sessionID });
+    const user = await getCurrentUserBySession(req);
+
+    if (!user) throw new Error('User not found by session');
+
     const collection = AccDb.collection<IMailEntry>(destination);
     const entries = (await collection.find({}).toArray()).filter(
       entry => !entry.answered && entry.user._id.toString() === user._id.toString(),
@@ -181,15 +182,17 @@ const Mailer: IMailer = {
     const _id = new ObjectId(identifier);
     const AccDB: Db = Mongo.getAccountsRepository();
     const targetColl = AccDB.collection(target);
-    const oldEntry = await targetColl.findOne({ _id });
+    const oldEntry = await targetColl.findOne(Mongo.query(_id));
     if (!oldEntry || oldEntry.answered === undefined)
       return res.status(409).send('Invalid mail entry in database');
 
     const isAnswered = oldEntry.answered;
-    const updateResult = await updateOne(targetColl, { _id }, { $set: { answered: !isAnswered } });
-    if (updateResult.result.ok !== 1) return res.status(500).send('Failed updating entry');
+    const updateResult = await updateOne(targetColl, Mongo.query(_id), {
+      $set: { answered: !isAnswered },
+    });
+    if (!updateResult) return res.status(500).send('Failed updating entry');
 
-    res.status(200).send(await targetColl.findOne({ _id }));
+    res.status(200).send(await targetColl.findOne(Mongo.query(_id)));
   },
 };
 

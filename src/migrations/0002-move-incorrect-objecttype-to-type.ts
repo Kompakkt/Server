@@ -40,7 +40,7 @@ import { IEntity, IDigitalEntity } from '../common/interfaces';
         },
       },
     ).catch(console.log);
-    console.log(result ? result.result.ok === 1 : `Failed saving digital Entity ${title}`);
+    console.log(result ? result : `Failed saving digital Entity ${title}`);
   }
 
   process.exit(0);

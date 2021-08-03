@@ -1,12 +1,18 @@
 import { Request, Response } from 'express';
-import { Collection, Db } from 'mongodb';
 import { unlink } from 'fs-extra';
 
 import klawSync from 'klaw-sync';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo } from './mongo';
+import {
+  Mongo,
+  deleteOne,
+  users,
+  updateOne,
+  getAllItemsOfCollection,
+  getCollection,
+} from './mongo';
 import { RootDirectory } from '../environment';
 import { IEntity } from '../common/interfaces';
 
@@ -29,15 +35,12 @@ interface ICleaning {
 
 const Cleaning: ICleaning = {
   deleteUnusedPersonsAndInstitutions: async (req, res) => {
-    const ObjDB: Db = Mongo.getEntitiesRepository();
-    const personCollection = ObjDB.collection('person');
-    const instCollection = ObjDB.collection('institution');
-    const digobjCollection = ObjDB.collection('digitalentity');
-    const phyobjCollection = ObjDB.collection('physicalentity');
-    const allPersons = await personCollection.find({}).toArray();
-    const allInstitutions = await instCollection.find({}).toArray();
-    const allDigObjs = await digobjCollection.find({}).toArray();
-    const allPhyObjs = await phyobjCollection.find({}).toArray();
+    const personCollection = getCollection('person');
+    const instCollection = getCollection('institution');
+    const allPersons = await getAllItemsOfCollection('person');
+    const allInstitutions = await getAllItemsOfCollection('institution');
+    const allDigObjs = await getAllItemsOfCollection('digitalentity');
+    const allPhyObjs = await getAllItemsOfCollection('physicalentity');
 
     const confirm = req.params.confirm || false;
 
@@ -51,12 +54,10 @@ const Cleaning: ICleaning = {
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await personCollection.deleteOne({
-        _id: person._id,
-      });
-      if (deleteResult.result.ok === 1) {
+      const deleteResult = await deleteOne(personCollection, Mongo.query(person._id));
+      if (deleteResult) {
         Logger.info(`Deleted unused person ${person}`);
-        total.push({ person, result: deleteResult.result });
+        total.push({ person, result: deleteResult });
       }
     }
     for (const institution of allInstitutions) {
@@ -64,12 +65,10 @@ const Cleaning: ICleaning = {
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await instCollection.deleteOne({
-        _id: institution._id,
-      });
-      if (deleteResult.result.ok === 1) {
+      const deleteResult = await deleteOne(instCollection, Mongo.query(institution._id));
+      if (deleteResult) {
         Logger.info(`Deleted unused institution ${institution}`);
-        total.push({ institution, result: deleteResult.result });
+        total.push({ institution, result: deleteResult });
       }
     }
 
@@ -81,9 +80,7 @@ const Cleaning: ICleaning = {
     });
   },
   deleteNullRefs: async (req, res) => {
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection = AccDB.collection('users');
-    const allUsers = await users.find({}).toArray();
+    const allUsers = await users().find({}).toArray();
 
     const confirm = req.params.confirm || false;
 
@@ -105,8 +102,10 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await users.updateOne({ _id: user._id }, { $set: { data: user.data } });
-      if (updateResult.result.ok !== 1) {
+      const updateResult = await updateOne(users(), Mongo.query(user._id), {
+        $set: { data: user.data },
+      });
+      if (!updateResult) {
         Logger.err(`Failed deleting missing references of user ${user._id}`);
         return false;
       }
@@ -132,8 +131,7 @@ const Cleaning: ICleaning = {
     res.status(200).send({ confirm, total });
   },
   cleanUploadedFiles: async (req, res) => {
-    const ObjDB: Db = Mongo.getEntitiesRepository();
-    const entities = await ObjDB.collection<IEntity>('entity').find({}).toArray();
+    const entities = await getAllItemsOfCollection<IEntity>('entity');
     // Get all file paths from entities and flatten the array
     const files = ([] as string[]).concat(
       ...entities.map(entity => entity.files.map(file => file.file_link)),

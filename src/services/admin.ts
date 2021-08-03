@@ -6,7 +6,7 @@ import { EUserRank, IEntity, IUserData } from '../common/interfaces';
 import { updateUserPassword, IPasswordEntry } from './express';
 import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
-import { Mongo, updateOne } from './mongo';
+import { Mongo, updateOne, getCurrentUserBySession, users } from './mongo';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
 
@@ -24,21 +24,15 @@ interface IAdmin {
 
 const Admin: IAdmin = {
   checkIsAdmin: async (req, res, next) => {
-    const username = req.body.username;
-    const sessionID = req.sessionID;
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection<IUserData> = AccDB.collection('users');
-    const found = await users.findOne({ username, sessionID });
-    if (!found || found.role !== EUserRank.admin) {
+    const user = await getCurrentUserBySession(req);
+    if (user?.role !== EUserRank.admin) {
       return res.status(401).send('Could not verify your admin status');
     }
     return next();
   },
   getAllUsers: async (_, res) => {
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection<IUserData> = AccDB.collection('users');
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
-    const allAccounts = await users.find({}).toArray();
+    const allAccounts = await users().find({}).toArray();
     const filteredAccounts = await Promise.all(
       allAccounts.map(account => {
         filterProperties.forEach(prop => ((account as any)[prop] = undefined));
@@ -51,10 +45,8 @@ const Admin: IAdmin = {
     const _id = checkAndReturnObjectId(req.params.identifier);
     if (!_id) return res.status(400).send('Invalid identifier');
 
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection<IUserData> = AccDB.collection('users');
+    const user = await users().findOne<IUserData>(Mongo.query(_id));
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
-    const user = await users.findOne({ _id });
 
     if (!user) return res.status(404).send('User not found');
 
@@ -84,14 +76,12 @@ const Admin: IAdmin = {
       return res.status(400).send('Invalid role specified');
     }
 
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection<IUserData> = AccDB.collection('users');
-    const user = await users.findOne({ _id });
+    const user = await users().findOne(Mongo.query(_id));
 
     if (!user) return res.status(500).send('Updating user role failed');
 
-    const updateResult = await updateOne(users, { _id }, { $set: { role } });
-    if (updateResult.result.ok !== 1) return res.status(500).send('Updating user role failed');
+    const updateResult = await updateOne(users(), Mongo.query(_id), { $set: { role } });
+    if (!updateResult) return res.status(500).send('Updating user role failed');
 
     if (Configuration.Mailer && Configuration.Mailer.Target) {
       Mailer.sendMail({
@@ -111,28 +101,22 @@ const Admin: IAdmin = {
 
     const ObjDB: Db = Mongo.getEntitiesRepository();
     const EntityCollection: Collection<IEntity> = ObjDB.collection('entity');
-    const found = await EntityCollection.findOne({ _id });
+    const found = await EntityCollection.findOne(Mongo.query(_id));
     if (!found) return res.status(404).send('No entity with this identifier found');
 
     const isEntityOnline: boolean = found.online;
-    const updateResult = await updateOne(
-      ObjDB.collection('entity'),
-      { _id },
-      { $set: { online: !isEntityOnline } },
-    );
-    if (updateResult.result.ok !== 1) {
-      return res.status(500).send('Failed updating published state');
-    }
+    const updateResult = await updateOne(ObjDB.collection('entity'), Mongo.query(_id), {
+      $set: { online: !isEntityOnline },
+    });
+    if (!updateResult) return res.status(500).send('Failed updating published state');
     return res.status(200).send(await Mongo.resolve<IEntity>(_id, 'entity'));
   },
   resetUserPassword: async (req, res) => {
     const username = req.params.username;
     if (!username) return res.status(400).send('Invalid username');
 
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const users: Collection<IUserData> = AccDB.collection('users');
-    const passwords: Collection<IPasswordEntry> = AccDB.collection('passwords');
-    const user = await users.findOne({ username });
+    const passwords = Mongo.getAccountsRepository().collection<IPasswordEntry>('passwords');
+    const user = await users().findOne({ username });
     const pwEntry = await passwords.findOne({ username });
     if (!user) return res.status(400).send('User not found');
     if (!pwEntry) return res.status(400).send('User has no existing password entry');

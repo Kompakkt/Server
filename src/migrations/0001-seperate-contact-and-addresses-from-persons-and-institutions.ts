@@ -59,8 +59,8 @@ import {
       Mongo.getEntitiesRepository().collection<IInstitution>('institution'),
       Mongo.query(institution._id),
       { $set: institution },
-    ).catch(console.log);
-    console.log(result ? result.result.ok === 1 : `Failed saving institution ${name}`);
+    );
+    console.log(result ? result : `Failed saving institution ${name}`);
   }
 
   // Persons
@@ -115,7 +115,7 @@ import {
       Mongo.query(person._id),
       { $set: person },
     ).catch(console.log);
-    console.log(result ? result.result.ok === 1 : `Failed saving ${prename} ${name}`);
+    console.log(result ? result : `Failed saving ${prename} ${name}`);
   }
 
   process.exit(0);

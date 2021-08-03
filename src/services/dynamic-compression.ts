@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import { exists, move, readFile, writeFile } from 'fs-extra';
+import { pathExists, move, readFile, writeFile } from 'fs-extra';
 import { join } from 'path';
 import { brotliCompress, constants, gzip } from 'zlib';
 
-const wrapperExists = async (filename: string) =>
-  new Promise<boolean>((resolve, _) => exists(filename, resolve));
+const wrapperExists = async (filename: string) => pathExists(filename);
 
 const wrapperReadFile = async (filename: string) =>
   new Promise<Buffer>((resolve, reject) =>

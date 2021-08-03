@@ -49,8 +49,7 @@ const updateAnnotationList = async (
   const update = { $set: { annotations: obj.annotations } };
 
   const updateResult = await updateOne(coll, query, update);
-
-  return updateResult.result.ok === 1;
+  return !!updateResult;
 };
 
 export const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
@@ -179,18 +178,19 @@ export const saveGroup = async (group: IGroup, userData: IUserData) => {
 export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   const resolved = await Mongo.resolve<IAddress>(address, 'address');
   address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
-  const { _id } = address;
 
-  return updateOne(
+  const result = await updateOne(
     Mongo.getEntitiesRepository().collection('address'),
-    Mongo.query(_id),
+    Mongo.query(address._id),
     { $set: { ...address } },
     { upsert: true },
-  ).then(res => {
-    const _id = res.upsertedId?._id ?? address._id;
-    if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
-    return { ...address, _id };
-  });
+  );
+
+  if (!result) throw new Error('Failed saving address');
+
+  const _id = result.upsertedId?._id ?? address._id;
+  if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
+  return { ...address, _id };
 };
 
 export const saveInstitution = async (
@@ -216,36 +216,38 @@ export const saveInstitution = async (
     institution.addresses[id] = await saveAddress(address as IAddress, userData);
   }
 
-  const _id = institution._id;
   if (!save) return institution;
 
-  return updateOne(
+  const result = await updateOne(
     Mongo.getEntitiesRepository().collection('institution'),
-    Mongo.query(_id),
+    Mongo.query(institution._id),
     { $set: { ...institution } },
     { upsert: true },
-  ).then(res => {
-    const _id = res.upsertedId?._id ?? institution._id;
-    if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
-    return { ...institution, _id };
-  });
+  );
+
+  if (!result) throw new Error('Failed saving institution');
+
+  const _id = result.upsertedId?._id ?? institution._id;
+  if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
+  return { ...institution, _id };
 };
 
 export const saveContact = async (contact: IContact, userData?: IUserData) => {
   const resolved = await Mongo.resolve<IContact>(contact, 'contact');
   contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
-  const { _id } = contact;
 
-  return updateOne(
+  const result = await updateOne(
     Mongo.getEntitiesRepository().collection('contact'),
-    Mongo.query(_id),
+    Mongo.query(contact._id),
     { $set: { ...contact } },
     { upsert: true },
-  ).then(res => {
-    const _id = res.upsertedId?._id ?? contact._id;
-    if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
-    return { ...contact, _id };
-  });
+  );
+
+  if (!result) throw new Error('Failed saving contact');
+
+  const _id = result.upsertedId?._id ?? contact._id;
+  if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
+  return { ...contact, _id };
 };
 
 export const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
@@ -278,19 +280,20 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
     person.contact_references[id] = await saveContact(contact, userData);
   }
 
-  const _id = person._id;
   if (!save) return person;
 
-  return updateOne(
+  const result = await updateOne(
     Mongo.getEntitiesRepository().collection('person'),
-    Mongo.query(_id),
+    Mongo.query(person._id),
     { $set: { ...person } },
     { upsert: true },
-  ).then(res => {
-    const _id = res.upsertedId?._id ?? person._id;
-    if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
-    return { ...person, _id };
-  });
+  );
+
+  if (!result) throw new Error('Failed saving person');
+
+  const _id = result.upsertedId?._id ?? person._id;
+  if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
+  return { ...person, _id };
 };
 
 export const saveMetaDataEntity = async (
@@ -329,6 +332,8 @@ export const saveMetaDataEntity = async (
         { $set: { ...tag } },
         { upsert: true },
       ).then(res => {
+        if (!res) return undefined;
+
         const _id = res.upsertedId?._id ?? tag._id;
         Mongo.insertCurrentUserData(userData, _id, 'tag');
         return _id;
@@ -347,11 +352,9 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
   }
 
   for (let i = 0; i < newEntity.institutions.length; i++) {
-    newEntity.institutions[i] = ((await saveInstitution(
-      newEntity.institutions[i],
-      userData,
-      true,
-    )) as any)._id;
+    newEntity.institutions[i] = (
+      (await saveInstitution(newEntity.institutions[i], userData, true)) as any
+    )._id;
   }
 
   for (let i = 0; i < newEntity.phyObjs.length; i++) {
@@ -368,6 +371,8 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
       { $set: { ...savedEntity } },
       { upsert: true },
     ).then(res => {
+      if (!res) throw new Error('Failed saving physicalentity');
+
       const _id = res.upsertedId?._id ?? savedEntity._id;
       Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
       return _id;

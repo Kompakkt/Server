@@ -21,7 +21,7 @@ import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
 import { Logger } from './logger';
-import { Mongo } from './mongo';
+import { Mongo, updateOne } from './mongo';
 import { serveFile } from './dynamic-compression';
 
 export interface IPasswordEntry {
@@ -32,15 +32,8 @@ export interface IPasswordEntry {
   };
 }
 
-const {
-  enableHTTPS,
-  SSLPaths,
-  LDAP,
-  Port,
-  Host,
-  PassportSecret,
-  OriginWhitelist,
-} = Configuration.Express;
+const { enableHTTPS, SSLPaths, LDAP, Port, Host, PassportSecret, OriginWhitelist } =
+  Configuration.Express;
 const { UploadDirectory } = Configuration.Uploads;
 
 const Server = express();
@@ -59,7 +52,7 @@ const createServer = () => {
 };
 
 const Listener = createServer();
-const WebSocket = SocketIo(Listener);
+const WebSocket = new SocketIo.Server(Listener);
 
 const startListening = () => {
   Listener.listen(Port, Host);
@@ -158,19 +151,18 @@ const registerUser = async (req: Request, res: Response) => {
 
 const updateUserPassword = async (username: string, password: string): Promise<boolean> => {
   const passwords = Mongo.getAccountsRepository().collection<IPasswordEntry>('passwords');
-  const result = await passwords.updateOne(
+  const result = await updateOne(
+    passwords,
     { username },
     { $set: { username, password: saltHashPassword(password) } },
     { upsert: true },
   );
-  const success = result.result.ok === 1;
-  return success;
+  return !!result;
 };
 
 // ExpressJS Middleware
 // Enable CORS
 Server.use(
-  '*',
   cors({
     origin: (origin, callback) => {
       if (origin && OriginWhitelist.length > 0 && OriginWhitelist.indexOf(origin) === -1) {
@@ -275,8 +267,8 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (req, callback) => {
 passport.use(new LdapStrategy(getLDAPConfig, verifyLdapStrategy));
 passport.use(new LocalStrategy.Strategy(verifyLocalStrategy));
 
-passport.serializeUser((user: IUserData, done) => done(undefined, user.username));
-passport.deserializeUser((username, done) => done(undefined, username));
+passport.serializeUser((user, done) => done(undefined, (user as IUserData).username));
+passport.deserializeUser((username, done) => done(undefined, username as string));
 
 Server.use(passport.initialize());
 
