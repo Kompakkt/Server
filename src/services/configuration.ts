@@ -12,10 +12,12 @@ interface IConfiguration {
     AccountsDB: string;
     Port: number;
     Hostname: string;
+    ClientURL?: string;
   };
   Redis: {
     Hostname: string;
     Port: number;
+    DBOffset: number;
   };
   Uploads: {
     TempDirectory: string;
@@ -38,6 +40,12 @@ interface IConfiguration {
       DNauthUID: boolean;
       Host: string;
       searchBase: string;
+      Keys?: {
+        username: string;
+        prename: string;
+        surname: string;
+        mail: string;
+      };
     };
   };
   Services?: {
@@ -68,6 +76,7 @@ const LoadConfig = () => {
     Redis: {
       Hostname: 'localhost',
       Port: 6379,
+      DBOffset: 1,
     },
     Uploads: {
       TempDirectory: 'temp',
@@ -77,12 +86,7 @@ const LoadConfig = () => {
       Host: '127.0.0.1',
       PublicIP: 'localhost',
       Port: 8080,
-      OriginWhitelist: [
-        'http://localhost:4200',
-        'http://localhost:8080',
-        'http://localhost:8080/upload',
-        'http://localhost:8080/uploadfinished',
-      ],
+      OriginWhitelist: [],
       enableHTTPS: false,
       SSLPaths: {
         PrivateKey: '',

@@ -59,7 +59,7 @@ const Utility: IUtility = {
     const entityId = req.params.identifier;
     if (!ObjectId.isValid(entityId)) return res.status(404).send('Invalid entity _id ');
 
-    const user = await getCurrentUserBySession(req.sessionID);
+    const user = await getCurrentUserBySession(req);
 
     const isUserOwnerOfCompilation = (comp: ICompilation) =>
       JSON.stringify(user?.data?.compilation)?.includes(comp._id.toString());
@@ -196,7 +196,7 @@ const Utility: IUtility = {
     return res.status(200);
   },
   findUserInGroups: async (req, res) => {
-    const user = await getCurrentUserBySession(req.sessionID);
+    const user = await getCurrentUserBySession(req);
     if (!user) return res.status(404).send('Failed getting user by SessionId');
     const groups = await collectionAsArray<IGroup>('group');
 
@@ -211,7 +211,7 @@ const Utility: IUtility = {
       );
   },
   findUserInCompilations: async (req, res) => {
-    const user = await getCurrentUserBySession(req.sessionID);
+    const user = await getCurrentUserBySession(req);
     if (!user) return res.status(404).send('Failed getting user by SessionId');
     const compilations = await Promise.all(
       (await collectionAsArray<ICompilation>('compilation'))
@@ -242,7 +242,7 @@ const Utility: IUtility = {
     return res.status(200).send(resolvedCompilations);
   },
   findUserInMetadata: async (req, res) => {
-    const user = await getCurrentUserBySession(req.sessionID);
+    const user = await getCurrentUserBySession(req);
     if (!user) return res.status(404).send('Failed getting user by SessionId');
     const entities = await collectionAsArray<IEntity>('entity');
 

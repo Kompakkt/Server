@@ -90,7 +90,7 @@ export const saveAnnotation = async (
   if (!source) throw new Error('Missing source');
   if (!annotation.body?.content?.relatedPerspective)
     throw new Error('Missing body.content.relatedPerspective');
-  annotation.body.content.relatedPerspective.preview = await Mongo.saveBase64toImage(
+  annotation.body.content.relatedPerspective.preview = await Mongo.updatePreviewImage(
     annotation.body.content.relatedPerspective.preview,
     'annotation',
     annotation._id,
@@ -158,7 +158,7 @@ export const saveEntity = async (entity: IEntity, userData: IUserData) => {
    * This removes the host address from the URL
    * so images will load correctly */
   if (entity.settings?.preview) {
-    entity.settings.preview = await Mongo.saveBase64toImage(
+    entity.settings.preview = await Mongo.updatePreviewImage(
       entity.settings.preview,
       'entity',
       entity._id,

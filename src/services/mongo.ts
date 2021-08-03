@@ -1,7 +1,6 @@
 /* tslint:disable:max-line-length */
 import { NextFunction, Request, Response } from 'express';
-import { writeFileSync } from 'fs';
-import { ensureDirSync } from 'fs-extra';
+import { ensureDir, writeFile } from 'fs-extra';
 import * as imagemin from 'imagemin';
 import * as pngquant from 'imagemin-pngquant';
 import {
@@ -31,7 +30,7 @@ import {
 } from '../common/interfaces';
 
 import { Configuration } from './configuration';
-import { Cache } from './cache';
+import { RepoCache, UserCache } from './cache';
 import { Logger } from './logger';
 import {
   resolveCompilation,
@@ -49,6 +48,10 @@ import {
   saveInstitution,
 } from './saving-strategies';
 /* tslint:enable:max-line-length */
+
+const isUser = (obj: any): obj is IUserData => {
+  return obj && !!obj?.username && !!obj?.mail;
+};
 
 interface IExploreRequest {
   searchEntity: boolean;
@@ -73,7 +76,8 @@ const updateOne = async (
   update: UpdateQuery<any>,
   options?: UpdateOneOptions,
 ) => {
-  await Cache.flush();
+  // TODO: Only invalidate keys that need invalidation
+  await Promise.all([RepoCache.flush(), UserCache.flush()]);
   // Mongo does not allow mutation of the _id property.
   // Deletes _id from all $set queries
   if (update.$set) {
@@ -87,77 +91,84 @@ const updateOne = async (
 const areObjectIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) =>
   new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
 
-const saveBase64toImage = async (
-  base64input: string,
+// TODO: (Optional) Convert to progressive JPEG?
+const updatePreviewImage = async (
+  base64OrUrl: string,
   subfolder: string,
   identifier: string | ObjectId,
 ) => {
-  const saveId = identifier.toString();
-  let finalImagePath = '';
-  // TODO: Solve without try-catch block
-  // TODO: Convert to progressive JPEG?
-  try {
-    if (base64input.indexOf('data:image') !== -1) {
-      const replaced = base64input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
-      const tempBuff = Buffer.from(replaced, 'base64');
-      await imagemin
-        .buffer(tempBuff, {
-          plugins: [
-            pngquant.default({
-              speed: 1,
-              strip: true,
-              dithering: 1,
-            }),
-          ],
-        })
-        .then(res => {
-          ensureDirSync(`${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`);
-          writeFileSync(
-            `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/${saveId}.png`,
-            res,
-          );
+  const convertBase64ToBuffer = (input: string) => {
+    const replaced = input.replace(/^data:image\/(png|gif|jpeg);base64,/, '');
+    return Buffer.from(replaced, 'base64');
+  };
 
-          finalImagePath = `previews/${subfolder}/${saveId}.png`;
-        })
-        .catch(e => Logger.err(e));
-    } else {
-      finalImagePath = `previews/${base64input.split('previews/')[1]}`;
-    }
-  } catch (e) {
-    Logger.err(e);
-    return finalImagePath;
-  }
+  const minifyBuffer = (buffer: Buffer) =>
+    imagemin.buffer(buffer, {
+      plugins: [
+        pngquant.default({
+          speed: 1,
+          strip: true,
+          dithering: 1,
+        }),
+      ],
+    });
+
+  const writeBufferToFile = async (buffer: Buffer) => {
+    const subfolderPath = `${RootDirectory}/${UploadConf.UploadDirectory}/previews/${subfolder}/`;
+    const filePath = `${subfolderPath}${identifier}.png`;
+    return ensureDir(subfolderPath)
+      .then(() => writeFile(filePath, buffer))
+      .then(() => `previews/${subfolder}/${identifier}.png`);
+  };
+
+  const getPreviewImagePath = async (input: string) => {
+    // If the image is not a base64 image we assume it has already been converted and saved to disk
+    if (!input.includes('data:image')) return `previews/${input.split('previews/')[1]}`;
+
+    // Otherwise we save it to a new file
+    const converted = convertBase64ToBuffer(input);
+    const minified = await minifyBuffer(converted);
+
+    return await writeBufferToFile(minified);
+  };
+
+  const finalImagePath = await getPreviewImagePath(base64OrUrl).catch(() => 'previews/noimage.png');
+
   const https = Configuration.Express.enableHTTPS ? 'https' : 'http';
   const pubip = Configuration.Express.PublicIP;
   const port = Configuration.Express.Port;
+
   return `${https}://${pubip}:${port}/${finalImagePath}`;
 };
 
-const MongoURL = `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
+const MongoURL = MongoConf.ClientURL ?? `mongodb://${MongoConf.Hostname}:${MongoConf.Port}/`;
 const Client = new MongoClient(MongoURL, {
   useNewUrlParser: true,
-  // DEPRECATED:
-  // reconnectTries: Number.POSITIVE_INFINITY,
-  // reconnectInterval: 1000,
   useUnifiedTopology: true,
 });
+
+// MongoDB Helper methods
 const getAccountsRepository = (): Db => Client.db(MongoConf.AccountsDB);
 const getEntitiesRepository = (): Db => Client.db(MongoConf.RepositoryDB);
 const users = (): Collection<IUserData> => getAccountsRepository().collection('users');
-const getCurrentUserBySession = async (sessionID: string | undefined) => {
-  if (!sessionID) return null;
-  return users().findOne({ sessionID });
+const getCollection = <T extends unknown>(collectionName: string) =>
+  getEntitiesRepository().collection<T>(collectionName);
+const getCurrentUserBySession = async (req: Request) => {
+  const username = req.session?.passport?.user;
+  const sessionID = req.sessionID;
+  if (!sessionID || !username) return null;
+  return users().findOne({ sessionID, username });
 };
 const getUserByUsername = async (username: string) => users().findOne({ username });
-const getAllItemsOfCollection = async (collection: string) =>
-  getEntitiesRepository().collection(collection).find({}).toArray();
+const getAllItemsOfCollection = async <T extends unknown>(collectionName: string) =>
+  getCollection<T>(collectionName).find({}).toArray();
 
 interface IMongo {
   init(): Promise<MongoClient>;
   isMongoDBConnected(_: Request, res: Response, next: NextFunction): void;
   getAccountsRepository(): Db;
   getEntitiesRepository(): Db;
-  saveBase64toImage(
+  updatePreviewImage(
     base64input: string,
     subfolder: string,
     identifier: string | ObjectId,
@@ -199,8 +210,7 @@ const Mongo: IMongo = {
       Client.connect(error => {
         if (!error) {
           resolve(Client);
-          Logger.info('Connected to MongoDB. Cleaning SessionIDs');
-          users().updateMany({}, { $set: { sessionID: '' } });
+          Logger.info('Connected to MongoDB');
         } else {
           reject();
           Logger.err(`Couldn't connect to MongoDB.
@@ -219,7 +229,7 @@ const Mongo: IMongo = {
   },
   getAccountsRepository,
   getEntitiesRepository,
-  saveBase64toImage,
+  updatePreviewImage,
   /**
    * Fix cases where an ObjectId is sent but it is not detected as one
    * used as Middleware
@@ -250,7 +260,8 @@ const Mongo: IMongo = {
 
     const sessionID = req.sessionID;
 
-    const updateResult = await users().updateOne(
+    const updateResult = await updateOne(
+      users(),
       { username },
       {
         $set: {
@@ -283,8 +294,7 @@ const Mongo: IMongo = {
     };
     delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
-    return users()
-      .updateOne({ username }, { $set: updatedUser }, { upsert: true })
+    return updateOne(users(), { username }, { $set: updatedUser }, { upsert: true })
       .then(async () => {
         Logger.log(`User ${updatedUser.username} logged in`);
         res.status(200).send(await Mongo.resolveUserData(updatedUser));
@@ -295,21 +305,24 @@ const Mongo: IMongo = {
       });
   },
   insertCurrentUserData: async (req, identifier: string | ObjectId, collection: string) => {
-    const sessionID = req.sessionID;
-    const userData = await getCurrentUserBySession(sessionID);
+    const user = isUser(req)
+      ? await getUserByUsername(req.username)
+      : await getCurrentUserBySession(req as Request);
 
-    if (!ObjectId.isValid(identifier) || !userData) return false;
+    if (!ObjectId.isValid(identifier) || !user) return false;
 
-    userData.data[collection] = userData.data[collection] ? userData.data[collection] : [];
+    user.data[collection] = user.data[collection] ? user.data[collection] : [];
 
-    const doesExist = userData.data[collection]
+    const doesExist = user.data[collection]
       .filter(obj => obj)
       .find((obj: any) => obj.toString() === identifier.toString());
 
     if (doesExist) return true;
 
-    userData.data[collection].push(new ObjectId(identifier));
-    const updateResult = await users().updateOne({ sessionID }, { $set: { data: userData.data } });
+    user.data[collection].push(new ObjectId(identifier));
+    const updateResult = await updateOne(users(), Mongo.query(user._id), {
+      $set: { data: user.data },
+    });
 
     if (updateResult.result.ok !== 1) return false;
     return true;
@@ -317,8 +330,8 @@ const Mongo: IMongo = {
   resolveUserData: async _userData => {
     const userData = { ..._userData } as IUserData;
 
-    const hash = Cache.hash(userData.username);
-    const temp = await Cache.get<IUserData>(hash);
+    const hash = UserCache.hash(userData.username);
+    const temp = await UserCache.get<IUserData>(hash);
 
     if (temp) {
       return temp;
@@ -336,31 +349,19 @@ const Mongo: IMongo = {
       }
     }
 
-    Cache.set(hash, userData);
+    UserCache.set(hash, userData);
 
     return userData;
   },
   getCurrentUserData: async (req, res) => {
-    const sessionID = req.sessionID;
-    const userData = await getCurrentUserBySession(sessionID);
-    if (!userData) return res.status(404).send('User not found by sessionID. Try relogging');
-
-    return res.status(200).send(await Mongo.resolveUserData(userData));
+    const user = await getCurrentUserBySession(req);
+    return user
+      ? res.status(200).send(await Mongo.resolveUserData(user))
+      : res.status(404).send('User not found by sessionID. Try relogging');
   },
-  validateLoginSession: async (req, res, next) => {
-    let cookieSID: string | undefined;
-    if (req.cookies['connect.sid']) {
-      cookieSID = req.cookies['connect.sid'] as string;
-      const startIndex = cookieSID.indexOf(':') + 1;
-      const endIndex = cookieSID.indexOf('.');
-      cookieSID = cookieSID.substring(startIndex, endIndex);
-    }
-    const sessionID = (req.sessionID = cookieSID ? cookieSID : req.sessionID);
-
-    const userData = await getCurrentUserBySession(sessionID);
-    if (!userData) return res.status(404).send('User not found by session');
-
-    return next();
+  validateLoginSession: async (req, _, next) => {
+    const user = await getCurrentUserBySession(req);
+    return next(user ? null : 'User not found by session');
   },
   /**
    * DEPRECATED: Redirects to correct function though!
@@ -373,7 +374,7 @@ const Mongo: IMongo = {
     await Mongo.addEntityToCollection(req, res);
   },
   isAllowedToEdit: async (req, res, next) => {
-    const userData = await getCurrentUserBySession(req.sessionID);
+    const userData = await getCurrentUserBySession(req);
     if (!userData) return res.status(404).send('User not found by session');
 
     const collectionName = req.params.collection.toLowerCase();
@@ -405,7 +406,7 @@ const Mongo: IMongo = {
     return next();
   },
   addEntityToCollection: async (req, res) => {
-    Cache.flush();
+    RepoCache.flush();
 
     const { userData, doesEntityExist, isValidObjectId, collectionName } = (req as any).data as {
       userData: IUserData;
@@ -414,7 +415,7 @@ const Mongo: IMongo = {
       collectionName: string;
     };
 
-    const collection: Collection = getEntitiesRepository().collection(collectionName);
+    const collection = getCollection(collectionName);
     let entity = req.body;
     const _id = isValidObjectId ? new ObjectId(entity._id) : new ObjectId();
     entity._id = _id;
@@ -470,11 +471,10 @@ const Mongo: IMongo = {
     const identifier = ObjectId.isValid(req.params.identifier)
       ? new ObjectId(req.params.identifier)
       : req.params.identifier;
-    const collection: Collection = getEntitiesRepository().collection('entity');
-    const subfolder = 'entity';
+    const collection = getCollection<IEntity>('entity');
 
-    const finalImagePath = await saveBase64toImage(preview, subfolder, identifier);
-    if (finalImagePath === '') return res.status(500).send('Failed saving preview image');
+    // Save preview to file, if not yet done
+    const finalImagePath = await updatePreviewImage(preview, 'entity', identifier);
 
     // Overwrite old settings
     const settings = { ...req.body, preview: finalImagePath };
@@ -486,18 +486,18 @@ const Mongo: IMongo = {
   },
   isUserOwnerOfEntity: async (req, identifier: string | ObjectId) => {
     const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier) : identifier;
-    const userData = await getCurrentUserBySession(req.sessionID);
-    if (!userData) {
-      return false;
-    }
-    const resolvedUser = (await Mongo.resolveUserData(userData)) ?? {};
+    const user = isUser(req)
+      ? await getUserByUsername(req.username)
+      : await getCurrentUserBySession(req);
+    if (!user) return false;
+    const resolvedUser = (await Mongo.resolveUserData(user)) ?? {};
     return JSON.stringify(resolvedUser).indexOf(_id.toString()) !== -1;
   },
   isUserAdmin: async req => {
-    const userData = await getCurrentUserBySession(req.sessionID);
+    const userData = await getCurrentUserBySession(req);
     return userData ? userData.role === EUserRank.admin : false;
   },
-  query: (_id: string | ObjectId) => {
+  query: (_id: string | ObjectId): FilterQuery<any> => {
     return {
       $or: [{ _id }, { _id: new ObjectId(_id) }, { _id: _id.toString() }],
     };
@@ -507,16 +507,16 @@ const Mongo: IMongo = {
     const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
     if (!ObjectId.isValid(parsedId)) return undefined;
     const _id = new ObjectId(parsedId);
-    const resolve_collection = getEntitiesRepository().collection<T>(collection_name);
+    const resolve_collection = getCollection<T>(collection_name);
 
-    const temp = await Cache.get<T>(parsedId);
+    const temp = await RepoCache.get<T>(parsedId);
     if (temp) {
       // Make sure returned object is valid and not {}
       if ((temp as any)._id) {
         return temp as T;
       }
       // Flush invalid object from cache
-      Cache.del(parsedId).then(numDelKeys => {
+      RepoCache.del(parsedId).then(numDelKeys => {
         if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
       });
     }
@@ -538,7 +538,7 @@ const Mongo: IMongo = {
         return resolve_result;
       })
       .then(async result => {
-        if (result) await Cache.set(parsedId, result);
+        if (result) await RepoCache.set(parsedId, result);
         return result as T | null;
       })
       .catch(err => {
@@ -588,25 +588,24 @@ const Mongo: IMongo = {
   removeEntityFromCollection: async (req, res) => {
     const RequestCollection = req.params.collection.toLowerCase();
 
-    const collection = getEntitiesRepository().collection(RequestCollection);
+    const collection = getCollection(RequestCollection);
     const sessionID = req.sessionID;
 
     const identifier = ObjectId.isValid(req.params.identifier)
       ? new ObjectId(req.params.identifier)
       : req.params.identifier;
 
-    const find_result = await getCurrentUserBySession(sessionID);
+    const user = await getCurrentUserBySession(req);
+    if (!user) return res.status(404).send('User not found');
 
-    if (!find_result) return res.status(404).send('User not found');
-
-    if (req.body?.username !== find_result?.username) {
+    if (req.body?.username !== user?.username) {
       Logger.err('Entity removal failed due to username & session not matching');
       return res.status(403).send('Input username does not match username with current sessionID');
     }
 
     // Flatten account.data so its an array of ObjectId.toString()
     const UserRelatedEntities = Array.prototype
-      .concat(...Object.values(find_result.data))
+      .concat(...Object.values(user.data))
       .map(id => id.toString());
 
     if (!UserRelatedEntities.find(obj => obj === identifier.toString())) {
@@ -616,14 +615,11 @@ const Mongo: IMongo = {
     }
     const delete_result = await collection.deleteOne({ _id: identifier });
     if (delete_result.result.ok === 1) {
-      find_result.data[RequestCollection] = find_result.data[RequestCollection].filter(
+      user.data[RequestCollection] = user.data[RequestCollection].filter(
         id => id !== identifier.toString(),
       );
 
-      const update_result = await users().updateOne(
-        { sessionID },
-        { $set: { data: find_result.data } },
-      );
+      const update_result = await updateOne(users(), { sessionID }, { $set: { data: user.data } });
 
       if (update_result.result.ok === 1) {
         const message = `Deleted ${RequestCollection} ${req.params.identifier}`;
@@ -640,7 +636,7 @@ const Mongo: IMongo = {
       Logger.warn(delete_result);
       res.status(500).send(message);
     }
-    return Cache.flush();
+    return RepoCache.flush();
   },
   searchByEntityFilter: async (req, res) => {
     const RequestCollection = req.params.collection.toLowerCase();
@@ -755,18 +751,17 @@ const Mongo: IMongo = {
     const { types, offset, searchEntity, filters, searchText } = req.body as IExploreRequest;
     const items = new Array<IEntity | ICompilation>();
     const limit = 30;
-    const userData = await getCurrentUserBySession(req.sessionID);
+    const userData = await getCurrentUserBySession(req);
     const userOwned = userData ? JSON.stringify(userData.data) : '';
 
     // Check if req is cached
-    const reqHash = Cache.hash(req.body);
-    const temp = await Cache.get<IEntity[] | ICompilation[]>(reqHash);
+    const reqHash = RepoCache.hash(req.body);
+    const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
     if (temp) {
       items.push(...temp);
     } else if (searchEntity) {
-      const cursor = await Mongo.getEntitiesRepository()
-        .collection<IEntity>('entity')
+      const cursor = getCollection<IEntity>('entity')
         .find({
           finished: true,
           online: true,
@@ -838,8 +833,7 @@ const Mongo: IMongo = {
 
       items.push(...entities);
     } else {
-      const cursor = await Mongo.getEntitiesRepository()
-        .collection<ICompilation>('compilation')
+      const cursor = getCollection<ICompilation>('compilation')
         .find({})
         .sort({
           name: 1,
@@ -919,7 +913,7 @@ const Mongo: IMongo = {
     res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
     // Cache full req
-    Cache.set(reqHash, items);
+    RepoCache.set(reqHash, items);
   },
   test: async (req, res) => {
     //console.log(req.ip, req.ips);
