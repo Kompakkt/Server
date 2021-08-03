@@ -154,13 +154,10 @@ const users = (): Collection<IUserData> => getAccountsRepository().collection('u
 const getCollection = <T extends unknown>(collectionName: string) =>
   getEntitiesRepository().collection<T>(collectionName);
 const getCurrentUserBySession = async (req: Request) => {
-  const _id = req.session?.passport?.user;
+  const username = req.session?.passport?.user;
   const sessionID = req.sessionID;
-  if (!sessionID || !_id) return null;
-  return users().findOne({
-    sessionID,
-    $or: [{ _id }, { _id: new ObjectId(_id) }, { _id: _id.toString() }],
-  });
+  if (!sessionID || !username) return null;
+  return users().findOne({ sessionID, username });
 };
 const getUserByUsername = async (username: string) => users().findOne({ username });
 const getAllItemsOfCollection = async <T extends unknown>(collectionName: string) =>

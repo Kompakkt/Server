@@ -48,6 +48,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const Mailer: IMailer = {
+  // TODO: As Typeguard
   isConfigValid: () => {
     return (
       Configuration.Mailer &&

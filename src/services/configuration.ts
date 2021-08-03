@@ -40,6 +40,12 @@ interface IConfiguration {
       DNauthUID: boolean;
       Host: string;
       searchBase: string;
+      Keys?: {
+        username: string;
+        prename: string;
+        surname: string;
+        mail: string;
+      };
     };
   };
   Services?: {
