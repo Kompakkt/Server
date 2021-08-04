@@ -188,7 +188,7 @@ export const saveAddress = async (address: IAddress, userData?: IUserData) => {
 
   if (!result) throw new Error('Failed saving address');
 
-  const _id = result.upsertedId?._id ?? address._id;
+  const _id = result.upsertedId ?? address._id;
   if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
   return { ...address, _id };
 };
@@ -227,7 +227,7 @@ export const saveInstitution = async (
 
   if (!result) throw new Error('Failed saving institution');
 
-  const _id = result.upsertedId?._id ?? institution._id;
+  const _id = result.upsertedId ?? institution._id;
   if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
   return { ...institution, _id };
 };
@@ -245,7 +245,7 @@ export const saveContact = async (contact: IContact, userData?: IUserData) => {
 
   if (!result) throw new Error('Failed saving contact');
 
-  const _id = result.upsertedId?._id ?? contact._id;
+  const _id = result.upsertedId ?? contact._id;
   if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
   return { ...contact, _id };
 };
@@ -291,7 +291,7 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
 
   if (!result) throw new Error('Failed saving person');
 
-  const _id = result.upsertedId?._id ?? person._id;
+  const _id = result.upsertedId ?? person._id;
   if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
   return { ...person, _id };
 };
@@ -334,7 +334,7 @@ export const saveMetaDataEntity = async (
       ).then(res => {
         if (!res) return undefined;
 
-        const _id = res.upsertedId?._id ?? tag._id;
+        const _id = res.upsertedId ?? tag._id;
         Mongo.insertCurrentUserData(userData, _id, 'tag');
         return _id;
       })) as any;
@@ -373,7 +373,7 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
     ).then(res => {
       if (!res) throw new Error('Failed saving physicalentity');
 
-      const _id = res.upsertedId?._id ?? savedEntity._id;
+      const _id = res.upsertedId ?? savedEntity._id;
       Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
       return _id;
     })) as any;

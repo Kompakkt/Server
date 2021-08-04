@@ -480,7 +480,7 @@ const Mongo: IMongo = {
       return res.status(500).send(`Failed updating ${collectionName} ${_id}`);
     }
 
-    const resultId = updateResult.upsertedId ? updateResult.upsertedId._id : _id;
+    const resultId = updateResult.upsertedId ?? _id;
     Logger.info(`Success! Updated ${collectionName} ${_id}`);
     return res.status(200).send(await Mongo.resolve<any>(resultId, collectionName));
   },
