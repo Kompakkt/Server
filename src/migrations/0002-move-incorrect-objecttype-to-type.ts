@@ -29,7 +29,7 @@ import { IEntity, IDigitalEntity } from '../common/interfaces';
     console.log(`Migrating digital Entity ${title}`);
 
     const result = await updateOne(
-      Mongo.getEntitiesRepository().collection<IDigitalEntity>('digitalentity'),
+      Mongo.getEntitiesDb().collection<IDigitalEntity>('digitalentity'),
       Mongo.query(digitalEntity._id),
       {
         $set: {

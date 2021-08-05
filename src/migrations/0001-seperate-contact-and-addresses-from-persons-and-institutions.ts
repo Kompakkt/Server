@@ -56,7 +56,7 @@ import {
     }
 
     const result = await updateOne(
-      Mongo.getEntitiesRepository().collection<IInstitution>('institution'),
+      Mongo.getEntitiesDb().collection<IInstitution>('institution'),
       Mongo.query(institution._id),
       { $set: institution },
     );
@@ -111,7 +111,7 @@ import {
     }
 
     const result = await updateOne(
-      Mongo.getEntitiesRepository().collection<IPerson>('person'),
+      Mongo.getEntitiesDb().collection<IPerson>('person'),
       Mongo.query(person._id),
       { $set: person },
     ).catch(console.log);

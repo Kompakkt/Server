@@ -5,16 +5,19 @@ import klawSync from 'klaw-sync';
 
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import {
-  Mongo,
-  deleteOne,
-  users,
-  updateOne,
-  getAllItemsOfCollection,
-  getCollection,
-} from './mongo';
 import { RootDirectory } from '../environment';
-import { IEntity } from '../common/interfaces';
+import {
+  IEntity,
+  IPerson,
+  IInstitution,
+  IDigitalEntity,
+  IPhysicalEntity,
+  IUserData,
+} from '../common/interfaces';
+
+import Entities from './db/entities';
+import Users from './db/users';
+import { query } from './db/functions';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -35,12 +38,10 @@ interface ICleaning {
 
 const Cleaning: ICleaning = {
   deleteUnusedPersonsAndInstitutions: async (req, res) => {
-    const personCollection = getCollection('person');
-    const instCollection = getCollection('institution');
-    const allPersons = await getAllItemsOfCollection('person');
-    const allInstitutions = await getAllItemsOfCollection('institution');
-    const allDigObjs = await getAllItemsOfCollection('digitalentity');
-    const allPhyObjs = await getAllItemsOfCollection('physicalentity');
+    const allPersons = await Entities.findAll<IPerson>('person');
+    const allInstitutions = await Entities.findAll<IInstitution>('institution');
+    const allDigObjs = await Entities.findAll<IDigitalEntity>('digitalentity');
+    const allPhyObjs = await Entities.findAll<IPhysicalEntity>('physicalentity');
 
     const confirm = req.params.confirm || false;
 
@@ -50,22 +51,22 @@ const Cleaning: ICleaning = {
 
     const fullJSON = `${JSON.stringify(allDigObjs)}${JSON.stringify(allPhyObjs)}`;
     for (const person of allPersons) {
-      const _id = person._id;
+      const _id = person._id.toString();
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await deleteOne(personCollection, Mongo.query(person._id));
+      const deleteResult = await Entities.deleteOne('person', query(person._id));
       if (deleteResult) {
         Logger.info(`Deleted unused person ${person}`);
         total.push({ person, result: deleteResult });
       }
     }
     for (const institution of allInstitutions) {
-      const _id = institution._id;
+      const _id = institution._id.toString();
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await deleteOne(instCollection, Mongo.query(institution._id));
+      const deleteResult = await Entities.deleteOne('institution', query(institution._id));
       if (deleteResult) {
         Logger.info(`Deleted unused institution ${institution}`);
         total.push({ institution, result: deleteResult });
@@ -80,7 +81,7 @@ const Cleaning: ICleaning = {
     });
   },
   deleteNullRefs: async (req, res) => {
-    const allUsers = await users().find({}).toArray();
+    const allUsers = await Users.findAll<IUserData>('users');
 
     const confirm = req.params.confirm || false;
 
@@ -89,7 +90,7 @@ const Cleaning: ICleaning = {
     const checkReferences = async (array: any[], field: string) => {
       const deletedReferences: any[] = [];
       for (const _id of array) {
-        const result = await Mongo.resolve<any>(_id, field);
+        const result = await Entities.resolve<any>(_id, field);
         if (result !== null && Object.keys(result).length > 0) continue;
         deletedReferences.push({ field, _id });
       }
@@ -102,7 +103,7 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await updateOne(users(), Mongo.query(user._id), {
+      const updateResult = await Users.updateOne('users', query(user._id), {
         $set: { data: user.data },
       });
       if (!updateResult) {
@@ -131,7 +132,7 @@ const Cleaning: ICleaning = {
     res.status(200).send({ confirm, total });
   },
   cleanUploadedFiles: async (req, res) => {
-    const entities = await getAllItemsOfCollection<IEntity>('entity');
+    const entities = await Entities.findAll<IEntity>('entity');
     // Get all file paths from entities and flatten the array
     const files = ([] as string[]).concat(
       ...entities.map(entity => entity.files.map(file => file.file_link)),

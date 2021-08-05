@@ -29,12 +29,16 @@ class CacheClient {
     return this.redis.del(key);
   }
 
+  public async has(key: string) {
+    return this.redis.get(key).then(value => !!value);
+  }
+
   public async get<T extends unknown>(key: string) {
     return this.redis.get(key).then(value => (value ? (JSON.parse(value) as T) : undefined));
   }
 
-  public async set(key: string, value: any) {
-    return this.redis.set(key, JSON.stringify(value), 'EX', 3600);
+  public async set(key: string, value: any, seconds = 60) {
+    return this.redis.set(key, JSON.stringify(value), 'EX', seconds);
   }
 }
 
@@ -47,4 +51,4 @@ const SessionCache = new CacheClient(offset + 3);
 // Cache information about who uploaded files
 const UploadCache = new CacheClient(offset + 4);
 
-export { RepoCache, UserCache, SessionCache, UploadCache };
+export { RepoCache, UserCache, SessionCache, UploadCache, CacheClient };
