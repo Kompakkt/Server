@@ -1,21 +1,6 @@
-import {
-  ICompilation,
-  IAddress,
-  IEntity,
-  IContact,
-  IDigitalEntity,
-  IPerson,
-  IInstitution,
-  IPhysicalEntity,
-  ITag,
-  IAnnotation,
-  isDigitalEntity,
-  isPerson,
-  isInstitution,
-  isUnresolved,
-} from '../common/interfaces';
-
-import { Mongo } from './mongo';
+// prettier-ignore
+import { ICompilation, IAddress, IEntity, IContact, IDigitalEntity, IPerson, IInstitution, IPhysicalEntity, ITag, IAnnotation, isDigitalEntity, isPerson, isInstitution, isUnresolved } from '../../common/interfaces';
+import Entities from './entities';
 
 const removeUnrelatedEntities = <T extends unknown>(
   obj: IPerson | IInstitution,
@@ -44,14 +29,14 @@ const removeUnrelatedEntities = <T extends unknown>(
 
 const exists = (obj: any) => !!obj;
 
-export const resolveInstitution = async (institution: IInstitution, entityId?: string) => {
+const resolveInstitution = async (institution: IInstitution, entityId?: string) => {
   if (entityId) institution = removeUnrelatedEntities<IInstitution>(institution, entityId);
 
   for (const [id, address] of Object.entries(institution.addresses)) {
     // Next line is due to migration 0001
     // Can be removed once all institutions are migrated using 0001
     if (!isUnresolved(address)) continue;
-    const resolved = await Mongo.resolve<IAddress>(address, 'address');
+    const resolved = await Entities.resolve<IAddress>(address, 'address');
     if (resolved) institution.addresses[id] = resolved;
     else delete institution.addresses[id];
   }
@@ -59,14 +44,14 @@ export const resolveInstitution = async (institution: IInstitution, entityId?: s
   return institution;
 };
 
-export const resolvePerson = async (person: IPerson, entityId?: string) => {
+const resolvePerson = async (person: IPerson, entityId?: string) => {
   if (entityId) person = removeUnrelatedEntities<IPerson>(person, entityId);
 
   for (const [id, contact] of Object.entries(person.contact_references)) {
     // Next line is due to migration 0001
     // Can be removed once all persons are migrated using 0001
     if (!isUnresolved(contact)) continue;
-    const resolved = await Mongo.resolve<IContact>(contact, 'contact');
+    const resolved = await Entities.resolve<IContact>(contact, 'contact');
     if (resolved) person.contact_references[id] = resolved;
     else delete person.contact_references[id];
   }
@@ -74,7 +59,7 @@ export const resolvePerson = async (person: IPerson, entityId?: string) => {
   for (const [id, institutions] of Object.entries(person.institutions)) {
     const resolvedInstitutions = await Promise.all(
       (institutions ?? []).map(async i =>
-        Mongo.resolve<IInstitution>(i, 'institution').then(resolved => {
+        Entities.resolve<IInstitution>(i, 'institution').then(resolved => {
           if (!resolved) return undefined;
           return resolveInstitution(resolved, entityId);
         }),
@@ -93,7 +78,7 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
 
   if (entity.persons) {
     for (let i = 0; i < entity.persons.length; i++) {
-      const shallow = await Mongo.resolve<IPerson>(entity.persons[i], 'person');
+      const shallow = await Entities.resolve<IPerson>(entity.persons[i], 'person');
       if (!shallow) continue;
       const deep = await resolvePerson(shallow, _id);
       if (!deep) continue;
@@ -110,7 +95,7 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
 
   if (entity.institutions) {
     for (let i = 0; i < entity.institutions.length; i++) {
-      const shallow = await Mongo.resolve<IInstitution>(entity.institutions[i], 'institution');
+      const shallow = await Entities.resolve<IInstitution>(entity.institutions[i], 'institution');
       if (!shallow) continue;
       const deep = await resolveInstitution(shallow, _id);
       if (!deep) continue;
@@ -121,16 +106,16 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
   return entity;
 };
 
-export const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
+const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
   const entity = (await resolveMetaDataEntity(digitalEntity)) as IDigitalEntity;
 
   entity.tags = (
-    await Promise.all((entity.tags ?? []).map(tag => Mongo.resolve<ITag>(tag, 'tag')))
+    await Promise.all((entity.tags ?? []).map(tag => Entities.resolve<ITag>(tag, 'tag')))
   ).filter(exists) as ITag[];
 
   if (entity.phyObjs) {
     for (let i = 0; i < entity.phyObjs.length; i++) {
-      const resolved = await Mongo.resolve<IPhysicalEntity>(entity.phyObjs[i], 'physicalentity');
+      const resolved = await Entities.resolve<IPhysicalEntity>(entity.phyObjs[i], 'physicalentity');
       if (!resolved) {
         continue;
       }
@@ -141,9 +126,9 @@ export const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
   return entity;
 };
 
-export const resolveEntity = async (entity: IEntity) => {
+const resolveEntity = async (entity: IEntity) => {
   for (const id in entity.annotations) {
-    const resolved = await Mongo.resolve<IAnnotation>(id, 'annotation');
+    const resolved = await Entities.resolve<IAnnotation>(id, 'annotation');
     if (!resolved) {
       delete entity.annotations[id];
       continue;
@@ -152,7 +137,7 @@ export const resolveEntity = async (entity: IEntity) => {
   }
 
   if (!isDigitalEntity(entity.relatedDigitalEntity)) {
-    const resolved = await Mongo.resolve<IDigitalEntity>(
+    const resolved = await Entities.resolve<IDigitalEntity>(
       entity.relatedDigitalEntity,
       'digitalentity',
     );
@@ -161,9 +146,9 @@ export const resolveEntity = async (entity: IEntity) => {
   return entity;
 };
 
-export const resolveCompilation = async (compilation: ICompilation) => {
+const resolveCompilation = async (compilation: ICompilation) => {
   for (const id in compilation.entities) {
-    const resolved = await Mongo.resolve<IEntity>(id, 'entity');
+    const resolved = await Entities.resolve<IEntity>(id, 'entity');
     if (!resolved) {
       delete compilation.entities[id];
       continue;
@@ -172,7 +157,7 @@ export const resolveCompilation = async (compilation: ICompilation) => {
   }
 
   for (const id in compilation.annotations) {
-    const resolved = await Mongo.resolve<IAnnotation>(id, 'annotation');
+    const resolved = await Entities.resolve<IAnnotation>(id, 'annotation');
     if (!resolved) {
       delete compilation.annotations[id];
       continue;
@@ -181,4 +166,12 @@ export const resolveCompilation = async (compilation: ICompilation) => {
   }
 
   return compilation;
+};
+
+export const Resolve = {
+  institution: resolveInstitution,
+  person: resolvePerson,
+  digitalentity: resolveDigitalEntity,
+  entity: resolveEntity,
+  compilation: resolveCompilation,
 };

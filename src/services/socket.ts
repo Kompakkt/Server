@@ -1,5 +1,4 @@
 import SocketIo from 'socket.io';
-
 import { WebSocket } from './express';
 import { Logger } from './logger';
 

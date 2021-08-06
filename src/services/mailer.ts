@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
-import { Db, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
-
-import { IUserData, EUserRank } from '../common/interfaces';
+import { EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-import { Mongo, updateOne, insertOne, users, getCurrentUserBySession } from './mongo';
+import { Users, Accounts, query } from './db';
 
 interface IMailer {
   isConfigValid(): any;
@@ -27,19 +26,6 @@ interface ISendMailRequest {
   subject?: string;
   mailbody?: string;
   target?: ETarget;
-}
-
-interface IMailEntry {
-  _id: string | ObjectId;
-  target: string;
-  content: {
-    mailbody: string;
-    subject: string;
-  };
-  timestamp: string;
-  user: IUserData;
-  answered: boolean;
-  mailSent: boolean;
 }
 
 const transporter = nodemailer.createTransport({
@@ -114,16 +100,14 @@ const Mailer: IMailer = {
   addUserToDatabase: async (req, mailSent) => {
     const target = req.body.target;
     if (!Configuration.Mailer.Target || !Object.keys(Configuration.Mailer.Target).includes(target))
-      return;
+      return false;
 
-    const AccDb: Db = Mongo.getAccountsRepository();
-    const user = await getCurrentUserBySession(req);
-    const collection = AccDb.collection(target);
+    const user = await Users.getBySession(req);
+    if (!user) return false;
 
     if (target === ETarget.upload && user?.role === EUserRank.user) {
-      await updateOne(
-        users(),
-        { sessionID: req.sessionID },
+      await Accounts.users.updateOne(
+        { username: user.username, sessionID: user.sessionID },
         { $set: { role: EUserRank.uploadrequested } },
       );
     }
@@ -139,37 +123,30 @@ const Mailer: IMailer = {
       mailSent,
     };
 
-    const insertResult = await insertOne(collection, document);
+    const insertResult = await Accounts.mails.insertOne(document);
     if (!insertResult) {
       Logger.info('Failed adding user to mail database');
+      return false;
     } else {
       Logger.info(`Added user to DB ${document}`);
+      return true;
     }
   },
   countUserMails: async (req, destination) => {
-    const AccDb: Db = Mongo.getAccountsRepository();
-    const user = await getCurrentUserBySession(req);
-
+    const user = await Users.getBySession(req);
     if (!user) throw new Error('User not found by session');
 
-    const collection = AccDb.collection<IMailEntry>(destination);
-    const entries = (await collection.find({}).toArray()).filter(
-      entry => !entry.answered && entry.user._id.toString() === user._id.toString(),
-    );
-    return entries.length;
+    const entries = await Accounts.mails.find({
+      answered: false,
+      user: query(user._id),
+      target: destination,
+    });
+    return entries?.length ?? -1;
   },
   getMailRelatedDatabaseEntries: async (_, res): Promise<any> => {
-    const AccDb: Db = Mongo.getAccountsRepository();
     if (!Configuration.Mailer.Target) return res.status(500).send('Mailing service not configured');
-
     const targets = Object.keys(Configuration.Mailer.Target);
-    const result: any = {};
-    for (const target of targets) {
-      const coll = AccDb.collection(target);
-      const all = await coll.find({}).toArray();
-      result[target] = all;
-    }
-    res.status(200).send(result);
+    res.status(200).send({ targets, entries: await Accounts.mails.findAll() });
   },
   toggleMailAnswered: async (req, res): Promise<any> => {
     const target = req.params.target;
@@ -180,19 +157,17 @@ const Mailer: IMailer = {
     if (!ObjectId.isValid(identifier)) return res.status(400).send('Invalid mail identifier');
 
     const _id = new ObjectId(identifier);
-    const AccDB: Db = Mongo.getAccountsRepository();
-    const targetColl = AccDB.collection(target);
-    const oldEntry = await targetColl.findOne(Mongo.query(_id));
-    if (!oldEntry || oldEntry.answered === undefined)
+    const oldEntry = await Accounts.mails.findOne(query(_id));
+    if (!oldEntry || !!oldEntry.answered)
       return res.status(409).send('Invalid mail entry in database');
 
     const isAnswered = oldEntry.answered;
-    const updateResult = await updateOne(targetColl, Mongo.query(_id), {
+    const updateResult = await Accounts.mails.updateOne(query(_id), {
       $set: { answered: !isAnswered },
     });
     if (!updateResult) return res.status(500).send('Failed updating entry');
 
-    res.status(200).send(await targetColl.findOne(Mongo.query(_id)));
+    res.status(200).send(await Accounts.mails.findOne(query(_id)));
   },
 };
 

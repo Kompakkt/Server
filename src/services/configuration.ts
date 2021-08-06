@@ -1,9 +1,7 @@
 import { isMaster } from 'cluster';
 import deepmerge from 'deepmerge';
 import { readJsonSync } from 'fs-extra';
-
 import { ConfigFile } from '../environment';
-
 import { Logger } from './logger';
 
 interface IConfiguration {

@@ -1,30 +1,15 @@
+// prettier-ignore
+import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, IStrippedUserData, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';
-
-import {
-  IAnnotation,
-  IAddress,
-  ICompilation,
-  IContact,
-  IEntity,
-  IGroup,
-  IUserData,
-  IDigitalEntity,
-  IPhysicalEntity,
-  IPerson,
-  IInstitution,
-  IStrippedUserData,
-  isEntity,
-  isAnnotation,
-  isDigitalEntity,
-  isUnresolved,
-} from '../common/interfaces';
-import { RootDirectory } from '../environment';
-
-import { Logger } from './logger';
-import { Mongo, updateOne } from './mongo';
-import { Configuration as Conf } from './configuration';
+import { RootDirectory } from '../../environment';
+import { Logger } from '../logger';
+import { Configuration as Conf } from '../configuration';
+import { query, updatePreviewImage } from './functions';
+import { Repo } from './controllers';
+import Entities from './entities';
+import Users from './users';
 
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 
@@ -34,25 +19,25 @@ const stripUserData = (obj: IUserData): IStrippedUserData => ({
   fullname: obj.fullname,
 });
 
+type EntityOrComp = IEntity | ICompilation;
+
 const updateAnnotationList = async (
   entityOrCompId: string,
-  add_to_coll: string,
+  coll: string,
   annotationId: string | ObjectId,
 ) => {
-  const obj = await Mongo.resolve<IEntity | ICompilation>(entityOrCompId, add_to_coll, 0);
+  const obj = await Entities.resolve<EntityOrComp>(entityOrCompId, coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
-  const coll = Mongo.getEntitiesRepository().collection(add_to_coll);
-  const query = { _id: new ObjectId(entityOrCompId) };
-  const update = { $set: { annotations: obj.annotations } };
-
-  const updateResult = await updateOne(coll, query, update);
+  const updateResult = await Repo.get<EntityOrComp>(coll).updateOne(query(entityOrCompId), {
+    $set: { annotations: obj.annotations },
+  });
   return !!updateResult;
 };
 
-export const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
+const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
   // Remove invalid annotations
   for (const id in compilation.annotations) {
     const value = compilation.annotations[id];
@@ -70,26 +55,24 @@ export const saveCompilation = async (compilation: ICompilation, userData: IUser
     delete compilation.entities[id];
   }
 
-  await Mongo.insertCurrentUserData(userData, compilation._id, 'compilation');
+  await Users.makeOwnerOf(userData, compilation._id, 'compilation');
   return { ...compilation };
 };
 
-export const saveAnnotation = async (
+const saveAnnotation = async (
   annotation: IAnnotation,
   userData: IUserData,
   doesEntityExist: boolean,
 ) => {
   // If the Annotation already exists, check for owner
-  const isAnnotationOwner = doesEntityExist
-    ? await Mongo.isUserOwnerOfEntity(userData, annotation._id)
-    : true;
+  const isAnnotationOwner = doesEntityExist ? await Users.isOwner(userData, annotation._id) : true;
   // Check if anything was missing for safety
   if (!annotation || !annotation.target?.source) throw new Error('Invalid annotation');
   const source = annotation.target.source;
   if (!source) throw new Error('Missing source');
   if (!annotation.body?.content?.relatedPerspective)
     throw new Error('Missing body.content.relatedPerspective');
-  annotation.body.content.relatedPerspective.preview = await Mongo.updatePreviewImage(
+  annotation.body.content.relatedPerspective.preview = await updatePreviewImage(
     annotation.body.content.relatedPerspective.preview,
     'annotation',
     annotation._id,
@@ -108,14 +91,14 @@ export const saveAnnotation = async (
   if (!validEntity) throw new Error('Invalid related entity id');
 
   // Case: Trying to change Default Annotations
-  const isEntityOwner = await Mongo.isUserOwnerOfEntity(userData, relatedEntityId);
+  const isEntityOwner = await Users.isOwner(userData, relatedEntityId);
   if (!validCompilation && !isEntityOwner) throw new Error('Permission denied');
 
   // Case: Compilation owner trying to re-rank annotations
-  const isCompilationOwner = await Mongo.isUserOwnerOfEntity(userData, relatedCompId);
+  const isCompilationOwner = await Users.isOwner(userData, relatedCompId);
 
   if (!isAnnotationOwner && isCompilationOwner) {
-    const existing = await Mongo.resolve<IAnnotation>(annotation, 'annotation');
+    const existing = await Entities.resolve<IAnnotation>(annotation, 'annotation');
 
     // If not new and not existing then what are we even doing
     if (!existing) throw new Error('Permission denied');
@@ -144,12 +127,12 @@ export const saveAnnotation = async (
     throw new Error(message);
   }
 
-  if (isAnnotationOwner) await Mongo.insertCurrentUserData(userData, annotation._id, 'annotation');
+  if (isAnnotationOwner) await Users.makeOwnerOf(userData, annotation._id, 'annotation');
 
   return annotation;
 };
 
-export const saveEntity = async (entity: IEntity, userData: IUserData) => {
+const saveEntity = async (entity: IEntity, userData: IUserData) => {
   if (!entity.creator) entity.creator = stripUserData(userData);
 
   /* Preview image URLs might have a corrupted address
@@ -157,17 +140,17 @@ export const saveEntity = async (entity: IEntity, userData: IUserData) => {
    * This removes the host address from the URL
    * so images will load correctly */
   if (entity.settings?.preview) {
-    entity.settings.preview = await Mongo.updatePreviewImage(
+    entity.settings.preview = await updatePreviewImage(
       entity.settings.preview,
       'entity',
       entity._id,
     );
   }
-  await Mongo.insertCurrentUserData(userData, entity._id, 'entity');
+  await Users.makeOwnerOf(userData, entity._id, 'entity');
   return entity;
 };
 
-export const saveGroup = async (group: IGroup, userData: IUserData) => {
+const saveGroup = async (group: IGroup, userData: IUserData) => {
   const strippedUserData = stripUserData(userData);
   group.creator = strippedUserData;
   group.members = [strippedUserData];
@@ -175,13 +158,12 @@ export const saveGroup = async (group: IGroup, userData: IUserData) => {
   return group;
 };
 
-export const saveAddress = async (address: IAddress, userData?: IUserData) => {
-  const resolved = await Mongo.resolve<IAddress>(address, 'address');
+const saveAddress = async (address: IAddress, userData?: IUserData) => {
+  const resolved = await Entities.resolve<IAddress>(address, 'address');
   address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
 
-  const result = await updateOne(
-    Mongo.getEntitiesRepository().collection('address'),
-    Mongo.query(address._id),
+  const result = await Repo.address.updateOne(
+    query(address._id),
     { $set: { ...address } },
     { upsert: true },
   );
@@ -189,16 +171,12 @@ export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   if (!result) throw new Error('Failed saving address');
 
   const _id = result.upsertedId ?? address._id;
-  if (userData) Mongo.insertCurrentUserData(userData, _id, 'address');
+  if (userData) Users.makeOwnerOf(userData, _id, 'address');
   return { ...address, _id };
 };
 
-export const saveInstitution = async (
-  institution: IInstitution,
-  userData?: IUserData,
-  save = false,
-) => {
-  const resolved = await Mongo.resolve<IInstitution>(institution, 'institution');
+const saveInstitution = async (institution: IInstitution, userData?: IUserData, save = false) => {
+  const resolved = await Entities.resolve<IInstitution>(institution, 'institution');
   institution._id = institution?._id ?? resolved?._id ?? new ObjectId().toString();
 
   // If institution exists, combine roles
@@ -218,9 +196,8 @@ export const saveInstitution = async (
 
   if (!save) return institution;
 
-  const result = await updateOne(
-    Mongo.getEntitiesRepository().collection('institution'),
-    Mongo.query(institution._id),
+  const result = await Repo.institution.updateOne(
+    query(institution._id),
     { $set: { ...institution } },
     { upsert: true },
   );
@@ -228,17 +205,16 @@ export const saveInstitution = async (
   if (!result) throw new Error('Failed saving institution');
 
   const _id = result.upsertedId ?? institution._id;
-  if (userData) Mongo.insertCurrentUserData(userData, _id, 'institution');
+  if (userData) Users.makeOwnerOf(userData, _id, 'institution');
   return { ...institution, _id };
 };
 
-export const saveContact = async (contact: IContact, userData?: IUserData) => {
-  const resolved = await Mongo.resolve<IContact>(contact, 'contact');
+const saveContact = async (contact: IContact, userData?: IUserData) => {
+  const resolved = await Entities.resolve<IContact>(contact, 'contact');
   contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
 
-  const result = await updateOne(
-    Mongo.getEntitiesRepository().collection('contact'),
-    Mongo.query(contact._id),
+  const result = await Repo.contact.updateOne(
+    query(contact._id),
     { $set: { ...contact } },
     { upsert: true },
   );
@@ -246,12 +222,12 @@ export const saveContact = async (contact: IContact, userData?: IUserData) => {
   if (!result) throw new Error('Failed saving contact');
 
   const _id = result.upsertedId ?? contact._id;
-  if (userData) Mongo.insertCurrentUserData(userData, _id, 'contact');
+  if (userData) Users.makeOwnerOf(userData, _id, 'contact');
   return { ...contact, _id };
 };
 
-export const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
-  const resolved = await Mongo.resolve<IPerson>(person, 'person');
+const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
+  const resolved = await Entities.resolve<IPerson>(person, 'person');
   person._id = person?._id ?? resolved?._id ?? new ObjectId().toString();
 
   // If person exists, combine roles
@@ -282,9 +258,8 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
 
   if (!save) return person;
 
-  const result = await updateOne(
-    Mongo.getEntitiesRepository().collection('person'),
-    Mongo.query(person._id),
+  const result = await Repo.person.updateOne(
+    query(person._id),
     { $set: { ...person } },
     { upsert: true },
   );
@@ -292,11 +267,11 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
   if (!result) throw new Error('Failed saving person');
 
   const _id = result.upsertedId ?? person._id;
-  if (userData) Mongo.insertCurrentUserData(userData, _id, 'person');
+  if (userData) Users.makeOwnerOf(userData, _id, 'person');
   return { ...person, _id };
 };
 
-export const saveMetaDataEntity = async (
+const saveMetaDataEntity = async (
   entity: IDigitalEntity | IPhysicalEntity,
   userData: IUserData,
 ) => {
@@ -326,25 +301,22 @@ export const saveMetaDataEntity = async (
 
       tag._id = ObjectId.isValid(tag._id) ? tag._id : new ObjectId();
 
-      newEntity.tags[i] = (await updateOne(
-        Mongo.getEntitiesRepository().collection('tag'),
-        Mongo.query(tag._id),
-        { $set: { ...tag } },
-        { upsert: true },
-      ).then(res => {
-        if (!res) return undefined;
+      newEntity.tags[i] = (await Repo.tag
+        .updateOne(query(tag._id), { $set: { ...tag } }, { upsert: true })
+        .then(res => {
+          if (!res) return undefined;
 
-        const _id = res.upsertedId ?? tag._id;
-        Mongo.insertCurrentUserData(userData, _id, 'tag');
-        return _id;
-      })) as any;
+          const _id = res.upsertedId ?? tag._id;
+          Users.makeOwnerOf(userData, _id, 'tag');
+          return _id;
+        })) as any;
     }
   }
 
   return newEntity;
 };
 
-export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
+const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
   const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IDigitalEntity;
 
   for (let i = 0; i < newEntity.persons.length; i++) {
@@ -365,19 +337,29 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
       newEntity.phyObjs[i],
       userData,
     )) as IPhysicalEntity;
-    newEntity.phyObjs[i] = (await updateOne(
-      Mongo.getEntitiesRepository().collection('physicalentity'),
-      Mongo.query(savedEntity._id),
-      { $set: { ...savedEntity } },
-      { upsert: true },
-    ).then(res => {
-      if (!res) throw new Error('Failed saving physicalentity');
+    newEntity.phyObjs[i] = (await Repo.physicalentity
+      .updateOne(query(savedEntity._id), { $set: { ...savedEntity } }, { upsert: true })
+      .then(res => {
+        if (!res) throw new Error('Failed saving physicalentity');
 
-      const _id = res.upsertedId ?? savedEntity._id;
-      Mongo.insertCurrentUserData(userData, _id, 'physicalentity');
-      return _id;
-    })) as any;
+        const _id = res.upsertedId ?? savedEntity._id;
+        Users.makeOwnerOf(userData, _id, 'physicalentity');
+        return _id;
+      })) as any;
   }
 
   return newEntity;
+};
+
+export const Save = {
+  compilation: saveCompilation,
+  annotation: saveAnnotation,
+  entity: saveEntity,
+  group: saveGroup,
+  address: saveAddress,
+  institution: saveInstitution,
+  contact: saveContact,
+  person: savePerson,
+  metadataentity: saveMetaDataEntity,
+  digitalentity: saveDigitalEntity,
 };

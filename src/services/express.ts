@@ -14,14 +14,12 @@ import LdapStrategy from 'passport-ldapauth';
 import LocalStrategy from 'passport-local';
 import SocketIo from 'socket.io';
 import resTime from 'response-time';
-
 import { RootDirectory } from '../environment';
 import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
-
+import { Accounts } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
 import { Logger } from './logger';
-import { Mongo, updateOne } from './mongo';
 import { serveFile } from './dynamic-compression';
 
 export interface IPasswordEntry {
@@ -80,14 +78,11 @@ const saltHashPassword = (password: string) => {
   return sha512(password, generateSalt(SALT_LENGTH));
 };
 
-const verifyUser = async (username: string, password: string) => {
-  const users = Mongo.getAccountsRepository().collection<IUserData>('users');
-  const passwords = Mongo.getAccountsRepository().collection<IPasswordEntry>('passwords');
-
+const verifyPassword = async (username: string, password: string) => {
   // Exit early if user does not exist
-  if (!(await users.findOne({ username }))) return false;
+  if (!(await Accounts.users.findOne({ username }))) return false;
 
-  const pwEntry = await passwords.findOne({ username });
+  const pwEntry = await Accounts.passwords.findOne({ username });
   if (!pwEntry) return false;
 
   const { salt, passwordHash: hash } = pwEntry.password;
@@ -105,8 +100,6 @@ interface IRegisterRequest {
 }
 
 const registerUser = async (req: Request, res: Response) => {
-  const users = Mongo.getAccountsRepository().collection<IUserData>('users');
-
   const isRegisterRequest = (obj: any): obj is IRegisterRequest => {
     const person = obj as IRegisterRequest;
     return (
@@ -120,14 +113,15 @@ const registerUser = async (req: Request, res: Response) => {
   };
 
   // First user gets admin
-  const isFirstUser = (await users.findOne({})) === null;
+  const isFirstUser = (await Accounts.users.findOne({})) === null;
   const role = isFirstUser ? EUserRank.admin : EUserRank.user;
 
   const user = req.body as IRegisterRequest;
   if (!isRegisterRequest(user)) return res.status(400).send('Incomplete user data');
 
   const { username, password } = user;
-  if (!!(await users.findOne({ username }))) return res.status(409).send('User already exists');
+  if (!!(await Accounts.users.findOne({ username })))
+    return res.status(409).send('User already exists');
 
   const adjustedUser: IUserData & { password?: string } = {
     ...user,
@@ -139,20 +133,17 @@ const registerUser = async (req: Request, res: Response) => {
   };
   delete adjustedUser.password;
 
-  // TODO: Check for errors and simplify
-  if (await updateUserPassword(username, password)) {
-    return users
-      .insertOne(adjustedUser)
-      .then(() => res.status(201).send({ status: 'OK', ...adjustedUser }))
-      .catch(() => res.status(500).send('Failed inserting user'));
+  if (
+    (await updateUserPassword(username, password)) &&
+    !!(await Accounts.users.insertOne(adjustedUser))
+  ) {
+    return res.status(201).send({ status: 'OK', ...adjustedUser });
   }
   return res.status(500).send('Failed inserting user');
 };
 
 const updateUserPassword = async (username: string, password: string): Promise<boolean> => {
-  const passwords = Mongo.getAccountsRepository().collection<IPasswordEntry>('passwords');
-  const result = await updateOne(
-    passwords,
+  const result = await Accounts.passwords.updateOne(
     { username },
     { $set: { username, password: saltHashPassword(password) } },
     { upsert: true },
@@ -230,9 +221,8 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
 };
 
 const verifyLocalStrategy: LocalStrategy.VerifyFunction = async (username, password, done) => {
-  const users = Mongo.getAccountsRepository().collection<IUserData>('users');
-  const user = await users.findOne({ username });
-  if (!user || !(await verifyUser(username, password))) {
+  const user = await Accounts.users.findOne({ username });
+  if (!user || !(await verifyPassword(username, password))) {
     return done(undefined, false);
   }
   return done(undefined, user);

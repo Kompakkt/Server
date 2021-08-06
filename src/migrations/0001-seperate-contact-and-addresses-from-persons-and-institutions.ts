@@ -1,24 +1,11 @@
-import { Mongo, updateOne } from '../services/mongo';
-import { Configuration } from '../services/configuration';
-import { saveAddress, saveContact } from '../services/saving-strategies';
-import {
-  IPerson,
-  IInstitution,
-  IContact,
-  IAddress,
-  IDocument,
-  isUnresolved,
-} from '../common/interfaces';
+import { Repo, Entities, query } from '../services/db';
+import { Save } from '../services/db/saving-strategies';
+// prettier-ignore
+import { IPerson, IInstitution, IContact, IAddress, IDocument, isUnresolved } from '../common/interfaces';
 
 (async () => {
-  const client = await Mongo.init();
-  if (!client) return;
-  const db = client.db(Configuration.Mongo.RepositoryDB);
-  const persons = db.collection<IPerson>('person');
-  const institutions = db.collection<IInstitution>('institution');
-
   // Institutions
-  const instCursor = institutions.find({});
+  const instCursor = Repo.institution.findAllCursor();
   while (await instCursor.hasNext()) {
     let institution: IInstitution | undefined | null = await instCursor.next();
     if (!institution) continue;
@@ -30,7 +17,7 @@ import {
     const needsMigration = !!Object.values(addresses).find(addr => !isUnresolved(addr));
     if (!needsMigration) continue;
     console.log(`Migrating institution ${name}`);
-    institution = await Mongo.resolve<IInstitution>(institution, 'institution');
+    institution = await Entities.resolve<IInstitution>(institution, 'institution');
     if (!institution) {
       console.log(`Failed to resolve ${name}. Not migrated.`);
       continue;
@@ -48,23 +35,19 @@ import {
       continue;
     }
 
-    const address = await saveAddress(addressEntry);
+    const address = await Save.address(addressEntry);
 
     institution.addresses = {};
     for (const id of relatedIds) {
       institution.addresses[id] = { _id: address._id };
     }
 
-    const result = await updateOne(
-      Mongo.getEntitiesRepository().collection<IInstitution>('institution'),
-      Mongo.query(institution._id),
-      { $set: institution },
-    );
+    const result = await Repo.institution.updateOne(query(institution._id), { $set: institution });
     console.log(result ? result : `Failed saving institution ${name}`);
   }
 
   // Persons
-  const personCursor = persons.find({});
+  const personCursor = Repo.person.findAllCursor();
   while (await personCursor.hasNext()) {
     let person: IPerson | undefined | null = await personCursor.next();
     if (!person) continue;
@@ -80,7 +63,7 @@ import {
     const needsMigration = !!Object.values(contact_references).find(c => !isUnresolved(c));
     if (!needsMigration) continue;
     console.log(`Migrating person ${prename} ${name}`);
-    person = await Mongo.resolve<IPerson>(person, 'person');
+    person = await Entities.resolve<IPerson>(person, 'person');
     if (!person) {
       console.log(`Failed to resolve ${prename} ${name}. Not migrated.`);
       continue;
@@ -102,7 +85,7 @@ import {
 
     person.contact_references = {};
     if (contactEntry) {
-      const contact = await saveContact(contactEntry);
+      const contact = await Save.contact(contactEntry);
       for (const id of relatedIds) {
         person.contact_references[id] = { _id: contact._id };
       }
@@ -110,11 +93,9 @@ import {
       console.log(`No valid entries found for ${prename} ${name}`);
     }
 
-    const result = await updateOne(
-      Mongo.getEntitiesRepository().collection<IPerson>('person'),
-      Mongo.query(person._id),
-      { $set: person },
-    ).catch(console.log);
+    const result = await Repo.person
+      .updateOne(query(person._id), { $set: person })
+      .catch(console.log);
     console.log(result ? result : `Failed saving ${prename} ${name}`);
   }
 
