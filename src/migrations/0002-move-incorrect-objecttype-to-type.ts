@@ -1,6 +1,4 @@
-import '../services/db/client';
-import { Repo } from '../services/db/controllers';
-import { query } from '../services/db/functions';
+import { Repo, query } from '../services/db';
 
 (async () => {
   const types = ['model', 'audio', 'image', 'video'];

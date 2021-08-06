@@ -17,12 +17,11 @@ import resTime from 'response-time';
 
 import { RootDirectory } from '../environment';
 import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
-
+import { Accounts } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
 import { Logger } from './logger';
 import { serveFile } from './dynamic-compression';
-import { Accounts } from './db/controllers';
 
 export interface IPasswordEntry {
   username: string;

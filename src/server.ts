@@ -1,7 +1,4 @@
-import DBClient from './services/db/client';
-import Entities from './services/db/entities';
-import Users from './services/db/users';
-import { Repo } from './services/db/controllers';
+import { DBClient, Entities, Users, Repo } from './services/db';
 import { Admin } from './services/admin';
 import { Cleaning } from './services/cleaning';
 import { Express, Server, WebSocket } from './services/express';

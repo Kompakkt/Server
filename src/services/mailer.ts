@@ -6,9 +6,7 @@ import { EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 
-import Users from './db/users';
-import { Accounts } from './db/controllers';
-import { query } from './db/functions';
+import { Users, Accounts, query } from './db'
 
 interface IMailer {
   isConfigValid(): any;

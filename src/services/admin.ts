@@ -9,10 +9,7 @@ import { Configuration } from './configuration';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
 
-import Entities from './db/entities';
-import Users from './db/users';
-import { Accounts, Repo } from './db/controllers';
-import { query } from './db/functions';
+import { Entities, Users, Accounts, Repo, query } from './db'
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;

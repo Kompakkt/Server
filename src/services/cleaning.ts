@@ -7,9 +7,7 @@ import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { RootDirectory } from '../environment';
 
-import Entities from './db/entities';
-import { query } from './db/functions';
-import { Accounts, Repo } from './db/controllers';
+import { Entities, Accounts, Repo, query } from './db'
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>

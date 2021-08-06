@@ -10,10 +10,7 @@ import {
   isAnnotation,
 } from '../common/interfaces';
 
-import Entities from './db/entities';
-import Users from './db/users';
-import { Accounts, Repo } from './db/controllers';
-import { query } from './db/functions';
+import { Entities, Repo, Users, Accounts, query } from './db';
 
 interface IUtility {
   findAllEntityOwnersRequest(req: Request, res: Response): any;

@@ -1,7 +1,4 @@
-import '../services/db/client';
-import { Repo } from '../services/db/controllers';
-import { Entities } from '../services/db/entities';
-import { query } from '../services/db/functions';
+import { Repo, Entities, query } from '../services/db';
 import { saveAddress, saveContact } from '../services/db/saving-strategies';
 import {
   IPerson,
