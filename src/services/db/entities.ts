@@ -94,7 +94,7 @@ const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Re
   // We already got rejected. Don't update entity in DB
   if (res.headersSent) return undefined;
 
-  const updateResult = await Repo.get(coll).updateOne({ _id }, { $set: entity }, { upsert: true });
+  const updateResult = await Repo.get(coll)?.updateOne({ _id }, { $set: entity }, { upsert: true });
 
   if (!updateResult) {
     Logger.err(`Failed updating ${coll} ${_id}`);
@@ -143,7 +143,7 @@ const resolve = async <T>(obj: any, coll: string, depth?: number) => {
   }
 
   return Repo.get<T>(coll)
-    .findOne(query(_id))
+    ?.findOne(query(_id))
     .then(async resolve_result => {
       if (depth && depth === 0) return resolve_result;
 
@@ -200,7 +200,7 @@ const getAllEntitiesFromCollection = async (req: Request<IEntityRequestParams>, 
   const allowed = ['person', 'institution', 'tag'];
   if (!allowed.includes(coll)) return res.status(200).send([]);
 
-  const docs = await Repo.get(coll).findAll();
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   return res.status(200).send(resolved.filter(_ => _));
 };
@@ -231,7 +231,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
     return res.status(401).send(message);
   }
 
-  const deleteResult = await Repo.get(coll).deleteOne(query(_id));
+  const deleteResult = await Repo.get(coll)?.deleteOne(query(_id));
   if (!deleteResult) {
     const message = `Failed deleting ${coll} ${req.params.identifier}`;
     Logger.warn(message);
@@ -297,7 +297,7 @@ const searchByEntityFilter = async (req: Request<IEntityRequestParams>, res: Res
     return true;
   };
 
-  const docs = await Repo.get(coll).findAll();
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   const filtered = resolved.filter(obj => {
     for (const prop in filter) {
@@ -320,7 +320,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
 
   if (offset < 0) return res.status(400).send('Offset is smaller than 0');
 
-  const docs = (await Repo.get(coll).findAll()).slice(offset, offset + length);
+  const docs = ((await Repo.get(coll)?.findAll()) ?? []).slice(offset, offset + length);
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
 
   const getNestedValues = (obj: any) => {
@@ -360,6 +360,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
   return res.status(200).send(filterResults(resolved));
 };
 
+// TODO: improve performance by splitting into multiple indexes?
 const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   const { types, offset, searchEntity, filters, searchText } = req.body;
   const items = new Array<IEntity | ICompilation>();
@@ -368,7 +369,7 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   const userOwned = userData ? JSON.stringify(userData.data) : '';
 
   // Check if req is cached
-  const reqHash = RepoCache.hash(req.body);
+  const reqHash = RepoCache.hash({ sessionID: req.sessionID ?? 'guest', ...req.body});
   const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
   if (temp && temp?.length > 0) {
@@ -518,12 +519,12 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
   // Cache full req
-  RepoCache.set(reqHash, items);
+  RepoCache.set(reqHash, items, 3600);
 };
 
 const test = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
-  const docs = await Repo.get(coll).findAll();
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
 
   const maxRand = 5;
   const randIndex = Math.floor(Math.random() * (docs.length - maxRand));

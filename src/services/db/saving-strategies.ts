@@ -31,7 +31,7 @@ const updateAnnotationList = async (
   annotationId = annotationId.toString();
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
-  const updateResult = await Repo.get<EntityOrComp>(coll).updateOne(query(entityOrCompId), {
+  const updateResult = await Repo.get<EntityOrComp>(coll)?.updateOne(query(entityOrCompId), {
     $set: { annotations: obj.annotations },
   });
   return !!updateResult;

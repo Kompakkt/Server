@@ -104,5 +104,5 @@ export const Repo = {
   person: new Controller<IPerson>('person', RepositoryDB),
   physicalentity: new Controller<IPhysicalEntity>('physicalentity', RepositoryDB),
   tag: new Controller<ITag>('tag', RepositoryDB),
-  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T>,
+  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T> | undefined,
 };
