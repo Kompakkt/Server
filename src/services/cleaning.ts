@@ -12,12 +12,11 @@ import {
   IInstitution,
   IDigitalEntity,
   IPhysicalEntity,
-  IUserData,
 } from '../common/interfaces';
 
 import Entities from './db/entities';
-import Users from './db/users';
 import { query } from './db/functions';
+import { Accounts } from './db/controllers';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -81,7 +80,7 @@ const Cleaning: ICleaning = {
     });
   },
   deleteNullRefs: async (req, res) => {
-    const allUsers = await Users.findAll<IUserData>('users');
+    const allUsers = await Accounts.User.findAll();
 
     const confirm = req.params.confirm || false;
 
@@ -103,7 +102,7 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await Users.updateOne('users', query(user._id), {
+      const updateResult = await Accounts.User.updateOne(query(user._id), {
         $set: { data: user.data },
       });
       if (!updateResult) {

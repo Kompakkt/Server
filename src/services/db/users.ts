@@ -1,4 +1,4 @@
-import { ObjectId, Filter, UpdateFilter, UpdateOptions, OptionalId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 
 import {
@@ -11,58 +11,20 @@ import {
 } from '../../common/interfaces';
 
 import { UserCache } from '../cache';
-import { Configuration } from '../configuration';
 import { Logger } from '../logger';
 
 import { query } from './functions';
+import { Accounts } from './controllers';
 import Entities from './entities';
-import DBClient from './client';
-
-const db = () => DBClient.Client.db(Configuration.Mongo.RepositoryDB);
-
-const collection = <T>(coll: string) => db().collection<T>(coll);
-
-const findOne = <T>(coll: string, filter: Filter<T>) => collection<T>(coll).findOne(filter);
-
-const findAll = <T>(coll: string) => collection<T>(coll).find({}).toArray();
-
-const insertOne = <T>(coll: string, doc: OptionalId<T>) =>
-  collection<T>(coll)
-    .insertOne(doc)
-    .catch(err => {
-      Logger.err('Failed insertOne', coll, err);
-      return undefined;
-    });
-
-const insertMany = <T>(coll: string, docs: Array<OptionalId<T>>) =>
-  collection<T>(coll)
-    .insertMany(docs)
-    .catch(err => {
-      Logger.err('Failed insertMany', coll, err);
-      return undefined;
-    });
-
-const updateOne = <T>(
-  coll: string,
-  filter: Filter<T>,
-  update: UpdateFilter<T>,
-  options: UpdateOptions = {},
-) =>
-  collection<T>(coll)
-    .updateOne(filter, update, options)
-    .catch(err => {
-      Logger.err('Failed updateOne', coll, filter, update, err);
-      return undefined;
-    });
 
 const getBySession = (req: Request<any>) => {
   const username = (req as any).session?.passport?.user;
   const sessionID = req.sessionID;
   if (!sessionID || !username) return undefined;
-  return findOne<IUserData>('users', { sessionID, username });
+  return Accounts.User.findOne({ sessionID, username });
 };
 
-const getByUsername = (username: string) => findOne<IUserData>('users', { username });
+const getByUsername = (username: string) => Accounts.User.findOne({ username });
 
 const getUser = async (req: Request<any> | IUserData) =>
   isUser(req) ? await getByUsername(req.username) : await getBySession(req as Request);
@@ -89,7 +51,7 @@ const login = async (req: Request<any>, res: Response) => {
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
-  return updateOne('users', { username }, { $set: updatedUser }, { upsert: true })
+  return Accounts.User.updateOne({ username }, { $set: updatedUser }, { upsert: true })
     .then(async () => {
       Logger.log(`User ${updatedUser.username} logged in`);
       res.status(200).send(await resolve(updatedUser));
@@ -104,7 +66,7 @@ const logout = async (req: Request<any>, res: Response) => {
   const user = await getBySession(req);
   if (!user) return res.status(400).send('User not found by session');
   const { username, sessionID } = user;
-  return updateOne('users', { username, sessionID }, { $set: { sessionID: undefined } });
+  return Accounts.User.updateOne({ username, sessionID }, { $set: { sessionID: undefined } });
 };
 
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {
@@ -121,7 +83,9 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   if (doesExist) return true;
 
   user.data[coll].push(new ObjectId(_id));
-  const updateResult = await updateOne('users', query(user._id), { $set: { data: user.data } });
+  const updateResult = await Accounts.User.updateOne(query(user._id), {
+    $set: { data: user.data },
+  });
   if (!updateResult) return false;
 
   UserCache.del(UserCache.hash(user.username));
@@ -137,7 +101,9 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   user.data[coll] = user.data[coll] ?? [];
   user.data[coll] = user.data[coll].filter(id => id !== _id);
 
-  const updateResult = await updateOne('users', query(user._id), { $set: { data: user.data } });
+  const updateResult = await Accounts.User.updateOne(query(user._id), {
+    $set: { data: user.data },
+  });
   if (!updateResult) return false;
 
   UserCache.del(UserCache.hash(user.username));
@@ -242,7 +208,7 @@ const validateSession = async (req: Request<any>, _: Response, next: NextFunctio
 };
 
 const getStrippedUsers = async (_: Request<any>, res: Response) => {
-  const users = await findAll<IUserData>('users');
+  const users = await Accounts.User.findAll();
   return res.status(200).send(
     users.map(user => ({
       username: user.username,
@@ -253,12 +219,6 @@ const getStrippedUsers = async (_: Request<any>, res: Response) => {
 };
 
 export const Users = {
-  collection,
-  findOne,
-  findAll,
-  insertOne,
-  insertMany,
-  updateOne,
   getUser,
   getBySession,
   getByUsername,

@@ -5,7 +5,6 @@ import {
   IAnnotation,
   ICompilation,
   IEntity,
-  IUserData,
   IStrippedUserData,
   IGroup,
   isAnnotation,
@@ -13,6 +12,7 @@ import {
 
 import Entities from './db/entities';
 import Users from './db/users';
+import { Accounts } from './db/controllers';
 import { query } from './db/functions';
 
 interface IUtility {
@@ -37,7 +37,7 @@ const Utility: IUtility = {
     return res.status(200).send(accounts);
   },
   findAllEntityOwners: async (entityId: string) => {
-    const accounts = (await Users.findAll<IUserData>('users'))
+    const accounts = (await Accounts.User.findAll())
       .filter(userData => {
         const Entities = JSON.stringify(userData.data.entity);
         return Entities ? Entities.indexOf(entityId) !== -1 : false;
@@ -160,7 +160,7 @@ const Utility: IUtility = {
     }
 
     const findUserQuery = ownerId ? query(ownerId) : { username: ownerUsername };
-    const user = await Users.findOne<IUserData>('users', findUserQuery);
+    const user = await Accounts.User.findOne(findUserQuery);
     if (!user) return res.status(400).send('Incorrect owner _id or username given');
 
     user.data.entity = user.data.entity ?? [];
@@ -179,7 +179,7 @@ const Utility: IUtility = {
       );
     }
 
-    const updateResult = await Users.updateOne('users', findUserQuery, {
+    const updateResult = await Accounts.User.updateOne(findUserQuery, {
       $set: { data: user.data },
     });
 

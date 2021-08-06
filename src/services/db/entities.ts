@@ -81,14 +81,14 @@ const insertMany = <T>(coll: string, docs: Array<OptionalId<T>>) =>
 
 const updateOne = <T>(
   coll: string,
-  query: Filter<T>,
+  filter: Filter<T>,
   update: UpdateFilter<T>,
   options: UpdateOptions = {},
 ) =>
   collection<T>(coll)
-    .updateOne(query, update, options)
+    .updateOne(filter, update, options)
     .catch(err => {
-      Logger.err('Failed updating', coll, query, update, err);
+      Logger.err('Failed updateOne', coll, filter, update, err);
       return undefined;
     });
 

@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
 
-import { IUserData, EUserRank } from '../common/interfaces';
+import { EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 
 import Users from './db/users';
+import { Accounts } from './db/controllers';
 import { query } from './db/functions';
 
 interface IMailer {
@@ -29,19 +30,6 @@ interface ISendMailRequest {
   subject?: string;
   mailbody?: string;
   target?: ETarget;
-}
-
-interface IMailEntry {
-  _id: string | ObjectId;
-  target: string;
-  content: {
-    mailbody: string;
-    subject: string;
-  };
-  timestamp: string;
-  user: IUserData;
-  answered: boolean;
-  mailSent: boolean;
 }
 
 const transporter = nodemailer.createTransport({
@@ -122,8 +110,7 @@ const Mailer: IMailer = {
     if (!user) return false;
 
     if (target === ETarget.upload && user?.role === EUserRank.user) {
-      await Users.updateOne(
-        'users',
+      await Accounts.User.updateOne(
         { username: user.username, sessionID: user.sessionID },
         { $set: { role: EUserRank.uploadrequested } },
       );
@@ -140,7 +127,7 @@ const Mailer: IMailer = {
       mailSent,
     };
 
-    const insertResult = await Users.insertOne(target, document);
+    const insertResult = await Accounts.Mail.insertOne(document);
     if (!insertResult) {
       Logger.info('Failed adding user to mail database');
       return false;
@@ -153,21 +140,17 @@ const Mailer: IMailer = {
     const user = await Users.getBySession(req);
     if (!user) throw new Error('User not found by session');
 
-    return (
-      await Users.collection<IMailEntry>(destination)
-        .find<IMailEntry>({ answered: false, user: query(user._id) })
-        .toArray()
-    ).length;
+    const entries = await Accounts.Mail.find({
+      answered: false,
+      user: query(user._id),
+      target: destination,
+    });
+    return entries?.length ?? -1;
   },
   getMailRelatedDatabaseEntries: async (_, res): Promise<any> => {
     if (!Configuration.Mailer.Target) return res.status(500).send('Mailing service not configured');
-
     const targets = Object.keys(Configuration.Mailer.Target);
-    const result: any = {};
-    for (const target of targets) {
-      result[target] = await Users.findAll(target);
-    }
-    res.status(200).send(result);
+    res.status(200).send({ targets, entries: await Accounts.Mail.findAll() });
   },
   toggleMailAnswered: async (req, res): Promise<any> => {
     const target = req.params.target;
@@ -178,17 +161,17 @@ const Mailer: IMailer = {
     if (!ObjectId.isValid(identifier)) return res.status(400).send('Invalid mail identifier');
 
     const _id = new ObjectId(identifier);
-    const oldEntry = await Users.findOne(target, query(_id));
+    const oldEntry = await Accounts.Mail.findOne(query(_id));
     if (!oldEntry || !!oldEntry.answered)
       return res.status(409).send('Invalid mail entry in database');
 
     const isAnswered = oldEntry.answered;
-    const updateResult = await Users.updateOne(target, query(_id), {
+    const updateResult = await Accounts.Mail.updateOne(query(_id), {
       $set: { answered: !isAnswered },
     });
     if (!updateResult) return res.status(500).send('Failed updating entry');
 
-    res.status(200).send(await Users.findOne(target, query(_id)));
+    res.status(200).send(await Accounts.Mail.findOne(query(_id)));
   },
 };
 

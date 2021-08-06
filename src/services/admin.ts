@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 
-import { EUserRank, IEntity, IUserData } from '../common/interfaces';
+import { EUserRank, IEntity } from '../common/interfaces';
 
-import { updateUserPassword, IPasswordEntry } from './express';
+import { updateUserPassword } from './express';
 import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
 import { Mailer } from './mailer';
@@ -11,6 +11,7 @@ import { Logger } from './logger';
 
 import Entities from './db/entities';
 import Users from './db/users';
+import { Accounts } from './db/controllers';
 import { query } from './db/functions';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
@@ -35,7 +36,7 @@ const Admin: IAdmin = {
   },
   getAllUsers: async (_, res) => {
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
-    const allAccounts = await Users.findAll<IUserData>('users');
+    const allAccounts = await Accounts.User.findAll();
     const filteredAccounts = await Promise.all(
       allAccounts.map(account => {
         // TODO: Typing
@@ -52,7 +53,7 @@ const Admin: IAdmin = {
     const _id = checkAndReturnObjectId(req.params.identifier);
     if (!_id) return res.status(400).send('Invalid identifier');
 
-    const user = await Users.findOne<IUserData>('users', query(_id));
+    const user = await Accounts.User.findOne(query(_id));
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
 
     if (!user) return res.status(404).send('User not found');
@@ -83,10 +84,10 @@ const Admin: IAdmin = {
       return res.status(400).send('Invalid role specified');
     }
 
-    const user = await Users.findOne<IUserData>('users', query(_id));
+    const user = await Accounts.User.findOne(query(_id));
     if (!user) return res.status(500).send('Updating user role failed');
 
-    const updateResult = await Users.updateOne('users', query(_id), { $set: { role } });
+    const updateResult = await Accounts.User.updateOne(query(_id), { $set: { role } });
     if (!updateResult) return res.status(500).send('Updating user role failed');
 
     if (Configuration.Mailer && Configuration.Mailer.Target) {
@@ -119,8 +120,8 @@ const Admin: IAdmin = {
     const username = req.params.username;
     if (!username) return res.status(400).send('Invalid username');
 
-    const user = await Users.findOne<IUserData>('users', { username });
-    const pwEntry = await Users.findOne<IPasswordEntry>('passwords', { username });
+    const user = await Accounts.User.findOne({ username });
+    const pwEntry = await Accounts.Password.findOne({ username });
     if (!user) return res.status(400).send('User not found');
     if (!pwEntry) return res.status(400).send('User has no existing password entry');
 
