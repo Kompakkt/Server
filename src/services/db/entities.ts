@@ -1,8 +1,7 @@
-import { ObjectId, Filter, UpdateFilter, UpdateOptions, OptionalId } from 'mongodb';
+import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
 
 import { RepoCache } from '../cache';
-import { Configuration } from '../configuration';
 import { Logger } from '../logger';
 import {
   ICompilation,
@@ -34,7 +33,8 @@ import {
 
 import { query, updatePreviewImage } from './functions';
 import Users from './users';
-import DBClient from './client';
+import { Repo } from './controllers';
+// import DBClient from './client';
 
 interface IExploreRequest {
   searchEntity: boolean;
@@ -55,67 +55,27 @@ interface IEntityRequestParams {
   password?: string;
 }
 
-const db = () => DBClient.Client.db(Configuration.Mongo.RepositoryDB);
-
-const collection = <T>(coll: string) => db().collection<T>(coll);
-
-const findOne = <T>(coll: string, query: Filter<T>) => collection<T>(coll).findOne(query);
-
-const findAll = <T>(coll: string) => collection<T>(coll).find({}).toArray();
-
-const insertOne = <T>(coll: string, doc: OptionalId<T>) =>
-  collection<T>(coll)
-    .insertOne(doc)
-    .catch(err => {
-      Logger.err('Failed insertOne', coll, err);
-      return undefined;
-    });
-
-const insertMany = <T>(coll: string, docs: Array<OptionalId<T>>) =>
-  collection<T>(coll)
-    .insertMany(docs)
-    .catch(err => {
-      Logger.err('Failed insertMany', coll, err);
-      return undefined;
-    });
-
-const updateOne = <T>(
-  coll: string,
-  filter: Filter<T>,
-  update: UpdateFilter<T>,
-  options: UpdateOptions = {},
-) =>
-  collection<T>(coll)
-    .updateOne(filter, update, options)
-    .catch(err => {
-      Logger.err('Failed updateOne', coll, filter, update, err);
-      return undefined;
-    });
-
-const deleteOne = <T>(coll: string, query: Filter<T>) =>
-  collection<T>(coll)
-    .deleteOne(query)
-    .catch(err => {
-      Logger.err('Failed deleting', coll, query, err);
-      return undefined;
-    });
-
 /**
  * DEPRECATED: Redirects to correct function though!
  * When the user submits the metadataform this function
  * adds the missing data to defined collections
  */
-
 const submit = async (req: Request<IEntityRequestParams>, res: Response) => {
   Logger.info('Handling submit req');
   req.params.collection = 'digitalentity';
   await addEntityToCollection(req, res);
 };
 
+// TODO: Typesafe collectionName with validation
 const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Response) => {
   RepoCache.flush();
 
-  const { userData, doesEntityExist, isValidObjectId, collectionName } = (req as any).data as {
+  const {
+    userData,
+    doesEntityExist,
+    isValidObjectId,
+    collectionName: coll,
+  } = (req as any).data as {
     userData: IUserData;
     doesEntityExist: boolean;
     isValidObjectId: boolean;
@@ -147,7 +107,7 @@ const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Re
       savingPromise = saveDigitalEntity(entity, userData);
       break;
     default:
-      await Users.makeOwnerOf(req, _id, collectionName);
+      await Users.makeOwnerOf(req, _id, coll);
       break;
   }
   await savingPromise
@@ -160,16 +120,16 @@ const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Re
   // We already got rejected. Don't update entity in DB
   if (res.headersSent) return undefined;
 
-  const updateResult = await updateOne(collectionName, { _id }, { $set: entity }, { upsert: true });
+  const updateResult = await Repo.get(coll).updateOne({ _id }, { $set: entity }, { upsert: true });
 
   if (!updateResult) {
-    Logger.err(`Failed updating ${collectionName} ${_id}`);
-    return res.status(500).send(`Failed updating ${collectionName} ${_id}`);
+    Logger.err(`Failed updating ${coll} ${_id}`);
+    return res.status(500).send(`Failed updating ${coll} ${_id}`);
   }
 
   const resultId = updateResult.upsertedId ?? _id;
-  Logger.info(`Success! Updated ${collectionName} ${_id}`);
-  return res.status(200).send(await resolve<any>(resultId, collectionName));
+  Logger.info(`Success! Updated ${coll} ${_id}`);
+  return res.status(200).send(await resolve<any>(resultId, coll));
 };
 
 const updateEntitySettings = async (req: Request<IEntityRequestParams>, res: Response) => {
@@ -183,14 +143,14 @@ const updateEntitySettings = async (req: Request<IEntityRequestParams>, res: Res
 
   // Overwrite old settings
   const settings = { ...req.body, preview: finalImagePath };
-  const result = await updateOne('entity', { _id: identifier }, { $set: { settings } });
+  const result = await Repo.entity.updateOne({ _id: identifier }, { $set: { settings } });
 
   if (!result) return res.status(500).send('Failed updating settings');
 
   return res.status(200).send(settings);
 };
 
-const resolve = async <T>(obj: any, collection_name: string, depth?: number) => {
+const resolve = async <T>(obj: any, coll: string, depth?: number) => {
   if (!obj) return undefined;
   const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
   if (!ObjectId.isValid(parsedId)) return undefined;
@@ -204,11 +164,12 @@ const resolve = async <T>(obj: any, collection_name: string, depth?: number) => 
     }
     // Flush invalid object from cache
     RepoCache.del(parsedId).then(numDelKeys => {
-      if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${collection_name} cache`);
+      if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${coll} cache`);
     });
   }
 
-  return findOne<T>(collection_name, query(_id))
+  return Repo.get<T>(coll)
+    .findOne(query(_id))
     .then(async resolve_result => {
       if (depth && depth === 0) return resolve_result;
 
@@ -229,7 +190,7 @@ const resolve = async <T>(obj: any, collection_name: string, depth?: number) => 
       return result as unknown as T | null;
     })
     .catch(err => {
-      Logger.warn(`Encountered error trying to resolve ${parsedId} in ${collection_name}`);
+      Logger.warn(`Encountered error trying to resolve ${parsedId} in ${coll}`);
       Logger.err(err);
       return undefined;
     });
@@ -265,7 +226,7 @@ const getAllEntitiesFromCollection = async (req: Request<IEntityRequestParams>, 
   const allowed = ['person', 'institution', 'tag'];
   if (!allowed.includes(coll)) return res.status(200).send([]);
 
-  const docs = await findAll(coll);
+  const docs = await Repo.get(coll).findAll();
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   return res.status(200).send(resolved.filter(_ => _));
 };
@@ -296,7 +257,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
     return res.status(401).send(message);
   }
 
-  const deleteResult = await deleteOne(coll, query(_id));
+  const deleteResult = await Repo.get(coll).deleteOne(query(_id));
   if (!deleteResult) {
     const message = `Failed deleting ${coll} ${req.params.identifier}`;
     Logger.warn(message);
@@ -362,7 +323,7 @@ const searchByEntityFilter = async (req: Request<IEntityRequestParams>, res: Res
     return true;
   };
 
-  const docs = await findAll(coll);
+  const docs = await Repo.get(coll).findAll();
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   const filtered = resolved.filter(obj => {
     for (const prop in filter) {
@@ -385,7 +346,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
 
   if (offset < 0) return res.status(400).send('Offset is smaller than 0');
 
-  const docs = (await findAll(coll)).slice(offset, offset + length);
+  const docs = (await Repo.get(coll).findAll()).slice(offset, offset + length);
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
 
   const getNestedValues = (obj: any) => {
@@ -439,8 +400,8 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   if (temp && temp?.length > 0) {
     items.push(...temp);
   } else if (searchEntity) {
-    const cursor = collection<IEntity>('entity')
-      .find<IEntity>({
+    const cursor = Repo.entity
+      .findCursor({
         finished: true,
         online: true,
         mediaType: {
@@ -506,8 +467,8 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
 
     items.push(...entities);
   } else {
-    const cursor = collection<ICompilation>('compilation')
-      .find<ICompilation>({})
+    const cursor = Repo.compilation
+      .findCursor({})
       .sort({
         name: 1,
       })
@@ -588,7 +549,7 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
 
 const test = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
-  const docs = await findAll<any>(coll);
+  const docs = await Repo.get(coll).findAll();
 
   const maxRand = 5;
   const randIndex = Math.floor(Math.random() * (docs.length - maxRand));
@@ -603,13 +564,6 @@ const test = async (req: Request<IEntityRequestParams>, res: Response) => {
 };
 
 export const Entities = {
-  collection,
-  findOne,
-  findAll,
-  insertOne,
-  insertMany,
-  updateOne,
-  deleteOne,
   submit,
   addEntityToCollection,
   updateEntitySettings,

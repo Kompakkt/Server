@@ -11,7 +11,7 @@ import { Logger } from './logger';
 
 import Entities from './db/entities';
 import Users from './db/users';
-import { Accounts } from './db/controllers';
+import { Accounts, Repo } from './db/controllers';
 import { query } from './db/functions';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
@@ -36,7 +36,7 @@ const Admin: IAdmin = {
   },
   getAllUsers: async (_, res) => {
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
-    const allAccounts = await Accounts.User.findAll();
+    const allAccounts = await Accounts.users.findAll();
     const filteredAccounts = await Promise.all(
       allAccounts.map(account => {
         // TODO: Typing
@@ -53,7 +53,7 @@ const Admin: IAdmin = {
     const _id = checkAndReturnObjectId(req.params.identifier);
     if (!_id) return res.status(400).send('Invalid identifier');
 
-    const user = await Accounts.User.findOne(query(_id));
+    const user = await Accounts.users.findOne(query(_id));
     const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
 
     if (!user) return res.status(404).send('User not found');
@@ -84,10 +84,10 @@ const Admin: IAdmin = {
       return res.status(400).send('Invalid role specified');
     }
 
-    const user = await Accounts.User.findOne(query(_id));
+    const user = await Accounts.users.findOne(query(_id));
     if (!user) return res.status(500).send('Updating user role failed');
 
-    const updateResult = await Accounts.User.updateOne(query(_id), { $set: { role } });
+    const updateResult = await Accounts.users.updateOne(query(_id), { $set: { role } });
     if (!updateResult) return res.status(500).send('Updating user role failed');
 
     if (Configuration.Mailer && Configuration.Mailer.Target) {
@@ -106,11 +106,11 @@ const Admin: IAdmin = {
     const _id = checkAndReturnObjectId(req.body.identifier);
     if (!_id) return res.status(400).send('Incorrect req parameters');
 
-    const found = await Entities.findOne<IEntity>('entity', query(_id));
+    const found = await Repo.entity.findOne(query(_id));
     if (!found) return res.status(404).send('No entity with this identifier found');
 
     const isEntityOnline: boolean = found.online;
-    const updateResult = await Entities.updateOne('entity', query(_id), {
+    const updateResult = await Repo.entity.updateOne(query(_id), {
       $set: { online: !isEntityOnline },
     });
     if (!updateResult) return res.status(500).send('Failed updating published state');
@@ -120,8 +120,8 @@ const Admin: IAdmin = {
     const username = req.params.username;
     if (!username) return res.status(400).send('Invalid username');
 
-    const user = await Accounts.User.findOne({ username });
-    const pwEntry = await Accounts.Password.findOne({ username });
+    const user = await Accounts.users.findOne({ username });
+    const pwEntry = await Accounts.passwords.findOne({ username });
     if (!user) return res.status(400).send('User not found');
     if (!pwEntry) return res.status(400).send('User has no existing password entry');
 

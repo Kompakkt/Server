@@ -26,6 +26,8 @@ import {
 import { Logger } from '../logger';
 import { IPasswordEntry } from '../express';
 
+// TODO: Add resolving strategy to controller
+// TODO: Add saving strategy to controller
 class Controller<T> {
   private coll: string;
   private db: Db;
@@ -51,8 +53,14 @@ class Controller<T> {
         return undefined;
       });
   }
+  public findCursor(filter: Filter<T>, options: FindOptions = {}) {
+    return this.collection.find<T>(filter, options);
+  }
   public findAll() {
     return this.collection.find<T>({}).toArray();
+  }
+  public findAllCursor() {
+    return this.collection.find<T>({});
   }
   public insertOne(doc: OptionalId<T>) {
     return this.collection.insertOne(doc).catch(err => {
@@ -95,24 +103,25 @@ export interface IMailEntry {
 }
 
 const AccountsDB = DBClient.Client.db(Configuration.Mongo.AccountsDB);
-const EntitiesDB = DBClient.Client.db(Configuration.Mongo.RepositoryDB);
+const RepositoryDB = DBClient.Client.db(Configuration.Mongo.RepositoryDB);
 
 export const Accounts = {
-  User: new Controller<IUserData>('users', AccountsDB),
-  Password: new Controller<IPasswordEntry>('users', AccountsDB),
-  Mail: new Controller<IMailEntry>('mails', AccountsDB),
+  users: new Controller<IUserData>('users', AccountsDB),
+  passwords: new Controller<IPasswordEntry>('passwords', AccountsDB),
+  mails: new Controller<IMailEntry>('mails', AccountsDB),
 };
 
-export const Entities = {
-  Address: new Controller<IAddress>('address', EntitiesDB),
-  Annotation: new Controller<IAnnotation>('annotation', EntitiesDB),
-  Compilation: new Controller<ICompilation>('compilation', EntitiesDB),
-  Contact: new Controller<IContact>('contact', EntitiesDB),
-  DigitalEntity: new Controller<IDigitalEntity>('digitalentity', EntitiesDB),
-  Entity: new Controller<IEntity>('entity', EntitiesDB),
-  Group: new Controller<IGroup>('group', EntitiesDB),
-  Institution: new Controller<IInstitution>('institution', EntitiesDB),
-  Person: new Controller<IPerson>('person', EntitiesDB),
-  PhysicalEntity: new Controller<IPhysicalEntity>('physicalentity', EntitiesDB),
-  Tag: new Controller<ITag>('tag', EntitiesDB),
+export const Repo = {
+  address: new Controller<IAddress>('address', RepositoryDB),
+  annotation: new Controller<IAnnotation>('annotation', RepositoryDB),
+  compilation: new Controller<ICompilation>('compilation', RepositoryDB),
+  contact: new Controller<IContact>('contact', RepositoryDB),
+  digitalentity: new Controller<IDigitalEntity>('digitalentity', RepositoryDB),
+  entity: new Controller<IEntity>('entity', RepositoryDB),
+  group: new Controller<IGroup>('group', RepositoryDB),
+  institution: new Controller<IInstitution>('institution', RepositoryDB),
+  person: new Controller<IPerson>('person', RepositoryDB),
+  physicalentity: new Controller<IPhysicalEntity>('physicalentity', RepositoryDB),
+  tag: new Controller<ITag>('tag', RepositoryDB),
+  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T>,
 };

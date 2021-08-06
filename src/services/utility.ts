@@ -12,7 +12,7 @@ import {
 
 import Entities from './db/entities';
 import Users from './db/users';
-import { Accounts } from './db/controllers';
+import { Accounts, Repo } from './db/controllers';
 import { query } from './db/functions';
 
 interface IUtility {
@@ -37,7 +37,7 @@ const Utility: IUtility = {
     return res.status(200).send(accounts);
   },
   findAllEntityOwners: async (entityId: string) => {
-    const accounts = (await Accounts.User.findAll())
+    const accounts = (await Accounts.users.findAll())
       .filter(userData => {
         const Entities = JSON.stringify(userData.data.entity);
         return Entities ? Entities.indexOf(entityId) !== -1 : false;
@@ -71,7 +71,7 @@ const Utility: IUtility = {
 
     const compilations = await Promise.all(
       (
-        await Entities.findAll<ICompilation>('compilation')
+        await Repo.compilation.findAll()
       )
         .filter(isValid)
         .filter(includesEntity)
@@ -105,7 +105,7 @@ const Utility: IUtility = {
       return res.status(400).send('Invalid compilation given');
     }
 
-    const compilation = await Entities.findOne<ICompilation>('compilation', query(compId));
+    const compilation = await Repo.compilation.findOne(query(compId));
     if (!compilation) return res.status(404).send('Compilation not found');
 
     const resolvedAnnotations = (
@@ -124,7 +124,7 @@ const Utility: IUtility = {
         return ann;
       });
 
-    const insertResult = await Entities.insertMany<IAnnotation>('annotation', validAnnotations);
+    const insertResult = await Repo.annotation.insertMany(validAnnotations);
     if (!insertResult) return res.status(500).send('Failed inserting Annotations');
 
     for (const anno of validAnnotations) {
@@ -132,7 +132,7 @@ const Utility: IUtility = {
       compilation.annotations[anno._id.toString()] = anno;
     }
 
-    const updateResult = await Entities.updateOne('compilation', query(compId), {
+    const updateResult = await Repo.compilation.updateOne(query(compId), {
       $set: { annotations: compilation.annotations },
     });
     if (!updateResult) return res.status(500).send('Failed updating annotations');
@@ -160,7 +160,7 @@ const Utility: IUtility = {
     }
 
     const findUserQuery = ownerId ? query(ownerId) : { username: ownerUsername };
-    const user = await Accounts.User.findOne(findUserQuery);
+    const user = await Accounts.users.findOne(findUserQuery);
     if (!user) return res.status(400).send('Incorrect owner _id or username given');
 
     user.data.entity = user.data.entity ?? [];
@@ -179,7 +179,7 @@ const Utility: IUtility = {
       );
     }
 
-    const updateResult = await Accounts.User.updateOne(findUserQuery, {
+    const updateResult = await Accounts.users.updateOne(findUserQuery, {
       $set: { data: user.data },
     });
 
@@ -190,7 +190,7 @@ const Utility: IUtility = {
   findUserInGroups: async (req, res) => {
     const user = await Users.getBySession(req);
     if (!user) return res.status(404).send('Failed getting user by SessionId');
-    const groups = await Entities.findAll<IGroup>('group');
+    const groups = await Repo.group.findAll();
 
     return res
       .status(200)
@@ -207,7 +207,7 @@ const Utility: IUtility = {
     if (!user) return res.status(404).send('Failed getting user by SessionId');
     const compilations = await Promise.all(
       (
-        await Entities.findAll<ICompilation>('compilation')
+        await Repo.compilation.findAll()
       )
         .filter(comp => comp.whitelist.enabled)
         .map(async comp => {
@@ -238,7 +238,7 @@ const Utility: IUtility = {
   findUserInMetadata: async (req, res) => {
     const user = await Users.getBySession(req);
     if (!user) return res.status(404).send('Failed getting user by SessionId');
-    const entities = await Entities.findAll<IEntity>('entity');
+    const entities = await Repo.entity.findAll();
 
     const resolvedEntities = (
       await Promise.all(entities.map(entity => Entities.resolve<IEntity>(entity, 'entity')))

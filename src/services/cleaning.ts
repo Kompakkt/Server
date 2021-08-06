@@ -6,17 +6,10 @@ import klawSync from 'klaw-sync';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { RootDirectory } from '../environment';
-import {
-  IEntity,
-  IPerson,
-  IInstitution,
-  IDigitalEntity,
-  IPhysicalEntity,
-} from '../common/interfaces';
 
 import Entities from './db/entities';
 import { query } from './db/functions';
-import { Accounts } from './db/controllers';
+import { Accounts, Repo } from './db/controllers';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -37,10 +30,10 @@ interface ICleaning {
 
 const Cleaning: ICleaning = {
   deleteUnusedPersonsAndInstitutions: async (req, res) => {
-    const allPersons = await Entities.findAll<IPerson>('person');
-    const allInstitutions = await Entities.findAll<IInstitution>('institution');
-    const allDigObjs = await Entities.findAll<IDigitalEntity>('digitalentity');
-    const allPhyObjs = await Entities.findAll<IPhysicalEntity>('physicalentity');
+    const allPersons = await Repo.person.findAll();
+    const allInstitutions = await Repo.institution.findAll();
+    const allDigObjs = await Repo.digitalentity.findAll();
+    const allPhyObjs = await Repo.physicalentity.findAll();
 
     const confirm = req.params.confirm || false;
 
@@ -54,7 +47,7 @@ const Cleaning: ICleaning = {
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await Entities.deleteOne('person', query(person._id));
+      const deleteResult = await Repo.person.deleteOne(query(person._id));
       if (deleteResult) {
         Logger.info(`Deleted unused person ${person}`);
         total.push({ person, result: deleteResult });
@@ -65,7 +58,7 @@ const Cleaning: ICleaning = {
       const index = fullJSON.indexOf(_id);
       if (index !== -1) continue;
       if (!confirm) continue;
-      const deleteResult = await Entities.deleteOne('institution', query(institution._id));
+      const deleteResult = await Repo.institution.deleteOne(query(institution._id));
       if (deleteResult) {
         Logger.info(`Deleted unused institution ${institution}`);
         total.push({ institution, result: deleteResult });
@@ -80,7 +73,7 @@ const Cleaning: ICleaning = {
     });
   },
   deleteNullRefs: async (req, res) => {
-    const allUsers = await Accounts.User.findAll();
+    const allUsers = await Accounts.users.findAll();
 
     const confirm = req.params.confirm || false;
 
@@ -102,7 +95,7 @@ const Cleaning: ICleaning = {
         user.data[ref.field].splice(index, 1);
       }
       if (!confirm) return true;
-      const updateResult = await Accounts.User.updateOne(query(user._id), {
+      const updateResult = await Accounts.users.updateOne(query(user._id), {
         $set: { data: user.data },
       });
       if (!updateResult) {
@@ -131,7 +124,7 @@ const Cleaning: ICleaning = {
     res.status(200).send({ confirm, total });
   },
   cleanUploadedFiles: async (req, res) => {
-    const entities = await Entities.findAll<IEntity>('entity');
+    const entities = await Repo.entity.findAll();
     // Get all file paths from entities and flatten the array
     const files = ([] as string[]).concat(
       ...entities.map(entity => entity.files.map(file => file.file_link)),

@@ -110,7 +110,7 @@ const Mailer: IMailer = {
     if (!user) return false;
 
     if (target === ETarget.upload && user?.role === EUserRank.user) {
-      await Accounts.User.updateOne(
+      await Accounts.users.updateOne(
         { username: user.username, sessionID: user.sessionID },
         { $set: { role: EUserRank.uploadrequested } },
       );
@@ -127,7 +127,7 @@ const Mailer: IMailer = {
       mailSent,
     };
 
-    const insertResult = await Accounts.Mail.insertOne(document);
+    const insertResult = await Accounts.mails.insertOne(document);
     if (!insertResult) {
       Logger.info('Failed adding user to mail database');
       return false;
@@ -140,7 +140,7 @@ const Mailer: IMailer = {
     const user = await Users.getBySession(req);
     if (!user) throw new Error('User not found by session');
 
-    const entries = await Accounts.Mail.find({
+    const entries = await Accounts.mails.find({
       answered: false,
       user: query(user._id),
       target: destination,
@@ -150,7 +150,7 @@ const Mailer: IMailer = {
   getMailRelatedDatabaseEntries: async (_, res): Promise<any> => {
     if (!Configuration.Mailer.Target) return res.status(500).send('Mailing service not configured');
     const targets = Object.keys(Configuration.Mailer.Target);
-    res.status(200).send({ targets, entries: await Accounts.Mail.findAll() });
+    res.status(200).send({ targets, entries: await Accounts.mails.findAll() });
   },
   toggleMailAnswered: async (req, res): Promise<any> => {
     const target = req.params.target;
@@ -161,17 +161,17 @@ const Mailer: IMailer = {
     if (!ObjectId.isValid(identifier)) return res.status(400).send('Invalid mail identifier');
 
     const _id = new ObjectId(identifier);
-    const oldEntry = await Accounts.Mail.findOne(query(_id));
+    const oldEntry = await Accounts.mails.findOne(query(_id));
     if (!oldEntry || !!oldEntry.answered)
       return res.status(409).send('Invalid mail entry in database');
 
     const isAnswered = oldEntry.answered;
-    const updateResult = await Accounts.Mail.updateOne(query(_id), {
+    const updateResult = await Accounts.mails.updateOne(query(_id), {
       $set: { answered: !isAnswered },
     });
     if (!updateResult) return res.status(500).send('Failed updating entry');
 
-    res.status(200).send(await Accounts.Mail.findOne(query(_id)));
+    res.status(200).send(await Accounts.mails.findOne(query(_id)));
   },
 };
 

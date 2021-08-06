@@ -14,7 +14,6 @@ import {
   IPhysicalEntity,
   IPerson,
   IInstitution,
-  ITag,
   IStrippedUserData,
   isEntity,
   isAnnotation,
@@ -25,6 +24,7 @@ import { RootDirectory } from '../../environment';
 import { Logger } from '../logger';
 import { Configuration as Conf } from '../configuration';
 import { query, updatePreviewImage } from './functions';
+import { Repo } from './controllers';
 import Entities from './entities';
 import Users from './users';
 
@@ -36,17 +36,19 @@ const stripUserData = (obj: IUserData): IStrippedUserData => ({
   fullname: obj.fullname,
 });
 
+type EntityOrComp = IEntity | ICompilation;
+
 const updateAnnotationList = async (
   entityOrCompId: string,
-  collectionName: string,
+  coll: string,
   annotationId: string | ObjectId,
 ) => {
-  const obj = await Entities.resolve<IEntity | ICompilation>(entityOrCompId, collectionName, 0);
+  const obj = await Entities.resolve<EntityOrComp>(entityOrCompId, coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
-  const updateResult = await Entities.updateOne(collectionName, query(entityOrCompId), {
+  const updateResult = await Repo.get<EntityOrComp>(coll).updateOne(query(entityOrCompId), {
     $set: { annotations: obj.annotations },
   });
   return !!updateResult;
@@ -177,8 +179,7 @@ export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   const resolved = await Entities.resolve<IAddress>(address, 'address');
   address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
 
-  const result = await Entities.updateOne(
-    'address',
+  const result = await Repo.address.updateOne(
     query(address._id),
     { $set: { ...address } },
     { upsert: true },
@@ -216,8 +217,7 @@ export const saveInstitution = async (
 
   if (!save) return institution;
 
-  const result = await Entities.updateOne(
-    'institution',
+  const result = await Repo.institution.updateOne(
     query(institution._id),
     { $set: { ...institution } },
     { upsert: true },
@@ -234,8 +234,7 @@ export const saveContact = async (contact: IContact, userData?: IUserData) => {
   const resolved = await Entities.resolve<IContact>(contact, 'contact');
   contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
 
-  const result = await Entities.updateOne(
-    'contact',
+  const result = await Repo.contact.updateOne(
     query(contact._id),
     { $set: { ...contact } },
     { upsert: true },
@@ -280,8 +279,7 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
 
   if (!save) return person;
 
-  const result = await Entities.updateOne(
-    'person',
+  const result = await Repo.person.updateOne(
     query(person._id),
     { $set: { ...person } },
     { upsert: true },
@@ -324,18 +322,15 @@ export const saveMetaDataEntity = async (
 
       tag._id = ObjectId.isValid(tag._id) ? tag._id : new ObjectId();
 
-      newEntity.tags[i] = (await Entities.updateOne<ITag>(
-        'tag',
-        query(tag._id),
-        { $set: { ...tag } },
-        { upsert: true },
-      ).then(res => {
-        if (!res) return undefined;
+      newEntity.tags[i] = (await Repo.tag
+        .updateOne(query(tag._id), { $set: { ...tag } }, { upsert: true })
+        .then(res => {
+          if (!res) return undefined;
 
-        const _id = res.upsertedId ?? tag._id;
-        Users.makeOwnerOf(userData, _id, 'tag');
-        return _id;
-      })) as any;
+          const _id = res.upsertedId ?? tag._id;
+          Users.makeOwnerOf(userData, _id, 'tag');
+          return _id;
+        })) as any;
     }
   }
 
@@ -363,18 +358,15 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
       newEntity.phyObjs[i],
       userData,
     )) as IPhysicalEntity;
-    newEntity.phyObjs[i] = (await Entities.updateOne(
-      'physicalentity',
-      query(savedEntity._id),
-      { $set: { ...savedEntity } },
-      { upsert: true },
-    ).then(res => {
-      if (!res) throw new Error('Failed saving physicalentity');
+    newEntity.phyObjs[i] = (await Repo.physicalentity
+      .updateOne(query(savedEntity._id), { $set: { ...savedEntity } }, { upsert: true })
+      .then(res => {
+        if (!res) throw new Error('Failed saving physicalentity');
 
-      const _id = res.upsertedId ?? savedEntity._id;
-      Users.makeOwnerOf(userData, _id, 'physicalentity');
-      return _id;
-    })) as any;
+        const _id = res.upsertedId ?? savedEntity._id;
+        Users.makeOwnerOf(userData, _id, 'physicalentity');
+        return _id;
+      })) as any;
   }
 
   return newEntity;

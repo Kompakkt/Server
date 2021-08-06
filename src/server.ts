@@ -1,6 +1,7 @@
 import DBClient from './services/db/client';
 import Entities from './services/db/entities';
 import Users from './services/db/users';
+import { Repo } from './services/db/controllers';
 import { Admin } from './services/admin';
 import { Cleaning } from './services/cleaning';
 import { Express, Server, WebSocket } from './services/express';
@@ -51,7 +52,7 @@ Server.get('/api/v1/get/id', DBClient.getUnusedObjectId);
 Server.get('/api/v1/get/users', Users.validateSession, Users.getStrippedUsers);
 
 Server.get('/api/v1/get/groups', Users.validateSession, async (_, res) => {
-  return res.status(200).send(await Entities.findAll('group'));
+  return res.status(200).send(await Repo.group.findAll());
 });
 
 // POST

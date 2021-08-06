@@ -82,9 +82,9 @@ const saltHashPassword = (password: string) => {
 
 const verifyUser = async (username: string, password: string) => {
   // Exit early if user does not exist
-  if (!(await Accounts.User.findOne({ username }))) return false;
+  if (!(await Accounts.users.findOne({ username }))) return false;
 
-  const pwEntry = await Accounts.Password.findOne({ username });
+  const pwEntry = await Accounts.passwords.findOne({ username });
   if (!pwEntry) return false;
 
   const { salt, passwordHash: hash } = pwEntry.password;
@@ -115,14 +115,14 @@ const registerUser = async (req: Request, res: Response) => {
   };
 
   // First user gets admin
-  const isFirstUser = (await Accounts.User.findOne({})) === null;
+  const isFirstUser = (await Accounts.users.findOne({})) === null;
   const role = isFirstUser ? EUserRank.admin : EUserRank.user;
 
   const user = req.body as IRegisterRequest;
   if (!isRegisterRequest(user)) return res.status(400).send('Incomplete user data');
 
   const { username, password } = user;
-  if (!!(await Accounts.User.findOne({ username })))
+  if (!!(await Accounts.users.findOne({ username })))
     return res.status(409).send('User already exists');
 
   const adjustedUser: IUserData & { password?: string } = {
@@ -137,7 +137,7 @@ const registerUser = async (req: Request, res: Response) => {
 
   if (
     (await updateUserPassword(username, password)) &&
-    !!(await Accounts.User.insertOne(adjustedUser))
+    !!(await Accounts.users.insertOne(adjustedUser))
   ) {
     return res.status(201).send({ status: 'OK', ...adjustedUser });
   }
@@ -145,7 +145,7 @@ const registerUser = async (req: Request, res: Response) => {
 };
 
 const updateUserPassword = async (username: string, password: string): Promise<boolean> => {
-  const result = await Accounts.Password.updateOne(
+  const result = await Accounts.passwords.updateOne(
     { username },
     { $set: { username, password: saltHashPassword(password) } },
     { upsert: true },
@@ -223,7 +223,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
 };
 
 const verifyLocalStrategy: LocalStrategy.VerifyFunction = async (username, password, done) => {
-  const user = await Accounts.User.findOne({ username });
+  const user = await Accounts.users.findOne({ username });
   if (!user || !(await verifyUser(username, password))) {
     return done(undefined, false);
   }

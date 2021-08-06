@@ -21,10 +21,10 @@ const getBySession = (req: Request<any>) => {
   const username = (req as any).session?.passport?.user;
   const sessionID = req.sessionID;
   if (!sessionID || !username) return undefined;
-  return Accounts.User.findOne({ sessionID, username });
+  return Accounts.users.findOne({ sessionID, username });
 };
 
-const getByUsername = (username: string) => Accounts.User.findOne({ username });
+const getByUsername = (username: string) => Accounts.users.findOne({ username });
 
 const getUser = async (req: Request<any> | IUserData) =>
   isUser(req) ? await getByUsername(req.username) : await getBySession(req as Request);
@@ -51,7 +51,7 @@ const login = async (req: Request<any>, res: Response) => {
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
-  return Accounts.User.updateOne({ username }, { $set: updatedUser }, { upsert: true })
+  return Accounts.users.updateOne({ username }, { $set: updatedUser }, { upsert: true })
     .then(async () => {
       Logger.log(`User ${updatedUser.username} logged in`);
       res.status(200).send(await resolve(updatedUser));
@@ -66,7 +66,7 @@ const logout = async (req: Request<any>, res: Response) => {
   const user = await getBySession(req);
   if (!user) return res.status(400).send('User not found by session');
   const { username, sessionID } = user;
-  return Accounts.User.updateOne({ username, sessionID }, { $set: { sessionID: undefined } });
+  return Accounts.users.updateOne({ username, sessionID }, { $set: { sessionID: undefined } });
 };
 
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {
@@ -83,7 +83,7 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   if (doesExist) return true;
 
   user.data[coll].push(new ObjectId(_id));
-  const updateResult = await Accounts.User.updateOne(query(user._id), {
+  const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
   });
   if (!updateResult) return false;
@@ -101,7 +101,7 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   user.data[coll] = user.data[coll] ?? [];
   user.data[coll] = user.data[coll].filter(id => id !== _id);
 
-  const updateResult = await Accounts.User.updateOne(query(user._id), {
+  const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
   });
   if (!updateResult) return false;
@@ -208,7 +208,7 @@ const validateSession = async (req: Request<any>, _: Response, next: NextFunctio
 };
 
 const getStrippedUsers = async (_: Request<any>, res: Response) => {
-  const users = await Accounts.User.findAll();
+  const users = await Accounts.users.findAll();
   return res.status(200).send(
     users.map(user => ({
       username: user.username,
