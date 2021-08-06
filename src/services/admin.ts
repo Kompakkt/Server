@@ -126,7 +126,7 @@ const Admin: IAdmin = {
     if (success) {
       Logger.info(`Updated password for ${username}`);
       Mailer.sendMail({
-        from: Configuration.Mailer.Target?.contact ?? 'noreply@kompakkt.de',
+        from: Configuration.Mailer?.Target?.contact ?? 'noreply@kompakkt.de',
         to: user.mail,
         subject: '[Kompakkt] Your password has been reset',
         text: `

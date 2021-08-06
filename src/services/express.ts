@@ -36,12 +36,12 @@ const { UploadDirectory } = Configuration.Uploads;
 
 const Server = express();
 const createServer = () => {
-  if (enableHTTPS) {
+  if (enableHTTPS && SSLPaths) {
     const privateKey = readFileSync(SSLPaths.PrivateKey);
     const certificate = readFileSync(SSLPaths.Certificate);
 
     const options: HTTPS.ServerOptions = { key: privateKey, cert: certificate };
-    if (SSLPaths.Passphrase?.length > 0) {
+    if (!!SSLPaths.Passphrase) {
       options.passphrase = SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);

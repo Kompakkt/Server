@@ -369,7 +369,7 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   const userOwned = userData ? JSON.stringify(userData.data) : '';
 
   // Check if req is cached
-  const reqHash = RepoCache.hash({ sessionID: req.sessionID ?? 'guest', ...req.body});
+  const reqHash = RepoCache.hash({ sessionID: req.sessionID ?? 'guest', ...req.body });
   const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
   if (temp && temp?.length > 0) {
