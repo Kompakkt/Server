@@ -54,7 +54,7 @@
     "flatten": "^1.0.3",
     "fs-extra": "^10.0.0",
     "imagemin": "^7.0.1",
-    "imagemin-pngquant": "^9.0.2",
+    "imagemin-pngquant": "^8.0.0",
     "ioredis": "^4.27.7",
     "klaw-sync": "^6.0.0",
     "mongodb": "^4.0.1",

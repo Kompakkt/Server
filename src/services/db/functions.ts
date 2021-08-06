@@ -4,6 +4,7 @@ import imagemin from 'imagemin';
 import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
+import { Logger } from '../logger';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
@@ -75,7 +76,10 @@ const updatePreviewImage = async (
     return await writeBufferToFile(minified);
   };
 
-  const finalImagePath = await getPreviewImagePath(base64OrUrl).catch(() => 'previews/noimage.png');
+  const finalImagePath = await getPreviewImagePath(base64OrUrl).catch(err => {
+    Logger.err('Failed saving image from base64', err);
+    return 'previews/noimage.png';
+  });
 
   const https = Configuration.Express.enableHTTPS ? 'https' : 'http';
   const pubip = Configuration.Express.PublicIP;

@@ -27,18 +27,15 @@ const isUser = (obj: any): obj is IUserData => {
 const login = async (req: Request<any>, res: Response) => {
   const user: IUserData = req.user as IUserData;
   const username = req.body.username.toLowerCase();
-  const userData = await getBySession(req);
-  console.log('user', user);
-  console.log('userData', userData);
+  const userdata = await getByUsername(username);
 
-  if (!userData) return res.status(400).send('User not found by session');
+  if (!userdata) return res.status(400).send('User not found');
 
   const updatedUser: IUserData = {
     ...user,
-    username,
-    sessionID: userData.sessionID,
-    data: userData.data ?? {},
-    role: userData.role ?? EUserRank.user,
+    sessionID: req.sessionID,
+    data: userdata.data ?? {},
+    role: userdata.role ?? EUserRank.user,
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 

@@ -78,7 +78,7 @@ const saltHashPassword = (password: string) => {
   return sha512(password, generateSalt(SALT_LENGTH));
 };
 
-const verifyUser = async (username: string, password: string) => {
+const verifyPassword = async (username: string, password: string) => {
   // Exit early if user does not exist
   if (!(await Accounts.users.findOne({ username }))) return false;
 
@@ -222,7 +222,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
 
 const verifyLocalStrategy: LocalStrategy.VerifyFunction = async (username, password, done) => {
   const user = await Accounts.users.findOne({ username });
-  if (!user || !(await verifyUser(username, password))) {
+  if (!user || !(await verifyPassword(username, password))) {
     return done(undefined, false);
   }
   return done(undefined, user);
