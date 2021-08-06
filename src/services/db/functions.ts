@@ -2,7 +2,6 @@ import { ObjectId, Filter } from 'mongodb';
 import { ensureDir, writeFile } from 'fs-extra';
 import imagemin from 'imagemin';
 import imageminPngquant from 'imagemin-pngquant';
-
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 

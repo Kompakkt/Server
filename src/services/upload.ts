@@ -5,7 +5,6 @@ import multer from 'multer';
 import { basename, dirname, extname, join } from 'path';
 import slugify from 'slugify';
 import { createHash } from 'crypto';
-
 import { RootDirectory } from '../environment';
 import { UploadCache } from './cache';
 import { Configuration } from './configuration';

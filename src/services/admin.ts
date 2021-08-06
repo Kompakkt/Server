@@ -1,15 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
-
 import { EUserRank, IEntity } from '../common/interfaces';
-
 import { updateUserPassword } from './express';
 import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
-
-import { Entities, Users, Accounts, Repo, query } from './db'
+import { Entities, Users, Accounts, Repo, query } from './db';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;

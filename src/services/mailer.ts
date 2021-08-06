@@ -1,12 +1,10 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
-
 import { EUserRank } from '../common/interfaces';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
-
-import { Users, Accounts, query } from './db'
+import { Users, Accounts, query } from './db';
 
 interface IMailer {
   isConfigValid(): any;

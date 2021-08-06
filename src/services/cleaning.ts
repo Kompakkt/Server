@@ -1,13 +1,10 @@
 import { Request, Response } from 'express';
 import { unlink } from 'fs-extra';
-
 import klawSync from 'klaw-sync';
-
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { RootDirectory } from '../environment';
-
-import { Entities, Accounts, Repo, query } from './db'
+import { Entities, Accounts, Repo, query } from './db';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>

@@ -1,6 +1,5 @@
 import Redis from 'ioredis';
 import hash from 'object-hash';
-
 import { Logger } from './logger';
 import { Configuration } from './configuration';
 

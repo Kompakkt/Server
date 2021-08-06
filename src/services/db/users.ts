@@ -1,18 +1,9 @@
+// prettier-ignore
+import { IUserData, EUserRank, IDocument, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
-
-import {
-  IUserData,
-  EUserRank,
-  IDocument,
-  isAnnotation,
-  isPerson,
-  isInstitution,
-} from '../../common/interfaces';
-
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
-
 import { query } from './functions';
 import { Accounts } from './controllers';
 import Entities from './entities';
@@ -51,7 +42,8 @@ const login = async (req: Request<any>, res: Response) => {
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
-  return Accounts.users.updateOne({ username }, { $set: updatedUser }, { upsert: true })
+  return Accounts.users
+    .updateOne({ username }, { $set: updatedUser }, { upsert: true })
     .then(async () => {
       Logger.log(`User ${updatedUser.username} logged in`);
       res.status(200).send(await resolve(updatedUser));

@@ -1,5 +1,4 @@
 import Axios from 'axios';
-
 import { Configuration } from './configuration';
 
 const Europeana = {

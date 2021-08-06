@@ -1,28 +1,9 @@
-import {
-  ObjectId,
-  Filter,
-  Db,
-  OptionalId,
-  UpdateFilter,
-  UpdateOptions,
-  FindOptions,
-} from 'mongodb';
+// prettier-ignore
+import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common/interfaces';
+// prettier-ignore
+import { ObjectId, Filter, Db, OptionalId, UpdateFilter, UpdateOptions, FindOptions } from 'mongodb';
 import { Configuration } from '../configuration';
 import DBClient from './client';
-import {
-  IUserData,
-  IAddress,
-  IAnnotation,
-  ICompilation,
-  IContact,
-  IDigitalEntity,
-  IEntity,
-  IGroup,
-  IInstitution,
-  IPerson,
-  IPhysicalEntity,
-  ITag,
-} from '../../common/interfaces';
 import { Logger } from '../logger';
 import { IPasswordEntry } from '../express';
 

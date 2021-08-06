@@ -1,13 +1,7 @@
 import { Repo, Entities, query } from '../services/db';
-import { saveAddress, saveContact } from '../services/db/saving-strategies';
-import {
-  IPerson,
-  IInstitution,
-  IContact,
-  IAddress,
-  IDocument,
-  isUnresolved,
-} from '../common/interfaces';
+import { Save } from '../services/db/saving-strategies';
+// prettier-ignore
+import { IPerson, IInstitution, IContact, IAddress, IDocument, isUnresolved } from '../common/interfaces';
 
 (async () => {
   // Institutions
@@ -41,7 +35,7 @@ import {
       continue;
     }
 
-    const address = await saveAddress(addressEntry);
+    const address = await Save.address(addressEntry);
 
     institution.addresses = {};
     for (const id of relatedIds) {
@@ -91,7 +85,7 @@ import {
 
     person.contact_references = {};
     if (contactEntry) {
-      const contact = await saveContact(contactEntry);
+      const contact = await Save.contact(contactEntry);
       for (const id of relatedIds) {
         person.contact_references[id] = { _id: contact._id };
       }

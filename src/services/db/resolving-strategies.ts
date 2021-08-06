@@ -1,20 +1,5 @@
-import {
-  ICompilation,
-  IAddress,
-  IEntity,
-  IContact,
-  IDigitalEntity,
-  IPerson,
-  IInstitution,
-  IPhysicalEntity,
-  ITag,
-  IAnnotation,
-  isDigitalEntity,
-  isPerson,
-  isInstitution,
-  isUnresolved,
-} from '../../common/interfaces';
-
+// prettier-ignore
+import { ICompilation, IAddress, IEntity, IContact, IDigitalEntity, IPerson, IInstitution, IPhysicalEntity, ITag, IAnnotation, isDigitalEntity, isPerson, isInstitution, isUnresolved } from '../../common/interfaces';
 import Entities from './entities';
 
 const removeUnrelatedEntities = <T extends unknown>(
@@ -44,7 +29,7 @@ const removeUnrelatedEntities = <T extends unknown>(
 
 const exists = (obj: any) => !!obj;
 
-export const resolveInstitution = async (institution: IInstitution, entityId?: string) => {
+const resolveInstitution = async (institution: IInstitution, entityId?: string) => {
   if (entityId) institution = removeUnrelatedEntities<IInstitution>(institution, entityId);
 
   for (const [id, address] of Object.entries(institution.addresses)) {
@@ -59,7 +44,7 @@ export const resolveInstitution = async (institution: IInstitution, entityId?: s
   return institution;
 };
 
-export const resolvePerson = async (person: IPerson, entityId?: string) => {
+const resolvePerson = async (person: IPerson, entityId?: string) => {
   if (entityId) person = removeUnrelatedEntities<IPerson>(person, entityId);
 
   for (const [id, contact] of Object.entries(person.contact_references)) {
@@ -121,7 +106,7 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
   return entity;
 };
 
-export const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
+const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
   const entity = (await resolveMetaDataEntity(digitalEntity)) as IDigitalEntity;
 
   entity.tags = (
@@ -141,7 +126,7 @@ export const resolveDigitalEntity = async (digitalEntity: IDigitalEntity) => {
   return entity;
 };
 
-export const resolveEntity = async (entity: IEntity) => {
+const resolveEntity = async (entity: IEntity) => {
   for (const id in entity.annotations) {
     const resolved = await Entities.resolve<IAnnotation>(id, 'annotation');
     if (!resolved) {
@@ -161,7 +146,7 @@ export const resolveEntity = async (entity: IEntity) => {
   return entity;
 };
 
-export const resolveCompilation = async (compilation: ICompilation) => {
+const resolveCompilation = async (compilation: ICompilation) => {
   for (const id in compilation.entities) {
     const resolved = await Entities.resolve<IEntity>(id, 'entity');
     if (!resolved) {
@@ -181,4 +166,12 @@ export const resolveCompilation = async (compilation: ICompilation) => {
   }
 
   return compilation;
+};
+
+export const Resolve = {
+  institution: resolveInstitution,
+  person: resolvePerson,
+  digitalentity: resolveDigitalEntity,
+  entity: resolveEntity,
+  compilation: resolveCompilation,
 };

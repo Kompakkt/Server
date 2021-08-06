@@ -1,25 +1,8 @@
+// prettier-ignore
+import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, IStrippedUserData, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';
-
-import {
-  IAnnotation,
-  IAddress,
-  ICompilation,
-  IContact,
-  IEntity,
-  IGroup,
-  IUserData,
-  IDigitalEntity,
-  IPhysicalEntity,
-  IPerson,
-  IInstitution,
-  IStrippedUserData,
-  isEntity,
-  isAnnotation,
-  isDigitalEntity,
-  isUnresolved,
-} from '../../common/interfaces';
 import { RootDirectory } from '../../environment';
 import { Logger } from '../logger';
 import { Configuration as Conf } from '../configuration';
@@ -54,7 +37,7 @@ const updateAnnotationList = async (
   return !!updateResult;
 };
 
-export const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
+const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
   // Remove invalid annotations
   for (const id in compilation.annotations) {
     const value = compilation.annotations[id];
@@ -76,7 +59,7 @@ export const saveCompilation = async (compilation: ICompilation, userData: IUser
   return { ...compilation };
 };
 
-export const saveAnnotation = async (
+const saveAnnotation = async (
   annotation: IAnnotation,
   userData: IUserData,
   doesEntityExist: boolean,
@@ -149,7 +132,7 @@ export const saveAnnotation = async (
   return annotation;
 };
 
-export const saveEntity = async (entity: IEntity, userData: IUserData) => {
+const saveEntity = async (entity: IEntity, userData: IUserData) => {
   if (!entity.creator) entity.creator = stripUserData(userData);
 
   /* Preview image URLs might have a corrupted address
@@ -167,7 +150,7 @@ export const saveEntity = async (entity: IEntity, userData: IUserData) => {
   return entity;
 };
 
-export const saveGroup = async (group: IGroup, userData: IUserData) => {
+const saveGroup = async (group: IGroup, userData: IUserData) => {
   const strippedUserData = stripUserData(userData);
   group.creator = strippedUserData;
   group.members = [strippedUserData];
@@ -175,7 +158,7 @@ export const saveGroup = async (group: IGroup, userData: IUserData) => {
   return group;
 };
 
-export const saveAddress = async (address: IAddress, userData?: IUserData) => {
+const saveAddress = async (address: IAddress, userData?: IUserData) => {
   const resolved = await Entities.resolve<IAddress>(address, 'address');
   address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -192,11 +175,7 @@ export const saveAddress = async (address: IAddress, userData?: IUserData) => {
   return { ...address, _id };
 };
 
-export const saveInstitution = async (
-  institution: IInstitution,
-  userData?: IUserData,
-  save = false,
-) => {
+const saveInstitution = async (institution: IInstitution, userData?: IUserData, save = false) => {
   const resolved = await Entities.resolve<IInstitution>(institution, 'institution');
   institution._id = institution?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -230,7 +209,7 @@ export const saveInstitution = async (
   return { ...institution, _id };
 };
 
-export const saveContact = async (contact: IContact, userData?: IUserData) => {
+const saveContact = async (contact: IContact, userData?: IUserData) => {
   const resolved = await Entities.resolve<IContact>(contact, 'contact');
   contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -247,7 +226,7 @@ export const saveContact = async (contact: IContact, userData?: IUserData) => {
   return { ...contact, _id };
 };
 
-export const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
+const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
   const resolved = await Entities.resolve<IPerson>(person, 'person');
   person._id = person?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -292,7 +271,7 @@ export const savePerson = async (person: IPerson, userData?: IUserData, save = f
   return { ...person, _id };
 };
 
-export const saveMetaDataEntity = async (
+const saveMetaDataEntity = async (
   entity: IDigitalEntity | IPhysicalEntity,
   userData: IUserData,
 ) => {
@@ -337,7 +316,7 @@ export const saveMetaDataEntity = async (
   return newEntity;
 };
 
-export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
+const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
   const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IDigitalEntity;
 
   for (let i = 0; i < newEntity.persons.length; i++) {
@@ -370,4 +349,17 @@ export const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData:
   }
 
   return newEntity;
+};
+
+export const Save = {
+  compilation: saveCompilation,
+  annotation: saveAnnotation,
+  entity: saveEntity,
+  group: saveGroup,
+  address: saveAddress,
+  institution: saveInstitution,
+  contact: saveContact,
+  person: savePerson,
+  metadataentity: saveMetaDataEntity,
+  digitalentity: saveDigitalEntity,
 };

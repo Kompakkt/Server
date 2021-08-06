@@ -1,6 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
-
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
 

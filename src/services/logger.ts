@@ -1,7 +1,6 @@
 import { ensureFileSync, statSync, writeFileSync } from 'fs-extra';
 import { join } from 'path';
 import { inspect } from 'util';
-
 import { LogLevel } from '../enums';
 import { Environment, RootDirectory } from '../environment';
 

@@ -14,7 +14,6 @@ import LdapStrategy from 'passport-ldapauth';
 import LocalStrategy from 'passport-local';
 import SocketIo from 'socket.io';
 import resTime from 'response-time';
-
 import { RootDirectory } from '../environment';
 import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
 import { Accounts } from './db';

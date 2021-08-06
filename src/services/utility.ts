@@ -1,15 +1,7 @@
+// prettier-ignore
+import { IAnnotation, ICompilation, IEntity, IStrippedUserData, IGroup, isAnnotation } from '../common/interfaces';
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
-
-import {
-  IAnnotation,
-  ICompilation,
-  IEntity,
-  IStrippedUserData,
-  IGroup,
-  isAnnotation,
-} from '../common/interfaces';
-
 import { Entities, Repo, Users, Accounts, query } from './db';
 
 interface IUtility {

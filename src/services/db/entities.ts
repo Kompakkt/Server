@@ -1,40 +1,14 @@
+// prettier-ignore
+import {  ICompilation, IEntity, IUserData, IMetaDataDigitalEntity, isAnnotation, isCompilation, isDigitalEntity, isEntity, isPerson, isInstitution } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
-
 import { RepoCache } from '../cache';
 import { Logger } from '../logger';
-import {
-  ICompilation,
-  IEntity,
-  IUserData,
-  IMetaDataDigitalEntity,
-  isAnnotation,
-  isCompilation,
-  isDigitalEntity,
-  isEntity,
-  isPerson,
-  isInstitution,
-} from '../../common/interfaces';
-import {
-  resolveCompilation,
-  resolveDigitalEntity,
-  resolveEntity,
-  resolvePerson,
-  resolveInstitution,
-} from './resolving-strategies';
-import {
-  saveAnnotation,
-  saveCompilation,
-  saveDigitalEntity,
-  saveEntity,
-  savePerson,
-  saveInstitution,
-} from './saving-strategies';
-
+import { Resolve } from './resolving-strategies';
+import { Save } from './saving-strategies';
 import { query, updatePreviewImage } from './functions';
 import Users from './users';
 import { Repo } from './controllers';
-// import DBClient from './client';
 
 interface IExploreRequest {
   searchEntity: boolean;
@@ -89,22 +63,22 @@ const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Re
   let savingPromise: Promise<any> | undefined;
   switch (true) {
     case isCompilation(entity):
-      savingPromise = saveCompilation(entity, userData);
+      savingPromise = Save.compilation(entity, userData);
       break;
     case isEntity(entity):
-      savingPromise = saveEntity(entity, userData);
+      savingPromise = Save.entity(entity, userData);
       break;
     case isAnnotation(entity):
-      savingPromise = saveAnnotation(entity, userData, doesEntityExist);
+      savingPromise = Save.annotation(entity, userData, doesEntityExist);
       break;
     case isPerson(entity):
-      savingPromise = savePerson(entity, userData);
+      savingPromise = Save.person(entity, userData);
       break;
     case isInstitution(entity):
-      savingPromise = saveInstitution(entity, userData);
+      savingPromise = Save.institution(entity, userData);
       break;
     case isDigitalEntity(entity):
-      savingPromise = saveDigitalEntity(entity, userData);
+      savingPromise = Save.digitalentity(entity, userData);
       break;
     default:
       await Users.makeOwnerOf(req, _id, coll);
@@ -173,15 +147,15 @@ const resolve = async <T>(obj: any, coll: string, depth?: number) => {
     .then(async resolve_result => {
       if (depth && depth === 0) return resolve_result;
 
-      if (isDigitalEntity(resolve_result)) return resolveDigitalEntity(resolve_result);
+      if (isDigitalEntity(resolve_result)) return Resolve.digitalentity(resolve_result);
 
-      if (isEntity(resolve_result)) return resolveEntity(resolve_result);
+      if (isEntity(resolve_result)) return Resolve.entity(resolve_result);
 
-      if (isCompilation(resolve_result)) return resolveCompilation(resolve_result);
+      if (isCompilation(resolve_result)) return Resolve.compilation(resolve_result);
 
-      if (isPerson(resolve_result)) return resolvePerson(resolve_result);
+      if (isPerson(resolve_result)) return Resolve.person(resolve_result);
 
-      if (isInstitution(resolve_result)) return resolveInstitution(resolve_result);
+      if (isInstitution(resolve_result)) return Resolve.institution(resolve_result);
 
       return resolve_result;
     })
