@@ -513,22 +513,44 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   RepoCache.set(reqHash, items, 3600);
 };
 
+/**
+ * Resolves all entries in a collection. Used for error checking
+ */
 const test = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
   if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
   const docs = (await Repo.get(coll)?.findAll()) ?? [];
-
-  const maxRand = 5;
-  const randIndex = Math.floor(Math.random() * (docs.length - maxRand));
-
-  const resolved = await Promise.all(
-    docs.slice(randIndex, randIndex + maxRand).map(doc => resolve<any>(doc, coll)),
-  );
+  const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   const filtered = resolved.filter(_ => _);
 
-  return res.status(200).send(filtered.slice(0, 5));
-  return res.status(200).send({});
+  // prettier-ignore
+  Logger.info(`Found ${docs.length} in ${coll}. Resolved ${resolved.length}. Remaining after filtering ${filtered.length}`);
+
+  return res.json({ found: docs.length, resolved: resolved.length, final: filtered.length });
+};
+
+/**
+ * Resolves all entries in all collections. Used for error checking
+ */
+const testAll = async (_: Request, res: Response) => {
+  const collections = Object.values(ECollection);
+  const totals = { found: 0, resolved: 0, final: 0 };
+
+  for (const coll of collections) {
+    const docs = (await Repo.get(coll)?.findAll()) ?? [];
+    const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
+    const filtered = resolved.filter(_ => _);
+
+    // prettier-ignore
+    Logger.info(`Found ${docs.length} in ${coll}. Resolved ${resolved.length}. Remaining after filtering ${filtered.length}`);
+
+    totals.found += docs.length;
+    totals.resolved += resolved.length;
+    totals.final += filtered.length;
+  }
+
+  return res.json(totals);
 };
 
 export const Entities = {
@@ -542,6 +564,7 @@ export const Entities = {
   searchByTextFilter,
   explore,
   test,
+  testAll,
 };
 
 export default Entities;

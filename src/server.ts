@@ -1,9 +1,9 @@
-import { DBClient, Entities } from './services/db';
+import { DBClient } from './services/db';
 import { Express, Server, WebSocket } from './services/express';
 import { Socket } from './services/socket';
 
 // prettier-ignore
-import { AdminRouter, ApiV1Router, CleaningRouter, MailRouter, UploadRouter, UserManagementRouter, UtilityRouter } from './routes';
+import { AdminRouter, ApiV1Router, CleaningRouter, MailRouter, UploadRouter, UserManagementRouter, UtilityRouter, TestingRouter } from './routes';
 
 // Check if MongoDB is connected
 Server.use(DBClient.Middleware.isConnected);
@@ -33,11 +33,9 @@ Server.use('/mail', MailRouter);
 Server.use('/upload', UploadRouter);
 Server.use('/user-management', UserManagementRouter);
 Server.use('/utility', UtilityRouter);
+Server.use('/testing', TestingRouter);
 
 // WebSocket
 WebSocket.on('connection', Socket._handler);
-
-// Test Route
-Server.get('/test/:collection', Entities.test);
 
 Express.startListening();
