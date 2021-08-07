@@ -6,7 +6,7 @@ import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
-import { Entities, Users, Accounts, Repo, query } from './db';
+import { Entities, Users, Accounts, Repo, query, isValidCollection } from './db';
 
 const checkAndReturnObjectId = (id: ObjectId | string) =>
   ObjectId.isValid(id) ? new ObjectId(id) : undefined;
@@ -55,6 +55,7 @@ const Admin: IAdmin = {
     filterProperties.forEach(prop => ((user as any)[prop] = undefined));
 
     for (const coll in user.data) {
+      if (!isValidCollection(coll)) continue;
       for (let i = 0; i < user.data[coll].length; i++) {
         const obj = user.data[coll][i];
         user.data[coll][i] = await Entities.resolve(obj, coll, 0);

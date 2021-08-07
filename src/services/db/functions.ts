@@ -5,6 +5,7 @@ import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
+import { IUserData, IStrippedUserData } from '../../common/interfaces';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
@@ -84,4 +85,14 @@ const updatePreviewImage = async (
   return finalImagePath;
 };
 
-export { query, areIdsEqual, updatePreviewImage };
+/**
+ * Removes all user properties except for fullname, username and _id
+ * @type {[type]}
+ */
+const stripUserData = (obj: IUserData): IStrippedUserData => ({
+  _id: obj._id,
+  username: obj.username,
+  fullname: obj.fullname,
+});
+
+export { query, areIdsEqual, updatePreviewImage, stripUserData };

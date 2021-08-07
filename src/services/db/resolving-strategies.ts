@@ -174,4 +174,8 @@ export const Resolve = {
   digitalentity: resolveDigitalEntity,
   entity: resolveEntity,
   compilation: resolveCompilation,
+  get: <T extends unknown>(collection: string, ...args: any) =>
+    (Resolve as any)[collection]
+      ? ((Resolve as any)[collection](...args) as Promise<T | undefined>)
+      : undefined,
 };

@@ -1,31 +1,26 @@
 // prettier-ignore
-import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, IStrippedUserData, ITag, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
+import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, ITag, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';
 import { RootDirectory } from '../../environment';
 import { Logger } from '../logger';
 import { Configuration as Conf } from '../configuration';
-import { query, updatePreviewImage } from './functions';
+import { query, updatePreviewImage, stripUserData } from './functions';
 import { Repo } from './controllers';
 import Entities from './entities';
 import Users from './users';
 
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 
-const stripUserData = (obj: IUserData): IStrippedUserData => ({
-  _id: obj._id,
-  username: obj.username,
-  fullname: obj.fullname,
-});
-
 type EntityOrComp = IEntity | ICompilation;
 
 const updateAnnotationList = async (
   entityOrCompId: string,
-  coll: string,
+  coll: 'entity' | 'compilation',
   annotationId: string | ObjectId,
 ) => {
+  if (coll !== 'entity' && coll !== 'compilation') return undefined;
   const obj = await Entities.resolve<EntityOrComp>(entityOrCompId, coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();

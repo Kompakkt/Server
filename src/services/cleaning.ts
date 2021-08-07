@@ -4,7 +4,7 @@ import klawSync from 'klaw-sync';
 import { Configuration } from './configuration';
 import { Logger } from './logger';
 import { RootDirectory } from '../environment';
-import { Entities, Accounts, Repo, query } from './db';
+import { Entities, Accounts, Repo, query, isValidCollection } from './db';
 
 const deleteFile = async (path: string) =>
   new Promise<void>((resolve, reject) =>
@@ -74,20 +74,21 @@ const Cleaning: ICleaning = {
 
     const total: any[] = [];
 
-    const checkReferences = async (array: any[], field: string) => {
+    const checkReferences = async (array: any[], coll: string) => {
       const deletedReferences: any[] = [];
+      if (!isValidCollection(coll)) return [];
       for (const _id of array) {
-        const result = await Entities.resolve<any>(_id, field);
+        const result = await Entities.resolve<any>(_id, coll);
         if (result !== null && Object.keys(result).length > 0) continue;
-        deletedReferences.push({ field, _id });
+        deletedReferences.push({ coll, _id });
       }
       return deletedReferences;
     };
 
     const deleteUserNullRefs = async (user: any, nullrefs: any[]): Promise<boolean> => {
       for (const ref of nullrefs) {
-        const index = user.data[ref.field].indexOf(ref._id);
-        user.data[ref.field].splice(index, 1);
+        const index = user.data[ref.coll].indexOf(ref._id);
+        user.data[ref.coll].splice(index, 1);
       }
       if (!confirm) return true;
       const updateResult = await Accounts.users.updateOne(query(user._id), {
@@ -102,10 +103,10 @@ const Cleaning: ICleaning = {
     };
 
     const iterateOverUserData = async (user: any) => {
-      for (const property in user.data) {
-        if (user.data[property] instanceof Array) {
-          if (user.data[property].length <= 0) continue;
-          const nullRefs = await checkReferences(user.data[property], property);
+      for (const coll in user.data) {
+        if (user.data[coll] instanceof Array) {
+          if (user.data[coll].length <= 0) continue;
+          const nullRefs = await checkReferences(user.data[coll], coll);
           if (nullRefs.length === 0) continue;
           const success = await deleteUserNullRefs(user, nullRefs);
           if (success) total.push({ user: user.username, nullRefs });

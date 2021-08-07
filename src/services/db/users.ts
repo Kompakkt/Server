@@ -114,12 +114,12 @@ const resolve = async (req: Request<any> | IUserData) => {
   if (cachedUser) return cachedUser;
 
   // Otherwise fully resolve
-  for (const property in { ...data }) {
-    data[property] = await Promise.all(
-      data[property].map(async obj => Entities.resolve(obj, property)),
-    );
+  for (const coll in { ...data }) {
+    if (!isValidCollection(coll)) continue;
+
+    data[coll] = await Promise.all(data[coll].map(async obj => Entities.resolve(obj, coll)));
     // Filter possible null's
-    data[property] = data[property].filter(obj => obj && Object.keys(obj).length > 0);
+    data[coll] = data[coll].filter(obj => obj && Object.keys(obj).length > 0);
   }
 
   // Replace new resolved data and update cache
