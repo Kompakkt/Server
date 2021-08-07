@@ -1,11 +1,12 @@
 // prettier-ignore
-import { IUserData, EUserRank, IDocument, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
+import { IUserData, EUserRank, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
 import { query } from './functions';
-import { Accounts } from './controllers';
+import { Accounts, Repo } from './controllers';
+import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
 import Entities from './entities';
 
 const getBySession = (req: Request<any>) => {
@@ -150,15 +151,21 @@ const isAdmin = async (req: Request<any> | IUserData) => {
   return user ? user.role === EUserRank.admin : false;
 };
 
-const isAllowedToEdit = async (req: Request<any>, res: Response, next: NextFunction) => {
+const isAllowedToEdit = async (
+  req: Request<ICollectionParam, any, PushableEntry>,
+  res: Response<any, IEntityHeadsUp>,
+  next: NextFunction,
+) => {
   const user = await getBySession(req);
   if (!user) return res.status(404).send('User not found by session');
 
-  const collectionName = req.params.collection.toLowerCase();
-  const entity = req.body as IDocument;
+  const collectionName = req.params.collection;
+  if (!isValidCollection(collectionName)) return res.status(400).send('Invalid collection');
 
-  const isValidObjectId = ObjectId.isValid(entity._id);
-  const doesEntityExist = !!(await Entities.resolve(entity, collectionName, 0));
+  const { _id } = req.body;
+
+  const isValidObjectId = ObjectId.isValid(_id);
+  const doesEntityExist = !!(await Repo.get(collectionName)?.findOne(query(_id)));
 
   /**
    * If the entity already exists we need to check for owner status
@@ -169,18 +176,12 @@ const isAllowedToEdit = async (req: Request<any>, res: Response, next: NextFunct
    */
   const isEditableType = (_e: any) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
-  const needOwnerCheck = isValidObjectId && doesEntityExist && !isEditableType(entity);
-  if (needOwnerCheck && !(await isOwner(req, entity._id))) {
+  const needOwnerCheck = isValidObjectId && doesEntityExist && !isEditableType(req.body);
+  if (needOwnerCheck && !(await isOwner(req, _id))) {
     return res.status(401).send('User is not owner');
   }
 
-  // TODO: As Interface
-  (req as any).data = {
-    userData: user,
-    doesEntityExist,
-    isValidObjectId,
-    collectionName,
-  };
+  res.locals.headsUp = { user, doesEntityExist, isValidObjectId, collectionName };
 
   return next();
 };

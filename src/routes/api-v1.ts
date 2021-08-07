@@ -50,9 +50,6 @@ router.get('/get/groups', (_, res) => Repo.group.findAll().then(res.json));
 // Add or update a document to a collection
 router.post('/post/push/:collection', Users.isAllowedToEdit, Entities.addEntityToCollection);
 
-// Submit route for digitalentity, redirects to the route above with correct parameter
-router.post('/post/submit', Entities.submit);
-
 // Update the settings of a specific entity
 router.post('/post/settings/:identifier', Entities.updateEntitySettings);
 

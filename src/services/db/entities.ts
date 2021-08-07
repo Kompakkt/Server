@@ -1,5 +1,5 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IUserData, IMetaDataDigitalEntity, isAnnotation, isCompilation, isDigitalEntity, isEntity, isPerson, isInstitution } from '../../common/interfaces';
+import {  ICompilation, IEntity, IMetaDataDigitalEntity, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
 import { RepoCache } from '../cache';
@@ -7,6 +7,7 @@ import { Logger } from '../logger';
 import { Resolve } from './resolving-strategies';
 import { Save } from './saving-strategies';
 import { query, updatePreviewImage } from './functions';
+import { IEntityHeadsUp, PushableEntry, isValidCollection, ECollection } from './definitions';
 import Users from './users';
 import { Repo } from './controllers';
 
@@ -29,72 +30,68 @@ interface IEntityRequestParams {
   password?: string;
 }
 
-/**
- * DEPRECATED: Redirects to correct function though!
- * When the user submits the metadataform this function
- * adds the missing data to defined collections
- */
-const submit = async (req: Request<IEntityRequestParams>, res: Response) => {
-  Logger.info('Handling submit req');
-  req.params.collection = 'digitalentity';
-  await addEntityToCollection(req, res);
-};
-
-// TODO: Typesafe collectionName with validation
-const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Response) => {
+// TODO: Should all collections be pushable?
+const addEntityToCollection = async (
+  req: Request<any, any, PushableEntry>,
+  res: Response<any, IEntityHeadsUp>,
+) => {
   RepoCache.flush();
 
-  const {
-    userData,
-    doesEntityExist,
-    isValidObjectId,
-    collectionName: coll,
-  } = (req as any).data as {
-    userData: IUserData;
-    doesEntityExist: boolean;
-    isValidObjectId: boolean;
-    collectionName: string;
-  };
+  const { user, doesEntityExist, isValidObjectId, collectionName: coll } = res.locals.headsUp;
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
   let entity = req.body;
   const _id = isValidObjectId ? new ObjectId(entity._id) : new ObjectId();
   entity._id = _id;
 
-  let savingPromise: Promise<any> | undefined;
-  switch (true) {
-    case isCompilation(entity):
-      savingPromise = Save.compilation(entity, userData);
-      break;
-    case isEntity(entity):
-      savingPromise = Save.entity(entity, userData);
-      break;
-    case isAnnotation(entity):
-      savingPromise = Save.annotation(entity, userData, doesEntityExist);
-      break;
-    case isPerson(entity):
-      savingPromise = Save.person(entity, userData);
-      break;
-    case isInstitution(entity):
-      savingPromise = Save.institution(entity, userData);
-      break;
-    case isDigitalEntity(entity):
-      savingPromise = Save.digitalentity(entity, userData);
-      break;
-    default:
-      await Users.makeOwnerOf(req, _id, coll);
-      break;
+  // Validate the request body via typeguard and match it via collection name
+  // to prevent pushing a generally valid entity to the wrong collection
+  // TODO: could be solved with a map
+  // TODO: validation could be handled by saving strategy instead
+  let savingPromise: Promise<PushableEntry> | undefined;
+  if (isAddress(entity) && coll === ECollection.address) {
+    savingPromise = Save.address(entity, user);
+  } else if (isAnnotation(entity) && coll === ECollection.annotation) {
+    savingPromise = Save.annotation(entity, user, doesEntityExist);
+  } else if (isCompilation(entity) && coll === ECollection.compilation) {
+    savingPromise = Save.compilation(entity, user);
+  } else if (isContact(entity) && coll === ECollection.contact) {
+    savingPromise = Save.contact(entity, user);
+  } else if (isDigitalEntity(entity) && coll === ECollection.digitalentity) {
+    savingPromise = Save.digitalentity(entity, user);
+  } else if (isEntity(entity) && coll === ECollection.entity) {
+    savingPromise = Save.entity(entity, user);
+  } else if (isGroup(entity) && coll === ECollection.group) {
+    savingPromise = Save.group(entity, user);
+  } else if (isInstitution(entity) && coll === ECollection.institution) {
+    savingPromise = Save.institution(entity, user);
+  } else if (isPerson(entity) && coll === ECollection.person) {
+    savingPromise = Save.person(entity, user);
+  } else if (isPhysicalEntity(entity) && coll === ECollection.physicalentity) {
+    savingPromise = Save.metadataentity(entity, user);
+  } else if (isTag(entity) && coll === ECollection.tag) {
+    savingPromise = Save.tag(entity, user);
+  } else {
+    return res.status(400).send('Sent entity does not belong in given collection');
   }
-  await savingPromise
-    ?.then(async res => {
-      entity = res;
-      if (isDigitalEntity(entity)) await Users.makeOwnerOf(req, entity._id, 'digitalentity');
-    })
-    .catch(err => Logger.err(err) && res.status(500).send(err));
 
-  // We already got rejected. Don't update entity in DB
-  if (res.headersSent) return undefined;
+  // Just in case this did not happen in the saving strategy
+  Users.makeOwnerOf(req, _id, coll);
 
-  const updateResult = await Repo.get(coll)?.updateOne({ _id }, { $set: entity }, { upsert: true });
+  const resultEntity = savingPromise
+    ? await savingPromise.catch(err => {
+        Logger.err('Failed saving entity to database', err);
+        return undefined;
+      })
+    : entity;
+
+  if (!resultEntity) return res.status(500).send('Failed saving entity to database');
+
+  const updateResult = await Repo.get(coll)?.updateOne(
+    { _id },
+    { $set: resultEntity },
+    { upsert: true },
+  );
 
   if (!updateResult) {
     Logger.err(`Failed updating ${coll} ${_id}`);
@@ -539,7 +536,6 @@ const test = async (req: Request<IEntityRequestParams>, res: Response) => {
 };
 
 export const Entities = {
-  submit,
   addEntityToCollection,
   updateEntitySettings,
   resolve,
