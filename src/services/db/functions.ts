@@ -81,11 +81,7 @@ const updatePreviewImage = async (
     return 'previews/noimage.png';
   });
 
-  const https = Configuration.Express.enableHTTPS ? 'https' : 'http';
-  const pubip = Configuration.Express.PublicIP;
-  const port = Configuration.Express.Port;
-
-  return `${https}://${pubip}:${port}/${finalImagePath}`;
+  return finalImagePath;
 };
 
 export { query, areIdsEqual, updatePreviewImage };

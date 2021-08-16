@@ -37,11 +37,11 @@ class Controller<T> {
   public findCursor(filter: Filter<T>, options: FindOptions = {}) {
     return this.collection.find<T>(filter, options);
   }
-  public findAll() {
-    return this.collection.find<T>({}).toArray();
-  }
   public findAllCursor() {
     return this.collection.find<T>({});
+  }
+  public findAll() {
+    return this.findAllCursor().toArray();
   }
   public insertOne(doc: OptionalId<T>) {
     return this.collection.insertOne(doc).catch(err => {
