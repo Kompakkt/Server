@@ -274,7 +274,7 @@ Server.use(
     cookie: {
       httpOnly: false,
       sameSite: 'none',
-      secure: enableHTTPS,
+      secure: true,
     },
   }),
 );
