@@ -27,13 +27,16 @@ const userInWhitelistQuery = async (user: IUserData) => {
   const groups = await Repo.group.find(userInGroupQuery(user));
 
   // Build query for whitelist containing the user in persons or in groups
-  const groupQuery = (groups ?? []).map(g => ({ $elemMatch: { _id: queryIn(g._id) } }));
-  return {
-    $or: [
-      { 'whitelist.persons': { $elemMatch: { _id: queryIn(user._id) } } },
-      { 'whitelist.groups': { $or: groupQuery } },
-    ],
+  const query: Filter<ICompilation> = {
+    'whitelist.enabled': { $eq: true },
+    '$or': [{ 'whitelist.persons': { $elemMatch: { _id: queryIn(user._id) } } }],
   };
+  if (groups && groups.length > 0) {
+    const groupQuery = { $elemMatch: { _id: { $in: groups.flatMap(g => queryIn(g._id).$in) } } };
+    query.$or!.push({ 'whitelist.groups': groupQuery });
+  }
+
+  return query;
 };
 
 const userInGroupQuery = (user: IUserData) => {
@@ -69,7 +72,7 @@ const countEntityUses = async (req: Request<IIdentifierParam>, res: Response) =>
   const filter: Filter<ICompilation> = { $or: [{ password: { $eq: '' } }] };
   if (user) {
     filter.$or!.push({ 'creator._id': queryIn(user._id) });
-    filter.$or!.push(userInWhitelistQuery(user));
+    filter.$or!.push(await userInWhitelistQuery(user));
   }
   filter[`entities.${_id}`] = { $exists: true };
 
@@ -169,7 +172,8 @@ const findUserInCompilations = async (req: Request, res: Response) => {
   if (!user) return res.status(404).send('Failed getting user by SessionId');
 
   // Only show compilations where the user is in the whitelist
-  const compilations = await Repo.compilation.find(userInWhitelistQuery(user));
+  const filter = await userInWhitelistQuery(user);
+  const compilations = await Repo.compilation.find(filter);
   if (!compilations) return res.status(200).send([]);
 
   const resolved = await Promise.all(
