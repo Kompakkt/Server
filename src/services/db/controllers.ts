@@ -93,3 +93,8 @@ export const Repo = {
   tag: new Controller<ITag>('tag', RepositoryDB),
   get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T> | undefined,
 };
+
+// Create indexes
+Accounts.users.collection.createIndex({ "username": 1 });
+Accounts.users.collection.createIndex({ "username": 1, "sessionID": 1 });
+Accounts.passwords.collection.createIndex({ "username": 1 });
