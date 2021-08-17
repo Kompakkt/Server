@@ -1,11 +1,12 @@
 // prettier-ignore
-import { IUserData, EUserRank, IDocument, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
+import { IUserData, EUserRank, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
-import { query } from './functions';
-import { Accounts } from './controllers';
+import { query, areIdsEqual } from './functions';
+import { Accounts, Repo } from './controllers';
+import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
 import Entities from './entities';
 
 const getBySession = (req: Request<any>) => {
@@ -63,15 +64,14 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
 
   if (!ObjectId.isValid(_id) || !user) return false;
 
-  user.data[coll] = user.data[coll] ?? [];
+  const arr = (user.data[coll] ?? []).filter(_ => _);
 
-  const doesExist = user.data[coll]
-    .filter(obj => obj)
-    .find((obj: any) => obj.toString() === _id.toString());
-
+  const doesExist = arr.find(id => areIdsEqual(id, _id));
   if (doesExist) return true;
 
-  user.data[coll].push(new ObjectId(_id));
+  arr.push(new ObjectId(_id));
+
+  user.data[coll] = arr;
   const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
   });
@@ -87,8 +87,8 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
 
   if (!ObjectId.isValid(_id) || !user) return false;
 
-  user.data[coll] = user.data[coll] ?? [];
-  user.data[coll] = user.data[coll].filter(id => id !== _id);
+  const arr = (user.data[coll] ?? []).filter(_ => _).filter(id => !areIdsEqual(id, _id));
+  user.data[coll] = arr;
 
   const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
@@ -113,12 +113,12 @@ const resolve = async (req: Request<any> | IUserData) => {
   if (cachedUser) return cachedUser;
 
   // Otherwise fully resolve
-  for (const property in { ...data }) {
-    data[property] = await Promise.all(
-      data[property].map(async obj => Entities.resolve(obj, property)),
-    );
+  for (const coll in { ...data }) {
+    if (!isValidCollection(coll)) continue;
+    if (data[coll] === undefined) continue;
+    data[coll] = await Promise.all(data[coll]!.map(async obj => Entities.resolve(obj, coll)));
     // Filter possible null's
-    data[property] = data[property].filter(obj => obj && Object.keys(obj).length > 0);
+    data[coll] = data[coll]!.filter(obj => obj && Object.keys(obj).length > 0);
   }
 
   // Replace new resolved data and update cache
@@ -150,15 +150,21 @@ const isAdmin = async (req: Request<any> | IUserData) => {
   return user ? user.role === EUserRank.admin : false;
 };
 
-const isAllowedToEdit = async (req: Request<any>, res: Response, next: NextFunction) => {
+const isAllowedToEdit = async (
+  req: Request<ICollectionParam, any, PushableEntry>,
+  res: Response<any, IEntityHeadsUp>,
+  next: NextFunction,
+) => {
   const user = await getBySession(req);
   if (!user) return res.status(404).send('User not found by session');
 
-  const collectionName = req.params.collection.toLowerCase();
-  const entity = req.body as IDocument;
+  const collectionName = req.params.collection;
+  if (!isValidCollection(collectionName)) return res.status(400).send('Invalid collection');
 
-  const isValidObjectId = ObjectId.isValid(entity._id);
-  const doesEntityExist = !!(await Entities.resolve(entity, collectionName, 0));
+  const { _id } = req.body;
+
+  const isValidObjectId = ObjectId.isValid(_id);
+  const doesEntityExist = !!(await Repo.get(collectionName)?.findOne(query(_id)));
 
   /**
    * If the entity already exists we need to check for owner status
@@ -169,18 +175,12 @@ const isAllowedToEdit = async (req: Request<any>, res: Response, next: NextFunct
    */
   const isEditableType = (_e: any) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
-  const needOwnerCheck = isValidObjectId && doesEntityExist && !isEditableType(entity);
-  if (needOwnerCheck && !(await isOwner(req, entity._id))) {
+  const needOwnerCheck = isValidObjectId && doesEntityExist && !isEditableType(req.body);
+  if (needOwnerCheck && !(await isOwner(req, _id))) {
     return res.status(401).send('User is not owner');
   }
 
-  // TODO: As Interface
-  (req as any).data = {
-    userData: user,
-    doesEntityExist,
-    isValidObjectId,
-    collectionName,
-  };
+  res.locals.headsUp = { user, doesEntityExist, isValidObjectId, collectionName };
 
   return next();
 };

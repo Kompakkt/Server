@@ -1,5 +1,7 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IUserData, IMetaDataDigitalEntity, isAnnotation, isCompilation, isDigitalEntity, isEntity, isPerson, isInstitution } from '../../common/interfaces';
+import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag } from '../../common/interfaces';
+// prettier-ignore
+import { IEntityHeadsUp, PushableEntry, isValidCollection, ECollection, CollectionName } from './definitions';
 import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
 import { RepoCache } from '../cache';
@@ -7,6 +9,7 @@ import { Logger } from '../logger';
 import { Resolve } from './resolving-strategies';
 import { Save } from './saving-strategies';
 import { query, updatePreviewImage } from './functions';
+
 import Users from './users';
 import { Repo } from './controllers';
 
@@ -30,72 +33,79 @@ interface IEntityRequestParams {
 }
 
 /**
- * DEPRECATED: Redirects to correct function though!
- * When the user submits the metadataform this function
- * adds the missing data to defined collections
+ * Takes an object and tries to save it to a collection. Depending on the type of the object also
+ * transforms the object and recursively saves inner objects (see saving strategies).
+ * Objects get validated via a type guard and the associated collection name.
+ * If the object type and the collection name do not match, returns undefined.
+ * @type {[type]}
  */
-const submit = async (req: Request<IEntityRequestParams>, res: Response) => {
-  Logger.info('Handling submit req');
-  req.params.collection = 'digitalentity';
-  await addEntityToCollection(req, res);
+const saveEntity = (
+  entity: PushableEntry,
+  options: { coll: CollectionName; user: IUserData; doesEntityExist: boolean },
+): Promise<PushableEntry> | undefined => {
+  const { coll, user, doesEntityExist } = options;
+  switch (coll) {
+    case ECollection.address:
+      return isAddress(entity) ? Save.address(entity, user) : undefined;
+    case ECollection.annotation:
+      return isAnnotation(entity) ? Save.annotation(entity, user, doesEntityExist!) : undefined;
+    case ECollection.compilation:
+      return isCompilation(entity) ? Save.compilation(entity, user) : undefined;
+    case ECollection.contact:
+      return isContact(entity) ? Save.contact(entity, user) : undefined;
+    case ECollection.digitalentity:
+      return isDigitalEntity(entity) ? Save.digitalentity(entity, user) : undefined;
+    case ECollection.entity:
+      return isEntity(entity) ? Save.entity(entity, user) : undefined;
+    case ECollection.group:
+      return isGroup(entity) ? Save.group(entity, user) : undefined;
+    case ECollection.institution:
+      return isInstitution(entity) ? Save.institution(entity, user) : undefined;
+    case ECollection.person:
+      return isPerson(entity) ? Save.person(entity, user) : undefined;
+    case ECollection.physicalentity:
+      return isPhysicalEntity(entity) ? Save.metadataentity(entity, user) : undefined;
+    case ECollection.tag:
+      return isTag(entity) ? Save.tag(entity, user) : undefined;
+    default:
+      return undefined;
+  }
 };
 
-// TODO: Typesafe collectionName with validation
-const addEntityToCollection = async (req: Request<IEntityRequestParams>, res: Response) => {
+// TODO: Should all collections be pushable?
+const addEntityToCollection = async (
+  req: Request<any, any, PushableEntry>,
+  res: Response<any, IEntityHeadsUp>,
+) => {
   RepoCache.flush();
 
-  const {
-    userData,
-    doesEntityExist,
-    isValidObjectId,
-    collectionName: coll,
-  } = (req as any).data as {
-    userData: IUserData;
-    doesEntityExist: boolean;
-    isValidObjectId: boolean;
-    collectionName: string;
-  };
+  const { user, doesEntityExist, isValidObjectId, collectionName: coll } = res.locals.headsUp;
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
   let entity = req.body;
   const _id = isValidObjectId ? new ObjectId(entity._id) : new ObjectId();
   entity._id = _id;
 
-  let savingPromise: Promise<any> | undefined;
-  switch (true) {
-    case isCompilation(entity):
-      savingPromise = Save.compilation(entity, userData);
-      break;
-    case isEntity(entity):
-      savingPromise = Save.entity(entity, userData);
-      break;
-    case isAnnotation(entity):
-      savingPromise = Save.annotation(entity, userData, doesEntityExist);
-      break;
-    case isPerson(entity):
-      savingPromise = Save.person(entity, userData);
-      break;
-    case isInstitution(entity):
-      savingPromise = Save.institution(entity, userData);
-      break;
-    case isDigitalEntity(entity):
-      savingPromise = Save.digitalentity(entity, userData);
-      break;
-    default:
-      await Users.makeOwnerOf(req, _id, coll);
-      break;
-  }
-  await savingPromise
-    ?.then(async res => {
-      entity = res;
-      if (isDigitalEntity(entity)) await Users.makeOwnerOf(req, entity._id, 'digitalentity');
-    })
-    .catch(err => Logger.err(err) && res.status(500).send(err));
+  const savingPromise = saveEntity(entity, { coll, user, doesEntityExist });
+  if (!savingPromise)
+    return res.status(400).send('Sent entity does not belong in given collection');
 
-  // We already got rejected. Don't update entity in DB
-  if (res.headersSent) return undefined;
+  // Just in case this did not happen in the saving strategy
+  Users.makeOwnerOf(req, _id, coll);
 
-  const updateResult = await Repo.get(coll).updateOne({ _id }, { $set: entity }, { upsert: true });
+  // Run saving promise
+  const resultEntity = await savingPromise.catch(err => {
+    Logger.err('Failed saving entity to database', err);
+    return undefined;
+  });
+  if (!resultEntity) return res.status(500).send('Failed saving entity to database');
 
+  // This might double save, but that does not really matter
+  const updateResult = await Repo.get(coll)?.updateOne(
+    { _id },
+    { $set: resultEntity },
+    { upsert: true },
+  );
   if (!updateResult) {
     Logger.err(`Failed updating ${coll} ${_id}`);
     return res.status(500).send(`Failed updating ${coll} ${_id}`);
@@ -124,61 +134,37 @@ const updateEntitySettings = async (req: Request<IEntityRequestParams>, res: Res
   return res.status(200).send(settings);
 };
 
-const resolve = async <T>(obj: any, coll: string, depth?: number) => {
+const resolve = async <T>(obj: any, coll: CollectionName, depth?: number) => {
+  if (!isValidCollection(coll)) return undefined;
   if (!obj) return undefined;
-  const parsedId = (obj['_id'] ? obj['_id'] : obj).toString();
+
+  const parsedId = (obj._id ? obj._id : obj).toString();
   if (!ObjectId.isValid(parsedId)) return undefined;
   const _id = new ObjectId(parsedId);
 
-  const temp = await RepoCache.get<T>(parsedId);
-  if (temp) {
-    // Make sure returned object is valid and not {}
-    if ((temp as any)._id) {
-      return temp as T;
-    }
-    // Flush invalid object from cache
-    RepoCache.del(parsedId).then(numDelKeys => {
-      if (numDelKeys > 0) Logger.info(`Deleted ${parsedId} from ${coll} cache`);
-    });
-  }
+  // Get shallow result. Attempt to get from cache
+  const result =
+    (await RepoCache.get<T>(parsedId)) ?? (await Repo.get<T>(coll)?.findOne(query(_id)));
+  if (!result) return undefined;
 
-  return Repo.get<T>(coll)
-    .findOne(query(_id))
-    .then(async resolve_result => {
-      if (depth && depth === 0) return resolve_result;
+  // Cache shallow result
+  await RepoCache.set(parsedId, result);
 
-      if (isDigitalEntity(resolve_result)) return Resolve.digitalentity(resolve_result);
-
-      if (isEntity(resolve_result)) return Resolve.entity(resolve_result);
-
-      if (isCompilation(resolve_result)) return Resolve.compilation(resolve_result);
-
-      if (isPerson(resolve_result)) return Resolve.person(resolve_result);
-
-      if (isInstitution(resolve_result)) return Resolve.institution(resolve_result);
-
-      return resolve_result;
-    })
-    .then(async result => {
-      if (result) await RepoCache.set(parsedId, result);
-      return result as unknown as T | null;
-    })
-    .catch(err => {
-      Logger.warn(`Encountered error trying to resolve ${parsedId} in ${coll}`);
-      Logger.err(err);
-      return undefined;
-    });
+  // Either return or resolve deeper
+  if (depth === 0) return result;
+  return Resolve.get<T>(coll, result) ?? result;
 };
 
 const getEntityFromCollection = async (req: Request<IEntityRequestParams>, res: Response) => {
-  const RequestCollection = req.params.collection.toLowerCase();
+  const coll = req.params.collection.toLowerCase();
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
   const _id = ObjectId.isValid(req.params.identifier)
     ? new ObjectId(req.params.identifier)
     : req.params.identifier;
   const password = req.params.password ? req.params.password : '';
-  const entity = await resolve<any>(_id, RequestCollection);
-  if (!entity) return res.status(404).send(`No ${RequestCollection} found with given identifier`);
+  const entity = await resolve<any>(_id, coll);
+  if (!entity) return res.status(404).send(`No ${coll} found with given identifier`);
 
   if (isCompilation(entity)) {
     const compilation = entity;
@@ -197,11 +183,13 @@ const getEntityFromCollection = async (req: Request<IEntityRequestParams>, res: 
 
 const getAllEntitiesFromCollection = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
+
   const allowed = ['person', 'institution', 'tag'];
   if (!allowed.includes(coll)) return res.status(200).send([]);
 
-  const docs = await Repo.get(coll).findAll();
-  const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
+  const resolved = await Promise.all(docs.map(doc => resolve<unknown>(doc, coll)));
   return res.status(200).send(resolved.filter(_ => _));
 };
 
@@ -231,7 +219,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
     return res.status(401).send(message);
   }
 
-  const deleteResult = await Repo.get(coll).deleteOne(query(_id));
+  const deleteResult = await Repo.get(coll)?.deleteOne(query(_id));
   if (!deleteResult) {
     const message = `Failed deleting ${coll} ${req.params.identifier}`;
     Logger.warn(message);
@@ -254,6 +242,8 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
 
 const searchByEntityFilter = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
+
   const body: any = req.body ? req.body : {};
   const filter: any = body.filter ? body.filter : {};
 
@@ -297,7 +287,7 @@ const searchByEntityFilter = async (req: Request<IEntityRequestParams>, res: Res
     return true;
   };
 
-  const docs = await Repo.get(coll).findAll();
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   const filtered = resolved.filter(obj => {
     for (const prop in filter) {
@@ -311,6 +301,7 @@ const searchByEntityFilter = async (req: Request<IEntityRequestParams>, res: Res
 
 const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
   const filter = req.body.filter ? req.body.filter.map((_: any) => _.toLowerCase()) : [''];
   const offset = req.body.offset ? parseInt(req.body.offset, 10) : 0;
@@ -320,7 +311,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
 
   if (offset < 0) return res.status(400).send('Offset is smaller than 0');
 
-  const docs = (await Repo.get(coll).findAll()).slice(offset, offset + length);
+  const docs = ((await Repo.get(coll)?.findAll()) ?? []).slice(offset, offset + length);
   const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
 
   const getNestedValues = (obj: any) => {
@@ -360,6 +351,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
   return res.status(200).send(filterResults(resolved));
 };
 
+// TODO: improve performance by splitting into multiple indexes?
 const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   const { types, offset, searchEntity, filters, searchText } = req.body;
   const items = new Array<IEntity | ICompilation>();
@@ -368,7 +360,7 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   const userOwned = userData ? JSON.stringify(userData.data) : '';
 
   // Check if req is cached
-  const reqHash = RepoCache.hash(req.body);
+  const reqHash = RepoCache.hash({ sessionID: req.sessionID ?? 'guest', ...req.body });
   const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
   if (temp && temp?.length > 0) {
@@ -429,13 +421,13 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
         continue;
       }
 
-      const { description, licence } = resolved.relatedDigitalEntity as IMetaDataDigitalEntity;
+      const { description, licence } = resolved.relatedDigitalEntity as IDigitalEntity;
       entities.push({
         ...resolved,
         relatedDigitalEntity: {
           description,
           licence,
-        } as IMetaDataDigitalEntity,
+        } as IDigitalEntity,
       } as IEntity);
     }
 
@@ -518,27 +510,50 @@ const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
   res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
 
   // Cache full req
-  RepoCache.set(reqHash, items);
+  RepoCache.set(reqHash, items, 3600);
 };
 
+/**
+ * Resolves all entries in a collection. Used for error checking
+ */
 const test = async (req: Request<IEntityRequestParams>, res: Response) => {
   const coll = req.params.collection.toLowerCase();
-  const docs = await Repo.get(coll).findAll();
+  if (!isValidCollection(coll)) return res.status(400).send('Invalid collection');
 
-  const maxRand = 5;
-  const randIndex = Math.floor(Math.random() * (docs.length - maxRand));
-
-  const resolved = await Promise.all(
-    docs.slice(randIndex, randIndex + maxRand).map(doc => resolve<any>(doc, coll)),
-  );
+  const docs = (await Repo.get(coll)?.findAll()) ?? [];
+  const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
   const filtered = resolved.filter(_ => _);
 
-  return res.status(200).send(filtered.slice(0, 5));
-  return res.status(200).send({});
+  // prettier-ignore
+  Logger.info(`Found ${docs.length} in ${coll}. Resolved ${resolved.length}. Remaining after filtering ${filtered.length}`);
+
+  return res.json({ found: docs.length, resolved: resolved.length, final: filtered.length });
+};
+
+/**
+ * Resolves all entries in all collections. Used for error checking
+ */
+const testAll = async (_: Request, res: Response) => {
+  const collections = Object.values(ECollection);
+  const totals = { found: 0, resolved: 0, final: 0 };
+
+  for (const coll of collections) {
+    const docs = (await Repo.get(coll)?.findAll()) ?? [];
+    const resolved = await Promise.all(docs.map(doc => resolve<any>(doc, coll)));
+    const filtered = resolved.filter(_ => _);
+
+    // prettier-ignore
+    Logger.info(`Found ${docs.length} in ${coll}. Resolved ${resolved.length}. Remaining after filtering ${filtered.length}`);
+
+    totals.found += docs.length;
+    totals.resolved += resolved.length;
+    totals.final += filtered.length;
+  }
+
+  return res.json(totals);
 };
 
 export const Entities = {
-  submit,
   addEntityToCollection,
   updateEntitySettings,
   resolve,
@@ -549,6 +564,7 @@ export const Entities = {
   searchByTextFilter,
   explore,
   test,
+  testAll,
 };
 
 export default Entities;

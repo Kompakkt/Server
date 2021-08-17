@@ -5,6 +5,7 @@ import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
+import { IUserData, IStrippedUserData, ICompilation } from '../../common/interfaces';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
@@ -12,8 +13,27 @@ import { Logger } from '../logger';
  */
 const query = (_id: string | ObjectId): Filter<any> => {
   return {
-    $or: [{ _id }, { _id: new ObjectId(_id) }, { _id: _id.toString() }],
+    $or: [{ _id: _id.toString() }, { _id: new ObjectId(_id.toString()) }],
   };
+};
+
+/**
+ * Turns an _id into a more forgiving Query (Array) by allowing both ObjectId as well as string
+ * @type {[type]}
+ */
+const queryIn = (_id: string | ObjectId): Filter<any> => {
+  return {
+    $in: [_id.toString(), new ObjectId(_id.toString())],
+  };
+};
+
+/**
+ * Sets the password property of a compilation to a boolean,
+ * depending on whether the compilation has a password
+ * @type {[type]}
+ */
+const lockCompilation = (comp: ICompilation): ICompilation => {
+  return { ...comp, password: !!comp.password };
 };
 
 /**
@@ -25,6 +45,14 @@ const areIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) =>
   if (!ObjectId.isValid(firstId)) return false;
   if (!ObjectId.isValid(secondId)) return false;
   return new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
+};
+
+/**
+ * Checks wheter an _id is valid
+ * @type {Boolean}
+ */
+const isValidId = (_id?: string | ObjectId): _id is string | ObjectId => {
+  return !!_id && ObjectId.isValid(_id);
 };
 
 // TODO: (Optional) Convert to progressive JPEG?
@@ -84,4 +112,22 @@ const updatePreviewImage = async (
   return finalImagePath;
 };
 
-export { query, areIdsEqual, updatePreviewImage };
+/**
+ * Removes all user properties except for fullname, username and _id
+ * @type {[type]}
+ */
+const stripUserData = (obj: IUserData): IStrippedUserData => ({
+  _id: obj._id,
+  username: obj.username,
+  fullname: obj.fullname,
+});
+
+export {
+  query,
+  queryIn,
+  areIdsEqual,
+  updatePreviewImage,
+  stripUserData,
+  isValidId,
+  lockCompilation,
+};

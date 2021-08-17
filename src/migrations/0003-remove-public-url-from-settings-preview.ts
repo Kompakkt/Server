@@ -22,7 +22,7 @@ import { Repo, query } from '../services/db';
 
     const result = await Repo.entity
       .updateOne(query(entity._id), {
-        $set: {      settings,      },
+        $set: { settings },
       })
       .catch(console.log);
     console.log(result ? result : `Failed saving Entity ${name}`);

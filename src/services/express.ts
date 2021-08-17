@@ -36,12 +36,12 @@ const { UploadDirectory } = Configuration.Uploads;
 
 const Server = express();
 const createServer = () => {
-  if (enableHTTPS) {
+  if (enableHTTPS && SSLPaths) {
     const privateKey = readFileSync(SSLPaths.PrivateKey);
     const certificate = readFileSync(SSLPaths.Certificate);
 
     const options: HTTPS.ServerOptions = { key: privateKey, cert: certificate };
-    if (SSLPaths.Passphrase?.length > 0) {
+    if (!!SSLPaths.Passphrase) {
       options.passphrase = SSLPaths.Passphrase;
     }
     return HTTPS.createServer(options, Server);
@@ -90,35 +90,42 @@ const verifyPassword = async (username: string, password: string) => {
   return newHash === hash;
 };
 
-interface IRegisterRequest {
+export interface ILoginBody {
   username: string;
   password: string;
+}
+
+export const isLoginRequest = (obj: any): obj is ILoginBody => {
+  const person = obj as Partial<ILoginBody>;
+  return person?.username !== undefined && person?.password !== undefined;
+};
+
+export interface IRegisterBody extends ILoginBody {
   prename: string;
   surname: string;
   mail: string;
   fullname: string;
 }
 
-const registerUser = async (req: Request, res: Response) => {
-  const isRegisterRequest = (obj: any): obj is IRegisterRequest => {
-    const person = obj as IRegisterRequest;
-    return (
-      !!person?.fullname &&
-      !!person?.prename &&
-      !!person?.surname &&
-      !!person?.mail &&
-      !!person?.username &&
-      !!person?.password
-    );
-  };
+export const isRegisterRequest = (obj: any): obj is IRegisterBody => {
+  const person = obj as Partial<IRegisterBody>;
+  return (
+    person?.fullname !== undefined &&
+    person?.prename !== undefined &&
+    person?.surname !== undefined &&
+    person?.mail !== undefined &&
+    isLoginRequest(person)
+  );
+};
 
+const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response) => {
   // First user gets admin
   const isFirstUser = (await Accounts.users.findOne({})) === null;
   const role = isFirstUser ? EUserRank.admin : EUserRank.user;
 
-  const user = req.body as IRegisterRequest;
-  if (!isRegisterRequest(user)) return res.status(400).send('Incomplete user data');
+  if (!isRegisterRequest(req.body)) return res.status(400).send('Incomplete user data');
 
+  const user = req.body;
   const { username, password } = user;
   if (!!(await Accounts.users.findOne({ username })))
     return res.status(409).send('User already exists');
@@ -240,7 +247,7 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (req, callback) => {
     });
   }
 
-  const { username, password } = (req as Request).body;
+  const { username, password } = (req as Request<any, any, ILoginBody>).body;
   callback(undefined, {
     server: {
       url: LDAP?.Host ?? '',

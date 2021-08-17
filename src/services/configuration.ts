@@ -4,63 +4,101 @@ import { readJsonSync } from 'fs-extra';
 import { ConfigFile } from '../environment';
 import { Logger } from './logger';
 
+export interface IMongoConfiguration {
+  RepositoryDB: string;
+  AccountsDB: string;
+  Port: number;
+  Hostname: string;
+  ClientURL?: string;
+}
+
+export interface IRedisConfiguration {
+  Hostname: string;
+  Port: number;
+  DBOffset: number;
+}
+
+export interface IUploadConfiguration {
+  TempDirectory: string;
+  UploadDirectory: string;
+}
+
+export interface IExpressConfiguration {
+  Host: string;
+  PublicIP: string;
+  Port: number;
+  OriginWhitelist: string[];
+  PassportSecret: string;
+  enableHTTPS: boolean;
+  SSLPaths?: IExpressSSLConfiguration;
+  LDAP?: ILDAPConfiguration;
+}
+
+export interface IExpressSSLConfiguration {
+  PrivateKey: string;
+  Certificate: string;
+  Passphrase?: string;
+}
+
+export interface ILDAPKeys {
+  username: string;
+  prename: string;
+  surname: string;
+  mail: string;
+}
+
+export interface ILDAPConfiguration {
+  DN: string;
+  DNauthUID: boolean;
+  Host: string;
+  searchBase: string;
+  Keys?: ILDAPKeys;
+}
+
+export const isLDAPConfiguration = (obj: any): obj is ILDAPConfiguration => {
+  return (
+    !!obj &&
+    obj?.DN !== undefined &&
+    obj?.DNauthID !== undefined &&
+    obj?.Host !== undefined &&
+    obj?.searchBase !== undefined
+  );
+};
+
+export interface IMailerConfiguration {
+  Host: string;
+  Port: number;
+  Target: {
+    contact: string;
+    upload: string;
+    bugreport: string;
+  };
+}
+
+export const isMailConfiguration = (obj: any): obj is IMailerConfiguration => {
+  return (
+    !!obj &&
+    obj?.Host !== undefined &&
+    obj?.Port !== undefined &&
+    obj?.Target !== undefined &&
+    obj?.Target.contact !== undefined &&
+    obj?.Target.upload !== undefined &&
+    obj?.Target.bugreport !== undefined
+  );
+};
+
 interface IConfiguration {
-  Mongo: {
-    RepositoryDB: string;
-    AccountsDB: string;
-    Port: number;
-    Hostname: string;
-    ClientURL?: string;
-  };
-  Redis: {
-    Hostname: string;
-    Port: number;
-    DBOffset: number;
-  };
-  Uploads: {
-    TempDirectory: string;
-    UploadDirectory: string;
-  };
-  Express: {
-    Host: string;
-    PublicIP: string;
-    Port: number;
-    OriginWhitelist: string[];
-    enableHTTPS: boolean;
-    SSLPaths: {
-      PrivateKey: string;
-      Certificate: string;
-      Passphrase: string;
-    };
-    PassportSecret: string;
-    LDAP?: {
-      DN: string;
-      DNauthUID: boolean;
-      Host: string;
-      searchBase: string;
-      Keys?: {
-        username: string;
-        prename: string;
-        surname: string;
-        mail: string;
-      };
-    };
-  };
+  Mongo: IMongoConfiguration;
+  Redis: IRedisConfiguration;
+  Uploads: IUploadConfiguration;
+  Express: IExpressConfiguration;
   Services?: {
     Europeana?: {
       apiKey: string;
       endpoint: string;
     };
   };
-  Mailer: {
-    Host?: string;
-    Port?: number;
-    Target?: {
-      contact: string;
-      upload: string;
-      bugreport: string;
-    };
-  };
+  Mailer?: IMailerConfiguration;
 }
 
 const LoadConfig = () => {
@@ -86,14 +124,8 @@ const LoadConfig = () => {
       Port: 8080,
       OriginWhitelist: [],
       enableHTTPS: false,
-      SSLPaths: {
-        PrivateKey: '',
-        Certificate: '',
-        Passphrase: '',
-      },
       PassportSecret: 'change me',
     },
-    Mailer: {},
   };
 
   Logger.info('Loading configuration');

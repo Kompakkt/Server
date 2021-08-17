@@ -1,43 +1,38 @@
 // prettier-ignore
-import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, IStrippedUserData, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
+import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, ITag, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
 import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';
 import { RootDirectory } from '../../environment';
 import { Logger } from '../logger';
 import { Configuration as Conf } from '../configuration';
-import { query, updatePreviewImage } from './functions';
+import { query, updatePreviewImage, stripUserData } from './functions';
 import { Repo } from './controllers';
 import Entities from './entities';
 import Users from './users';
 
 const upDir = `${RootDirectory}/${Conf.Uploads.UploadDirectory}/`;
 
-const stripUserData = (obj: IUserData): IStrippedUserData => ({
-  _id: obj._id,
-  username: obj.username,
-  fullname: obj.fullname,
-});
-
 type EntityOrComp = IEntity | ICompilation;
 
 const updateAnnotationList = async (
   entityOrCompId: string,
-  coll: string,
+  coll: 'entity' | 'compilation',
   annotationId: string | ObjectId,
 ) => {
+  if (coll !== 'entity' && coll !== 'compilation') return undefined;
   const obj = await Entities.resolve<EntityOrComp>(entityOrCompId, coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
-  const updateResult = await Repo.get<EntityOrComp>(coll).updateOne(query(entityOrCompId), {
+  const updateResult = await Repo.get<EntityOrComp>(coll)?.updateOne(query(entityOrCompId), {
     $set: { annotations: obj.annotations },
   });
   return !!updateResult;
 };
 
-const saveCompilation = async (compilation: ICompilation, userData: IUserData) => {
+const saveCompilation = async (compilation: ICompilation, user: IUserData) => {
   // Remove invalid annotations
   for (const id in compilation.annotations) {
     const value = compilation.annotations[id];
@@ -46,7 +41,7 @@ const saveCompilation = async (compilation: ICompilation, userData: IUserData) =
   }
 
   // Add creator
-  if (!compilation.creator) compilation.creator = stripUserData(userData);
+  if (!compilation.creator) compilation.creator = stripUserData(user);
 
   // Remove invalid and duplicate entities
   for (const id in compilation.entities) {
@@ -55,17 +50,18 @@ const saveCompilation = async (compilation: ICompilation, userData: IUserData) =
     delete compilation.entities[id];
   }
 
-  await Users.makeOwnerOf(userData, compilation._id, 'compilation');
-  return { ...compilation };
+  await Users.makeOwnerOf(user, compilation._id, 'compilation');
+
+  return compilation;
 };
 
 const saveAnnotation = async (
   annotation: IAnnotation,
-  userData: IUserData,
+  user: IUserData,
   doesEntityExist: boolean,
 ) => {
   // If the Annotation already exists, check for owner
-  const isAnnotationOwner = doesEntityExist ? await Users.isOwner(userData, annotation._id) : true;
+  const isAnnotationOwner = doesEntityExist ? await Users.isOwner(user, annotation._id) : true;
   // Check if anything was missing for safety
   if (!annotation || !annotation.target?.source) throw new Error('Invalid annotation');
   const source = annotation.target.source;
@@ -91,11 +87,11 @@ const saveAnnotation = async (
   if (!validEntity) throw new Error('Invalid related entity id');
 
   // Case: Trying to change Default Annotations
-  const isEntityOwner = await Users.isOwner(userData, relatedEntityId);
+  const isEntityOwner = await Users.isOwner(user, relatedEntityId);
   if (!validCompilation && !isEntityOwner) throw new Error('Permission denied');
 
   // Case: Compilation owner trying to re-rank annotations
-  const isCompilationOwner = await Users.isOwner(userData, relatedCompId);
+  const isCompilationOwner = await Users.isOwner(user, relatedCompId);
 
   if (!isAnnotationOwner && isCompilationOwner) {
     const existing = await Entities.resolve<IAnnotation>(annotation, 'annotation');
@@ -112,8 +108,8 @@ const saveAnnotation = async (
   annotation.generated = annotation.generated ?? new Date().toISOString();
   annotation.lastModificationDate = new Date().toISOString();
   annotation.lastModifiedBy = {
-    _id: userData._id,
-    name: userData.fullname,
+    _id: user._id,
+    name: user.fullname,
     type: 'person',
   };
 
@@ -127,13 +123,13 @@ const saveAnnotation = async (
     throw new Error(message);
   }
 
-  if (isAnnotationOwner) await Users.makeOwnerOf(userData, annotation._id, 'annotation');
+  if (isAnnotationOwner) await Users.makeOwnerOf(user, annotation._id, 'annotation');
 
   return annotation;
 };
 
-const saveEntity = async (entity: IEntity, userData: IUserData) => {
-  if (!entity.creator) entity.creator = stripUserData(userData);
+const saveEntity = async (entity: IEntity, user: IUserData) => {
+  if (!entity.creator) entity.creator = stripUserData(user);
 
   /* Preview image URLs might have a corrupted address
    * because of Kompakkt runnning in an iframe
@@ -146,19 +142,20 @@ const saveEntity = async (entity: IEntity, userData: IUserData) => {
       entity._id,
     );
   }
-  await Users.makeOwnerOf(userData, entity._id, 'entity');
+  await Users.makeOwnerOf(user, entity._id, 'entity');
+
   return entity;
 };
 
-const saveGroup = async (group: IGroup, userData: IUserData) => {
-  const strippedUserData = stripUserData(userData);
+const saveGroup = async (group: IGroup, user: IUserData) => {
+  const strippedUserData = stripUserData(user);
   group.creator = strippedUserData;
   group.members = [strippedUserData];
   group.owners = [strippedUserData];
   return group;
 };
 
-const saveAddress = async (address: IAddress, userData?: IUserData) => {
+const saveAddress = async (address: IAddress, user?: IUserData) => {
   const resolved = await Entities.resolve<IAddress>(address, 'address');
   address._id = address?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -171,11 +168,11 @@ const saveAddress = async (address: IAddress, userData?: IUserData) => {
   if (!result) throw new Error('Failed saving address');
 
   const _id = result.upsertedId ?? address._id;
-  if (userData) Users.makeOwnerOf(userData, _id, 'address');
-  return { ...address, _id };
+  if (user) Users.makeOwnerOf(user, _id, 'address');
+  return { ...address, _id } as IAddress;
 };
 
-const saveInstitution = async (institution: IInstitution, userData?: IUserData, save = false) => {
+const saveInstitution = async (institution: IInstitution, user?: IUserData, save = false) => {
   const resolved = await Entities.resolve<IInstitution>(institution, 'institution');
   institution._id = institution?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -191,7 +188,7 @@ const saveInstitution = async (institution: IInstitution, userData?: IUserData, 
   for (const [id, address] of Object.entries(institution.addresses)) {
     if (isUnresolved(address)) continue;
     if (!address) continue;
-    institution.addresses[id] = await saveAddress(address as IAddress, userData);
+    institution.addresses[id] = await saveAddress(address as IAddress, user);
   }
 
   if (!save) return institution;
@@ -205,11 +202,11 @@ const saveInstitution = async (institution: IInstitution, userData?: IUserData, 
   if (!result) throw new Error('Failed saving institution');
 
   const _id = result.upsertedId ?? institution._id;
-  if (userData) Users.makeOwnerOf(userData, _id, 'institution');
-  return { ...institution, _id };
+  if (user) Users.makeOwnerOf(user, _id, 'institution');
+  return { ...institution, _id } as IInstitution;
 };
 
-const saveContact = async (contact: IContact, userData?: IUserData) => {
+const saveContact = async (contact: IContact, user?: IUserData) => {
   const resolved = await Entities.resolve<IContact>(contact, 'contact');
   contact._id = contact?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -222,11 +219,11 @@ const saveContact = async (contact: IContact, userData?: IUserData) => {
   if (!result) throw new Error('Failed saving contact');
 
   const _id = result.upsertedId ?? contact._id;
-  if (userData) Users.makeOwnerOf(userData, _id, 'contact');
-  return { ...contact, _id };
+  if (user) Users.makeOwnerOf(user, _id, 'contact');
+  return { ...contact, _id } as IContact;
 };
 
-const savePerson = async (person: IPerson, userData?: IUserData, save = false) => {
+const savePerson = async (person: IPerson, user?: IUserData, save = false) => {
   const resolved = await Entities.resolve<IPerson>(person, 'person');
   person._id = person?._id ?? resolved?._id ?? new ObjectId().toString();
 
@@ -244,7 +241,7 @@ const savePerson = async (person: IPerson, userData?: IUserData, save = false) =
       (person.institutions[id]?.filter(i => i && !isUnresolved(i)) as IInstitution[]) ?? [];
     if (!institutions) continue;
     const savedInstitutions = await Promise.all(
-      institutions.map(i => saveInstitution(i, userData, true)),
+      institutions.map(i => saveInstitution(i, user, true)),
     );
     person.institutions[id] = savedInstitutions.map(i => ({ _id: i._id }));
   }
@@ -253,7 +250,7 @@ const savePerson = async (person: IPerson, userData?: IUserData, save = false) =
     if (isUnresolved(contact)) continue;
     if (!contact) continue;
     if ((contact as IContact)?.mail?.length <= 0) continue;
-    person.contact_references[id] = await saveContact(contact, userData);
+    person.contact_references[id] = await saveContact(contact, user);
   }
 
   if (!save) return person;
@@ -267,14 +264,23 @@ const savePerson = async (person: IPerson, userData?: IUserData, save = false) =
   if (!result) throw new Error('Failed saving person');
 
   const _id = result.upsertedId ?? person._id;
-  if (userData) Users.makeOwnerOf(userData, _id, 'person');
-  return { ...person, _id };
+  if (user) Users.makeOwnerOf(user, _id, 'person');
+  return { ...person, _id } as IPerson;
 };
 
-const saveMetaDataEntity = async (
-  entity: IDigitalEntity | IPhysicalEntity,
-  userData: IUserData,
-) => {
+const saveTag = async (entity: ITag, user: IUserData) => {
+  const tag = { ...entity } as ITag;
+  const resolved = await Entities.resolve<ITag>(tag, 'tag');
+  tag._id = tag?._id ?? resolved?._id ?? new ObjectId().toString();
+
+  const result = await Repo.tag.updateOne(query(tag._id), { $set: { ...tag } }, { upsert: true });
+
+  if (!result) throw new Error('Failed saving tag');
+  Users.makeOwnerOf(user, tag._id, 'tag');
+  return tag;
+};
+
+const saveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity, user: IUserData) => {
   const newEntity = { ...entity };
 
   // Save unsaved metadata files and return link
@@ -298,57 +304,44 @@ const saveMetaDataEntity = async (
   if (isDigitalEntity(newEntity)) {
     for (let i = 0; i < newEntity.tags.length; i++) {
       const tag = newEntity.tags[i];
-
-      tag._id = ObjectId.isValid(tag._id) ? tag._id : new ObjectId();
-
-      newEntity.tags[i] = (await Repo.tag
-        .updateOne(query(tag._id), { $set: { ...tag } }, { upsert: true })
-        .then(res => {
-          if (!res) return undefined;
-
-          const _id = res.upsertedId ?? tag._id;
-          Users.makeOwnerOf(userData, _id, 'tag');
-          return _id;
-        })) as any;
+      newEntity.tags[i] = (await saveTag(tag, user))._id as any;
     }
   }
 
-  return newEntity;
+  return newEntity as IDigitalEntity | IPhysicalEntity;
 };
 
-const saveDigitalEntity = async (digitalentity: IDigitalEntity, userData: IUserData) => {
-  const newEntity = (await saveMetaDataEntity(digitalentity, userData)) as IDigitalEntity;
+const saveDigitalEntity = async (digitalentity: IDigitalEntity, user: IUserData) => {
+  const newEntity = (await saveMetaDataEntity(digitalentity, user)) as IDigitalEntity;
 
   for (let i = 0; i < newEntity.persons.length; i++) {
-    newEntity.persons[i] = ((await savePerson(newEntity.persons[i], userData, true)) as any)._id;
+    newEntity.persons[i] = ((await savePerson(newEntity.persons[i], user, true)) as any)._id;
   }
 
   for (let i = 0; i < newEntity.institutions.length; i++) {
-    newEntity.institutions[i] = (
-      (await saveInstitution(newEntity.institutions[i], userData, true)) as any
-    )._id;
+    const institution = newEntity.institutions[i];
+    newEntity.institutions[i] = ((await saveInstitution(institution, user, true)) as any)._id;
   }
 
   for (let i = 0; i < newEntity.phyObjs.length; i++) {
     newEntity.phyObjs[i]._id = ObjectId.isValid(newEntity.phyObjs[i]._id)
       ? newEntity.phyObjs[i]._id
       : new ObjectId();
-    const savedEntity = (await saveMetaDataEntity(
-      newEntity.phyObjs[i],
-      userData,
-    )) as IPhysicalEntity;
+    const savedEntity = (await saveMetaDataEntity(newEntity.phyObjs[i], user)) as IPhysicalEntity;
     newEntity.phyObjs[i] = (await Repo.physicalentity
       .updateOne(query(savedEntity._id), { $set: { ...savedEntity } }, { upsert: true })
       .then(res => {
         if (!res) throw new Error('Failed saving physicalentity');
 
         const _id = res.upsertedId ?? savedEntity._id;
-        Users.makeOwnerOf(userData, _id, 'physicalentity');
+        Users.makeOwnerOf(user, _id, 'physicalentity');
         return _id;
       })) as any;
   }
 
-  return newEntity;
+  await Users.makeOwnerOf(user, newEntity._id, 'digitalentity');
+
+  return newEntity as IDigitalEntity;
 };
 
 export const Save = {
@@ -362,4 +355,5 @@ export const Save = {
   person: savePerson,
   metadataentity: saveMetaDataEntity,
   digitalentity: saveDigitalEntity,
+  tag: saveTag,
 };

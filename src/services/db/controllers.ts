@@ -1,9 +1,10 @@
 // prettier-ignore
 import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common/interfaces';
 // prettier-ignore
-import { ObjectId, Filter, Db, OptionalId, UpdateFilter, UpdateOptions, FindOptions } from 'mongodb';
+import { Filter, Db, OptionalId, UpdateFilter, UpdateOptions, FindOptions } from 'mongodb';
 import { Configuration } from '../configuration';
 import DBClient from './client';
+import { IMailEntry } from './definitions';
 import { Logger } from '../logger';
 import { IPasswordEntry } from '../express';
 
@@ -69,20 +70,6 @@ class Controller<T> {
   }
 }
 
-// TODO: Move somewhere else
-export interface IMailEntry {
-  _id: string | ObjectId;
-  target: string;
-  content: {
-    mailbody: string;
-    subject: string;
-  };
-  timestamp: string;
-  user: IUserData;
-  answered: boolean;
-  mailSent: boolean;
-}
-
 const AccountsDB = DBClient.Client.db(Configuration.Mongo.AccountsDB);
 const RepositoryDB = DBClient.Client.db(Configuration.Mongo.RepositoryDB);
 
@@ -104,5 +91,10 @@ export const Repo = {
   person: new Controller<IPerson>('person', RepositoryDB),
   physicalentity: new Controller<IPhysicalEntity>('physicalentity', RepositoryDB),
   tag: new Controller<ITag>('tag', RepositoryDB),
-  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T>,
+  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T> | undefined,
 };
+
+// Create indexes
+Accounts.users.collection.createIndex({ username: 1 });
+Accounts.users.collection.createIndex({ username: 1, sessionID: 1 });
+Accounts.passwords.collection.createIndex({ username: 1 });
