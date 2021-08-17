@@ -137,7 +137,7 @@ const cleanUploadedFiles = async (req: Request<IConfirmRequest>, res: Response) 
   const filesToDelete = existingFiles.filter(file => !files.includes(file));
 
   const results = new Array<boolean>();
-  if (confirm) results.push(...await Promise.all(filesToDelete.map(deleteFile)));
+  if (confirm) results.push(...(await Promise.all(filesToDelete.map(deleteFile))));
 
   res.status(200).send({
     confirm,

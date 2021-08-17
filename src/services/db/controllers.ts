@@ -95,6 +95,6 @@ export const Repo = {
 };
 
 // Create indexes
-Accounts.users.collection.createIndex({ "username": 1 });
-Accounts.users.collection.createIndex({ "username": 1, "sessionID": 1 });
-Accounts.passwords.collection.createIndex({ "username": 1 });
+Accounts.users.collection.createIndex({ username: 1 });
+Accounts.users.collection.createIndex({ username: 1, sessionID: 1 });
+Accounts.passwords.collection.createIndex({ username: 1 });
