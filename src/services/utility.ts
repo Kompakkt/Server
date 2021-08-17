@@ -16,7 +16,6 @@ interface IAnnotationListBody {
 interface IPromoteBody {
   command?: string;
   ownerUsername?: string;
-  ownerId?: string;
   entityId?: string;
 }
 
@@ -50,15 +49,15 @@ const userInGroupQuery = (user: IUserData) => {
   };
 };
 
-const findAllEntityOwners = async (entityId: string) => {
-  const accounts = (await Accounts.users.find({ 'data.entity': { $in: query(entityId) } })) ?? [];
+const findEntityOwnersQuery = async (_id: string | ObjectId) => {
+  const accounts = (await Accounts.users.find({ 'data.entity': queryIn(_id) })) ?? [];
   return accounts.map(stripUserData);
 };
 
 const findAllEntityOwnersRequest = async (req: Request<IIdentifierParam>, res: Response) => {
   const _id = req.params.identifier;
   if (!isValidId(_id)) return res.status(400).send('Invalid entity _id ');
-  return res.status(200).send(await findAllEntityOwners(_id));
+  return res.status(200).send(await findEntityOwnersQuery(_id));
 };
 
 const countEntityUses = async (req: Request<IIdentifierParam>, res: Response) => {
@@ -124,35 +123,32 @@ const addAnnotationsToAnnotationList = async (
 };
 
 const applyActionToEntityOwner = async (req: Request<any, any, IPromoteBody>, res: Response) => {
-  const command = req.body.command;
+  const { entityId: _id, command, ownerUsername: username } = req.body;
+
+  if (!isValidId(_id) || (await Repo.entity.findOne(query(_id))) === undefined)
+    return res.status(400).send('Invalid entity identifier');
+
+  if (!(await Users.isOwner(req, _id)))
+    return res.status(400).send('User sending the request is not owner of the object');
+
   if (command !== 'add' && command !== 'remove')
     return res.status(400).send('Invalid command. Use "add" or "remove"');
 
-  const ownerUsername = req.body.ownerUsername;
-  const ownerId = req.body.ownerId;
-  if (!ownerId && !ownerUsername) return res.status(400).send('No owner _id or username given');
-  if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId))
-    return res.status(400).send('Incorrect owner _id given');
+  if (!username)
+    return res.status(400).send('No user given');
 
-  const entityId = req.body.entityId;
-  if (!isValidId(entityId) || (await Repo.entity.findOne({ _id: query(entityId) })) === undefined) {
-    return res.status(400).send('Invalid entity identifier');
-  }
+  const user = await Users.getByUsername(username);
+  if (!user) return res.status(400).send('User not found by username');
 
-  const findUserQuery = ownerId ? query(ownerId) : { username: ownerUsername };
-  const user = await Accounts.users.findOne(findUserQuery);
-  if (!user) return res.status(400).send('Incorrect owner _id or username given');
-
-  user.data.entity = user.data.entity ?? [];
-  user.data.entity = user.data.entity.filter((_: any) => _);
+  user.data.entity = user.data.entity?.filter(_ => _) ?? [];
 
   let changed: undefined | boolean = undefined;
   if (command === 'add') {
-    changed = await Users.makeOwnerOf(req, entityId, 'entity');
+    changed = await Users.makeOwnerOf(user, _id, 'entity');
   } else if (command === 'remove') {
-    const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
-    if (entityUses === 1) return res.status(403).send('Cannot remove last owner');
-    changed = await Users.undoOwnerOf(req, entityId, 'entity');
+    const entityUses = (await findEntityOwnersQuery(_id)).length;
+    if (entityUses <= 1) return res.status(403).send('Cannot remove last owner');
+    changed = await Users.undoOwnerOf(user, _id, 'entity');
   }
 
   return res.status(200).send({ changed });
@@ -202,7 +198,7 @@ const findUserInMetadata = async (req: Request, res: Response) => {
 
 const Utility = {
   findAllEntityOwnersRequest,
-  findAllEntityOwners,
+  findEntityOwnersQuery,
   countEntityUses,
   addAnnotationsToAnnotationList,
   applyActionToEntityOwner,
