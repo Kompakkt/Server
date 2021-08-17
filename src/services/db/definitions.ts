@@ -1,23 +1,9 @@
 // prettier-ignore
-import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common/interfaces';
+import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag, Collection } from '../../common/interfaces';
 import { Logger } from '../logger';
 import { ObjectId } from 'mongodb';
 
-export enum ECollection {
-  address = 'address',
-  annotation = 'annotation',
-  compilation = 'compilation',
-  contact = 'contact',
-  digitalentity = 'digitalentity',
-  entity = 'entity',
-  group = 'group',
-  institution = 'institution',
-  person = 'person',
-  physicalentity = 'physicalentity',
-  tag = 'tag',
-}
-
-const collections = Object.values(ECollection);
+const collections = Object.values(Collection);
 
 Logger.info(`Defined collections: ${collections.join(', ')}`);
 

@@ -4,7 +4,7 @@ import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
-import { query, areIdsEqual } from './functions';
+import { query, areIdsEqual, getEmptyUserData } from './functions';
 import { Accounts, Repo } from './controllers';
 import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
 import Entities from './entities';
@@ -35,7 +35,7 @@ const login = async (req: Request<any>, res: Response) => {
   const updatedUser: IUserData = {
     ...user,
     sessionID: req.sessionID,
-    data: userdata.data ?? {},
+    data: { ...getEmptyUserData(), ...userdata.data },
     role: userdata.role ?? EUserRank.user,
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
@@ -63,8 +63,9 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   const user = await getUser(req);
 
   if (!ObjectId.isValid(_id) || !user) return false;
+  if (!isValidCollection(coll)) return false;
 
-  const arr = (user.data[coll] ?? []).filter(_ => _);
+  const arr = user.data[coll].filter(_ => _);
 
   const doesExist = arr.find(id => areIdsEqual(id, _id));
   if (doesExist) return true;
@@ -86,8 +87,9 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   const user = await getUser(req);
 
   if (!ObjectId.isValid(_id) || !user) return false;
+  if (!isValidCollection(coll)) return false;
 
-  const arr = (user.data[coll] ?? []).filter(_ => _).filter(id => !areIdsEqual(id, _id));
+  const arr = user.data[coll].filter(_ => _).filter(id => !areIdsEqual(id, _id));
   user.data[coll] = arr;
 
   const updateResult = await Accounts.users.updateOne(query(user._id), {

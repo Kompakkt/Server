@@ -1,7 +1,7 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag } from '../../common/interfaces';
+import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common/interfaces';
 // prettier-ignore
-import { IEntityHeadsUp, PushableEntry, isValidCollection, ECollection, CollectionName } from './definitions';
+import { IEntityHeadsUp, PushableEntry, isValidCollection, CollectionName } from './definitions';
 import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
 import { RepoCache } from '../cache';
@@ -45,27 +45,27 @@ const saveEntity = (
 ): Promise<PushableEntry> | undefined => {
   const { coll, user, doesEntityExist } = options;
   switch (coll) {
-    case ECollection.address:
+    case Collection.address:
       return isAddress(entity) ? Save.address(entity, user) : undefined;
-    case ECollection.annotation:
+    case Collection.annotation:
       return isAnnotation(entity) ? Save.annotation(entity, user, doesEntityExist!) : undefined;
-    case ECollection.compilation:
+    case Collection.compilation:
       return isCompilation(entity) ? Save.compilation(entity, user) : undefined;
-    case ECollection.contact:
+    case Collection.contact:
       return isContact(entity) ? Save.contact(entity, user) : undefined;
-    case ECollection.digitalentity:
+    case Collection.digitalentity:
       return isDigitalEntity(entity) ? Save.digitalentity(entity, user) : undefined;
-    case ECollection.entity:
+    case Collection.entity:
       return isEntity(entity) ? Save.entity(entity, user) : undefined;
-    case ECollection.group:
+    case Collection.group:
       return isGroup(entity) ? Save.group(entity, user) : undefined;
-    case ECollection.institution:
+    case Collection.institution:
       return isInstitution(entity) ? Save.institution(entity, user) : undefined;
-    case ECollection.person:
+    case Collection.person:
       return isPerson(entity) ? Save.person(entity, user) : undefined;
-    case ECollection.physicalentity:
+    case Collection.physicalentity:
       return isPhysicalEntity(entity) ? Save.metadataentity(entity, user) : undefined;
-    case ECollection.tag:
+    case Collection.tag:
       return isTag(entity) ? Save.tag(entity, user) : undefined;
     default:
       return undefined;
@@ -534,7 +534,7 @@ const test = async (req: Request<IEntityRequestParams>, res: Response) => {
  * Resolves all entries in all collections. Used for error checking
  */
 const testAll = async (_: Request, res: Response) => {
-  const collections = Object.values(ECollection);
+  const collections = Object.values(Collection);
   const totals = { found: 0, resolved: 0, final: 0 };
 
   for (const coll of collections) {

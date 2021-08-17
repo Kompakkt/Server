@@ -3,9 +3,9 @@ import Users from './users';
 import Entities from './entities';
 import { Accounts, Repo } from './controllers';
 // prettier-ignore
-import { areIdsEqual, query, queryIn, updatePreviewImage, stripUserData, isValidId, lockCompilation } from './functions';
+import { areIdsEqual, query, queryIn, updatePreviewImage, stripUserData, isValidId, lockCompilation, getEmptyUserData } from './functions';
 // prettier-ignore
-import { CollectionName, ECollection, ICollectionParam, IEntityHeadsUp, IMailEntry, isValidCollection, PushableEntry } from './definitions';
+import { CollectionName, ICollectionParam, IEntityHeadsUp, IMailEntry, isValidCollection, PushableEntry } from './definitions';
 
 export {
   DBClient,
@@ -18,7 +18,6 @@ export {
   queryIn,
   updatePreviewImage,
   CollectionName,
-  ECollection,
   ICollectionParam,
   IEntityHeadsUp,
   IMailEntry,
@@ -27,4 +26,5 @@ export {
   stripUserData,
   isValidId,
   lockCompilation,
+  getEmptyUserData,
 };

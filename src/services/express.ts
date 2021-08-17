@@ -16,7 +16,7 @@ import SocketIo from 'socket.io';
 import resTime from 'response-time';
 import { RootDirectory } from '../environment';
 import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
-import { Accounts } from './db';
+import { Accounts, getEmptyUserData } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
 import { Logger } from './logger';
@@ -133,7 +133,7 @@ const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response
   const adjustedUser: IUserData & { password?: string } = {
     ...user,
     role,
-    data: {},
+    data: getEmptyUserData(),
     _id: new ObjectId(),
     sessionID: '',
     password: undefined,
@@ -214,14 +214,14 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     return done('Not all required LDAP fields could be found. Check configuration.');
   }
 
-  const adjustedUser = {
+  const adjustedUser: Omit<Omit<IUserData, 'sessionID'>, '_id'> = {
     username,
     fullname: `${prename} ${surname}`,
     prename,
     surname,
     mail,
     role: EUserRank.user,
-    data: {},
+    data: getEmptyUserData(),
   };
 
   Logger.log(`${adjustedUser.fullname} logging in using LDAP strategy`);

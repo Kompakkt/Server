@@ -5,7 +5,7 @@ import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
-import { IUserData, IStrippedUserData, ICompilation } from '../../common/interfaces';
+import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../common/interfaces';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
@@ -54,6 +54,16 @@ const areIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) =>
 const isValidId = (_id?: string | ObjectId): _id is string | ObjectId => {
   return !!_id && ObjectId.isValid(_id);
 };
+
+// Used for helper method below
+const __tmp: { [key: string]: Array<any> } = {};
+for (const value of Object.values(Collection)) __tmp[value] = new Array<any>();
+/**
+ * Generates an empty object of all available database collections for the data property of a user.
+ * This can be applied at login and does not need a migration incase we add more types
+ * @type {[type]}
+ */
+const getEmptyUserData = () => ({ ...__tmp } as { [key in Collection]: Array<any> });
 
 // TODO: (Optional) Convert to progressive JPEG?
 /**
@@ -130,4 +140,5 @@ export {
   stripUserData,
   isValidId,
   lockCompilation,
+  getEmptyUserData,
 };
