@@ -2,16 +2,10 @@ import DBClient from './client';
 import Users from './users';
 import Entities from './entities';
 import { Accounts, Repo } from './controllers';
-import { areIdsEqual, query, updatePreviewImage, stripUserData } from './functions';
-import {
-  CollectionName,
-  ECollection,
-  ICollectionParam,
-  IEntityHeadsUp,
-  IMailEntry,
-  isValidCollection,
-  PushableEntry,
-} from './definitions';
+// prettier-ignore
+import { areIdsEqual, query, queryIn, updatePreviewImage, stripUserData, isValidId, lockCompilation } from './functions';
+// prettier-ignore
+import { CollectionName, ECollection, ICollectionParam, IEntityHeadsUp, IMailEntry, isValidCollection, PushableEntry } from './definitions';
 
 export {
   DBClient,
@@ -21,6 +15,7 @@ export {
   Repo,
   areIdsEqual,
   query,
+  queryIn,
   updatePreviewImage,
   CollectionName,
   ECollection,
@@ -30,4 +25,6 @@ export {
   isValidCollection,
   PushableEntry,
   stripUserData,
+  isValidId,
+  lockCompilation,
 };

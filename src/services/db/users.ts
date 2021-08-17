@@ -4,7 +4,7 @@ import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
-import { query } from './functions';
+import { query, areIdsEqual } from './functions';
 import { Accounts, Repo } from './controllers';
 import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
 import Entities from './entities';
@@ -64,15 +64,14 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
 
   if (!ObjectId.isValid(_id) || !user) return false;
 
-  user.data[coll] = user.data[coll] ?? [];
+  const arr = (user.data[coll] ?? []).filter(_ => _);
 
-  const doesExist = user.data[coll]
-    .filter(obj => obj)
-    .find((obj: any) => obj.toString() === _id.toString());
-
+  const doesExist = arr.find(id => areIdsEqual(id, _id));
   if (doesExist) return true;
 
-  user.data[coll].push(new ObjectId(_id));
+  arr.push(new ObjectId(_id));
+
+  user.data[coll] = arr;
   const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
   });
@@ -88,8 +87,8 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
 
   if (!ObjectId.isValid(_id) || !user) return false;
 
-  user.data[coll] = user.data[coll] ?? [];
-  user.data[coll] = user.data[coll].filter(id => id !== _id);
+  const arr = (user.data[coll] ?? []).filter(_ => _).filter(id => !areIdsEqual(id, _id));
+  user.data[coll] = arr;
 
   const updateResult = await Accounts.users.updateOne(query(user._id), {
     $set: { data: user.data },
@@ -116,10 +115,10 @@ const resolve = async (req: Request<any> | IUserData) => {
   // Otherwise fully resolve
   for (const coll in { ...data }) {
     if (!isValidCollection(coll)) continue;
-
-    data[coll] = await Promise.all(data[coll].map(async obj => Entities.resolve(obj, coll)));
+    if (data[coll] === undefined) continue;
+    data[coll] = await Promise.all(data[coll]!.map(async obj => Entities.resolve(obj, coll)));
     // Filter possible null's
-    data[coll] = data[coll].filter(obj => obj && Object.keys(obj).length > 0);
+    data[coll] = data[coll]!.filter(obj => obj && Object.keys(obj).length > 0);
   }
 
   // Replace new resolved data and update cache
