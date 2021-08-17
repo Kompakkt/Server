@@ -6,7 +6,7 @@ import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
 import { Mailer } from './mailer';
 import { Logger } from './logger';
-import { Entities, Users, Accounts, Repo, query, isValidCollection } from './db';
+import { Entities, Users, Accounts, Repo, query, isValidCollection, isValidId } from './db';
 
 interface IIdentifierRequest {
   identifier?: string | ObjectId;
@@ -19,9 +19,6 @@ interface IRoleRequest {
 interface IUsernameRequest {
   username?: string;
 }
-
-const checkAndReturnObjectId = (id?: ObjectId | string) =>
-  id ? (ObjectId.isValid(id) ? new ObjectId(id) : undefined) : undefined;
 
 const checkIsAdmin = async (
   req: Request<any, any, Partial<IUsernameRequest>>,
@@ -56,8 +53,8 @@ const getAllUsers = async (_: Request, res: Response) => {
 };
 
 const getUser = async (req: Request<IIdentifierRequest>, res: Response) => {
-  const _id = checkAndReturnObjectId(req.params.identifier);
-  if (!_id) return res.status(400).send('Invalid identifier');
+  const _id = req.params.identifier;
+  if (!isValidId(_id)) return res.status(400).send('Invalid identifier');
 
   const user = await Accounts.users.findOne(query(_id));
   const filterProperties = ['sessionID', 'rank', 'prename', 'surname'];
@@ -68,12 +65,13 @@ const getUser = async (req: Request<IIdentifierRequest>, res: Response) => {
 
   for (const coll in user.data) {
     if (!isValidCollection(coll)) continue;
-    for (let i = 0; i < user.data[coll].length; i++) {
-      const obj = user.data[coll][i];
-      user.data[coll][i] = await Entities.resolve(obj, coll, 0);
+    if (user.data[coll] === undefined) continue;
+    for (let i = 0; i < user.data[coll]!.length; i++) {
+      const obj = user.data[coll]![i];
+      user.data[coll]![i] = await Entities.resolve(obj, coll, 0);
     }
     // Filter null entities
-    user.data[coll] = user.data[coll].filter(obj => obj);
+    user.data[coll] = user.data[coll]!.filter(obj => obj);
   }
   return res.status(200).send(user);
 };
@@ -84,8 +82,8 @@ const promoteUserToRole = async (
 ) => {
   const { identifier, role } = req.body;
 
-  const _id = checkAndReturnObjectId(identifier);
-  if (!_id) return res.status(400).send('Invalid identifier');
+  const _id = identifier;
+  if (!isValidId(_id)) return res.status(400).send('Invalid identifier');
 
   const validRoles = Object.values(EUserRank);
   if (!role || !validRoles.includes(role)) return res.status(400).send('Invalid role specified');
@@ -113,8 +111,8 @@ const toggleEntityPublishedState = async (
   req: Request<any, any, IIdentifierRequest>,
   res: Response,
 ) => {
-  const _id = checkAndReturnObjectId(req.body.identifier);
-  if (!_id) return res.status(400).send('Incorrect req parameters');
+  const _id = req.body.identifier;
+  if (!isValidId(_id)) return res.status(400).send('Incorrect req parameters');
 
   const found = await Repo.entity.findOne(query(_id));
   if (!found) return res.status(404).send('No entity with this identifier found');

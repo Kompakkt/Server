@@ -1,244 +1,210 @@
 // prettier-ignore
-import { IAnnotation, ICompilation, IEntity, IStrippedUserData, IGroup, isAnnotation } from '../common/interfaces';
+import { IAnnotation, ICompilation, IEntity, isAnnotation, IUserData } from '../common/interfaces';
+// prettier-ignore
+import { Entities, Repo, Users, Accounts, query, queryIn, stripUserData, isValidId, lockCompilation } from './db';
 import { Request, Response } from 'express';
-import { ObjectId } from 'mongodb';
-import { Entities, Repo, Users, Accounts, query } from './db';
+import { ObjectId, Filter } from 'mongodb';
 
-interface IUtility {
-  findAllEntityOwnersRequest(req: Request, res: Response): any;
-  findAllEntityOwners(entityId: string): Promise<IStrippedUserData[]>;
-  countEntityUses(req: Request, res: Response): any;
-  addAnnotationsToAnnotationList(req: Request, res: Response): any;
-  applyActionToEntityOwner(req: Request, res: Response): any;
-
-  findUserInGroups(req: Request, res: Response): any;
-  findUserInCompilations(req: Request, res: Response): any;
-
-  findUserInMetadata(req: Request, res: Response): any;
+interface IIdentifierParam {
+  identifier?: string;
 }
 
-const Utility: IUtility = {
-  findAllEntityOwnersRequest: async (req, res) => {
-    const entityId = req.params.identifier;
-    if (!ObjectId.isValid(entityId)) return res.status(400).send('Invalid entity _id ');
+interface IAnnotationListBody {
+  annotations?: string[];
+}
 
-    const accounts = await Utility.findAllEntityOwners(entityId);
-    return res.status(200).send(accounts);
-  },
-  findAllEntityOwners: async (entityId: string) => {
-    const accounts = (await Accounts.users.findAll())
-      .filter(userData => {
-        const Entities = JSON.stringify(userData.data.entity);
-        return Entities ? Entities.indexOf(entityId) !== -1 : false;
-      })
-      .map(
-        userData =>
-          ({
-            fullname: userData.fullname,
-            username: userData.username,
-            _id: userData._id,
-          } as IStrippedUserData),
-      );
-    return accounts;
-  },
-  countEntityUses: async (req, res) => {
-    const entityId = req.params.identifier;
-    if (!ObjectId.isValid(entityId)) return res.status(404).send('Invalid entity _id ');
+interface IPromoteBody {
+  command?: string;
+  ownerUsername?: string;
+  ownerId?: string;
+  entityId?: string;
+}
 
-    const user = await Users.getBySession(req);
+// Query helpers
+// TODO: This can be cached without trouble
+const userInWhitelistQuery = async (user: IUserData) => {
+  // Get groups containing the user
+  const groups = await Repo.group.find(userInGroupQuery(user));
 
-    const isUserOwnerOfCompilation = (comp: ICompilation) =>
-      JSON.stringify(user?.data?.compilation)?.includes(comp._id.toString());
+  // Build query for whitelist containing the user in persons or in groups
+  const groupQuery = (groups ?? []).map(g => ({ $elemMatch: { _id: queryIn(g._id) } }));
+  return {
+    $or: [
+      { 'whitelist.persons': { $elemMatch: { _id: queryIn(user._id) } } },
+      { 'whitelist.groups': { $or: groupQuery } },
+    ],
+  };
+};
 
-    const isCompilationNotPWProtected = (comp: ICompilation) =>
-      comp.password === '' || comp.password === false || !comp.password;
+const userInGroupQuery = (user: IUserData) => {
+  const _idQuery = queryIn(user._id);
+  return {
+    $or: [
+      { 'creator._id': _idQuery },
+      { members: { $elemMatch: { _id: _idQuery } } },
+      { owners: { $elemMatch: { _id: _idQuery } } },
+    ],
+  };
+};
 
-    const isValid = (comp: ICompilation) =>
-      isUserOwnerOfCompilation(comp) || isCompilationNotPWProtected(comp);
+const findAllEntityOwners = async (entityId: string) => {
+  const accounts = (await Accounts.users.find({ 'data.entity': { $in: query(entityId) } })) ?? [];
+  return accounts.map(stripUserData);
+};
 
-    const includesEntity = (comp: ICompilation) => comp.entities[entityId] !== undefined;
+const findAllEntityOwnersRequest = async (req: Request<IIdentifierParam>, res: Response) => {
+  const _id = req.params.identifier;
+  if (!isValidId(_id)) return res.status(400).send('Invalid entity _id ');
+  return res.status(200).send(await findAllEntityOwners(_id));
+};
 
-    const compilations = await Promise.all(
-      (
-        await Repo.compilation.findAll()
-      )
-        .filter(isValid)
-        .filter(includesEntity)
-        .map(async comp => {
-          for (const id in comp.annotations) {
-            const resolved = await Entities.resolve<IAnnotation>(id, 'annotation');
-            if (!isAnnotation(resolved)) {
-              delete comp.annotations[id];
-              continue;
-            }
-            comp.annotations[id] = resolved;
-          }
-          return comp;
-        }),
-    );
-    const occurences = compilations.length;
+const countEntityUses = async (req: Request<IIdentifierParam>, res: Response) => {
+  const _id = req.params.identifier;
+  if (!isValidId(_id)) return res.status(400).send('Invalid entity _id ');
 
-    return res.status(200).send({ occurences, compilations });
-  },
-  addAnnotationsToAnnotationList: async (req, res) => {
-    const annotations = req.body.annotations as string[] | undefined;
-    if (!annotations || !Array.isArray(annotations))
-      return res.status(400).send('No annotation array sent');
+  const user = await Users.getBySession(req);
 
-    const compId = req.params.identifier;
-    if (
-      !compId ||
-      !ObjectId.isValid(compId) ||
-      (await Entities.resolve(compId, 'compilation')) === undefined
-    ) {
-      return res.status(400).send('Invalid compilation given');
-    }
+  // Build query for:
+  // (Not password protected || user is creator || user is whitelisted) && has entity
+  const filter: Filter<ICompilation> = { $or: [{ password: { $eq: '' } }] };
+  if (user) {
+    filter.$or!.push({ 'creator._id': queryIn(user._id) });
+    filter.$or!.push(userInWhitelistQuery(user));
+  }
+  filter[`entities.${_id}`] = { $exists: true };
 
-    const compilation = await Repo.compilation.findOne(query(compId));
-    if (!compilation) return res.status(404).send('Compilation not found');
+  const result = (await Repo.compilation.find(filter)) ?? [];
+  const compilations = result.map(lockCompilation);
+  const occurences = compilations.length;
 
-    const resolvedAnnotations = (
-      await Promise.all(
-        annotations
-          .filter(ann => ObjectId.isValid(ann))
-          .map(ann => Entities.resolve<IAnnotation>(ann, 'annotation')),
-      )
-    ).filter(ann => ann) as IAnnotation[];
-    const validAnnotations = resolvedAnnotations
-      .filter(ann => ann !== undefined && ann)
-      .map(ann => {
-        ann['_id'] = new ObjectId();
-        ann['target']['source']['relatedCompilation'] = req.params.identifier;
-        ann['lastModificationDate'] = new Date().toISOString();
-        return ann;
-      });
+  return res.status(200).send({ occurences, compilations });
+};
 
-    const insertResult = await Repo.annotation.insertMany(validAnnotations);
-    if (!insertResult) return res.status(500).send('Failed inserting Annotations');
+const addAnnotationsToAnnotationList = async (
+  req: Request<IIdentifierParam, any, IAnnotationListBody>,
+  res: Response,
+) => {
+  const list = req.body.annotations;
+  if (!list || !Array.isArray(list)) return res.status(400).send('No annotation array sent');
 
-    for (const anno of validAnnotations) {
-      if (!isAnnotation(anno)) continue;
-      compilation.annotations[anno._id.toString()] = anno;
-    }
+  const _id = req.params.identifier;
+  if (!isValidId(_id)) return res.status(400).send('Invalid compilation _id ');
 
-    const updateResult = await Repo.compilation.updateOne(query(compId), {
-      $set: { annotations: compilation.annotations },
-    });
-    if (!updateResult) return res.status(500).send('Failed updating annotations');
+  const compilation = await Repo.compilation.findOne(query(_id));
+  if (!compilation) return res.status(404).send('Compilation not found');
 
-    // Add Annotations to LDAP user
-    validAnnotations.forEach(ann => Users.makeOwnerOf(req, ann._id, 'annotation'));
-    return res.status(200).send(await Entities.resolve<ICompilation>(compId, 'compilation'));
-  },
-  applyActionToEntityOwner: async (req, res) => {
-    const command = req.body.command;
-    if (!['add', 'remove'].includes(command))
-      return res.status(400).send('Invalid command. Use "add" or "remove"');
-    const ownerUsername = req.body.ownerUsername;
-    const ownerId = req.body.ownerId;
-    if (!ownerId && !ownerUsername) return res.status(400).send('No owner _id or username given');
-    if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId))
-      return res.status(400).send('Incorrect owner _id given');
-    const entityId = req.body.entityId;
-    if (
-      !entityId ||
-      !ObjectId.isValid(entityId) ||
-      (await Entities.resolve<IEntity>(entityId, 'entity')) === undefined
-    ) {
-      return res.status(400).send('Invalid entity identifier');
-    }
+  const resolvedList = await Promise.all(list.map(a => Entities.resolve(a, 'annotation')));
+  const filteredList = resolvedList.filter(_ => _) as IAnnotation[];
+  const correctedList = filteredList.map(ann => {
+    ann._id = new ObjectId();
+    ann.target.source.relatedCompilation = _id;
+    ann.lastModificationDate = new Date().toISOString();
+    return ann;
+  });
 
-    const findUserQuery = ownerId ? query(ownerId) : { username: ownerUsername };
-    const user = await Accounts.users.findOne(findUserQuery);
-    if (!user) return res.status(400).send('Incorrect owner _id or username given');
+  const insertResult = await Repo.annotation.insertMany(correctedList);
+  if (!insertResult) return res.status(500).send('Failed inserting Annotations');
 
-    user.data.entity = user.data.entity ?? [];
-    user.data.entity = user.data.entity.filter((_: any) => _);
+  for (const anno of correctedList) {
+    if (!isAnnotation(anno)) continue;
+    compilation.annotations[anno._id.toString()] = anno;
+  }
 
-    if (command === 'add') {
-      if (!(user.data.entity as IEntity[]).find(obj => obj.toString() === entityId.toString())) {
-        user.data.entity.push(new ObjectId(entityId));
-      }
-    } else if (command === 'remove') {
-      const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
-      if (entityUses === 1) return res.status(403).send('Cannot remove last owner');
+  const updateResult = await Repo.compilation.updateOne(query(_id), {
+    $set: { annotations: compilation.annotations },
+  });
+  if (!updateResult) return res.status(500).send('Failed updating annotations');
 
-      user.data.entity = (user.data.entity as IEntity[]).filter(
-        entity => entity.toString() !== entityId.toString(),
-      );
-    }
+  // Add Annotations to LDAP user
+  correctedList.forEach(ann => Users.makeOwnerOf(req, ann._id, 'annotation'));
+  return res.status(200).send(await Entities.resolve<ICompilation>(_id, 'compilation'));
+};
 
-    const updateResult = await Accounts.users.updateOne(findUserQuery, {
-      $set: { data: user.data },
-    });
+const applyActionToEntityOwner = async (req: Request<any, any, IPromoteBody>, res: Response) => {
+  const command = req.body.command;
+  if (command !== 'add' && command !== 'remove')
+    return res.status(400).send('Invalid command. Use "add" or "remove"');
 
-    if (!updateResult) return res.status(500).send('Failed updating entity array');
+  const ownerUsername = req.body.ownerUsername;
+  const ownerId = req.body.ownerId;
+  if (!ownerId && !ownerUsername) return res.status(400).send('No owner _id or username given');
+  if (ownerId && !ownerUsername && !ObjectId.isValid(ownerId))
+    return res.status(400).send('Incorrect owner _id given');
 
-    return res.status(200);
-  },
-  findUserInGroups: async (req, res) => {
-    const user = await Users.getBySession(req);
-    if (!user) return res.status(404).send('Failed getting user by SessionId');
-    const groups = await Repo.group.findAll();
+  const entityId = req.body.entityId;
+  if (!isValidId(entityId) || (await Repo.entity.findOne({ _id: query(entityId) })) === undefined) {
+    return res.status(400).send('Invalid entity identifier');
+  }
 
-    return res
-      .status(200)
-      .send(
-        groups.filter(
-          group =>
-            JSON.stringify(group.members).includes(`${user._id}`) ||
-            JSON.stringify(group.owners).includes(`${user._id}`),
-        ),
-      );
-  },
-  findUserInCompilations: async (req, res) => {
-    const user = await Users.getBySession(req);
-    if (!user) return res.status(404).send('Failed getting user by SessionId');
-    const compilations = await Promise.all(
-      (
-        await Repo.compilation.findAll()
-      )
-        .filter(comp => comp.whitelist.enabled)
-        .map(async comp => {
-          // Get latest versions of groups
-          comp.whitelist.groups = (
-            await Promise.all(
-              comp.whitelist.groups.map(group => Entities.resolve<IGroup>(group, 'group')),
-            )
-          ).filter(group => group) as IGroup[];
-          return comp;
-        }),
-    );
+  const findUserQuery = ownerId ? query(ownerId) : { username: ownerUsername };
+  const user = await Accounts.users.findOne(findUserQuery);
+  if (!user) return res.status(400).send('Incorrect owner _id or username given');
 
-    const filteredCompilations = compilations.filter(
-      compilation =>
-        JSON.stringify(compilation.whitelist.groups).includes(`${user._id}`) ||
-        JSON.stringify(compilation.whitelist.persons).includes(`${user._id}`),
-    );
+  user.data.entity = user.data.entity ?? [];
+  user.data.entity = user.data.entity.filter((_: any) => _);
 
-    const resolvedCompilations = (
-      await Promise.all(
-        filteredCompilations.map(comp => Entities.resolve<ICompilation>(comp, 'compilation')),
-      )
-    ).filter(comp => comp) as ICompilation[];
+  let changed: undefined | boolean = undefined;
+  if (command === 'add') {
+    changed = await Users.makeOwnerOf(req, entityId, 'entity');
+  } else if (command === 'remove') {
+    const entityUses = (await Utility.findAllEntityOwners(entityId)).length;
+    if (entityUses === 1) return res.status(403).send('Cannot remove last owner');
+    changed = await Users.undoOwnerOf(req, entityId, 'entity');
+  }
 
-    return res.status(200).send(resolvedCompilations);
-  },
-  findUserInMetadata: async (req, res) => {
-    const user = await Users.getBySession(req);
-    if (!user) return res.status(404).send('Failed getting user by SessionId');
-    const entities = await Repo.entity.findAll();
+  return res.status(200).send({ changed });
+};
 
-    const resolvedEntities = (
-      await Promise.all(entities.map(entity => Entities.resolve<IEntity>(entity, 'entity')))
-    ).filter(entity => {
-      if (!entity) return false;
-      const stringified = JSON.stringify(entity.relatedDigitalEntity);
-      return stringified.includes(user.fullname) || stringified.includes(user.mail);
-    });
+const findUserInGroups = async (req: Request, res: Response) => {
+  const user = await Users.getBySession(req);
+  if (!user) return res.status(404).send('Failed getting user by SessionId');
 
-    return res.status(200).send(resolvedEntities);
-  },
+  const groups = await Repo.group.find(userInGroupQuery(user));
+
+  return res.status(200).send(groups);
+};
+
+const findUserInCompilations = async (req: Request, res: Response) => {
+  const user = await Users.getBySession(req);
+  if (!user) return res.status(404).send('Failed getting user by SessionId');
+
+  // Only show compilations where the user is in the whitelist
+  const compilations = await Repo.compilation.find(userInWhitelistQuery(user));
+  if (!compilations) return res.status(200).send([]);
+
+  const resolved = await Promise.all(
+    compilations.map(comp => Entities.resolve<ICompilation>(comp, 'compilation')),
+  );
+  const filtered = resolved.filter(_ => _) as ICompilation[];
+
+  return res.status(200).send(filtered.map(lockCompilation));
+};
+
+const findUserInMetadata = async (req: Request, res: Response) => {
+  const user = await Users.getBySession(req);
+  if (!user) return res.status(404).send('Failed getting user by SessionId');
+  const entities = await Repo.entity.findAll();
+
+  const resolvedEntities = (
+    await Promise.all(entities.map(e => Entities.resolve<IEntity>(e, 'entity')))
+  ).filter(entity => {
+    if (!entity) return false;
+    const stringified = JSON.stringify(entity.relatedDigitalEntity);
+    return stringified.includes(user.fullname) || stringified.includes(user.mail);
+  });
+
+  return res.status(200).send(resolvedEntities);
+};
+
+const Utility = {
+  findAllEntityOwnersRequest,
+  findAllEntityOwners,
+  countEntityUses,
+  addAnnotationsToAnnotationList,
+  applyActionToEntityOwner,
+  findUserInGroups,
+  findUserInCompilations,
+  findUserInMetadata,
 };
 
 export { Utility };
