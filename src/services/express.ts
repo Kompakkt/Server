@@ -224,6 +224,8 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     data: {},
   };
 
+  Logger.log(`${adjustedUser.fullname} logging in using LDAP strategy`);
+
   return done(undefined, adjustedUser);
 };
 
@@ -232,6 +234,9 @@ const verifyLocalStrategy: LocalStrategy.VerifyFunction = async (username, passw
   if (!user || !(await verifyPassword(username, password))) {
     return done(undefined, false);
   }
+
+  Logger.log(`${user.fullname} logging in using local strategy`);
+
   return done(undefined, user);
 };
 
