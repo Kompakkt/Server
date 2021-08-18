@@ -1,5 +1,5 @@
 // prettier-ignore
-import { IAnnotation, ICompilation, IEntity, isAnnotation, IUserData } from '../common/interfaces';
+import { IAnnotation, ICompilation, IEntity, isAnnotation, IUserData } from '../common';
 // prettier-ignore
 import { Entities, Repo, Users, Accounts, query, queryIn, stripUserData, isValidId, lockCompilation } from './db';
 import { Request, Response } from 'express';

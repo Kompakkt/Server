@@ -1,7 +1,7 @@
 import { Repo, Entities, query } from '../services/db';
 import { Save } from '../services/db/saving-strategies';
 // prettier-ignore
-import { IPerson, IInstitution, IContact, IAddress, IDocument, isUnresolved } from '../common/interfaces';
+import { IPerson, IInstitution, IContact, IAddress, IDocument, isUnresolved } from '../common';
 
 (async () => {
   // Institutions

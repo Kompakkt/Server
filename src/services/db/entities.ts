@@ -1,5 +1,5 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common/interfaces';
+import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common';
 // prettier-ignore
 import { IEntityHeadsUp, PushableEntry, isValidCollection, CollectionName } from './definitions';
 import { ObjectId } from 'mongodb';

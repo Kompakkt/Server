@@ -1,5 +1,5 @@
 // prettier-ignore
-import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag, Collection } from '../../common/interfaces';
+import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag, Collection } from '../../common';
 import { Logger } from '../logger';
 import { ObjectId } from 'mongodb';
 

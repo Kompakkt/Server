@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
-import { EUserRank, IEntity } from '../common/interfaces';
+import { UserRank, IEntity } from '../common';
 import { updateUserPassword } from './express';
 import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
@@ -13,7 +13,7 @@ interface IIdentifierRequest {
 }
 
 interface IRoleRequest {
-  role?: EUserRank;
+  role?: UserRank;
 }
 
 interface IUsernameRequest {
@@ -30,7 +30,7 @@ const checkIsAdmin = async (
     return res.status(400).send('Incorrect username or password');
 
   const user = await Users.getByUsername(username);
-  if (user?.role !== EUserRank.admin)
+  if (user?.role !== UserRank.admin)
     return res.status(401).send('Could not verify your admin status');
 
   return next();
@@ -85,7 +85,7 @@ const promoteUserToRole = async (
   const _id = identifier;
   if (!isValidId(_id)) return res.status(400).send('Invalid identifier');
 
-  const validRoles = Object.values(EUserRank);
+  const validRoles = Object.values(UserRank);
   if (!role || !validRoles.includes(role)) return res.status(400).send('Invalid role specified');
 
   const user = await Accounts.users.findOne(query(_id));

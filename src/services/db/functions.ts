@@ -5,7 +5,7 @@ import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
-import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../common/interfaces';
+import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../common';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string

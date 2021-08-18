@@ -15,7 +15,7 @@ import LocalStrategy from 'passport-local';
 import SocketIo from 'socket.io';
 import resTime from 'response-time';
 import { RootDirectory } from '../environment';
-import { IUserData, EUserRank, ObjectId } from '../common/interfaces';
+import { IUserData, UserRank, ObjectId } from '../common';
 import { Accounts, getEmptyUserData } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
@@ -121,7 +121,7 @@ export const isRegisterRequest = (obj: any): obj is IRegisterBody => {
 const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response) => {
   // First user gets admin
   const isFirstUser = (await Accounts.users.findOne({})) === null;
-  const role = isFirstUser ? EUserRank.admin : EUserRank.user;
+  const role = isFirstUser ? UserRank.admin : UserRank.user;
 
   if (!isRegisterRequest(req.body)) return res.status(400).send('Incomplete user data');
 
@@ -220,7 +220,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     prename,
     surname,
     mail,
-    role: EUserRank.user,
+    role: UserRank.user,
     data: getEmptyUserData(),
   };
 

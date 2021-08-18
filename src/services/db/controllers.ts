@@ -1,5 +1,5 @@
 // prettier-ignore
-import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common/interfaces';
+import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common';
 // prettier-ignore
 import { Filter, Db, OptionalId, UpdateFilter, UpdateOptions, FindOptions } from 'mongodb';
 import { Configuration } from '../configuration';

@@ -1,5 +1,5 @@
 // prettier-ignore
-import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, ITag, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common/interfaces';
+import { IAnnotation, IAddress, ICompilation, IContact, IEntity, IGroup, IUserData, IDigitalEntity, IPhysicalEntity, IPerson, IInstitution, ITag, isEntity, isAnnotation, isDigitalEntity, isUnresolved } from '../../common';
 import { ObjectId } from 'mongodb';
 import { ensureDirSync, writeFile } from 'fs-extra';
 import { join } from 'path';

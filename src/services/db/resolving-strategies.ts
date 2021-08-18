@@ -1,5 +1,5 @@
 // prettier-ignore
-import { ICompilation, IAddress, IEntity, IContact, IDigitalEntity, IPerson, IInstitution, IPhysicalEntity, ITag, IAnnotation, isDigitalEntity, isPerson, isInstitution, isUnresolved } from '../../common/interfaces';
+import { ICompilation, IAddress, IEntity, IContact, IDigitalEntity, IPerson, IInstitution, IPhysicalEntity, ITag, IAnnotation, isDigitalEntity, isPerson, isInstitution, isUnresolved } from '../../common';
 import Entities from './entities';
 
 const removeUnrelatedEntities = <T extends unknown>(

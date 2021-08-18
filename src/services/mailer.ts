@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import * as nodemailer from 'nodemailer';
-import { EUserRank } from '../common/interfaces';
+import { UserRank } from '../common';
 import { Configuration, isMailConfiguration } from './configuration';
 import { Logger } from './logger';
 import { Users, Accounts, query } from './db';
@@ -112,10 +112,10 @@ const addUserToDatabase = async (req: Request, mailSent: boolean) => {
   const user = await Users.getBySession(req);
   if (!user) return false;
 
-  if (target === ETarget.upload && user?.role === EUserRank.user) {
+  if (target === ETarget.upload && user?.role === UserRank.user) {
     await Accounts.users.updateOne(
       { username: user.username, sessionID: user.sessionID },
-      { $set: { role: EUserRank.uploadrequested } },
+      { $set: { role: UserRank.uploadrequested } },
     );
   }
 

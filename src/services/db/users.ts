@@ -1,5 +1,5 @@
 // prettier-ignore
-import { IUserData, EUserRank, isAnnotation, isPerson, isInstitution } from '../../common/interfaces';
+import { IUserData, UserRank, isAnnotation, isPerson, isInstitution } from '../../common';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
 import { UserCache } from '../cache';
@@ -36,7 +36,7 @@ const login = async (req: Request<any>, res: Response) => {
     ...user,
     sessionID: req.sessionID,
     data: { ...getEmptyUserData(), ...userdata.data },
-    role: userdata.role ?? EUserRank.user,
+    role: userdata.role ?? UserRank.user,
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
@@ -149,7 +149,7 @@ const isOwnerMiddleware = async (
 
 const isAdmin = async (req: Request<any> | IUserData) => {
   const user = await getUser(req);
-  return user ? user.role === EUserRank.admin : false;
+  return user ? user.role === UserRank.admin : false;
 };
 
 const isAllowedToEdit = async (
