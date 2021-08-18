@@ -56,7 +56,13 @@ const logout = async (req: Request<any>, res: Response) => {
   const user = await getBySession(req);
   if (!user) return res.status(400).send('User not found by session');
   const { username, sessionID } = user;
-  return Accounts.users.updateOne({ username, sessionID }, { $set: { sessionID: undefined } });
+  return Accounts.users
+    .updateOne({ username, sessionID }, { $set: { sessionID: undefined } })
+    .then(updateResult => {
+      return res
+        .status(!!updateResult ? 200 : 400)
+        .send(!!updateResult ? 'Logged out' : 'Failed logging out');
+    });
 };
 
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {

@@ -53,7 +53,7 @@ class DBClient {
     this.Client.connect(error => {
       if (!error) {
         DBClient.isConnected = true;
-        Logger.info('Connected to MongoDB');
+        Logger.info('Connected to MongoDB', MongoURL);
       } else {
         Logger.err(`Couldn't connect to MongoDB.
           Make sure it is running and check your configuration`);

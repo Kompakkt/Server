@@ -57,6 +57,10 @@ class Controller<T> {
     });
   }
   public updateOne(filter: Filter<T>, update: UpdateFilter<T>, options: UpdateOptions = {}) {
+    if (update.$set?._id) {
+      // Prevent updating immutable field '_id'
+      delete update.$set._id;
+    }
     return this.collection.updateOne(filter, update, options).catch(err => {
       Logger.err('Failed updateOne', this.db.databaseName, this.coll, filter, update, options, err);
       return undefined;
