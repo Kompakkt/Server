@@ -134,8 +134,7 @@ const applyActionToEntityOwner = async (req: Request<any, any, IPromoteBody>, re
   if (command !== 'add' && command !== 'remove')
     return res.status(400).send('Invalid command. Use "add" or "remove"');
 
-  if (!username)
-    return res.status(400).send('No user given');
+  if (!username) return res.status(400).send('No user given');
 
   const user = await Users.getByUsername(username);
   if (!user) return res.status(400).send('User not found by username');
