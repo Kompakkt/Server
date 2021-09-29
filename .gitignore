@@ -212,6 +212,9 @@ src/uploads/*
 src/temp
 src/temp/*
 
+src/common
+src/common/*
+
 # Ignore JSCPD output
 .jscpd/
 .jscpd/*
