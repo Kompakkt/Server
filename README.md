@@ -1,3 +1,25 @@
-# ObjectsRepository
+# Kompakkt Server / ObjectsRepository
 
-This README is WIP
+## Prerequisites
+
+- [NodeJS](https://nodejs.org/en/)
+- Node Package Manager ([NPM](https://www.npmjs.com/))
+- MongoDB
+- Redis
+
+## Development setup
+
+In order to setup your own development environment, you have to have [NodeJS](https://nodejs.org/en/) as well as Node Package Manager ([NPM](https://www.npmjs.com/)) installed.
+
+Clone this repository, cd to the project directory and run the following commands:
+
+```
+$ git clone https://github.com/Kompakkt/Common.git src/common
+$ npm i
+```
+
+Ensure that MongoDB and Redis is running then start the server with
+
+```
+$ npm run start
+```
