@@ -27,7 +27,7 @@ const isUser = (obj: any): obj is IUserData => {
 
 const login = async (req: Request<any>, res: Response) => {
   const user: IUserData = req.user as IUserData;
-  const username = req.body.username.toLowerCase();
+  const username = req.body.username;
   const userdata = await getByUsername(username);
 
   if (!userdata) return res.status(400).send('User not found');
