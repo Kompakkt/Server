@@ -368,7 +368,7 @@ const explore = async (req: Request<any, any, IExploreRequest>, res: Response) =
     })
     .then(finalItems => {
       res.status(200).send(finalItems);
-      // RepoCache.set(reqHash, items, 3600)
+      RepoCache.set(reqHash, finalItems, 3600);
     });
 };
 

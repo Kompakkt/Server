@@ -163,15 +163,8 @@ const exploreEntities = async (body: IExploreRequest & IPossibleUserdata) => {
 };
 
 const exploreCompilations = async (body: IExploreRequest & IPossibleUserdata) => {
-  const { types, offset, limit, userData, filters, searchText } = body;
-  const compilations =
-    (await Repo.compilation.find({
-      finished: true,
-      online: true,
-      mediaType: {
-        $in: types,
-      },
-    })) ?? [];
+  const { offset, limit, userData, filters, searchText } = body;
+  const compilations = (await Repo.compilation.findAll()) ?? [];
   // TODO: compilation sort params?
   const sortedComps = compilations; //  sortEntities(compilations, sortBy ?? SortOrder.popularity);
   const finalComps = new Array<ICompilation>();
@@ -231,13 +224,13 @@ const exploreCompilations = async (body: IExploreRequest & IPossibleUserdata) =>
       resolved.annotations[id] = { _id: value._id };
     }
 
-    compilations.push({
+    finalComps.push({
       ...resolved,
       password: isPWProtected,
     });
   }
 
-  return compilations;
+  return finalComps;
 };
 
 export { exploreEntities, exploreCompilations };
