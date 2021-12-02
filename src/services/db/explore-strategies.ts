@@ -72,7 +72,8 @@ const getAge = (entity: IEntity) => {
 };
 
 const byName = (a: IEntity, b: IEntity) => a.name.localeCompare(b.name);
-const byWeight = (a: IWeightedItem, b: IWeightedItem) => b.value - a.value;
+const byWeight = (a: IWeightedItem, b: IWeightedItem) =>
+  a.value !== b.value ? b.value - a.value : byName(a.entity, b.entity);
 const byAge = (a: IEntity, b: IEntity) => getAge(b) - getAge(a);
 
 const sortEntities = async (entities: IEntity[], order: SortOrder) => {
