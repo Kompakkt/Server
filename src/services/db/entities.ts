@@ -1,5 +1,5 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IDigitalEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common';
+import {  ICompilation, IEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common';
 // prettier-ignore
 import { IEntityHeadsUp, PushableEntry, isValidCollection, CollectionName } from './definitions';
 import { ObjectId } from 'mongodb';
@@ -9,22 +9,15 @@ import { Logger } from '../logger';
 import { Resolve } from './resolving-strategies';
 import { Save } from './saving-strategies';
 import { query, updatePreviewImage } from './functions';
+import {
+  exploreEntities,
+  exploreCompilations,
+  IExploreRequest,
+  SortOrder,
+} from './explore-strategies';
 
 import Users from './users';
 import { Repo } from './controllers';
-
-interface IExploreRequest {
-  searchEntity: boolean;
-  types: string[];
-  filters: {
-    annotatable: boolean;
-    annotated: boolean;
-    restricted: boolean;
-    associated: boolean;
-  };
-  searchText: string;
-  offset: number;
-}
 
 interface IEntityRequestParams {
   identifier: string;
@@ -352,165 +345,31 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
 };
 
 // TODO: improve performance by splitting into multiple indexes?
-const explore = async (req: Request<any, IExploreRequest>, res: Response) => {
-  const { types, offset, searchEntity, filters, searchText } = req.body;
-  const items = new Array<IEntity | ICompilation>();
-  const limit = 30;
+const explore = async (req: Request<any, any, IExploreRequest>, res: Response) => {
+  const { searchEntity } = req.body;
   const userData = await Users.getBySession(req);
-  const userOwned = userData ? JSON.stringify(userData.data) : '';
+
+  const fixedBody = {
+    ...req.body,
+    sortBy: req.body.sortBy ?? SortOrder.popularity,
+    limit: 30,
+    userData,
+    reversed: req.body.reversed ?? false,
+  };
 
   // Check if req is cached
   const reqHash = RepoCache.hash({ sessionID: req.sessionID ?? 'guest', ...req.body });
-  const temp = await RepoCache.get<IEntity[] | ICompilation[]>(reqHash);
 
-  if (temp && temp?.length > 0) {
-    items.push(...temp);
-  } else if (searchEntity) {
-    const cursor = Repo.entity
-      .findCursor({
-        finished: true,
-        online: true,
-        mediaType: {
-          $in: types,
-        },
-      })
-      .sort({
-        name: 1,
-      })
-      .skip(offset);
-
-    const entities: IEntity[] = [];
-
-    const canContinue = async () =>
-      (await cursor.hasNext()) && entities.length < limit && types.length > 0;
-
-    while (await canContinue()) {
-      const _entity = await cursor.next();
-      if (!_entity || !_entity._id) continue;
-      const resolved = await resolve<IEntity>(_entity, 'entity');
-      if (!resolved) continue;
-
-      const isOwner = userOwned.includes(resolved._id.toString());
-      const metadata = JSON.stringify(resolved).toLowerCase();
-
-      const isAnnotatable = isOwner; // only owner can set default annotations
-      if (filters.annotatable && !isAnnotatable) continue;
-
-      const isAnnotated = Object.keys(resolved.annotations).length > 0;
-      if (filters.annotated && !isAnnotated) continue;
-
-      let isRestricted = false;
-      // Whitelist visibility filter
-      if (resolved.whitelist.enabled) {
-        if (!userData) continue;
-        // TODO: manual checking instead of JSON.stringify
-        const isWhitelisted = JSON.stringify(resolved.whitelist).includes(userData._id.toString());
-        if (!isOwner && !isWhitelisted) continue;
-        isRestricted = true;
-      }
-      if (filters.restricted && !isRestricted) continue;
-
-      const isAssociated = userData // user appears in metadata
-        ? metadata.includes(userData.fullname.toLowerCase()) ||
-          metadata.includes(userData.mail.toLowerCase())
-        : false;
-      if (filters.associated && !isAssociated) continue;
-
-      // Search text filter
-      if (searchText !== '' && !metadata.includes(searchText)) {
-        continue;
-      }
-
-      const { description, licence } = resolved.relatedDigitalEntity as IDigitalEntity;
-      entities.push({
-        ...resolved,
-        relatedDigitalEntity: {
-          description,
-          licence,
-        } as IDigitalEntity,
-      } as IEntity);
-    }
-
-    items.push(...entities);
-  } else {
-    const cursor = Repo.compilation
-      .findCursor({})
-      .sort({
-        name: 1,
-      })
-      .skip(offset);
-    const compilations: ICompilation[] = [];
-
-    const canContinue = async () =>
-      (await cursor.hasNext()) && !cursor.closed && compilations.length < limit && types.length > 0;
-
-    while (await canContinue()) {
-      const _comp = await cursor.next();
-      if (!_comp) continue;
-      const resolved = await resolve<ICompilation>(_comp, 'compilation');
-
-      if (!resolved || !resolved._id) continue;
-      if (Object.keys(resolved.entities).length === 0) continue;
-
-      if (searchText !== '') {
-        if (
-          !resolved.name.toLowerCase().includes(searchText) &&
-          !resolved.description.toLowerCase().includes(searchText)
-        ) {
-          continue;
-        }
-      }
-
-      const isOwner = userOwned.includes(resolved._id.toString());
-
-      const isPWProtected = resolved.password !== undefined && resolved.password !== '';
-
-      // owner can always annotate
-      // otherwise only logged in and only if included in whitelist
-      const isWhitelisted =
-        resolved.whitelist.enabled &&
-        userData &&
-        JSON.stringify(resolved.whitelist).includes(userData._id.toString());
-      const isAnnotatable = isOwner ? true : isWhitelisted;
-      if (filters.annotatable && !isAnnotatable) continue;
-
-      if (isPWProtected && !isOwner && !isAnnotatable) continue;
-      if (filters.restricted && isPWProtected) continue;
-
-      const isAnnotated = Object.keys(resolved.annotations).length > 0;
-      if (filters.annotated && !isAnnotated) continue;
-
-      for (const id in resolved.entities) {
-        const value = resolved.entities[id];
-        if (!isEntity(value)) {
-          delete resolved.entities[id];
-          continue;
-        }
-        const { mediaType, name, settings } = value;
-        resolved.entities[id] = { mediaType, name, settings } as IEntity;
-      }
-      for (const id in resolved.annotations) {
-        const value = resolved.annotations[id];
-        if (!isAnnotation(value)) {
-          delete resolved.annotations[id];
-          continue;
-        }
-        resolved.annotations[id] = { _id: value._id };
-      }
-
-      compilations.push({
-        ...resolved,
-        password: isPWProtected,
-      });
-    }
-
-    items.push(...compilations);
-  }
-
-  res.status(200).send(items.sort((a, b) => a.name.localeCompare(b.name)));
-
-  // Cache full req
-  RepoCache.set(reqHash, items, 3600);
+  RepoCache.get<IEntity[] | ICompilation[]>(reqHash)
+    .then(cachedItems => {
+      if (cachedItems) return cachedItems;
+      if (searchEntity) return exploreEntities(fixedBody);
+      return exploreCompilations(fixedBody);
+    })
+    .then(finalItems => {
+      res.status(200).send(finalItems);
+      // RepoCache.set(reqHash, items, 3600)
+    });
 };
 
 /**

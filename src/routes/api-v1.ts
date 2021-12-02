@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ExploreCache } from '../services/cache';
 import { Express } from '../services/express';
 import { Admin } from '../services/admin';
 import { DBClient, Entities, Users, Repo } from '../services/db';
@@ -10,7 +11,16 @@ const router = Router();
 // These routes are accessible to anyone
 
 // Find a specific entry in the repository and optionally provide a password for access
-router.get('/get/find/:collection/:identifier/:password?', Entities.getEntityFromCollection);
+router.get(
+  '/get/find/:collection/:identifier/:password?',
+  (req, _, next) => {
+    const identifier = req.params.identifier.toString();
+    const hash = ExploreCache.hash(`popularity::${identifier}`);
+    ExploreCache.incr(hash).then(pop => console.log('Popularity increased to', pop));
+    next();
+  },
+  Entities.getEntityFromCollection,
+);
 
 // Find all *public* entries in a specific collection
 router.get('/get/findall/:collection', Entities.getAllEntitiesFromCollection);

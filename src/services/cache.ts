@@ -5,7 +5,7 @@ import { Configuration } from './configuration';
 
 const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
-class CacheClient {
+export class CacheClient {
   private redis: Redis.Redis;
   private db: number;
   private defaultSeconds: number;
@@ -41,15 +41,23 @@ class CacheClient {
   public async set(key: string, value: any, seconds = this.defaultSeconds) {
     return this.redis.set(key, JSON.stringify(value), 'EX', seconds);
   }
+
+  public async refresh(key: string, seconds = this.defaultSeconds) {
+    return this.redis.expire(key, seconds);
+  }
+
+  public async incr(key: string) {
+    return this.redis.incr(key);
+  }
 }
 
 // Repo/Entity MongoDB Cache
-const RepoCache = new CacheClient(offset + 1);
+export const RepoCache = new CacheClient(offset + 1);
 // User/Account MongoDB Cache
-const UserCache = new CacheClient(offset + 2);
+export const UserCache = new CacheClient(offset + 2);
 // User/Account Session Cache
-const SessionCache = new CacheClient(offset + 3);
+export const SessionCache = new CacheClient(offset + 3);
 // Cache information about who uploaded files
-const UploadCache = new CacheClient(offset + 4, 3.6e4);
-
-export { RepoCache, UserCache, SessionCache, UploadCache, CacheClient };
+export const UploadCache = new CacheClient(offset + 4, 3.6e4);
+// Cache explore requests
+export const ExploreCache = new CacheClient(offset + 5, 3.6e4);
