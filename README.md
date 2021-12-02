@@ -1,4 +1,8 @@
-# Kompakkt Server / ObjectsRepository
+# Kompakkt Server
+
+<p align="center">
+    <img src="https://github.com/Kompakkt/Assets/raw/main/server-logo.png" alt="Kompakkt Logo" width="600">
+</p>
 
 ## Prerequisites
 
