@@ -57,8 +57,11 @@ const startListening = () => {
   Logger.log(`HTTPS Server started and listening on port ${Port}`);
 };
 
+const AUTH_METHODS = !!LDAP ? ['local', 'ldapauth'] : ['local'];
 const authenticate = (options: { session: boolean } = { session: false }) =>
-  passport.authenticate(['local', 'ldapauth'], { session: options.session });
+  passport.authenticate(AUTH_METHODS, {
+    session: options.session,
+  });
 
 // Local Auth Registration, Salting and Verification
 const generateSalt = (length = 16) => {
@@ -211,7 +214,8 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
   const mail = user[LDAP?.Keys?.mail ?? 'mail'];
 
   if (!prename || !surname || !mail || !username) {
-    return done('Not all required LDAP fields could be found. Check configuration.');
+    Logger.warn('Missing fields from LDAP response or incorrect configuration');
+    return done(undefined, false);
   }
 
   const adjustedUser: Omit<Omit<IUserData, 'sessionID'>, '_id'> = {
