@@ -35,6 +35,13 @@ subfolders.forEach(folder => ensureDir(`${uploadDir}${folder}`));
 // Multer instance for file uploads
 const Multer = multer({
   dest: tempDir,
+  // TODO: Filter for allowed files?
+  /*fileFilter: (req, file, callback) => {
+    callback(null, true);
+  },*/
+  limits: {
+    fileSize: 1024 ** 3, // 1 GB
+  },
 });
 
 const fileUploadRequestHandler = Multer.single('file');
@@ -43,6 +50,10 @@ const fileUploadRequestHandler = Multer.single('file');
 const cancel = async (req: Request, res: Response) => {
   const { uuid: token, type } = req.body as any;
   const destPath = join(uploadDir, `${type}`, `${token}/`);
+
+  // Do nothing if path does not exist
+  const exists = await pathExists(destPath);
+  if (!exists) return res.status(200).send({ status: 'OK' });
 
   if (req.sessionID !== (await UploadCache.get(token))) {
     return res.status(403).send({
