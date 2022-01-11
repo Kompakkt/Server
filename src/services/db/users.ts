@@ -26,10 +26,18 @@ const isUser = (obj: any): obj is IUserData => {
 };
 
 const login = async (req: Request<any>, res: Response) => {
-  const user: IUserData = req.user as IUserData;
+  const user = req.user as IUserData & { strategy?: string };
   const username = req.body.username;
-  const userdata = await getByUsername(username);
+  let userdata = await getByUsername(username);
 
+  // Abort if user has no saved data and no strategy was given
+  if (!userdata && !user.strategy) return res.status(400).send('User not found');
+
+  // Strategy specific checks
+  // LDAP users will have no data saved on first login, so we take the request data instead
+  if (!userdata && user.strategy === 'ldap') userdata = user;
+
+  // At the end of strategy checks, abort if we still don't have any user data available
   if (!userdata) return res.status(400).send('User not found');
 
   const updatedUser: IUserData = {

@@ -218,7 +218,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     return done(undefined, false);
   }
 
-  const adjustedUser: Omit<Omit<IUserData, 'sessionID'>, '_id'> = {
+  const adjustedUser: Omit<Omit<IUserData, 'sessionID'>, '_id'> & { strategy: string } = {
     username,
     fullname: `${prename} ${surname}`,
     prename,
@@ -226,6 +226,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     mail,
     role: UserRank.user,
     data: getEmptyUserData(),
+    strategy: 'ldap',
   };
 
   Logger.log(`${adjustedUser.fullname} logging in using LDAP strategy`);
@@ -241,7 +242,7 @@ const verifyLocalStrategy: LocalStrategy.VerifyFunction = async (username, passw
 
   Logger.log(`${user.fullname} logging in using local strategy`);
 
-  return done(undefined, user);
+  return done(undefined, { ...user, strategy: 'local' });
 };
 
 const getLDAPConfig: LdapStrategy.OptionsFunction = (req, callback) => {
