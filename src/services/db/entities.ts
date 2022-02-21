@@ -228,7 +228,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
 
   const message = `Deleted ${coll} ${req.params.identifier}`;
   Logger.info(message);
-  res.status(200).send(message);
+  res.status(200).send({message});
 
   return RepoCache.flush();
 };
