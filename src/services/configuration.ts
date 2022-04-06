@@ -25,7 +25,6 @@ export interface IUploadConfiguration {
 
 export interface IExpressConfiguration {
   Host: string;
-  PublicIP: string;
   Port: number;
   OriginWhitelist: string[];
   PassportSecret: string;
@@ -120,7 +119,6 @@ const LoadConfig = () => {
     },
     Express: {
       Host: '127.0.0.1',
-      PublicIP: 'localhost',
       Port: 8080,
       OriginWhitelist: [],
       enableHTTPS: false,
@@ -145,7 +143,7 @@ const LoadConfig = () => {
     Logger.info('Configuration loaded from file');
 
     return confObj;
-  } catch (error) {
+  } catch (error: any) {
     if (isMaster) {
       if (error.code === 'ENOENT') {
         Logger.err('Config file not found. Falling back to default configuration');

@@ -284,19 +284,17 @@ const saveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity, user
   const newEntity = { ...entity };
 
   // Save unsaved metadata files and return link
-  const https = Conf.Express.enableHTTPS ? 'https' : 'http';
-  const pubip = Conf.Express.PublicIP;
-  const port = Conf.Express.Port;
   ensureDirSync(join(upDir, '/metadata_files/'));
   for (let i = 0; i < newEntity.metadata_files.length; i++) {
     const file = newEntity.metadata_files[i];
+    // Skip metadata files that have already been saved on the backend
     if (file.file_link.startsWith('http')) continue;
+
     const filename = `${newEntity._id}_${file.file_name}`;
 
     await writeFile(join(upDir, '/metadata_files/', `${filename}`), file.file_link);
 
-    const final = `${https}://${pubip}:${port}/uploads/metadata_files/${filename}`;
-    file.file_link = final;
+    file.file_link = `uploads/metadata_files/${filename}`;
 
     newEntity.metadata_files[i] = file;
   }
