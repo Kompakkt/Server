@@ -158,7 +158,7 @@ const isOwnerMiddleware = async (
   _: Response,
   next: NextFunction,
 ) => {
-  return isOwner(req, req.body.identifier) ? next() : next('Not owner of entity');
+  return (await isOwner(req, req.body.identifier)) ? next() : next('Not owner of entity');
 };
 
 const isAdmin = async (req: Request<any> | IUserData) => {
@@ -180,7 +180,9 @@ const isAllowedToEdit = async (
   const { _id } = req.body;
 
   const isValidObjectId = ObjectId.isValid(_id);
-  const doesEntityExist = !!(await Repo.get(collectionName)?.findOne(query(_id)));
+  const doesEntityExist = isValidObjectId
+    ? !!(await Repo.get(collectionName)?.findOne(query(_id)))
+    : false;
 
   /**
    * If the entity already exists we need to check for owner status
