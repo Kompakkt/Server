@@ -91,7 +91,7 @@ const saveAnnotation = async (
   if (!validCompilation && !isEntityOwner) throw new Error('Permission denied');
 
   // Case: Compilation owner trying to re-rank annotations
-  const isCompilationOwner = await Users.isOwner(user, relatedCompId);
+  const isCompilationOwner = validCompilation ? await Users.isOwner(user, relatedCompId) : false;
 
   if (!isAnnotationOwner && isCompilationOwner) {
     const existing = await Entities.resolve<IAnnotation>(annotation, 'annotation');
