@@ -48,7 +48,13 @@ if (isMailConfiguration(Configuration.Mailer)) {
   );
 }
 
-const sendMail = async (mail: nodemailer.SendMailOptions) => transporter?.sendMail(mail);
+const sendMail = async (mail: nodemailer.SendMailOptions) =>
+  new Promise((resolve, reject) =>
+    transporter?.sendMail(mail, (err, info) => {
+      if (err) reject({ err, info });
+      resolve(info);
+    }),
+  );
 const sendMailRequest = async (req: Request<any, any, ISendMailRequest>, res: Response) => {
   if (!req.body || !isMailConfiguration(Configuration.Mailer)) {
     res.status(500).send('Server mail config invalid');
