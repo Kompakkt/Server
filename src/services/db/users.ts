@@ -134,6 +134,35 @@ const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => 
   return res.status(200).send('Your password has been successfully reset');
 };
 
+const forgotUsername = async (req: Request<any>, res: Response) => {
+  const { mail } = req.body as { mail: string };
+
+  const user = await Accounts.users.findOne({ mail });
+  if (!user) return res.status(400).send('User not found');
+
+  const success = await Mailer.sendMail({
+    from: 'noreply@kompakkt.de',
+    to: user.mail,
+    subject: 'Your Kompakkt username',
+    text: `
+You seem to have forgotten your Kompakkt username, but no worries, we still know it!
+Your username is:
+${user.username}
+
+Head back to
+https://kompakkt.de/?action=login&username=${user.username}
+and log in!`,
+  })
+    .then(() => true)
+    .catch(err => {
+      Logger.err(err);
+      return false;
+    });
+  if (!success) return res.status(500).send('Failed sending username mail');
+
+  return res.status(200).send('Your username has been sent via mail');
+};
+
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {
   const user = await getUser(req);
 
@@ -295,6 +324,7 @@ export const Users = {
   logout,
   requestPasswordReset,
   confirmPasswordResetRequest,
+  forgotUsername,
   makeOwnerOf,
   undoOwnerOf,
   resolve,

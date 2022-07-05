@@ -24,5 +24,7 @@ router.get('/auth', Users.validateSession, Users.getCurrentUserData);
 router.post('/help/request-reset', Users.requestPasswordReset);
 // Allows users to change their password using their reset token
 router.post('/help/confirm-reset', Users.confirmPasswordResetRequest);
+// Allows users to retrieve their username via mail
+router.post('/help/forgot-username', Users.forgotUsername);
 
 export default router;
