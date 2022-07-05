@@ -11,10 +11,14 @@ import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../co
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
  * @type {[type]}
  */
-const query = (_id: string | ObjectId): Filter<any> => {
-  return {
-    $or: [{ _id: _id.toString() }, { _id: new ObjectId(_id.toString()) }],
-  };
+const query = (_id: string | ObjectId, targetProp = '_id'): Filter<any> => {
+  const query: Filter<any> = { $or: [] };
+  const obj: { [key: string]: string | ObjectId } = {};
+  obj[targetProp] = _id.toString();
+  query.$or!.push(obj);
+  obj[targetProp] = new ObjectId(_id.toString());
+  query.$or!.push(obj);
+  return query;
 };
 
 /**
