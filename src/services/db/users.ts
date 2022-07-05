@@ -1,10 +1,13 @@
 // prettier-ignore
-import { IUserData, UserRank, isAnnotation, isPerson, isInstitution } from '../../common';
+import { randomBytes } from 'crypto';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
+import { IUserData, UserRank, isAnnotation, isPerson, isInstitution } from '../../common';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
+import { Mailer } from '../mailer';
 import { query, areIdsEqual, getEmptyUserData } from './functions';
+import { updateUserPassword } from '../express';
 import { Accounts, Repo } from './controllers';
 import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
 import Entities from './entities';
@@ -71,6 +74,64 @@ const logout = async (req: Request<any>, res: Response) => {
         .status(!!updateResult ? 200 : 400)
         .send(!!updateResult ? 'Logged out' : 'Failed logging out');
     });
+};
+
+const requestPasswordReset = async (req: Request<any>, res: Response) => {
+  const { usernameOrMail } = req.body as { usernameOrMail: string };
+
+  const user = await Accounts.users.findOne({
+    $or: [{ username: usernameOrMail, mail: usernameOrMail }],
+  });
+  if (!user) return res.status(400).send('User not found');
+
+  const resetToken = randomBytes(32).toString('hex');
+
+  const updateResult = await Accounts.users.updateOne(query(user._id), { $set: { resetToken } });
+  if (!updateResult) return res.status(500).send('Failed requesting a password reset');
+
+  const text = `
+Somebody (hopefully you) requested to reset your Kompakkt account password.
+
+If this was not requested by you, you can ignore this mail.
+To reset your password, follow this link and choose a new password:
+https://kompakkt.de/?action=passwordreset&token=${resetToken}`.trim();
+
+  const success = await Mailer.sendMail({
+    from: 'noreply@kompakkt.de',
+    to: user.mail,
+    subject: 'Kompakkt password reset request',
+    text,
+  })
+    .then(() => true)
+    .catch(err => {
+      Logger.err(err);
+      return false;
+    });
+  if (!success) return res.status(500).send('Failed sending password reset mail');
+
+  return res.status(200).send('Your password reset has been requested');
+};
+
+const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => {
+  const { usernameOrMail, token, password } = req.body as {
+    usernameOrMail: string;
+    token: string;
+    password: string;
+  };
+
+  const user = await Accounts.users.findOne({
+    $or: [{ username: usernameOrMail, mail: usernameOrMail }],
+  });
+  if (!user) return res.status(400).send('User not found');
+
+  // TODO: add resetToken to IUserData or use a different collection
+  if ((user as any).resetToken !== token)
+    return res.status(500).send('Incorrect reset token given');
+  const success = await updateUserPassword(user.username, password);
+
+  if (!success) return res.status(500).send('Failed updating password');
+
+  return res.status(200).send('Your password has been successfully reset');
 };
 
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {
@@ -232,6 +293,8 @@ export const Users = {
   isUser,
   login,
   logout,
+  requestPasswordReset,
+  confirmPasswordResetRequest,
   makeOwnerOf,
   undoOwnerOf,
   resolve,

@@ -20,4 +20,9 @@ router.get('/logout', Users.validateSession, Users.logout);
 // Checks if the current session is valid and returns associated user data
 router.get('/auth', Users.validateSession, Users.getCurrentUserData);
 
+// Allows users to request a password reset token via mail
+router.post('/help/request-reset', Users.requestPasswordReset);
+// Allows users to change their password using their reset token
+router.post('/help/confirm-reset', Users.confirmPasswordResetRequest);
+
 export default router;
