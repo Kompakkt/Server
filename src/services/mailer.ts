@@ -125,7 +125,7 @@ const addUserToDatabase = async (req: Request, mailSent: boolean) => {
     target,
     content: { mailbody, subject },
     timestamp: new Date().toISOString(),
-    user,
+    user: user._id,
     answered: false,
     mailSent,
   };

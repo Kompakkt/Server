@@ -59,7 +59,7 @@ export interface IMailEntry {
     subject: string;
   };
   timestamp: string;
-  user: IUserData;
+  user: IUserData | string | ObjectId;
   answered: boolean;
   mailSent: boolean;
 }
