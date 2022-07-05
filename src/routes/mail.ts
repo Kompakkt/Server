@@ -9,7 +9,7 @@ const router = Router();
 // Subpath: /mail
 
 // Send a mail to the server admins
-router.post('/send', Users.validateSession, Mailer.sendMailRequest);
+router.post(['/send', '/sendmail'], Users.validateSession, Mailer.sendMailRequest);
 
 // These routes are username and password protected by forcing re-authentication
 router.use(Express.authenticate());

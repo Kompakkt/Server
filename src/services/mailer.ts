@@ -72,13 +72,13 @@ const sendMailRequest = async (req: Request<any, any, ISendMailRequest>, res: Re
   switch (body.target) {
     case ETarget.contact:
       if (unansweredMails >= 3) {
-        res.status(409).send('Limit for this category reached.');
+        res.status(409).send('You have too many open contact requests!');
         return undefined;
       }
       break;
     case ETarget.upload:
       if (unansweredMails > 0) {
-        res.status(409).send('User already reqed upload rights.');
+        res.status(409).send('You already requested upload capabilities!');
         return undefined;
       }
       break;
@@ -148,8 +148,8 @@ const countUserMails = async (req: Request, target: ETarget) => {
 
   const entries = await Accounts.mails.find({
     answered: false,
-    user: query(user._id),
     target: target,
+    ...query(user._id, 'user._id'),
   });
   return entries?.length ?? -1;
 };
