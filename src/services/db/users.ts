@@ -112,7 +112,7 @@ This link is only valid for 24 hours`.trim();
     });
   if (!success) return res.status(500).send('Failed sending password reset mail');
 
-  return res.status(200).send('Your password reset has been requested');
+  return res.status(200).end();
 };
 
 const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => {
@@ -137,7 +137,7 @@ const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => 
 
   if (!success) return res.status(500).send('Failed updating password');
 
-  return res.status(200).send('Your password has been successfully reset');
+  return res.status(200).end();
 };
 
 const forgotUsername = async (req: Request<any>, res: Response) => {
@@ -166,7 +166,7 @@ and log in!`,
     });
   if (!success) return res.status(500).send('Failed sending username mail');
 
-  return res.status(200).send('Your username has been sent via mail');
+  return res.status(200).send();
 };
 
 const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId, coll: string) => {
