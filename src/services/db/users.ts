@@ -83,8 +83,11 @@ const requestPasswordReset = async (req: Request<any>, res: Response) => {
   if (!user) return res.status(400).send('User not found');
 
   const resetToken = randomBytes(32).toString('hex');
+  const tokenExpiration = Date.now() + 86400000; // 24 hours
 
-  const updateResult = await Accounts.users.updateOne(query(user._id), { $set: { resetToken } });
+  const updateResult = await Accounts.users.updateOne(query(user._id), {
+    $set: { resetToken, tokenExpiration },
+  });
   if (!updateResult) return res.status(500).send('Failed requesting a password reset');
 
   const text = `
@@ -92,7 +95,9 @@ Somebody (hopefully you) requested to reset your Kompakkt account password.
 
 If this was not requested by you, you can ignore this mail.
 To reset your password, follow this link and choose a new password:
-https://kompakkt.de/?action=passwordreset&token=${resetToken}`.trim();
+https://kompakkt.de/?action=passwordreset&token=${resetToken}
+
+This link is only valid for 24 hours`.trim();
 
   const success = await Mailer.sendMail({
     from: 'noreply@kompakkt.de',
@@ -120,9 +125,14 @@ const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => 
   const user = await Accounts.users.findOne({ username });
   if (!user) return res.status(400).send('User not found');
 
-  // TODO: add resetToken to IUserData or use a different collection
-  if ((user as any).resetToken !== token)
-    return res.status(500).send('Incorrect reset token given');
+  // TODO: add resetToken & tokenExpiration to IUserData or use a different collection
+  const { resetToken, tokenExpiration } = user as unknown as {
+    resetToken: string;
+    tokenExpiration: number;
+  };
+
+  if (tokenExpiration < Date.now() || resetToken !== token)
+    return res.status(500).send('Incorrect or expired reset token given');
   const success = await updateUserPassword(user.username, password);
 
   if (!success) return res.status(500).send('Failed updating password');
