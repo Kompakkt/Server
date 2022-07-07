@@ -133,8 +133,15 @@ const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => 
 
   if (tokenExpiration < Date.now() || resetToken !== token)
     return res.status(500).send('Incorrect or expired reset token given');
-  const success = await updateUserPassword(user.username, password);
 
+  // Remove token
+  const updateResult = await Accounts.users.updateOne(query(user._id), {
+    $unset: { resetToken: '', tokenExpiration: '' },
+  });
+  if (!updateResult) return res.status(500).send('Failed updating password');
+
+  // Update password
+  const success = await updateUserPassword(user.username, password);
   if (!success) return res.status(500).send('Failed updating password');
 
   return res.status(200).end();
