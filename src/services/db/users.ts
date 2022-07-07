@@ -77,11 +77,9 @@ const logout = async (req: Request<any>, res: Response) => {
 };
 
 const requestPasswordReset = async (req: Request<any>, res: Response) => {
-  const { usernameOrMail } = req.body as { usernameOrMail: string };
+  const { username } = req.body as { username: string };
 
-  const user = await Accounts.users.findOne({
-    $or: [{ username: usernameOrMail, mail: usernameOrMail }],
-  });
+  const user = await Accounts.users.findOne({ username });
   if (!user) return res.status(400).send('User not found');
 
   const resetToken = randomBytes(32).toString('hex');
@@ -113,15 +111,13 @@ https://kompakkt.de/?action=passwordreset&token=${resetToken}`.trim();
 };
 
 const confirmPasswordResetRequest = async (req: Request<any>, res: Response) => {
-  const { usernameOrMail, token, password } = req.body as {
-    usernameOrMail: string;
+  const { username, token, password } = req.body as {
+    username: string;
     token: string;
     password: string;
   };
 
-  const user = await Accounts.users.findOne({
-    $or: [{ username: usernameOrMail, mail: usernameOrMail }],
-  });
+  const user = await Accounts.users.findOne({ username });
   if (!user) return res.status(400).send('User not found');
 
   // TODO: add resetToken to IUserData or use a different collection
