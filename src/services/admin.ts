@@ -99,7 +99,7 @@ const promoteUserToRole = async (
       from: Configuration.Mailer.Target['contact'],
       to: user.mail,
       subject: 'Your Kompakkt role has been updated',
-      text: `Hey ${user.fullname},\n\nYour role on Kompakkt has been changed from ${user.role} to ${role}\n\nVisit https://kompakkt.uni-koeln.de/profile to see what has changed`,
+      text: `Hey ${user.fullname},\n\nYour role on Kompakkt has been changed from ${user.role} to ${role}\n\nVisit https://kompakkt.de/profile to see what has changed`,
     })
       .then(result => Logger.log('Mail sent', result))
       .catch(error => Logger.warn('Failed to send mail', error));
