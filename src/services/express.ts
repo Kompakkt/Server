@@ -123,7 +123,7 @@ export const isRegisterRequest = (obj: any): obj is IRegisterBody => {
 
 const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response) => {
   // First user gets admin
-  const isFirstUser = (await Accounts.users.findOne({})) === null;
+  const isFirstUser = (await Accounts.users.findOne({})) === undefined;
   const role = isFirstUser ? UserRank.admin : UserRank.user;
 
   if (!isRegisterRequest(req.body)) return res.status(400).send('Incomplete user data');
