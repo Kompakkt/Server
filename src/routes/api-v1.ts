@@ -55,7 +55,7 @@ router.get(['/get/ldata', '/auth'], Users.getCurrentUserData);
 router.get('/get/users', Users.getStrippedUsers);
 
 // Get a list of all groups
-router.get('/get/groups', (_, res) => Repo.group.findAll().then(res.json));
+router.get('/get/groups', (_, res) => Repo.group.findAll().then(groups => res.json(groups)));
 
 // Add or update a document to a collection
 router.post('/post/push/:collection', Users.isAllowedToEdit, Entities.addEntityToCollection);
