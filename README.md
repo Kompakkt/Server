@@ -27,3 +27,9 @@ Ensure that MongoDB and Redis is running then start the server with
 ```
 $ npm run start
 ```
+
+## Running tests
+
+Tests are located in the `src/tests`-directory and can be ran using `npm run test`.
+
+For easier testing, a docker-compose setup is included, which can be ran using `docker-compose -f docker-compose.test.yml up`.

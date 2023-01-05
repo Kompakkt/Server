@@ -1,0 +1,46 @@
+---
+version: '3.9'
+services:
+  mongo:
+    image: mongo:5.0-focal
+    volumes:
+      - tmp:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: 'admin'
+      MONGO_INITDB_ROOT_PASSWORD: 'changeme'
+    ports:
+      - '127.0.0.1:37017:27017'
+    logging:
+      driver: none
+    command: mongod --quiet --logpath /dev/null
+
+  redis:
+    image: redis/redis-stack:7.0.6-RC3
+    ports:
+      - '127.0.0.1:6379:6379'
+    logging:
+      driver: none
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+
+  server:
+    build:
+      context: .
+      dockerfile: server.Dockerfile
+    command: ['npm', 'run', 'test']
+    volumes:
+      - .:/server
+      - ./config.test.json:/server/src/config.json
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      - mongo
+      - redis
+      - mailhog
+
+volumes:
+  tmp:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs

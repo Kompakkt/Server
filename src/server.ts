@@ -39,3 +39,5 @@ Server.use('/testing', TestingRouter);
 WebSocket.on('connection', Socket._handler);
 
 Express.startListening();
+
+export { Server, Express };

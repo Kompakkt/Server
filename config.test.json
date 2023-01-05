@@ -1,0 +1,25 @@
+{
+  "Express": {
+    "Host": "0.0.0.0",
+    "PassportSecret": "changeme",
+    "Port": 8080,
+    "PublicIP": "localhost",
+    "enableHTTPS": false
+  },
+  "Mailer": {
+    "Host": "mailhog",
+    "Port": 1025,
+    "Target": {
+      "bugreport": "bugreport@example.com",
+      "contact": "contact@example.com",
+      "upload": "upload@example.com"
+    }
+  },
+  "Mongo": {
+    "ClientURL": "mongodb://admin:changeme@mongo/admin"
+  },
+  "Redis": {
+    "Hostname": "redis",
+    "Port": 6379
+  }
+}
