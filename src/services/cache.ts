@@ -52,12 +52,12 @@ export class CacheClient {
 }
 
 // Repo/Entity MongoDB Cache
-export const RepoCache = new CacheClient(offset + 1);
+export const RepoCache = new CacheClient(offset + 1, 1);
 // User/Account MongoDB Cache
-export const UserCache = new CacheClient(offset + 2);
+export const UserCache = new CacheClient(offset + 2, 1);
 // User/Account Session Cache
 export const SessionCache = new CacheClient(offset + 3);
 // Cache information about who uploaded files
 export const UploadCache = new CacheClient(offset + 4, 3.6e4);
 // Cache explore requests
-export const ExploreCache = new CacheClient(offset + 5, 3.6e4);
+export const ExploreCache = new CacheClient(offset + 5, 300);

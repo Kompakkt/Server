@@ -147,11 +147,10 @@ const saveEntity = async (entity: IEntity, user: IUserData) => {
   return entity;
 };
 
-const saveGroup = async (group: IGroup, user: IUserData) => {
-  const strippedUserData = stripUserData(user);
-  group.creator = strippedUserData;
-  group.members = [strippedUserData];
-  group.owners = [strippedUserData];
+const saveGroup = async (group: IGroup) => {
+  group.creator = stripUserData(group.creator);
+  group.members = group.members.map(stripUserData);
+  group.owners = group.owners.map(stripUserData);
   return group;
 };
 

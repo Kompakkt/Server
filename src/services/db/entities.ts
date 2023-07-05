@@ -51,7 +51,7 @@ const saveEntity = (
     case Collection.entity:
       return isEntity(entity) ? Save.entity(entity, user) : undefined;
     case Collection.group:
-      return isGroup(entity) ? Save.group(entity, user) : undefined;
+      return isGroup(entity) ? Save.group(entity) : undefined;
     case Collection.institution:
       return isInstitution(entity) ? Save.institution(entity, user) : undefined;
     case Collection.person:

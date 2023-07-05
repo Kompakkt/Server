@@ -130,10 +130,14 @@ const updatePreviewImage = async (
  * Removes all user properties except for fullname, username and _id
  * @type {[type]}
  */
-const stripUserData = (obj: IUserData): IStrippedUserData => ({
-  _id: obj._id,
-  username: obj.username,
-  fullname: obj.fullname,
+const stripUserData = ({
+  _id,
+  username,
+  fullname,
+}: IUserData | IStrippedUserData): IStrippedUserData => ({
+  _id,
+  username,
+  fullname,
 });
 
 export {
