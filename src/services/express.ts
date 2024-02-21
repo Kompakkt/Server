@@ -4,7 +4,6 @@ import { BinaryLike, createHmac, randomBytes } from 'crypto';
 import express, { Request, Response } from 'express';
 import expressSession from 'express-session';
 import connectRedis from 'connect-redis';
-import shrinkRay from 'shrink-ray-current';
 import { readFileSync } from 'fs';
 import { copySync, ensureDirSync, pathExistsSync } from 'fs-extra';
 import * as HTTP from 'http';
@@ -187,8 +186,6 @@ Server.use(
 );
 // This turns req.body from application/json reqs into readable JSON
 Server.use(bodyParser({ limit: '50mb' }));
-// Compression: Brotli -> Fallback GZIP
-Server.use(shrinkRay());
 // Measure res time of req
 Server.use(resTime());
 // Static
