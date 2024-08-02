@@ -1,4 +1,4 @@
-import SocketIo from 'socket.io';
+import type { Socket as SocketIOSocket } from 'socket.io';
 import { WebSocket } from './express';
 import { Logger } from './logger';
 
@@ -48,7 +48,7 @@ const Users: {
 } = {};
 
 const Socket = {
-  _handler: (socket: SocketIo.Socket) => {
+  _handler: (socket: SocketIOSocket) => {
     Logger.info(`SocketIO connection ${socket.id}`);
 
     // SocketIO Internals

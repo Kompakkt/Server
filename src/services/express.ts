@@ -14,12 +14,13 @@ import LocalStrategy from 'passport-local';
 import SocketIo from 'socket.io';
 import resTime from 'response-time';
 import { RootDirectory } from '../environment';
-import { IUserData, UserRank, ObjectId } from '../common';
+import { IUserData, UserRank } from '../common';
 import { Accounts, getEmptyUserData } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
 import { Logger } from './logger';
 import { serveFile } from './dynamic-compression';
+import { ObjectId } from 'mongodb';
 
 export interface IPasswordEntry {
   username: string;

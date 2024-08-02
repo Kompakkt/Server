@@ -11,7 +11,7 @@ import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../co
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
  * @type {[type]}
  */
-const query = (_id: string | ObjectId, targetProp = '_id'): Filter<any> => {
+const query = (_id: string | ObjectId, targetProp = '_id') => {
   const query: Filter<any> = { $or: [] };
   const obj: { [key: string]: string | ObjectId } = {};
   obj[targetProp] = _id.toString();
@@ -25,7 +25,7 @@ const query = (_id: string | ObjectId, targetProp = '_id'): Filter<any> => {
  * Turns an _id into a more forgiving Query (Array) by allowing both ObjectId as well as string
  * @type {[type]}
  */
-const queryIn = (_id: string | ObjectId): Filter<any> => {
+const queryIn = (_id: string | ObjectId) => {
   return {
     $in: [_id.toString(), new ObjectId(_id.toString())],
   };
