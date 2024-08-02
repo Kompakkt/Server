@@ -123,7 +123,7 @@ export const isRegisterRequest = (obj: any): obj is IRegisterBody => {
 const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response) => {
   // First user gets admin
   const isFirstUser = (await Accounts.users.findOne({})) === undefined;
-  const role = isFirstUser ? UserRank.admin : UserRank.user;
+  const role = isFirstUser ? UserRank.admin : UserRank.uploader;
 
   if (!isRegisterRequest(req.body)) return res.status(400).send('Incomplete user data');
 
@@ -221,7 +221,7 @@ const verifyLdapStrategy: LdapStrategy.VerifyCallback = (user, done) => {
     prename,
     surname,
     mail,
-    role: UserRank.user,
+    role: UserRank.uploader,
     data: getEmptyUserData(),
     strategy: 'ldap',
   };

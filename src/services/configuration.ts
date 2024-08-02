@@ -1,6 +1,6 @@
 import { isMaster } from 'cluster';
 import deepmerge from 'deepmerge';
-import { readJsonSync } from 'fs-extra';
+import { readJsonSync, writeJsonSync } from 'fs-extra';
 import { ConfigFile } from '../environment';
 import { Logger } from './logger';
 
@@ -147,6 +147,7 @@ const LoadConfig = () => {
     if (isMaster) {
       if (error.code === 'ENOENT') {
         Logger.err('Config file not found. Falling back to default configuration');
+        writeJsonSync(ConfigFile, DefaultConfiguration, { spaces: 2 });
       } else {
         Logger.err('Failed loading configuration file. Falling back to default configuration');
         Logger.err(error);

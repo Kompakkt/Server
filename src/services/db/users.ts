@@ -47,7 +47,7 @@ const login = async (req: Request<any>, res: Response) => {
     ...user,
     sessionID: req.sessionID,
     data: { ...getEmptyUserData(), ...userdata.data },
-    role: userdata.role ?? UserRank.user,
+    role: userdata.role === UserRank.admin ? UserRank.admin : UserRank.uploader,
   };
   delete (updatedUser as any)['_id']; // To prevent Mongo write error
 
