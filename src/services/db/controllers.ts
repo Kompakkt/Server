@@ -4,13 +4,13 @@ import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntit
 import { Filter, Db, OptionalId, UpdateFilter, UpdateOptions, FindOptions } from 'mongodb';
 import { Configuration } from '../configuration';
 import DBClient from './client';
-import { IMailEntry } from './definitions';
+import type { IMailEntry } from './definitions';
 import { Logger } from '../logger';
 import { IPasswordEntry } from '../express';
 
 // TODO: Add resolving strategy to controller
 // TODO: Add saving strategy to controller
-class Controller<T> {
+class Controller<T extends Document> {
   private coll: string;
   private db: Db;
   constructor(collectionName: string, database: Db) {
@@ -44,13 +44,13 @@ class Controller<T> {
   public findAll() {
     return this.findAllCursor().toArray();
   }
-  public insertOne(doc: OptionalId<T>) {
+  public insertOne(doc: OptionalUnlessRequiredId<T>) {
     return this.collection.insertOne(doc).catch(err => {
       Logger.err('Failed insertOne', this.db.databaseName, this.coll, doc, err);
       return undefined;
     });
   }
-  public insertMany(docs: Array<OptionalId<T>>) {
+  public insertMany(docs: Array<OptionalUnlessRequiredId<T>>) {
     return this.collection.insertMany(docs).catch(err => {
       Logger.err('Failed insertMany', this.db.databaseName, this.coll, docs, err);
       return undefined;
@@ -59,6 +59,7 @@ class Controller<T> {
   public updateOne(filter: Filter<T>, update: UpdateFilter<T>, options: UpdateOptions = {}) {
     if (update.$set?._id) {
       // Prevent updating immutable field '_id'
+      // @ts-ignore
       delete update.$set._id;
     }
     return this.collection.updateOne(filter, update, options).catch(err => {
@@ -95,7 +96,8 @@ export const Repo = {
   person: new Controller<IPerson>('person', RepositoryDB),
   physicalentity: new Controller<IPhysicalEntity>('physicalentity', RepositoryDB),
   tag: new Controller<ITag>('tag', RepositoryDB),
-  get: <T extends unknown>(coll: string) => (Repo as any)[coll] as Controller<T> | undefined,
+  get: <T extends unknown>(coll: string) =>
+    (Repo as any)[coll] as Controller<T & Document> | undefined,
 };
 
 // Create indexes

@@ -1,7 +1,7 @@
 // prettier-ignore
-import {  ICompilation, IEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common';
+import type {  ICompilation, IEntity, IUserData, isAddress, isAnnotation, isCompilation, isContact, isDigitalEntity, isEntity, isGroup, isInstitution, isPerson, isPhysicalEntity, isTag, Collection } from '../../common';
 // prettier-ignore
-import { IEntityHeadsUp, PushableEntry, isValidCollection, CollectionName } from './definitions';
+import type { IEntityHeadsUp, PushableEntry, isValidCollection, CollectionName } from './definitions';
 import { ObjectId } from 'mongodb';
 import { Request, Response } from 'express';
 import { RepoCache } from '../cache';
@@ -136,8 +136,9 @@ const resolve = async <T>(obj: any, coll: CollectionName, depth?: number) => {
   const _id = new ObjectId(parsedId);
 
   // Get shallow result. Attempt to get from cache
+  const filter = query(_id);
   const result =
-    (await RepoCache.get<T>(parsedId)) ?? (await Repo.get<T>(coll)?.findOne(query(_id)));
+    (await RepoCache.get<T>(parsedId)) ?? (await Repo.get<T>(coll)?.findOne(filter as any));
   if (!result) return undefined;
 
   // Cache shallow result
@@ -228,7 +229,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
 
   const message = `Deleted ${coll} ${req.params.identifier}`;
   Logger.info(message);
-  res.status(200).send({message});
+  res.status(200).send({ message });
 
   return RepoCache.flush();
 };
@@ -347,7 +348,7 @@ const searchByTextFilter = async (req: Request<IEntityRequestParams>, res: Respo
 // TODO: improve performance by splitting into multiple indexes?
 const explore = async (req: Request<any, any, IExploreRequest>, res: Response) => {
   const { searchEntity } = req.body;
-  const userData = await Users.getBySession(req);
+  const userData = (await Users.getBySession(req)) ?? undefined;
 
   const fixedBody = {
     ...req.body,

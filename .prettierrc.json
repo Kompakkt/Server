@@ -1,12 +1,21 @@
 {
+  "arrowParens": "avoid",
+  "bracketSpacing": true,
+  "endOfLine": "lf",
+  "htmlWhitespaceSensitivity": "css",
+  "overrides": [
+    {
+      "files": "*.html",
+      "options": {
+        "parser": "angular"
+      }
+    }
+  ],
   "printWidth": 100,
-  "tabWidth": 2,
-  "useTabs": false,
+  "quoteProps": "consistent",
   "semi": true,
   "singleQuote": true,
-  "quoteProps": "consistent",
+  "tabWidth": 2,
   "trailingComma": "all",
-  "bracketSpacing": true,
-  "arrowParens": "avoid",
-  "endOfLine": "lf"
+  "useTabs": false
 }

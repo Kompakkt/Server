@@ -1,5 +1,6 @@
 // prettier-ignore
-import { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag, Collection } from '../../common';
+import type { IUserData, IAddress, IAnnotation, ICompilation, IContact, IDigitalEntity, IEntity, IGroup, IInstitution, IPerson, IPhysicalEntity, ITag } from '../../common';
+import { Collection } from '../../common';
 import { Logger } from '../logger';
 import { ObjectId } from 'mongodb';
 
@@ -38,20 +39,20 @@ export type PushableEntry =
   | IPhysicalEntity
   | ITag;
 
-export interface ICollectionParam {
+export type ICollectionParam = {
   collection: CollectionName;
-}
+};
 
-export interface IEntityHeadsUp {
+export type IEntityHeadsUp = {
   headsUp: {
     user: IUserData;
     doesEntityExist: boolean;
     isValidObjectId: boolean;
     collectionName: CollectionName;
   };
-}
+};
 
-export interface IMailEntry {
+export type IMailEntry = {
   _id: string | ObjectId;
   target: string;
   content: {
@@ -62,4 +63,4 @@ export interface IMailEntry {
   user: IUserData | string | ObjectId;
   answered: boolean;
   mailSent: boolean;
-}
+};

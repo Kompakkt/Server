@@ -5,7 +5,8 @@ import { Accounts, Repo } from './controllers';
 // prettier-ignore
 import { areIdsEqual, query, queryIn, updatePreviewImage, stripUserData, isValidId, lockCompilation, getEmptyUserData } from './functions';
 // prettier-ignore
-import { CollectionName, ICollectionParam, IEntityHeadsUp, IMailEntry, isValidCollection, PushableEntry } from './definitions';
+import type { CollectionName, ICollectionParam, IEntityHeadsUp, IMailEntry, PushableEntry } from './definitions';
+import { isValidCollection } from './definitions';
 
 export {
   DBClient,
