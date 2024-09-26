@@ -259,7 +259,7 @@ const getLDAPConfig: LdapStrategy.OptionsFunction = (req, callback) => {
   callback(undefined, {
     server: {
       url: LDAP?.Host ?? '',
-      bindDN: LDAP?.DNauthUID ? `uid=${username},${LDAP?.DN}` : LDAP?.DN ?? '',
+      bindDN: LDAP?.DNauthUID ? `uid=${username},${LDAP?.DN}` : (LDAP?.DN ?? ''),
       bindCredentials: `${password}`,
       searchBase: LDAP?.searchBase ?? '',
       searchFilter: `(uid=${username})`,

@@ -1,0 +1,20 @@
+version: '3'
+services:
+  openldap-search:
+    image: ghcr.io/heyitsbatman/openldap-search-server:main
+    network_mode: host
+  mongo:
+    image: docker.io/mvertes/alpine-mongo:latest
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    network_mode: host
+  redis:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    network_mode: host
+    ulimits:
+      memlock: -1
+    command: --maxmemory=1gb --proactor_threads=1
+  mailhog:
+    image: mailhog/mailhog:latest
+    network_mode: host
