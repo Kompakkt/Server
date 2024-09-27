@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { properties, classes, values, WikibaseID } from './wikibase_common';
-import { Session, get_annotation_description, get_direct_image_link } from './wikibase_api';
+import { properties, classes, values, WikibaseID } from './wikibase.common';
+import { Session, get_annotation_description, get_direct_image_link } from './wikibase.api';
 import { log } from 'src/logger';
 
 export async function get(wikibase_sparql_endpoint: string, query: string) {

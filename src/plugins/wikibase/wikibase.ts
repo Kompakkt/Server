@@ -1,21 +1,30 @@
 import { join, extname } from 'path';
 import {
-  IDigitalEntity,
-  IMediaHierarchy,
-  IMetadataChoices,
-  IAnnotationLinkChoices,
-  IWikibaseItem,
-} from '../../common';
-import { IDigitalEntityWikibase, IAnnotationWikibase } from './definitions';
-import { Configuration, isWikibaseConfiguration } from '../configuration';
+  type IMediaHierarchy,
+  type IMetadataChoices,
+  type IAnnotationLinkChoices,
+  type IWikibaseItem,
+  type IWikibaseDigitalEntityExtension,
+  type IWikibaseAnnotationExtension,
+  properties,
+  classes,
+  values,
+  WikibaseID,
+  type IWikibaseConfiguration,
+  isWikibaseConfiguration,
+} from './wikibase.common';
+import { Configuration, type IConfiguration } from 'src/configuration';
 import { DigitalEntityCache, MetadataChoicesCache } from '../cache';
-import * as wapi from './wikibase_api';
-import * as sparql from './wikibase_sparql';
-import { properties, classes, values, WikibaseID } from './wikibase_common';
+import * as wapi from './wikibase.api';
+import * as sparql from './wikibase.sparql';
 import { updatedDiff, deletedDiff } from 'deep-object-diff';
 import { RootDirectory } from '../../environment';
-import { Logger } from '../logger';
-import { Repo } from './controllers';
+import type { IAnnotation, IDigitalEntity } from 'src/common';
+import { info, warn } from 'src/logger';
+
+type WikibaseDigitalEntity = IDigitalEntity<IWikibaseDigitalEntityExtension>;
+type WikibaseAnnotation = IAnnotation<IWikibaseAnnotationExtension>;
+const WikibaseConfiguration = (Configuration as IConfiguration<{ Wikibase: IWikibaseConfiguration }>).Extensions?.Wikibase;
 
 let wbSession: wapi.Session | undefined = undefined;
 
@@ -36,22 +45,22 @@ async function initSession() {
     }
     return wbSession;
   }
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
-    console.log(Configuration.Wikibase);
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
+    console.log(WikibaseConfiguration);
     throw new Error('Server has no valid wikibase API config. Cannot add/update entity data');
   }
-  wbSession = await wapi.login(Configuration.Wikibase);
+  wbSession = await wapi.login(WikibaseConfiguration);
   return wbSession;
 }
 
 export async function fetchMetadataChoices(): Promise<IMetadataChoices | undefined> {
-  Logger.log('Fetching metadata choices from Wikibase');
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
-    Logger.err('Server has no valid wikibase API config. Cannot add/update entity data');
+  log('Fetching metadata choices from Wikibase');
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
+    err('Server has no valid wikibase API config. Cannot add/update entity data');
     return undefined;
   }
-  const domain = Configuration.Wikibase.Domain;
-  const endpoint = Configuration.Wikibase.SPARQLEndpoint;
+  const domain = WikibaseConfiguration.Domain;
+  const endpoint = WikibaseConfiguration.SPARQLEndpoint;
 
   let get_and_set = async (class_id: number) => {
     const key = class_id.toString();
@@ -96,11 +105,11 @@ export async function fetchMetadataChoices(): Promise<IMetadataChoices | undefin
 }
 
 export async function fetchAnnotationLinkChoices(): Promise<IAnnotationLinkChoices | undefined> {
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
     return undefined;
   }
-  const domain = Configuration.Wikibase.Domain;
-  const endpoint = Configuration.Wikibase.SPARQLEndpoint;
+  const domain = WikibaseConfiguration.Domain;
+  const endpoint = WikibaseConfiguration.SPARQLEndpoint;
 
   // const start = performance.now();
   let result: any = {};
@@ -144,11 +153,11 @@ export async function fetchAnnotationLinkChoices(): Promise<IAnnotationLinkChoic
 }
 
 export async function fetchWikibaseMetadata(id: string) {
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
     return undefined;
   }
-  const domain = Configuration.Wikibase.Domain;
-  const endpoint = Configuration.Wikibase.SPARQLEndpoint;
+  const domain = WikibaseConfiguration.Domain;
+  const endpoint = WikibaseConfiguration.SPARQLEndpoint;
   const result = await sparql.get_media_item_metadata(domain, endpoint, id);
   if (!result) return undefined;
 
@@ -159,23 +168,24 @@ export async function fetchWikibaseMetadata(id: string) {
 
 export async function updateDigitalEntity(
   id: string | undefined,
-  entity: IDigitalEntityWikibase,
-  claims: { [key: string]: any } = {},
-  prev: IDigitalEntityWikibase | undefined = undefined,
+  entity: WikibaseDigitalEntity,
+  claims: Record<string, unknown> = {},
+  prev?: WikibaseDigitalEntity,
 ) {
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
     return undefined;
   }
   const session = await initSession();
 
   let diff = Object.keys(entity);
-  if (prev != null) {
+  if (!!prev) {
     diff = Object.keys(updatedDiff(prev as any, entity as any));
   }
   let numericID = parseInt((id || 'Q0').slice(1));
+  const label = entity.extensions?.wikibase?.label?.['en'];
   // create new item and permanent properties if necessary
   if (id === undefined) {
-    const item = await wapi.create_item(session, entity.label['en'], entity.description);
+    const item = await wapi.create_item(session, label, entity.description);
     id = item?.entity?.id;
     if (session.debug) console.log(`create media item ${id}`);
     if (item.success !== 1 || id === undefined) {
@@ -192,7 +202,7 @@ export async function updateDigitalEntity(
     );
   } else {
     // editing item to potentially update label
-    await wapi.edit_item(session, id, entity.label['en'], entity.description);
+    await wapi.edit_item(session, id, label, entity.description);
   }
 
   // for
@@ -207,7 +217,7 @@ export async function updateDigitalEntity(
   // ie. to be removed and do so using the claimId maps
   if (prev) {
     let obsolete: string[] = [];
-    for (const item of prev.agents) {
+    for (const item of prev.extensions?.wikibase?.agents) {
       // due to problems with updating qualifiers we just delete any agent claims
       // to force re-addition
       const numId = new WikibaseID(item.id).numericID;
@@ -216,15 +226,15 @@ export async function updateDigitalEntity(
         delete claims['agents'][numId];
       }
     }
-    for (const item of prev.techniques) {
-      if (entity.techniques.find(i => i.id === item.id) === undefined) {
+    for (const item of prev.extensions?.wikibase?.techniques) {
+      if (entity.extensions?.wikibase?.techniques?.find(i => i.id === item.id) === undefined) {
         const numId = new WikibaseID(item.id).numericID.toString();
         if (session.debug)
           console.log(`removing technique ${numId} with claim Id ${claims['techniques'][numId]}`);
         obsolete.push(claims['techniques'][numId]);
       }
     }
-    for (const item of prev.software) {
+    for (const item of prev.extensions?.wikibase?.software) {
       if (entity.software.find(i => i.id === item.id) === undefined) {
         const numId = new WikibaseID(item.id).numericID.toString();
         if (session.debug)
@@ -232,8 +242,10 @@ export async function updateDigitalEntity(
         obsolete.push(claims['software'][numId]);
       }
     }
-    for (const item of prev.bibliographicRefs) {
-      if (entity.bibliographicRefs.find(i => i.id === item.id) === undefined) {
+    for (const item of prev.extensions?.wikibase?.bibliographicRefs) {
+      if (
+        entity.extensions?.wikibase?.bibliographicRefs.find(i => i.id === item.id) === undefined
+      ) {
         const numId = new WikibaseID(item.id).numericID.toString();
         if (session.debug)
           console.log(
@@ -242,8 +254,8 @@ export async function updateDigitalEntity(
         obsolete.push(claims['bibliographicRefs'][numId]);
       }
     }
-    for (const item of prev.physicalObjs) {
-      if (entity.physicalObjs.find(i => i.id === item.id) === undefined) {
+    for (const item of prev.extensions?.wikibase?.physicalObjs) {
+      if (entity.extensions?.wikibase?.physicalObjs?.find(i => i.id === item.id) === undefined) {
         const numId = new WikibaseID(item.id).numericID.toString();
         if (session.debug)
           console.log(
@@ -252,15 +264,15 @@ export async function updateDigitalEntity(
         obsolete.push(claims['physicalObjs'][numId]);
       }
     }
-    for (const item of prev.equipment) {
-      if (entity.equipment.indexOf(item) < 0) {
+    for (const item of prev.extensions?.wikibase?.equipment) {
+      if (entity.extensions?.wikibase?.equipment.indexOf(item) < 0) {
         if (session.debug)
           console.log(`removing equipment ${item} with claim Id ${claims['equipment'][item]}`);
         obsolete.push(claims['equipment'][item]);
       }
     }
-    for (const item of prev.externalLinks) {
-      if (entity.externalLinks.indexOf(item) < 0) {
+    for (const item of prev.extensions?.wikibase?.externalLinks) {
+      if (entity.extensions?.wikibase?.externalLinks.indexOf(item) < 0) {
         if (session.debug)
           console.log(
             `removing externalLink ${item} with claim Id ${claims['externalLinks'][item]}`,
@@ -417,8 +429,8 @@ export async function updateDigitalEntity(
       claims['physicalObjs'][physicalObjId.numericID],
     );
     const hierarchy = await sparql.get_part_hierarchy(
-      Configuration.Wikibase.Domain,
-      Configuration.Wikibase.SPARQLEndpoint,
+      WikibaseConfiguration.Domain,
+      WikibaseConfiguration.SPARQLEndpoint,
       physicalObjId.itemID,
     );
     hierarchies.push(hierarchy);
@@ -494,7 +506,7 @@ export async function updateDigitalEntity(
         session,
         id,
         'P74',
-        Configuration.Wikibase.KompakktAddress + '/entity/' + entity_id,
+        WikibaseConfiguration.KompakktAddress + '/entity/' + entity_id,
         claims['testing'],
       );
     }
@@ -504,13 +516,13 @@ export async function updateDigitalEntity(
 }
 
 export async function fetchAnnotation(item_id: string) {
-  if (!isWikibaseConfiguration(Configuration.Wikibase)) {
+  if (!isWikibaseConfiguration(WikibaseConfiguration)) {
     return undefined;
   }
 
   return sparql.get_annotation_data(
-    Configuration.Wikibase.Domain,
-    Configuration.Wikibase.SPARQLEndpoint,
+    WikibaseConfiguration.Domain,
+    WikibaseConfiguration.SPARQLEndpoint,
     item_id,
   );
 }
@@ -597,7 +609,7 @@ export async function updateAnnotation(
     if (claims['description'] === undefined) {
       // we only link this on first creation
 
-      let desc_domain = Configuration.Wikibase?.Public;
+      let desc_domain = WikibaseConfiguration?.Public;
       const descURL = new URL(`/wiki/Annotation:${id}`, desc_domain).href;
       if (session.debug) console.log(`update description to ${descURL}`);
       claims['description'] = await wapi.create_string_claim(
@@ -931,7 +943,7 @@ export async function removeAnnotation(id: string, claims: { [key: string]: any 
 
 export async function addWikibasePreviewImage(imgPath: string, itemId: string, claimId?: string) {
   if (imgPath === undefined) {
-    Logger.warn(`no preview image for ${itemId}!`);
+    warn(`no preview image for ${itemId}!`);
     return;
   }
 
@@ -997,7 +1009,7 @@ export async function addWikibasePreviewImageBase64(
 
 export async function wikibase_account_create(user: string, pass: string) {
   // function to wikibase account to match kompakkt.
-  Logger.info(`Creating account for ${user} in Wikibase.`);
+  info(`Creating account for ${user} in Wikibase.`);
   const session = await initSession();
 
   let response = await wapi.get_public(session.api_url, {

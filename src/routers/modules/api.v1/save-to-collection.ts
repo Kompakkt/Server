@@ -37,11 +37,6 @@ import {
 import { err, log } from 'src/logger';
 import { makeUserOwnerOf } from '../user-management/users';
 
-type SavingFn<T> = (obj: ServerDocument<IDocument | T>) => Promise<ServerDocument<T> | undefined>;
-type DangerousArray<T> = (T | string | undefined | null)[];
-type SavingFunction<T extends ServerDocument<T>> = (
-  entity: ServerDocument<T>,
-) => Promise<T | undefined>;
 type TransformFn<T> = (obj: ServerDocument<IDocument>) => Promise<Partial<T>>;
 
 const flattenRecordArray = (obj?: Record<string, any>): Record<string, IDocument[]> => {

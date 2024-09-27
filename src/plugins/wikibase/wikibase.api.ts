@@ -1,12 +1,10 @@
-import axios from 'axios';
 import { createReadStream } from 'fs';
 import { basename } from 'path';
 import { URLSearchParams } from 'url';
-import WikibaseError from '../../errors/wikibase_error';
-import { IWikibaseConfiguration } from '../configuration';
-import { classes, properties } from './wikibase_common';
+import { classes, properties } from './wikibase.common';
 import { err, info, log } from 'src/logger';
-const request = require('request');
+import type { IWikibaseConfiguration } from './wikibase.common';
+import { get as getRequest, post as postRequest } from 'src/util/requests'
 
 export class Session {
   public api_url: string;
@@ -103,14 +101,12 @@ export async function get(session: Session, url_params: any, update_cookie = fal
     headers.Cookie = session.cookie;
   }
 
-  const response = await axios({
-    url: session.api_url,
-    method: 'get',
-    params: url_params,
-    headers: headers,
-  }).catch(e => {
-    console.log('From get: ', e.toJSON());
-  });
+  const url = new URL(session.api_url);
+  for (const [key, value] of Object.entries(url_params)) {
+    url.searchParams.set(key, value.toString());
+  }
+  
+  const response = await getRequest(url.toString(), {    headers  });
 
   if (!response?.data) {
     err(`No response from ${session.api_url}`);
@@ -137,7 +133,7 @@ export async function get_public(api_url: string, url_params: any) {
   };
 
   log(`URL looks like: ${api_url}`);
-  const response = await axios({
+  const response = await getRequest({
     url: api_url,
     method: 'get',
     params: url_params,
@@ -179,7 +175,11 @@ export async function post(
     headers.Cookie = session.cookie;
   }
   // console.time('post request');
-  const response = await axios.post(session.api_url, data, { headers: headers }).catch(e => {
+  const response = await Bun.fetch(session.api_url, {
+    method: 'POST',
+    body: data,
+    headers,
+  }).catch(e => {
     console.log('From post: ', e.toJSON());
   });
   // console.timeEnd('post request');
@@ -232,9 +232,11 @@ export async function post2(
     headers.Cookie = session.cookie;
   }
   // console.time('post request');
-  const response = await axios.post(session.api_url, data, { headers: headers }).catch(e => {
-    console.log('From post: ', e.toJSON());
-  });
+  const response = await Bun.fetch(session.api_url, { body: data, headers, method: 'POST' }).catch(
+    e => {
+      console.log('From post: ', e.toJSON());
+    },
+  );
   // console.timeEnd('post request');
   if (!response?.data) {
     throw new WikibaseError(`No response from ${session.api_url}`);
@@ -297,8 +299,9 @@ export async function uploadStream(session: Session, stream: any, filename: stri
   // no idea how to do this in axios thanks to it returning html if not urlsearchparam-encoded
   return new Promise<any>((resolve, reject) => {
     log(`Uploading ${filename} to ${session.api_url}`);
+    // Bun.fetch(session.api_url, { body: formData, headers })
     request.post(
-      { url: session.api_url, formData: formData, headers },
+      { url: , formData: formData, headers },
       function (error: any, res: any, body: any) {
         if (error) {
           err(error);
@@ -837,6 +840,6 @@ export async function get_annotation_description(session: Session, annotationId:
 
 export async function get_direct_image_link(wikibase_domain: string, filename: string) {
   const url = `${wikibase_domain}/w/index.php?title=Special:Redirect/file/${filename}`;
-  const response = await axios.get(url);
+  const response = await Bun.fetch(url);
   return response.request.res.responseUrl;
 }

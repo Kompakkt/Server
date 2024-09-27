@@ -70,9 +70,14 @@ export interface IMailerConfiguration {
     upload: string;
     bugreport: string;
   };
+  Auth: {
+    User: string;
+    Pass: string;
+  };
+  Secure: boolean;
 }
 
-export const isMailConfiguration = (obj: any): obj is IMailerConfiguration => {
+export const isMailConfiguration = (obj: any, checkAuth?: boolean): obj is IMailerConfiguration => {
   return (
     !!obj &&
     obj?.Host !== undefined &&
@@ -80,11 +85,15 @@ export const isMailConfiguration = (obj: any): obj is IMailerConfiguration => {
     obj?.Target !== undefined &&
     obj?.Target.contact !== undefined &&
     obj?.Target.upload !== undefined &&
-    obj?.Target.bugreport !== undefined
+    obj?.Target.bugreport !== undefined &&
+    // check for auth
+    (checkAuth
+      ? obj?.Auth !== undefined && obj?.Auth.User !== undefined && obj?.Auth.Pass !== undefined
+      : true)
   );
 };
 
-interface IConfiguration {
+export interface IConfiguration<T = Record<string, unknown>> {
   Mongo: IMongoConfiguration;
   Redis: IRedisConfiguration;
   Uploads: IUploadConfiguration;
@@ -96,6 +105,7 @@ interface IConfiguration {
     };
   };
   Mailer?: IMailerConfiguration;
+  Extensions?: T;
 }
 
 const LoadConfig = async () => {
@@ -122,6 +132,7 @@ const LoadConfig = async () => {
       enableHTTPS: false,
       PassportSecret: 'change me',
     },
+    Extensions: {},
   };
 
   info('Loading configuration');
