@@ -19,7 +19,8 @@
     "lib": ["ESNext", "dom"],
     "jsx": "react-jsx",
     "jsxImportSource": "@kitajs/html",
-    "plugins": [{ "name": "@kitajs/ts-html-plugin" }]
+    "plugins": [{ "name": "@kitajs/ts-html-plugin" }],
+    "typeRoots": ["src/plugins/"]
   },
   "include": ["src/**/*.ts"]
 }

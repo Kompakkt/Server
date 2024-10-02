@@ -1,4 +1,3 @@
-version: '3'
 services:
   openldap-search:
     image: ghcr.io/heyitsbatman/openldap-search-server:main

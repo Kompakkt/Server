@@ -39,6 +39,7 @@ import {
   physicalEntityCollection,
   tagCollection,
 } from 'src/mongo';
+import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 type ResolveFn<T> = (obj: ServerDocument<IDocument | T>) => Promise<ServerDocument<T> | undefined>;
@@ -196,8 +197,11 @@ const createResolver = <T extends ServerDocument<T>>(
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
   return async (obj: any) => {
-    const entity = await resolveDocument(obj, collection, isTypeGuard);
+    const cachedEntity = (!!obj?._id) ? (await entitiesCache.get<ServerDocument<T>>((`${collection.collectionName}::${obj._id}`))) : undefined;
+    const entity = cachedEntity ?? await resolveDocument(obj, collection, isTypeGuard);
     if (!entity) return undefined;
+
+    await entitiesCache.set(`${collection.collectionName}::${entity._id}`, entity);
 
     if (additionalProcessing) {
       return await additionalProcessing(entity);

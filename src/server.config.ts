@@ -56,6 +56,7 @@ const configServer = new Elysia({
     }),
   )
   .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
+  .get('/favicon.ico', ({ redirect }) => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
   .use(timingPlugin({}))

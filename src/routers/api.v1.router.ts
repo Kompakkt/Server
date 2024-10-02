@@ -46,7 +46,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     .get('/get/id', () => new ObjectId())
     .post(
       '/post/explore',
-      async ({ body, userdata }) => {
+      async ({ body, userdata, error }) => {
         const combined = { ...body, userData: userdata ?? undefined };
         return body.searchEntity ? exploreEntities(combined) : exploreCompilations(combined);
       },
@@ -77,9 +77,9 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         }
 
         // Flatten account.data so its an array of ObjectId.toString()
-        const userEntities = Object.values(user.data).flatMap(e => e.toString());
+        const userEntities = Object.values(user.data).flat().map(e => e?.toString()).filter((e): e is string => !!e);
 
-        if (!userEntities.some(obj => obj === _id)) {
+        if (!userEntities.includes(_id)) {
           const message = 'Entity removal failed because Entity does not belong to user';
           err(message);
           return error(401, message);

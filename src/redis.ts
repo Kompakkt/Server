@@ -38,6 +38,11 @@ export class CacheClient {
     return this.redis.get(key).then(value => (value ? (JSON.parse(value) as T) : undefined));
   }
 
+  public async getAll<T extends unknown>(key: string) {
+    const matches = await this.redis.keys(key);
+    return Promise.all(matches.map(m => this.get<T>(m)));
+  }
+
   public async set(key: string, value: any, seconds = this.defaultSeconds) {
     return this.redis.set(key, JSON.stringify(value), 'EX', seconds);
   }

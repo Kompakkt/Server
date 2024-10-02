@@ -65,10 +65,21 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ params: { '*': path } }) => {
+    async ({ params: { '*': path }, set }) => {
       console.log(path);
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
       const filePath = join(uploadDir, path.split('/uploads').at(-1)!);
+
+      if (await Bun.file(`${filePath}.br`).exists()) {
+        set.headers['content-encoding'] = 'br';
+        return Bun.file(`${filePath}.br`);
+      }
+
+      if (await Bun.file(`${filePath}.gz`).exists()) {
+        set.headers['content-encoding'] = 'gzip';
+        return Bun.file(`${filePath}.gz`);
+      }
+
       return Bun.file(filePath);
       //     http://localhost:3030/uploads/model/66f1524a93ae4c138e26f96f/DamagedHelmet.glb
     },

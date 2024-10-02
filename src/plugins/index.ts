@@ -5,6 +5,7 @@ import { err, info, log } from 'src/logger';
 import type Elysia from 'elysia';
 import configServer from 'src/server.config';
 
+
 const getRoutes = (router: Elysia<any, any, any>) => {
     return router.routes.map(route => route.path);
 }
@@ -34,7 +35,7 @@ export const PluginController = new (class {
 
 export const initializePlugins = async () => {
     const pluginDir = await readdir(import.meta.dirname, { withFileTypes: true, recursive: true });
-    const pluginFiles = pluginDir.filter(entry => entry.name.includes('.plugin.ts')).map(file => join(file.parentPath, file.name));
+    const pluginFiles = pluginDir.filter(entry => entry.name.includes('plugin.ts')).map(file => join(file.parentPath, file.name));
     
     for (const file of pluginFiles) {
         try {
@@ -43,5 +44,7 @@ export const initializePlugins = async () => {
         } catch (error) {
             err(`Failed loading plugin ${file}`, error);
         }    
-    }    
+    }
+    
+    return PluginController.routers;
 }

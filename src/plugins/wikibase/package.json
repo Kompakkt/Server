@@ -1,0 +1,9 @@
+{
+  "name": "wikibase",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "wikibase-edit": "^5.3.3",
+    "wikibase-sdk": "^10.1.1"
+  }
+}

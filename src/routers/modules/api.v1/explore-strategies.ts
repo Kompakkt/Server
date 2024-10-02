@@ -1,12 +1,10 @@
 import { t, type Static } from 'elysia';
-import type { Filter } from 'mongodb';
-import type { IEntity, ICompilation, IDigitalEntity, IUserData } from 'src/common';
+import type { ICompilation, IEntity, IUserData } from 'src/common';
 import { isAnnotation, isEntity } from 'src/common';
 import { compilationCollection, entityCollection } from 'src/mongo';
+import { exploreCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveCompilation, resolveEntity } from './resolving-strategies';
-import { exploreCache } from 'src/redis';
-import { err } from 'src/logger';
 
 enum SortOrder {
   name = 'name',
@@ -105,20 +103,12 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
   const limit = body.limit ?? 30;
 
   const entities = await (async () => {
-    /* const key = `explore::entities::${exploreCache.hash({ searchText, types, filters, sortBy })}`;
+    const key = `explore::entities`;
     const cached = await exploreCache.get<ServerDocument<IEntity>[]>(key);
-    if (cached) return cached; */
-    const entities = await entityCollection
-      .find({
-        finished: true,
-        online: true,
-        mediaType: {
-          $in: types,
-        },
-      })
-      .toArray();
+    const entities =
+      cached ?? (await entityCollection.find({ finished: true, online: true }).toArray());
+    exploreCache.set(key, entities);
     const sortedEntities = await sortEntities(entities, sortBy ?? SortOrder.popularity);
-    /* exploreCache.set(key, sortedEntities); */
     return sortedEntities;
   })();
 
@@ -130,52 +120,55 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
   for (let i = offset; i < entities.length && finalEntities.length < limit; i++) {
     const _entity = entities[i];
     if (!_entity || !_entity._id) continue;
-    const resolved = await resolveEntity(_entity).catch((error) => {
-      err(_entity._id, error);
-      return 'BREAK';
-    });
-    if (!resolved) continue;
-    if (typeof resolved === 'string') break;
 
-    const isOwner = userOwned.includes(resolved._id.toString());
-    const metadata = JSON.stringify(resolved).toLowerCase();
+    if (!types.includes(_entity.mediaType)) continue;
+
+    const isOwner = userOwned.includes(_entity._id.toString());
 
     const isAnnotatable = isOwner; // only owner can set default annotations
     if (filters.annotatable && !isAnnotatable) continue;
 
-    const isAnnotated = Object.keys(resolved.annotations).length > 0;
+    const isAnnotated = Object.keys(_entity.annotations).length > 0;
     if (filters.annotated && !isAnnotated) continue;
 
     let isRestricted = false;
     // Whitelist visibility filter
-    if (resolved.whitelist.enabled) {
+    if (_entity.whitelist.enabled) {
       if (!userData) continue;
       // TODO: manual checking instead of JSON.stringify
-      const isWhitelisted = JSON.stringify(resolved.whitelist).includes(userData._id.toString());
+      const isWhitelisted = JSON.stringify(_entity.whitelist).includes(userData._id.toString());
       if (!isOwner && !isWhitelisted) continue;
       isRestricted = true;
     }
     if (filters.restricted && !isRestricted) continue;
 
-    const isAssociated = userData // user appears in metadata
-      ? metadata.includes(userData.fullname.toLowerCase()) ||
-        metadata.includes(userData.mail.toLowerCase())
-      : false;
-    if (filters.associated && !isAssociated) continue;
+    if (filters.associated || searchText !== '') {
+      const metadata = await (async () => {
+        const cached = await exploreCache.get<string>(
+          `explore::entities::metadata::${_entity._id}`,
+        );
+        if (cached) return cached;
+        const resolved = await resolveEntity(_entity);
+        const json = JSON.stringify(resolved).toLowerCase();
+        exploreCache.set(`explore::entities::metadata::${_entity._id}`, json);
+        return json;
+      })();
 
-    // Search text filter
-    if (searchText !== '' && !metadata.includes(searchText.toLowerCase())) {
-      continue;
+      if (!metadata) continue;
+
+      const isAssociated = userData // user appears in metadata
+        ? metadata.includes(userData.fullname.toLowerCase()) ||
+          metadata.includes(userData.mail.toLowerCase())
+        : false;
+      if (filters.associated && !isAssociated) continue;
+
+      // Search text filter
+      if (searchText !== '' && !metadata.includes(searchText.toLowerCase())) {
+        continue;
+      }
     }
 
-    const { description, licence } = resolved.relatedDigitalEntity as IDigitalEntity;
-    finalEntities.push({
-      ...resolved,
-      relatedDigitalEntity: {
-        description,
-        licence,
-      } as IDigitalEntity,
-    });
+    finalEntities.push(_entity);
   }
 
   return finalEntities;
@@ -253,4 +246,5 @@ const exploreCompilations = async (body: ExploreRequest & IPossibleUserdata) => 
   return finalComps;
 };
 
-export { exploreEntities, exploreCompilations };
+export { exploreCompilations, exploreEntities };
+

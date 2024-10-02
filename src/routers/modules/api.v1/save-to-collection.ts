@@ -1,7 +1,7 @@
+import { ObjectId, type Collection as DbCollection } from 'mongodb';
 import {
   Collection,
   isCompilation,
-  isContact,
   isDigitalEntity,
   isEntity,
   isInstitution,
@@ -9,18 +9,15 @@ import {
   isPhysicalEntity,
   isUnresolved,
   type ICompilation,
-  type IContact,
   type IDigitalEntity,
   type IDocument,
   type IEntity,
-  type IGroup,
   type IInstitution,
   type IPerson,
   type IPhysicalEntity,
   type IUserData,
 } from 'src/common';
-import { ObjectId, type Collection as DbCollection } from 'mongodb';
-import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { err, log } from 'src/logger';
 import {
   addressCollection,
   annotationCollection,
@@ -34,7 +31,8 @@ import {
   physicalEntityCollection,
   tagCollection,
 } from 'src/mongo';
-import { err, log } from 'src/logger';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { updatePreviewImage } from 'src/util/image-helpers';
 import { makeUserOwnerOf } from '../user-management/users';
 
 type TransformFn<T> = (obj: ServerDocument<IDocument>) => Promise<Partial<T>>;
@@ -82,6 +80,7 @@ const transformDocument: TransformFn<any> = async <T>(body: ServerDocument<IDocu
 
 const transformEntity: TransformFn<IEntity> = async body => {
   const asEntity = body as unknown as Partial<IEntity>;
+
   return {
     annotations: flattenRecord(asEntity.annotations),
     creator: asEntity.creator,
@@ -96,7 +95,13 @@ const transformEntity: TransformFn<IEntity> = async body => {
     relatedDigitalEntity: asEntity.relatedDigitalEntity
       ? flattenDocument(asEntity.relatedDigitalEntity)
       : flattenDocument({ _id: new ObjectId().toString() }),
-    settings: asEntity.settings,
+    settings: {
+      ...asEntity.settings!,
+      preview:
+        asEntity.settings?.preview && asEntity._id
+          ? await updatePreviewImage(asEntity.settings?.preview, 'entity', asEntity._id)
+          : asEntity.settings!.preview!,
+    },
     whitelist: asEntity.whitelist,
   };
 };
@@ -147,7 +152,9 @@ const transformCompilation: TransformFn<ICompilation> = async body => {
 const transformInstitution: TransformFn<IInstitution> = async body => {
   const asInstitution = body as unknown as Partial<IInstitution>;
 
-  const existing = asInstitution._id ? await institutionCollection.findOne({ _id: new ObjectId(asInstitution._id)}) : undefined;
+  const existing = asInstitution._id
+    ? await institutionCollection.findOne({ _id: new ObjectId(asInstitution._id) })
+    : undefined;
 
   const combinedAddresses = {
     ...flattenRecord(existing?.addresses ?? {}),
@@ -166,16 +173,24 @@ const transformInstitution: TransformFn<IInstitution> = async body => {
 const transformPerson: TransformFn<IPerson> = async body => {
   const asPerson = body as unknown as Partial<IPerson>;
 
-  const existing = asPerson._id ? await personCollection.findOne({ _id: new ObjectId(asPerson._id)}) : undefined;
+  const existing = asPerson._id
+    ? await personCollection.findOne({ _id: new ObjectId(asPerson._id) })
+    : undefined;
 
-  log(`Transforming person ${asPerson._id}`, asPerson.contact_references, flattenRecord(asPerson.contact_references));
+  log(
+    `Transforming person ${asPerson._id}`,
+    asPerson.contact_references,
+    flattenRecord(asPerson.contact_references),
+  );
 
   const combinedContactReferences = {
     ...flattenRecord(existing?.contact_references ?? {}),
     ...flattenRecord(asPerson.contact_references),
   };
 
-  const combinedInstitutions: Record<string, IDocument[]> = flattenRecordArray(existing?.institutions ?? {});
+  const combinedInstitutions: Record<string, IDocument[]> = flattenRecordArray(
+    existing?.institutions ?? {},
+  );
   for (const [key, arr] of Object.entries(flattenRecordArray(asPerson.institutions))) {
     combinedInstitutions[key] = [...(combinedInstitutions[key] ?? []), ...arr];
   }
@@ -235,13 +250,13 @@ const createSaver = <T extends ServerDocument<T>>(
     if (!obj) {
       return false;
     }
-    
+
     // Assume it is already saved and does not need to be saved
     if (typeof obj === 'string' || isUnresolved(obj)) {
       return true;
     }
-    
-    // If the _id is empty, create a new one 
+
+    // If the _id is empty, create a new one
     if (obj._id.toString().length === 0) {
       obj._id = new ObjectId().toString();
     }
