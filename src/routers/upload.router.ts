@@ -1,14 +1,15 @@
 import { Elysia, t } from 'elysia';
-import { readdir, rmdir, stat } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { readdir, rmdir, stat, symlink } from 'node:fs/promises';
+import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
 import type { IFile } from 'src/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
-import { err } from 'src/logger';
+import { err, info } from 'src/logger';
 import configServer from 'src/server.config';
 import { ensure } from 'src/util/file-related-helpers';
 import { authService } from './handlers/auth.service';
+import { md5Cache } from 'src/redis';
 
 declare global {
   interface ReadableStream<R = any> {
@@ -66,21 +67,24 @@ const uploadRouter = new Elysia()
   .get(
     'uploads/*',
     async ({ params: { '*': path }, set }) => {
-      console.log(path);
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
       const filePath = join(uploadDir, path.split('/uploads').at(-1)!);
+      const decodedPath = filePath
+        .split('/')
+        .map(part => decodeURIComponent(part))
+        .join('/');
 
-      if (await Bun.file(`${filePath}.br`).exists()) {
+      if (await Bun.file(`${decodedPath}.br`).exists()) {
         set.headers['content-encoding'] = 'br';
-        return Bun.file(`${filePath}.br`);
+        return Bun.file(`${decodedPath}.br`);
       }
 
-      if (await Bun.file(`${filePath}.gz`).exists()) {
+      if (await Bun.file(`${decodedPath}.gz`).exists()) {
         set.headers['content-encoding'] = 'gzip';
-        return Bun.file(`${filePath}.gz`);
+        return Bun.file(`${decodedPath}.gz`);
       }
 
-      return Bun.file(filePath);
+      return Bun.file(decodedPath);
       //     http://localhost:3030/uploads/model/66f1524a93ae4c138e26f96f/DamagedHelmet.glb
     },
     {
@@ -99,6 +103,7 @@ const uploadRouter = new Elysia()
         .post(
           '/file',
           async ({ error, userdata, body: { file, checksum, token, type, relativePath } }) => {
+            const serverChecksum = await calculateMD5(file.stream());
             const destPath = join(
               uploadDir,
               `${type}`,
@@ -106,12 +111,33 @@ const uploadRouter = new Elysia()
               `${slug(relativePath)}`,
               file.name,
             );
+
+            const existing = await md5Cache.get<string>(serverChecksum);
+            if (existing) {
+              // Create symlink
+              info(
+                `File already exists, creating symlink from ${join(uploadDir, existing)} to ${destPath}`,
+              );
+              await ensure(destPath);
+              await symlink(join(uploadDir, existing), destPath).catch(e => {
+                err(e);
+              });
+
+              return {
+                status: 'OK',
+                clientChecksum: checksum,
+                serverChecksum,
+                usingExisting: true,
+              };
+            }
+
             const success = await writeStreamToDisk(file.stream(), destPath);
             return success
               ? {
                   status: 'OK',
                   clientChecksum: checksum,
-                  serverChecksum: await calculateMD5(file.stream()),
+                  serverChecksum,
+                  usingExisting: false,
                 }
               : error('Internal Server Error');
           },
@@ -137,7 +163,7 @@ const uploadRouter = new Elysia()
             );
             if (!entries) return error(404);
 
-            const files = entries.filter(dirent => dirent.isFile());
+            const files = entries.filter(dirent => dirent.isFile() || dirent.isSymbolicLink());
 
             const filter = (() => {
               switch (type) {

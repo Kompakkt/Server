@@ -219,3 +219,6 @@ src/common/*
 .jscpd/
 .jscpd/*
 .flagged
+
+*-dump.json
+old_src/

@@ -128,6 +128,7 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
     persons: flattenDocumentArray(asDigitalEntity.persons),
     phyObjs: flattenDocumentArray(asDigitalEntity.phyObjs),
     tags: flattenDocumentArray(asDigitalEntity.tags),
+    extensions: asDigitalEntity.extensions ?? {},
   };
 };
 

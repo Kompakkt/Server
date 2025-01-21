@@ -37,36 +37,40 @@ export type IMediaHierarchy = {
 export type IWikibaseLabel = Record<string, string | string[]>;
 
 export type IWikibaseDigitalEntityExtension = {
-  wikibase?: Partial<{
-    label: IWikibaseLabel;
-    description: string | Array<string | IWikibaseItem>;
-    id: string;
-    address: string;
-    agents: IMediaAgent[];
-    techniques: IWikibaseItem[];
-    software: IWikibaseItem[];
-    equipment: Array<string | IWikibaseItem>;
-    creationDate: string | Array<string> | undefined;
-    externalLinks: Array<string | IWikibaseItem>; // Is this supposed to happen?
-    bibliographicRefs: IWikibaseItem[];
-    physicalObjs: IWikibaseItem[];
-    licence: number;
-    hierarchies: IMediaHierarchy[];
-    claims: Record<string, unknown>;
-  }>;
+  wikibase?: IWikibaseDigitalEntityExtensionData;
 };
 
+export type IWikibaseDigitalEntityExtensionData = Partial<{
+  label: IWikibaseLabel;
+  description: string | Array<string | IWikibaseItem>;
+  id: string;
+  address: string;
+  agents: IMediaAgent[];
+  techniques: Array<string | IWikibaseItem>;
+  software: Array<string | IWikibaseItem>;
+  equipment: Array<string | IWikibaseItem>;
+  creationDate: string | IWikibaseItem | undefined;
+  externalLinks: Array<string | IWikibaseItem>; // Is this supposed to happen?
+  bibliographicRefs: Array<string | IWikibaseItem>;
+  physicalObjs: Array<string | IWikibaseItem>;
+  licence: number;
+  hierarchies: IMediaHierarchy[];
+  claims: Record<string, unknown>;
+}>;
+
 export type IWikibaseAnnotationExtension = {
-  wikibase?: Partial<{
-    label: IWikibaseLabel;
-    description: string | Array<string | IWikibaseItem>;
-    authors: IWikibaseItem[];
-    licenses: IWikibaseItem[];
-    media: IWikibaseItem[];
-    mediaUrls: string;
-    entities: IWikibaseItem[];
-  }>;
+  wikibase?: IWikibaseAnnotationExtensionData;
 };
+
+export type IWikibaseAnnotationExtensionData = Partial<{
+  label: IWikibaseLabel;
+  description: string | Array<string | IWikibaseItem>;
+  authors: IWikibaseItem[];
+  licenses: IWikibaseItem[];
+  media: IWikibaseItem[];
+  mediaUrls: string;
+  entities: IWikibaseItem[];
+}>;
 
 export type IWikibaseConfiguration = {
   KompakktAddress?: string;
@@ -230,3 +234,155 @@ export class WikibaseID {
     this.numericID = parseInt(this.itemID.slice(1));
   }
 }
+
+export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
+  const spark = `SELECT
+    ?desc
+    ?label
+    ?licence ?licenceLabel
+    ?date
+    ?techniques ?techniquesLabel
+    ?software ?softwareLabel
+    ?equipment ?equipmentLabel
+    ?externalLinks
+    ?bibliographicRefs ?bibliographicRefsLabel
+    ?physicalObjs ?physicalObjsLabel
+    ?rightsOwner ?rightsOwnerLabel
+    ?dataCreator ?dataCreatorLabel
+    ?creator ?creatorLabel
+    ?editor ?editorLabel
+    ?contactperson ?contactpersonLabel
+    WHERE {
+      tib:${wikibaseId} schema:description ?desc .
+      tib:${wikibaseId} tibt:${WBPredicates.license} ?licence .
+      OPTIONAL { tib:${wikibaseId} rdfs:label ?label }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.dateCreated} ?date }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.technique} ?techniques }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.software} ?software }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.equipment} ?equipment }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.externalLink} ?externalLinks }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.bibliographicRef} ?bibliographicRefs }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.objectOfRepresentation} ?physicalObjs }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.instance_of} ?hierarchies }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.rightsOwner} ?rightsOwner }
+      OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.contactPerson} ?contactperson }
+      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.hasEvent} ?statement1.
+				            ?statement1 tibps:${WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
+							      tibpq:${WBPredicates.carriedOutBy} ?dataCreator. }
+      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.hasEvent} ?statement2.
+				            ?statement2 tibps:${WBPredicates.hasEvent} tib:${WBClasses.creation} ;
+							      tibpq:${WBPredicates.carriedOutBy} ?creator. }
+      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.hasEvent} ?statement3.
+				            ?statement3 tibps:${WBPredicates.hasEvent} tib:${WBClasses.modification} ;
+							      tibpq:${WBPredicates.carriedOutBy} ?editor. }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+    }`;
+  return spark;
+};
+
+export const getAnnotationMetadataSpark = (wikibaseId: string) => {
+  const spark = `SELECT
+      ?label ?desc ?dateCreated ?dateModified ?val ?rank ?motiv ?camType
+      ?cx ?cy ?cz
+      ?ctx ?cty ?ctz
+      ?sx ?sy ?sz
+      ?snx ?sny ?snz
+      ?target
+      ?concept ?conceptLabel
+      ?media ?mediaLabel
+      ?mediaURL ?relMediaThumb ?fileView
+      ?descAgent ?descAgentLabel
+      ?descLicense ?descLicenseLabel
+      WHERE {
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+        tib:${wikibaseId} schema:description ?desc .
+        tib:${wikibaseId} tibt:${WBPredicates.annotationVerified} ?val .
+        tib:${wikibaseId} tibt:${WBPredicates.annotationRanking} ?rank .
+        tib:${wikibaseId} tibt:${WBPredicates.annotationMotivation} ?motiv .
+        tib:${wikibaseId} tibt:${WBPredicates.cameraType} ?camType .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectivePositionX} ?cx .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectivePositionY} ?cy .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectivePositionZ} ?cz .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectiveTargetX} ?ctx .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectiveTargetY} ?cty .
+        tib:${wikibaseId} tibt:${WBPredicates.perspectiveTargetZ} ?ctz .
+        tib:${wikibaseId} tibt:${WBPredicates.targetEntity} ?target .
+        OPTIONAL {
+          tib:${wikibaseId} tibt:${WBPredicates.selectorNormalX} ?sx .
+          tib:${wikibaseId} tibt:${WBPredicates.selectorNormalY} ?sy .
+          tib:${wikibaseId} tibt:${WBPredicates.selectorNormalZ} ?sz .
+        }
+        OPTIONAL {
+          tib:${wikibaseId} tibt:${WBPredicates.selectorPositionX} ?snx .
+          tib:${wikibaseId} tibt:${WBPredicates.selectorPositionY} ?sny .
+          tib:${wikibaseId} tibt:${WBPredicates.selectorPositionZ} ?snz .
+        }
+        OPTIONAL {
+            tib:${wikibaseId} tibp:${WBPredicates.annotationDescriptionLink} [tibps:${WBPredicates.annotationDescriptionLink} ?descAgentItem; tibpq:${WBPredicates.rightsOwner} ?descAgent] .
+        }
+        OPTIONAL {
+            tib:${wikibaseId} tibp:${WBPredicates.annotationDescriptionLink} [tibps:${WBPredicates.annotationDescriptionLink} ?descLicenseItem; tibpq:${WBPredicates.license} ?descLicense]
+        }
+        OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.dateCreated} ?dateCreated .  }
+        OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.annotationRelatedConcepts} ?concept }
+        OPTIONAL {
+            tib:${wikibaseId} tibt:${WBPredicates.annotationRelatedMedia} ?media .
+            ?media tibt:${WBPredicates.entityLink} ?fileView.
+            ?media tibt:${WBPredicates.image} ?relMediaThumb.
+        }
+        OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.externalLink} ?mediaURL }
+        OPTIONAL { tib:${wikibaseId} rdfs:label ?label }
+      }`;
+  return spark;
+};
+
+export const getWikibaseClassAndSubclassSpark = (classes: string[]) => {
+  const class_string = 'tib:' + classes.join(' tib:');
+  const spark = `SELECT ?id ?label_en ?desc ?media WHERE {
+    values ?class {${class_string}}
+    {
+      ?id tibt:${WBPredicates.instance_of} ?class.
+    }
+    UNION
+    {
+      ?subclass tibt:${WBPredicates.subclass_of} ?class.
+      ?id tibt:${WBPredicates.instance_of} ?subclass.
+    }
+    ?id rdfs:label ?label_en filter (lang(?label_en) = "en").
+    OPTIONAL { ?id schema:description ?desc filter (lang(?desc) = "en")}.
+    OPTIONAL { ?media tibt:${WBPredicates.image} ?media. }
+  }`;
+  return spark;
+};
+
+export const getWikibaseClassInstancesSpark = (classes: string[]) => {
+  const class_string = 'tib:' + classes.join(' tib:');
+
+  const spark = `select DISTINCT ?id ?label_en ?description ?media where {
+      values ?class {${class_string}}
+      ?id tibt:${WBPredicates.instance_of} ?class.
+      ?id rdfs:label ?label_en filter (lang(?label_en) = "en").
+      optional { ?id schema:description ?description filter (lang(?description) = "en")}.
+      optional { ?id tibt:${WBPredicates.image} ?media. }
+    }`;
+
+  return spark;
+};
+
+export const getHierarchySpark = (wikibaseId: string) => {
+  const spark = `
+  SELECT ?type ?item ?itemLabel WHERE {
+    {
+      tib:${wikibaseId} tibt:${WBPredicates.isPartOf}* ?item.
+      BIND("parent" AS ?type)
+    } UNION {
+      tib:${wikibaseId} tibt:${WBPredicates.isPartOf} ?parent.
+      ?item tibt:${WBPredicates.isPartOf} ?parent.
+      BIND("sibling" AS ?type)
+    }
+    SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
+  }
+  `;
+
+  return spark;
+};

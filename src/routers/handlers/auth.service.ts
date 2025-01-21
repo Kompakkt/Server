@@ -1,6 +1,7 @@
 import jwt from '@elysiajs/jwt';
 import Elysia, { t, type Static } from 'elysia';
 import { ObjectId } from 'mongodb';
+import { AuthController } from 'src/authentication';
 import { UserRank } from 'src/common';
 import { userCollection } from 'src/mongo';
 import configServer, { jwtOptions } from 'src/server.config';
@@ -10,6 +11,10 @@ export const signInBody = t.Object({
   password: t.String(),
 });
 type SignInBody = Static<typeof signInBody>;
+
+export const strategyParams = t.Object({
+  strategy: t.Optional(t.String()),
+});
 
 export const authService = new Elysia({ name: 'Service.Auth' })
   .use(configServer)
@@ -26,8 +31,19 @@ export const authService = new Elysia({ name: 'Service.Auth' })
     }
     return { userdata: user, isLoggedIn: true, isAdmin: user.role === UserRank.admin };
   })
+  .decorate('useAuthController', async (body: SignInBody, strategy?: string) => {
+    const wrappedUserdata = await (async () => {
+      switch (strategy) {
+        case 'ldap':
+        case 'uni-cologne-ldap':
+          return AuthController.authenticate('UniCologneLDAPStrategy', body);
+        default:
+          return AuthController.authenticateAnyWithUsernamePassword(body);
+      }
+    })();
+    return wrappedUserdata;
+  })
   .macro(({ onBeforeHandle }) => ({
-    // This is declaring a service method
     isLoggedIn(needed?: boolean) {
       if (!needed) return;
       onBeforeHandle(({ error, userdata }) => {
@@ -44,10 +60,12 @@ export const authService = new Elysia({ name: 'Service.Auth' })
     },
     verifyLoginData(needed?: boolean) {
       if (!needed) return;
-      onBeforeHandle(({ error, body }) => {
+      onBeforeHandle(async ({ error, body, params, useAuthController }) => {
         const loginBody = body as SignInBody;
         if (!loginBody?.username || !loginBody?.password) return error('Forbidden');
-        // TODO: Verify login
+        const strategy = params?.strategy;
+        const authResult = await useAuthController(loginBody, strategy);
+        if (authResult instanceof Error) return error('Forbidden');
         return;
       });
     },

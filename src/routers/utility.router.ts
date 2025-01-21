@@ -10,6 +10,7 @@ import {
   findUserInCompilations,
   findUserInGroups,
 } from './modules/utility/utility';
+import { md5Cache } from 'src/redis';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -50,6 +51,18 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
                 command: t.Enum(Command),
                 entityId: t.String(),
                 otherUsername: t.String(),
+              }),
+            },
+          )
+          .post(
+            '/checksumexists',
+            async ({ body: { checksum } }) => {
+              const existing = await md5Cache.get<string>(checksum);
+              return { checksum, existing };
+            },
+            {
+              body: t.Object({
+                checksum: t.String(),
               }),
             },
           )

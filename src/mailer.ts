@@ -82,6 +82,7 @@ export const sendJSXMail = async ({
   to: string;
   subject: string;
 }): Promise<boolean> => {
+  console.log(jsx, wrapInMailBody({ jsx, subject }));
   return sendMail({
     from,
     to,

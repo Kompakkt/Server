@@ -1,4 +1,3 @@
-import { Err, Ok } from '@thames/monads';
 import { mongoClient, passwordCollection, userCollection } from 'src/mongo';
 import { verifyPassword } from 'src/util/authentication-helpers';
 import {
@@ -7,13 +6,12 @@ import {
   type AuthWithUsernamePassword,
 } from '../strategy';
 
-
-
 export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
   strategyName: string = 'MongoDbStrategy';
 
   async isAvailable(): Promise<boolean> {
-    return mongoClient.db('admin')
+    return mongoClient
+      .db('admin')
       .command({ ping: 1 })
       .then(_ => true)
       .catch(_ => false);
@@ -25,12 +23,12 @@ export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePass
       passwordCollection.findOne({ username }),
     ]);
     if (!userFindResult || !passwordFindResult) {
-      return Err('Incorrect username or password');
+      return new Error('Incorrect username or password');
     }
     const result = await verifyPassword(password, passwordFindResult);
     if (!result) {
-      return Err('Incorrect username or password');
+      return new Error('Incorrect username or password');
     }
-    return Ok(userFindResult);
+    return userFindResult;
   }
 }

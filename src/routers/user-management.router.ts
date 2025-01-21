@@ -1,7 +1,6 @@
 import { randomBytes } from 'crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { AuthController } from 'src/authentication';
 import { UserRank, type IUserData } from 'src/common';
 import { sendJSXMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
@@ -19,21 +18,11 @@ const userManagementRouter = new Elysia()
     app
       .post(
         '/login/:strategy?',
-        async ({ params: { strategy }, body, error, cookie: { auth }, jwt }) => {
-          const wrappedUserdata = await (async () => {
-            switch (strategy) {
-              case 'ldap':
-              case 'uni-cologne-ldap':
-                return AuthController.authenticate('UniCologneLDAPStrategy', body);
-              default:
-                return AuthController.authenticateAnyWithUsernamePassword(body);
-            }
-          })();
-          if (wrappedUserdata.isErr()) {
-            return error(401, wrappedUserdata.unwrapErr());
+        async ({ params: { strategy }, body, error, cookie: { auth }, jwt, useAuthController }) => {
+          const userdata = await useAuthController(body, strategy);
+          if (userdata instanceof Error) {
+            return error(401, userdata);
           }
-
-          const userdata = wrappedUserdata.unwrap();
 
           auth.set({
             value: await jwt.sign({ username: userdata.username, _id: userdata._id.toString() }),

@@ -11,6 +11,13 @@ import {
   isWikibaseConfiguration,
   type IWikibaseItem,
   type IMediaAgent,
+  type IWikibaseDigitalEntityExtensionData,
+  type IWikibaseAnnotationExtensionData,
+  getDigitalEntityMetadataSpark,
+  getAnnotationMetadataSpark,
+  getWikibaseClassAndSubclassSpark,
+  getWikibaseClassInstancesSpark,
+  getHierarchySpark,
 } from './common';
 import WBEdit from 'wikibase-edit';
 import WBK from 'wikibase-sdk';
@@ -21,17 +28,90 @@ import {
   type WikibaseDigitalEntity,
 } from './config';
 import { ObjectId } from 'mongodb';
-import { err, log } from 'src/logger';
+import { err, info, log } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
 import { get, RequestClient } from 'src/util/requests';
+import { Configuration } from 'src/configuration';
 
 type UndoPartial<T> = T extends Partial<infer R> ? R : T;
 
+type ValueLabelItem = {
+  value: string;
+  label: string;
+};
+
+type DescItem = {
+  value: string;
+  agent?: string;
+  agentLabel?: string;
+};
+
+export type MetadataResponseItem = {
+  licence: ValueLabelItem;
+  physicalObjs?: ValueLabelItem;
+  rightsOwner: ValueLabelItem;
+  dataCreator?: ValueLabelItem;
+  creator: ValueLabelItem;
+  editor?: ValueLabelItem;
+  contactperson?: ValueLabelItem;
+  desc: string;
+  label: string;
+  externalLinks?: string;
+  techniques?: ValueLabelItem;
+  software?: ValueLabelItem;
+  equipment?: ValueLabelItem;
+};
+
+type AnnotationResponseItem = {
+  desc: DescItem;
+  label: string;
+  val: string;
+  rank: number;
+  motiv: string;
+  camType: string;
+  cx: number;
+  cy: number;
+  cz: number;
+  ctx: number;
+  cty: number;
+  ctz: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  snx: number;
+  sny: number;
+  snz: number;
+  target: string;
+  concept?: ValueLabelItem;
+  media?: ValueLabelItem;
+  relMediaThumb?: string;
+  fileView?: string;
+};
+
+const isValueLabelItem = (item: MetadataField): item is ValueLabelItem => {
+  return (
+    typeof item !== 'string' &&
+    (item as ValueLabelItem).value !== undefined &&
+    (item as ValueLabelItem).label !== undefined
+  );
+};
+const isDescItem = (item: MetadataField): item is DescItem => {
+  return typeof item !== 'string' && (item as DescItem).value !== undefined;
+};
+type MetadataField = string | ValueLabelItem | number | DescItem;
+type RawMetadata = Record<string, MetadataField>[];
+type ProcessedMetadata = Record<string, MetadataField | Array<MetadataField>>;
+
+type HierarchiesResponseItem = {
+  item: ValueLabelItem;
+  type: string;
+};
+
 export class WikibaseService {
-  private static instance: WikibaseService;
-  private wbConnect: WikibaseConnector;
-  private wbEdit: ReturnType<typeof WBEdit>;
-  private wbSDK: ReturnType<typeof WBK>;
+  static instance: WikibaseService;
+  wbConnect: WikibaseConnector;
+  wbEdit: ReturnType<typeof WBEdit>;
+  wbSDK: ReturnType<typeof WBK>;
 
   constructor() {
     const instance = 'http://wb.local';
@@ -63,7 +143,7 @@ export class WikibaseService {
   public async updateAnnotation(
     id: string | undefined,
     fullAnnotation: WikibaseAnnotation,
-    claims: { [key: string]: any } = {},
+    claims: { [key: string]: string | string[] } = {},
     prevAnnotation: WikibaseAnnotation | undefined = undefined,
     preview: string | undefined = undefined,
   ) {
@@ -71,7 +151,7 @@ export class WikibaseService {
     const prev = prevAnnotation ? this.extractWikibaseExtensionData(prevAnnotation) : undefined;
     if (id === undefined) {
       console.log('id is undefined');
-      let create = await this.wbEdit.entity.create({
+      const create = await this.wbEdit.entity.create({
         type: 'item',
         labels: { en: annotation.label['en'] },
         descriptions: { en: annotation.description },
@@ -95,7 +175,7 @@ export class WikibaseService {
     //TODO shouldnt this be in the writeAnnotation function?
     const fixedPos = 6;
     log('related Media (kmpkt): ' + JSON.stringify(annotation.media));
-    let spark = {
+    const spark = {
       id: id,
       clear: true,
       labels: { en: annotation.label['en'] },
@@ -158,7 +238,7 @@ export class WikibaseService {
   public async updateDigitalEntity(
     id: string | undefined,
     fullEntity: WikibaseDigitalEntity,
-    claims: { [key: string]: any } = {},
+    claims: { [key: string]: string | string[] } = {},
     prevEntity: WikibaseDigitalEntity | undefined = undefined,
   ) {
     const entity = this.extractWikibaseExtensionData(fullEntity);
@@ -167,7 +247,7 @@ export class WikibaseService {
       `updateDigitalEntity with id ${id} and entity ${JSON.stringify(entity)}, claims ${JSON.stringify(claims)}, prev ${JSON.stringify(prev)}`,
     );
     if (id === undefined) {
-      let created = await this.wbEdit.entity.create({
+      const created = await this.wbEdit.entity.create({
         type: 'item',
         labels: { en: entity.label['en'] },
         descriptions: { en: entity.description },
@@ -195,7 +275,7 @@ export class WikibaseService {
 
     let entity_id = '' + entity_data?._id;
 
-    let model_events: any[] = [];
+    const model_events = new Array<{ value: string; qualifiers: { [x: string]: string[] } }>();
 
     let model_claims = {
       [WBPredicates.instance_of]: [WBClasses.media],
@@ -205,7 +285,7 @@ export class WikibaseService {
       [WBPredicates.objectOfRepresentation]: entity.physicalObjs.map(d => d['id']),
       [WBPredicates.bibliographicRef]: entity.bibliographicRefs.map(d => d['id']),
       [WBPredicates.equipment]: entity.equipment,
-      [WBPredicates.entityLink]: 'https://' + Configuration.Server.Host + '/entity/' + entity_id,
+      [WBPredicates.entityLink]: 'https://' + Configuration.Express.Host + '/entity/' + entity_id,
       [WBPredicates.image]: 'Preview' + id + '.png',
       [WBPredicates.hasAnnotation]: wikibase_annotation_ids?.map(d => d['wikibase_id']) ?? [],
       [WBPredicates.externalLink]: entity.externalLinks,
@@ -272,67 +352,41 @@ export class WikibaseService {
     // - siblings and parents together seem to cause reprint of subject
     // - resulting ids are q-code only not full path
 
-    let hierarchies: IMediaHierarchy[] = [];
-    let object_array = entity.physicalObjs.map(d => d['id']);
-    let process_hierarchies: IMediaHierarchy[][] = await Promise.all(
+    const object_array = entity.physicalObjs.map(d => d['id']);
+    const process_hierarchies: IMediaHierarchy[][] = await Promise.all(
       object_array.map(d => this.fetchHierarchy(d)),
     );
-    if (process_hierarchies.length > 1) {
-      hierarchies = process_hierarchies.flat();
-    }
 
-    return { itemId: id, claims: claims, hierarchies };
+    return { itemId: id, claims: claims, hierarchies: process_hierarchies.flat() };
   }
 
   public async fetchHierarchy(id: string): Promise<IMediaHierarchy[]> {
     console.log('fetching hierarchy for ' + id);
 
-    const query = `
-    SELECT ?type ?item ?itemLabel WHERE {
-      {
-        tib:${id} tibt:${WBPredicates.isPartOf}* ?item.
-        BIND("parent" AS ?type)
-      } UNION {
-        tib:${id} tibt:${WBPredicates.isPartOf} ?parent.
-        ?item tibt:${WBPredicates.isPartOf} ?parent.
-        BIND("sibling" AS ?type)
+    const spark = getHierarchySpark(id);
+    const results = (await this.wikibase_read<HierarchiesResponseItem>(spark)) ?? [];
+
+    const parents: IWikibaseItem[] = [];
+    const siblings: IWikibaseItem[] = [];
+
+    for (const item of results) {
+      const wikibaseItem = {
+        id: item['item']['value'],
+        label: { en: item['item']['label'] },
+        type: item['type'],
+      };
+      if (wikibaseItem.type === 'parent') {
+        parents.push(wikibaseItem);
+      } else if (wikibaseItem.type === 'sibling') {
+        siblings.push(wikibaseItem);
       }
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
     }
-    `;
 
-    const results = await this.wikibase_read(query);
-    if (!results) return [];
-
-    const hierarchy = results.reduce(
-      (acc: { parents: IWikibaseItem[]; siblings: IWikibaseItem[] }, d: any) => {
-        d['id'] = d['item']['value'];
-        d['label'] = { en: d['item']['label'] };
-        delete d['item'];
-        if (d.type === 'parent') {
-          acc.parents.push(d);
-        } else if (d.type === 'sibling') {
-          acc.siblings.push(d);
-        }
-        return acc;
-      },
-      { parents: [], siblings: [] },
-    );
-
-    hierarchy.parents.reverse();
-    return [hierarchy];
+    return [{ parents: parents.reverse(), siblings: siblings }];
   }
 
   public async fetchMetadataChoices(): Promise<IMetadataChoices | undefined> {
     log('Fetching metadata choices from Wikibase');
-
-    let result: any = {};
-    result.persons = await this.wikibase_class_instances([WBClasses.human, WBClasses.organisation]);
-    result.techniques = await this.wikibase_class_instances([WBClasses.technique]);
-    result.software = await this.wikibase_class_instances([WBClasses.software]);
-    result.roles = await this.wikibase_class_instances([WBClasses.role]);
-    result.bibliographic_refs = await this.wikibase_class_instances([WBClasses.bibliographicRef]);
-
     // // TODO this needs to be rethought as there will be "physical objects" which are not buildings.
     // // building ensemble will always be subclass of human-made object, although a room is not a "subclass of" a building!
     // // we could test a recursive "subclass of" or "has part" (tibt:P5*/tibt:P2*) and see how that performs
@@ -342,10 +396,20 @@ export class WikibaseService {
     // result.physical_objs = await this.wikibase_class_instances(building_class_ids);
 
     // updated to pull all instances of humanMadeObject directly.
-
-    result.physical_objs = await this.wikibase_class_instances([WBClasses.humanMadeObject]);
-
-    return result as IMetadataChoices;
+    try {
+      const result = {
+        persons: await this.wikibase_class_instances([WBClasses.human, WBClasses.organisation]),
+        techniques: await this.wikibase_class_instances([WBClasses.technique]),
+        software: await this.wikibase_class_instances([WBClasses.software]),
+        roles: await this.wikibase_class_instances([WBClasses.role]),
+        bibliographic_refs: await this.wikibase_class_instances([WBClasses.bibliographicRef]),
+        physical_objs: await this.wikibase_class_instances([WBClasses.humanMadeObject]),
+      } satisfies IMetadataChoices;
+      return result;
+    } catch (error) {
+      err('Error fetching metadata choices from Wikibase', error);
+      return undefined;
+    }
   }
 
   public async fetchAnnotationLinkChoices(): Promise<IAnnotationLinkChoices | undefined> {
@@ -353,51 +417,48 @@ export class WikibaseService {
       return undefined;
     }
 
-    let result: any = {};
-    result.relatedAgents = await this.wikibase_class_instances([WBClasses.human]);
-    result.relatedMedia = await this.wikibase_class_instances([WBClasses.media]);
-    result.relatedConcepts = await this.wikibase_class_instances([WBClasses.iconographicConcept]);
-    result.licenses = await this.wikibase_class_instances([WBClasses.license]);
-    log(
-      `Fetched ${result.relatedAgents.length} related agents, ${result.relatedMedia.length} related media, ${result.relatedConcepts.length} related concepts, and ${result.licenses.length} licenses from Wikibase`,
-    );
-    //log(result);
-    return result as IAnnotationLinkChoices;
+    try {
+      const result = {
+        relatedAgents: await this.wikibase_class_instances([WBClasses.human]),
+        relatedMedia: await this.wikibase_class_instances([WBClasses.media]),
+        relatedConcepts: await this.wikibase_class_instances([WBClasses.iconographicConcept]),
+        licenses: await this.wikibase_class_instances([WBClasses.license]),
+      } satisfies IAnnotationLinkChoices;
+      log(
+        `Fetched ${result.relatedAgents.length} related agents, ${result.relatedMedia.length} related media, ${result.relatedConcepts.length} related concepts, and ${result.licenses.length} licenses from Wikibase`,
+      );
+      return result;
+    } catch (error) {
+      err('Error fetching annotation link choices from Wikibase', error);
+      return undefined;
+    }
   }
 
   public async removeWikibaseItem(id: string) {
     this.wbEdit.entity.delete({ id: id });
   }
 
-  private async wikibase_read(spark: string) {
-    console.log(spark);
-    const prefixedSpark = ['PREFIX tibt: <https://wikibase.semantic-kompakkt.de/prop/direct/>', 'PREFIX tib: <https://wikibase.semantic-kompakkt.de/entity/>', spark].join('\n');
-    const query = this.wbSDK.sparqlQuery(prefixedSpark);
+  public async wikibase_read<T extends unknown>(spark: string): Promise<T[] | undefined> {
+    const query = this.wbSDK.sparqlQuery(spark);
+    // info('wikibase_read wikibase-sdk sparqlQuery', query);
 
     const result = await get(query, {}).catch(error => {
       console.log('wikibase_read', error.message, error.config?.url);
       return undefined;
     });
-    console.log(result);
+    // info('wikibase_read result', Bun.inspect(result));
 
     if (!result) return undefined;
     //const result = await this.wbConnect.requestSDKquery(query);
-    const simple = this.wbSDK.simplify.sparqlResults(result.data);
-    return simple;
+    const simple = this.wbSDK.simplify.sparqlResults(result);
+    // info('wikibase_read simplified result', Bun.inspect(simple));
+    return simple as T[];
   }
 
   private async wikibase_class_instances(class_array: string[]) {
-    const class_string: string = 'tib:' + class_array.join(' tib:');
+    const spark = getWikibaseClassInstancesSpark(class_array);
 
-    const spark = `select DISTINCT ?id ?label_en ?description ?media where { 
-        values ?class {${class_string}} 
-        ?id tibt:${WBPredicates.instance_of} ?class. 
-        ?id rdfs:label ?label_en filter (lang(?label_en) = "en"). 
-        optional { ?id schema:description ?description filter (lang(?description) = "en")}.
-        optional { ?id tibt:${WBPredicates.image} ?media. }
-      }`;
-
-    const class_items = await this.wikibase_read(spark);
+    const class_items = await this.wikibase_read<IWikibaseItem>(spark);
     if (!class_items) return [];
 
     // if thumb is defined we should convert it to a wikimedia special:Filepath Link, so it can resolve properly
@@ -415,23 +476,8 @@ export class WikibaseService {
   }
 
   private async wikibase_class_and_subclass_instances(class_array: string[]) {
-    const class_string: string = 'tib:' + class_array.join(' tib:');
-    const class_items = await this.wikibase_read(
-      `select ?id ?label_en ?desc ?media where { 
-      values ?class {${class_string}} 
-      {
-        ?id tibt:${WBPredicates.instance_of} ?class.
-      }
-      UNION
-      {
-        ?subclass tibt:${WBPredicates.subclass_of} ?class.
-        ?id tibt:${WBPredicates.instance_of} ?subclass.
-      }
-      ?id rdfs:label ?label_en filter (lang(?label_en) = "en"). 
-      optional { ?id schema:description ?desc filter (lang(?desc) = "en")}.
-      optional { ?media tibt:${WBPredicates.image} ?media. }
-    }`,
-    );
+    const spark = getWikibaseClassAndSubclassSpark(class_array);
+    const class_items = await this.wikibase_read<IWikibaseItem>(spark);
 
     if (!class_items) return [];
 
@@ -452,133 +498,91 @@ export class WikibaseService {
     await this.wbConnect.writeImage(id, image);
   }
 
-  public async fetchAnnotation(wikibase_id: string): Promise<WikibaseAnnotation | undefined> {
+  public async fetchAnnotation(
+    wikibase_id: string,
+  ): Promise<IWikibaseAnnotationExtensionData | undefined> {
     console.log('fetching annotation', wikibase_id);
-    const annotation = await this.wikibase_read(
-      `SELECT
-      ?label ?desc ?dateCreated ?dateModified ?val ?rank ?motiv ?camType
-      ?cx ?cy ?cz
-      ?ctx ?cty ?ctz
-      ?sx ?sy ?sz
-      ?snx ?sny ?snz
-      ?target
-      ?concept ?conceptLabel
-      ?media ?mediaLabel
-      ?mediaURL ?relMediaThumb ?fileView
-      ?descAgent ?descAgentLabel
-      ?descLicense ?descLicenseLabel
-      WHERE {
-        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-        tib:${wikibase_id} schema:description ?desc .
-        tib:${wikibase_id} tibt:${WBPredicates.annotationVerified} ?val .
-        tib:${wikibase_id} tibt:${WBPredicates.annotationRanking} ?rank .
-        tib:${wikibase_id} tibt:${WBPredicates.annotationMotivation} ?motiv .
-        tib:${wikibase_id} tibt:${WBPredicates.cameraType} ?camType .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectivePositionX} ?cx .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectivePositionY} ?cy .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectivePositionZ} ?cz .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectiveTargetX} ?ctx .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectiveTargetY} ?cty .
-        tib:${wikibase_id} tibt:${WBPredicates.perspectiveTargetZ} ?ctz .
-        tib:${wikibase_id} tibt:${WBPredicates.targetEntity} ?target .
-        OPTIONAL { 
-          tib:${wikibase_id} tibt:${WBPredicates.selectorNormalX} ?sx . 
-          tib:${wikibase_id} tibt:${WBPredicates.selectorNormalY} ?sy . 
-          tib:${wikibase_id} tibt:${WBPredicates.selectorNormalZ} ?sz . 
-        }
-        OPTIONAL {
-          tib:${wikibase_id} tibt:${WBPredicates.selectorPositionX} ?snx .
-          tib:${wikibase_id} tibt:${WBPredicates.selectorPositionY} ?sny .
-          tib:${wikibase_id} tibt:${WBPredicates.selectorPositionZ} ?snz . 
-        }
-        OPTIONAL {
-            tib:${wikibase_id} tibp:${WBPredicates.annotationDescriptionLink} [tibps:${WBPredicates.annotationDescriptionLink} ?descAgentItem; tibpq:${WBPredicates.rightsOwner} ?descAgent] .
-        }
-        OPTIONAL {
-            tib:${wikibase_id} tibp:${WBPredicates.annotationDescriptionLink} [tibps:${WBPredicates.annotationDescriptionLink} ?descLicenseItem; tibpq:${WBPredicates.license} ?descLicense]
-        }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.dateCreated} ?dateCreated .  }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.annotationRelatedConcepts} ?concept }
-        OPTIONAL {
-            tib:${wikibase_id} tibt:${WBPredicates.annotationRelatedMedia} ?media .
-            ?media tibt:${WBPredicates.entityLink} ?fileView.
-            ?media tibt:${WBPredicates.image} ?relMediaThumb.
-        }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.externalLink} ?mediaURL }
-        OPTIONAL { tib:${wikibase_id} rdfs:label ?label } 
-      }`,
-    );
 
-    const processedMetadata = this.processRawMetadata(annotation);
-    if (processedMetadata && Object.keys(processedMetadata).length > 0) {
-      let annotation = processedMetadata;
+    const spark = getAnnotationMetadataSpark(wikibase_id);
+    const simplifiedAnnotation = await this.wikibase_read<AnnotationResponseItem>(spark);
 
-      const descriptionAuthors: IWikibaseItem[] = [];
-      const descriptionLicenses: IWikibaseItem[] = [];
-      const relatedMedia: IWikibaseItem[] = this.processWikibaseItems(processedMetadata, 'media');
-
-      //because SPARQL is weird, we have to concat the media related stuff here (and with the processedMetadata)
-      for (let i = 0; i < relatedMedia.length; i++) {
-        relatedMedia[i].media = this.getPreviewImage(relatedMedia[i].id);
-        relatedMedia[i].internalID =
-          /* fist check if processedMetadata.filView is array or just string */ processedMetadata.fileView
-            ? processedMetadata.fileView
-            : processedMetadata.fileView[i];
-      }
-
-      if (annotation.desc.agent) {
-        descriptionAuthors.push({
-          id: getQNumberFromURL(annotation.desc.agent),
-          label: { en: annotation.desc.agentLabel },
-        });
-      }
-      if (annotation.desc.license) {
-        descriptionLicenses.push({
-          id: getQNumberFromURL(annotation.desc.license),
-          label: { en: annotation.desc.licenseLabel },
-        });
-      }
-
-      const annotationData: WikibaseAnnotation = {
-        id: wikibase_id,
-        label: { en: annotation.label },
-        description: annotation.desc.value,
-        created: annotation.dateCreated,
-        lastModificationDate: annotation.dateModified,
-        validated: annotation.val,
-        ranking: annotation.rank,
-        motivation: annotation.motiv,
-        cameraType: annotation.camType,
-        cameraPosition: {
-          x: parseFloat(annotation.cx),
-          y: parseFloat(annotation.cy),
-          z: parseFloat(annotation.cz),
-        },
-        cameraTarget: {
-          x: parseFloat(annotation.ctx),
-          y: parseFloat(annotation.cty),
-          z: parseFloat(annotation.ctz),
-        },
-        selectorNormal: {
-          x: parseFloat(annotation.sx),
-          y: parseFloat(annotation.sy),
-          z: parseFloat(annotation.sz),
-        },
-        targetMetadata: annotation.target,
-        descriptionAuthors: descriptionAuthors,
-        descriptionLicenses: descriptionLicenses,
-        relatedMedia: relatedMedia,
-        selectorPoint: {
-          x: parseFloat(annotation.snx),
-          y: parseFloat(annotation.sny),
-          z: parseFloat(annotation.snz),
-        },
-        relatedEntities: this.processWikibaseItems(processedMetadata, 'concept'),
-        relatedMediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL'),
-      };
-      return annotationData;
+    if (!simplifiedAnnotation) {
+      err('Annotation not found', wikibase_id, spark);
+      return undefined;
     }
-    return undefined;
+
+    const processedMetadata = this.processRawMetadata(simplifiedAnnotation);
+    if (Object.keys(processedMetadata).length <= 0) {
+      err('Annotation data empty', wikibase_id, simplifiedAnnotation, spark);
+      return undefined;
+    }
+
+    let annotation = processedMetadata as any;
+
+    const descriptionAuthors: IWikibaseItem[] = [];
+    const descriptionLicenses: IWikibaseItem[] = [];
+    const relatedMedia = this.processWikibaseItems(annotation, 'media') as IWikibaseItem[];
+
+    //because SPARQL is weird, we have to concat the media related stuff here (and with the annotation)
+    for (let i = 0; i < relatedMedia.length; i++) {
+      relatedMedia[i].media = this.getPreviewImage(relatedMedia[i].id);
+      // TODO: fist check if annotation.filView is array or just string
+      relatedMedia[i].internalID = Array.isArray(annotation.fileView)
+        ? annotation.fileView
+        : annotation.fileView[i];
+    }
+
+    if (annotation.desc.agent) {
+      descriptionAuthors.push({
+        id: getQNumberFromURL(annotation.desc.agent),
+        label: { en: annotation.desc.agentLabel },
+      });
+    }
+    if (annotation.desc.license) {
+      descriptionLicenses.push({
+        id: getQNumberFromURL(annotation.desc.license),
+        label: { en: annotation.desc.licenseLabel },
+      });
+    }
+
+    const annotationData: IWikibaseAnnotationExtensionData = {
+      id: wikibase_id,
+      label: { en: annotation.label },
+      description: annotation.desc.value,
+      created: annotation.dateCreated,
+      lastModificationDate: annotation.dateModified,
+      validated: annotation.val,
+      ranking: annotation.rank,
+      motivation: annotation.motiv,
+      cameraType: annotation.camType,
+      cameraPosition: {
+        x: parseFloat(annotation.cx),
+        y: parseFloat(annotation.cy),
+        z: parseFloat(annotation.cz),
+      },
+      cameraTarget: {
+        x: parseFloat(annotation.ctx),
+        y: parseFloat(annotation.cty),
+        z: parseFloat(annotation.ctz),
+      },
+      selectorNormal: {
+        x: parseFloat(annotation.sx),
+        y: parseFloat(annotation.sy),
+        z: parseFloat(annotation.sz),
+      },
+      targetMetadata: annotation.target,
+      descriptionAuthors: descriptionAuthors,
+      descriptionLicenses: descriptionLicenses,
+      relatedMedia: relatedMedia,
+      selectorPoint: {
+        x: parseFloat(annotation.snx),
+        y: parseFloat(annotation.sny),
+        z: parseFloat(annotation.snz),
+      },
+      relatedEntities: this.processWikibaseItems(processedMetadata, 'concept') as IWikibaseItem[],
+      relatedMediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL') as string[],
+    };
+    return annotationData;
   }
 
   getPreviewImage(id: string): string | undefined {
@@ -589,68 +593,39 @@ export class WikibaseService {
     return `${WikibaseConfiguration?.Domain}/wiki/Special:Filepath/Preview${id}.png`;
   }
 
-  public async fetchWikibaseMetadata(wikibase_id: any): Promise<WikibaseDigitalEntity | undefined> {
+  public async fetchWikibaseMetadata(
+    wikibase_id: any,
+  ): Promise<IWikibaseDigitalEntityExtensionData | undefined> {
     log('Fetching metadata from Wikibase for ' + wikibase_id);
 
-    const sparql = `SELECT 
-      ?desc 
-      ?label 
-      ?licence ?licenceLabel
-      ?date 
-      ?techniques ?techniquesLabel
-      ?software ?softwareLabel
-      ?equipment ?equipmentLabel
-      ?externalLinks 
-      ?bibliographicRefs ?bibliographicRefsLabel
-      ?physicalObjs ?physicalObjsLabel
-      ?rightsOwner ?rightsOwnerLabel
-      ?dataCreator ?dataCreatorLabel
-      ?creator ?creatorLabel
-      ?editor ?editorLabel
-      ?contactperson ?contactpersonLabel
-      WHERE {
-        tib:${wikibase_id} schema:description ?desc .
-        tib:${wikibase_id} tibt:${WBPredicates.license} ?licence .
-        OPTIONAL { tib:${wikibase_id} rdfs:label ?label }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.dateCreated} ?date }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.technique} ?techniques }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.software} ?software }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.equipment} ?equipment }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.externalLink} ?externalLinks }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.bibliographicRef} ?bibliographicRefs }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.objectOfRepresentation} ?physicalObjs }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.instance_of} ?hierarchies }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.rightsOwner} ?rightsOwner }
-        OPTIONAL { tib:${wikibase_id} tibt:${WBPredicates.contactPerson} ?contactperson }
-        OPTIONAL { tib:${wikibase_id} tibp:${WBPredicates.hasEvent} ?statement1.
-				            ?statement1 tibps:${WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
-							      tibpq:${WBPredicates.carriedOutBy} ?dataCreator. }
-        OPTIONAL { tib:${wikibase_id} tibp:${WBPredicates.hasEvent} ?statement2.
-				            ?statement2 tibps:${WBPredicates.hasEvent} tib:${WBClasses.creation} ;
-							      tibpq:${WBPredicates.carriedOutBy} ?creator. }
-        OPTIONAL { tib:${wikibase_id} tibp:${WBPredicates.hasEvent} ?statement3.
-				            ?statement3 tibps:${WBPredicates.hasEvent} tib:${WBClasses.modification} ;
-							      tibpq:${WBPredicates.carriedOutBy} ?editor. }
-        SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
-      }`;
-    //console.log(sparql)
-    const metadata = await this.wikibase_read(sparql);
-
-    const processedMetadata = this.processRawMetadata(metadata);
-
-    if (processedMetadata.length == 0) {
+    const spark = getDigitalEntityMetadataSpark(wikibase_id);
+    const metadata = await this.wikibase_read<MetadataResponseItem>(spark);
+    if (!metadata) {
       console.log('no metadata found');
       return undefined;
     }
+
+    const processedMetadata = this.processRawMetadata(metadata);
+    if (Object.keys(processedMetadata).length <= 0) {
+      console.log('no metadata found');
+      return undefined;
+    }
+
     const licence = new WikibaseID(
       processedMetadata['licence'] ? processedMetadata['licence']['value'] : '',
     ).numericID;
-    const digitalEntity: WikibaseDigitalEntity = {
+    const digitalEntity = {
       id: wikibase_id,
-      description: this.processWikibaseItems(processedMetadata, 'desc'),
-      label: { en: this.processWikibaseItems(processedMetadata, 'label') },
+      description: this.processWikibaseItems(processedMetadata, 'desc')
+        .map(item => (typeof item === 'string' ? item : item.label.en))
+        .join('.\n'),
+      label: {
+        en: this.processWikibaseItems(processedMetadata, 'label')
+          .map(item => (typeof item === 'string' ? item : item.label.en))
+          .join('.\n'),
+      },
       licence: licence ?? '',
-      creationDate: this.processWikibaseItems(processedMetadata, 'date'),
+      creationDate: this.processWikibaseItems(processedMetadata, 'date').at(0),
       agents: this.getAgentsFromMetadata(processedMetadata),
       techniques: this.processWikibaseItems(processedMetadata, 'techniques'),
       software: this.processWikibaseItems(processedMetadata, 'software'),
@@ -661,106 +636,103 @@ export class WikibaseService {
       hierarchies: processedMetadata['physicalObjs']
         ? await this.fetchHierarchy(processedMetadata['physicalObjs']['value'] as string)
         : [],
-    };
+    } satisfies IWikibaseDigitalEntityExtensionData;
 
     return digitalEntity;
   }
 
-  private processWikibaseItems(metadata: unknown, key: string) {
-    const items: IWikibaseItem[] = [];
-    const strings: string[] = [];
+  public processWikibaseItems(
+    metadata: ProcessedMetadata,
+    key: string,
+  ): Array<IWikibaseItem | string> {
+    const value = metadata?.[key];
+    if (!value) return [];
 
-    if (metadata?.[key]) {
-      if (Array.isArray(metadata[key])) {
-        const mappedItems = metadata[key].map((item: any) => ({
-          id: item.value,
-          label: { en: item.label },
-        }));
-        items.push(...mappedItems);
-      } else if (typeof metadata[key] === 'object') {
-        items.push({
-          id: metadata[key].value,
-          label: { en: metadata[key].label },
-        });
-      } else if (metadata?.[key] && typeof metadata[key] === 'string') {
-        strings.push(metadata[key].toString());
+    const items: Array<IWikibaseItem | string> = [];
+
+    if (Array.isArray(value)) {
+      const mappedItems = value.map(item => {
+        return isValueLabelItem(item)
+          ? { id: item.value, label: { en: item.label } }
+          : item.toString();
+      });
+      items.push(...mappedItems);
+    } else if (typeof value === 'string' || typeof value === 'number') {
+      items.push(value.toString());
+    } else if (typeof value === 'object' && isValueLabelItem(value)) {
+      items.push({
+        id: value.value,
+        label: { en: value.label },
+      });
+    }
+
+    return items;
+  }
+
+  public processRawMetadata(rawMetadata: RawMetadata) {
+    const processed: ProcessedMetadata = {};
+
+    const equals = (a: MetadataField, b: MetadataField) => {
+      if (
+        (typeof a === 'string' && typeof b === 'string') ||
+        (typeof a === 'number' && typeof b === 'number')
+      ) {
+        return a === b;
+      } else if ((isValueLabelItem(a) && isValueLabelItem(b)) || (isDescItem(a) && isDescItem(b))) {
+        return a.value === b.value;
+      }
+      return false;
+    };
+
+    for (const item of rawMetadata) {
+      for (const key of Object.keys(item)) {
+        const value = item[key];
+        // If the key is not in acc, initialize it
+        if (!processed[key]) processed[key] = value;
+
+        if (Array.isArray(processed[key])) {
+          // Check if the value already exists in the array
+          const valueExists = processed[key].some(item => equals(item, value));
+          // If the value doesn't exist, add it to the array
+          if (!valueExists) processed[key].push(value);
+        } else if (!equals(processed[key], value)) {
+          // If the value is different, convert it into an array and add the new value
+          processed[key] = [processed[key], value];
+        }
       }
     }
 
-    /* return either an array of items or an array of strings */
-    return items.length > 0 ? items : strings;
+    return processed;
   }
 
-  private processRawMetadata(rawMetadata: object[]) {
-    return rawMetadata.reduce((processedMetadata, row) => {
-      (Object.keys(row) as (keyof typeof row)[]).forEach(key => {
-        // If the key is not in processedMetadata, initialize it
-        if (!processedMetadata[key]) {
-          processedMetadata[key] = row[key];
-        } else {
-          // If the value is an object, not an array or a string, check if the current value is different
-          if (
-            (!Array.isArray(processedMetadata[key]) &&
-              typeof processedMetadata[key] !== 'string' &&
-              processedMetadata[key].value !== row[key].value) ||
-            (typeof processedMetadata[key] === 'string' && processedMetadata[key] !== row[key])
-          ) {
-            // If the value is different, convert it into an array and add the new value
-            processedMetadata[key] = [processedMetadata[key], row[key]];
-          } else if (Array.isArray(processedMetadata[key])) {
-            // Check if the value already exists in the array
-            const valueExists = processedMetadata[key].some((item: any) =>
-              typeof item === 'string' ? item === row[key] : item.value === row[key].value,
-            );
-            // If the value doesn't exist, add it to the array
-            if (!valueExists) {
-              processedMetadata[key].push(row[key]);
-            }
-          }
-        }
-      });
-      return processedMetadata;
-    }, {});
-  }
-
-  private getAgentsFromMetadata(metadata: any): IMediaAgent[] {
+  public getAgentsFromMetadata(metadata: ProcessedMetadata): IMediaAgent[] {
     const agents: IMediaAgent[] = [];
 
     // Check if metadata is empty
-    if (metadata.length === 0) {
+    if (Object.keys(metadata).length <= 0) {
       return agents;
     }
 
-    const addAgents = (metadata: any, roleTitle: string, roleKey: string, roleId: number) => {
-      if (Array.isArray(metadata?.[roleKey])) {
-        const agentsForRole = metadata[roleKey].map((agent: any) => ({
+    const addAgents = (roleTitle: string, roleKey: string, roleId: number) => {
+      const value = metadata?.[roleKey];
+      if (!value) return;
+      const arr = Array.isArray(value) ? value : [value];
+      const agentsForRole = arr
+        .filter((agent): agent is ValueLabelItem => isValueLabelItem(agent))
+        .map(agent => ({
           id: agent.value,
           label: { en: agent.label },
           role: roleId,
           roleTitle,
         }));
-        agents.push(...agentsForRole);
-      } else if (metadata?.[roleKey]) {
-        const agent = metadata[roleKey];
-        agents.push({
-          id: agent.value,
-          label: { en: agent.label },
-          role: roleId,
-          roleTitle,
-        });
-      }
+      agents.push(...agentsForRole);
     };
 
-    addAgents(metadata, 'Rightsowner', 'rightsOwner', getIDfromWBEntity(WBValues.roleRightsOwner));
-    addAgents(metadata, 'Data Creator', 'dataCreator', getIDfromWBEntity(WBValues.roleDataCreator));
-    addAgents(metadata, 'Creator', 'creator', getIDfromWBEntity(WBValues.roleCreator));
-    addAgents(metadata, 'Editor', 'editor', getIDfromWBEntity(WBValues.roleEditor));
-    addAgents(
-      metadata,
-      'Contact Person',
-      'contactperson',
-      getIDfromWBEntity(WBValues.roleContactPerson),
-    );
+    addAgents('Rightsowner', 'rightsOwner', getIDfromWBEntity(WBValues.roleRightsOwner));
+    addAgents('Data Creator', 'dataCreator', getIDfromWBEntity(WBValues.roleDataCreator));
+    addAgents('Creator', 'creator', getIDfromWBEntity(WBValues.roleCreator));
+    addAgents('Editor', 'editor', getIDfromWBEntity(WBValues.roleEditor));
+    addAgents('Contact Person', 'contactperson', getIDfromWBEntity(WBValues.roleContactPerson));
 
     return agents;
   }

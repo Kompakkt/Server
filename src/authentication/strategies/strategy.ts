@@ -1,8 +1,7 @@
-import { type Result } from '@thames/monads';
 import { type IUserData } from 'src/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
-export type AuthResult = Result<ServerDocument<IUserData>, string>;
+export type AuthResult = ServerDocument<IUserData> | Error;
 
 export type AuthWithUsernamePassword = {
   username: string;

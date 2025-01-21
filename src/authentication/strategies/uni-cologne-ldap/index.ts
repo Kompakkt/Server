@@ -1,12 +1,12 @@
-import { Err, Ok } from '@thames/monads';
 import { type IUserData, UserRank } from 'src/common';
 import {
   AuthenticationStrategy,
   type AuthResult,
   type AuthWithUsernamePassword,
 } from '../strategy';
-import { log } from 'src/logger';
+import { err, log } from 'src/logger';
 import { userCollection } from 'src/mongo';
+import { ObjectId } from 'mongodb';
 
 export type UniCologneLDAPResponse = {
   objectClass: string[];
@@ -22,7 +22,10 @@ export type UniCologneLDAPResponse = {
   dn: string;
 };
 
-const sendLDAPSearchRequest = (username: string, password: string) => {
+const sendLDAPSearchRequest = async (
+  username: string,
+  password: string,
+): Promise<UniCologneLDAPResponse | Error> => {
   return Bun.fetch(`localhost:3000/search`, {
     method: 'POST',
     headers: {
@@ -38,28 +41,27 @@ const sendLDAPSearchRequest = (username: string, password: string) => {
   })
     .then(res => res.json())
     .then(res => res as UniCologneLDAPResponse)
-    .catch(() => undefined);
+    .catch(err => new Error(err.toString()));
 };
 
 export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
   strategyName: string = 'UniCologneLDAPStrategy';
 
   async isAvailable(): Promise<boolean> {
-    return sendLDAPSearchRequest('test', 'test')
-      .then(result => result !== undefined)
-      .catch(() => false);
+    const result = await sendLDAPSearchRequest('test', 'test');
+    return result instanceof Error || !result ? false : true;
   }
 
   async authenticate(authObj: AuthWithUsernamePassword): Promise<AuthResult> {
     const result = await sendLDAPSearchRequest(authObj.username, authObj.password);
-    if (!result) {
-      return Err('Failed to authenticate');
+    if (result instanceof Error) {
+      return new Error('Failed to authenticate');
     }
 
     // If the fields are not returned, this likely means that the user does not exist or the password is wrong
     const { uid: username, givenName: prename, sn: surname, mail } = result;
     if (!prename || !surname || !mail || !username) {
-      return Err('Invalid username or password');
+      return new Error('Invalid username or password');
     }
 
     const user: Omit<Omit<IUserData, 'sessionID'>, '_id'> & { strategy: string } = {
@@ -77,11 +79,25 @@ export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsern
 
     const resolvedUser = await userCollection.findOne({ username, mail });
     if (!resolvedUser) {
-      // TODO
-      // await userCollection.insertOne(user);
-      return Err('Failed to authenticate');
+      log(`${user.fullname} is not registered yet. Creating new account...`);
+
+      const insertResult = await userCollection.insertOne({
+        ...user,
+        _id: new ObjectId(),
+      });
+      if (!insertResult.acknowledged) {
+        return new Error('Failed to authenticate');
+      }
+
+      const insertedUser = await userCollection.findOne({ _id: insertResult.insertedId });
+      if (!insertedUser) {
+        return new Error('Failed to authenticate');
+      }
+
+      return insertedUser;
     }
 
-    return Ok(resolvedUser);
+    log(`Logging in existing LDAP account ${user.fullname}`);
+    return resolvedUser;
   }
 }

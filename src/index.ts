@@ -1,11 +1,15 @@
 import './util/patch-structured-clone';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
-import { info } from './logger';
+import { err, info } from './logger';
 import finalServer from './server.final';
 import { initializePlugins } from './plugins';
 import Elysia from 'elysia';
+import { ensureMd5Checksums } from './jobs/ensure-md5-checksums';
 
-await Promise.allSettled([ensureUploadStructure()]);
+const jobs = [ensureUploadStructure, ensureMd5Checksums] as const;
+for (const job of jobs) {
+  await job().catch(err);
+}
 
 const pluginRoutes = await initializePlugins();
 

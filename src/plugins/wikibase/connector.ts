@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { Configuration } from 'src/configuration';
-import { err, log } from 'src/logger';
+import { err, info, log } from 'src/logger';
 import { RequestClient } from 'src/util/requests';
 import { RootDirectory } from '../../environment';
 
