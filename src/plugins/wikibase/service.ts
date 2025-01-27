@@ -114,10 +114,14 @@ export class WikibaseService {
   wbSDK: ReturnType<typeof WBK>;
 
   constructor() {
-    const instance = 'http://wb.local';
-    const username = WikibaseConfiguration?.AdminUsername ?? '';
-    const password = WikibaseConfiguration?.AdminPassword ?? '';
+    const instance = WikibaseConfiguration?.Domain;
+    const username = WikibaseConfiguration?.AdminUsername;
+    const password = WikibaseConfiguration?.AdminPassword;
     const sparqlEndpoint = WikibaseConfiguration?.SPARQLEndpoint;
+
+    if (!instance || !username || !password || !sparqlEndpoint) {
+      throw new Error('Wikibase configuration not found');
+    }
 
     this.wbConnect = new WikibaseConnector(instance, { username, password });
     this.wbEdit = WBEdit({ instance, credentials: { username, password } });

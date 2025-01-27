@@ -3,6 +3,7 @@ import Elysia from 'elysia';
 import { mongoClient } from 'src/mongo';
 import configServer from 'src/server.config';
 import { WikibaseService } from './service';
+import { WikibaseConfiguration } from './config';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)
@@ -12,6 +13,11 @@ const wikibaseRouter = new Elysia()
   })
   .get('/wikibase/choices/annotation-link', async ({ wikibaseService }) => {
     return wikibaseService.fetchAnnotationLinkChoices();
+  })
+  .get('/wikibase/instance/info', async () => {
+    return {
+      instance: WikibaseConfiguration.Domain,
+    };
   })
   .post(
     '/admin/generateWikiSecret',
