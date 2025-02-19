@@ -1,5 +1,5 @@
-import { createHmac, randomBytes, type BinaryLike } from 'node:crypto';
-import { passwordCollection, type PasswordDocument } from 'src/mongo';
+import { type BinaryLike, createHmac, randomBytes } from 'node:crypto';
+import { type PasswordDocument, passwordCollection } from 'src/mongo';
 
 const generateSalt = (length = 16) => {
   // tslint:disable-next-line
@@ -26,15 +26,11 @@ export const verifyPassword = async (
   return newHash === hash;
 };
 
-export const updateUserPassword = async (
-  username: string,
-  password: string,
-) => {
-  const result = await passwordCollection
-    .updateOne(
-      { username },
-      { $set: { username, password: saltHashPassword(password) } },
-      { upsert: true },
-    );
+export const updateUserPassword = async (username: string, password: string) => {
+  const result = await passwordCollection.updateOne(
+    { username },
+    { $set: { username, password: saltHashPassword(password) } },
+    { upsert: true },
+  );
   return result.modifiedCount + result.upsertedCount > 0;
 };

@@ -1,7 +1,7 @@
 declare module 'wikibase-edit' {
   export interface WikibaseError extends Error {
     statusCode: number;
-    context?: any;
+    context?: unknown;
     body?: {
       error: {
         code: string;
@@ -31,7 +31,7 @@ declare module 'wikibase-edit' {
   interface DataValue {
     datavalue?: {
       type: string;
-      value: any;
+      value: unknown;
     };
   }
 
@@ -75,20 +75,20 @@ declare module 'wikibase-edit' {
 
   export interface QualifierData {
     property: string;
-    value: any;
+    value: unknown;
     hash?: string;
   }
 
   export interface ReferenceData {
     hash?: string;
-    snaks: Record<string, any[]>;
+    snaks: Record<string, unknown[]>;
   }
 
   export interface ClaimData {
     id?: string;
     type?: string;
     rank?: 'normal' | 'preferred' | 'deprecated';
-    value?: any;
+    value?: unknown;
     qualifiers?: Record<string, QualifierData[]>;
     references?: ReferenceData[];
     remove?: boolean;
@@ -159,18 +159,18 @@ declare module 'wikibase-edit' {
       create: (params: {
         id: string;
         property: string;
-        value: any;
-        qualifiers?: Record<string, any[]>;
+        value: unknown;
+        qualifiers?: Record<string, unknown[]>;
         references?: ReferenceData[];
       }) => Promise<ClaimResponse>;
       remove: (
-        params: { guid: string } | { id: string; property: string; value: any },
+        params: { guid: string } | { id: string; property: string; value: unknown },
       ) => Promise<SuccessResponse>;
       update: (params: {
         guid: string;
         property: string;
-        oldValue: any;
-        newValue: any;
+        oldValue: unknown;
+        newValue: unknown;
       }) => Promise<ClaimResponse>;
       move: (params: {
         guid?: string;
@@ -184,14 +184,14 @@ declare module 'wikibase-edit' {
         guid: string;
         hash?: string;
         property: string;
-        value: any;
+        value: unknown;
       }) => Promise<ClaimResponse>;
       remove: (params: { guid: string; hash: string | string[] }) => Promise<SuccessResponse>;
       update: (params: {
         guid: string;
         property: string;
-        oldValue: any;
-        newValue: any;
+        oldValue: unknown;
+        newValue: unknown;
       }) => Promise<ClaimResponse>;
       move: (params: {
         guid: string;
@@ -204,7 +204,7 @@ declare module 'wikibase-edit' {
       set: (params: {
         guid: string;
         hash?: string;
-        snaks: Record<string, any[]>;
+        snaks: Record<string, unknown[]>;
       }) => Promise<ClaimResponse>;
       remove: (params: { guid: string; hash: string | string[] }) => Promise<SuccessResponse>;
     };

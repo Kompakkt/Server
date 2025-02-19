@@ -1,5 +1,5 @@
-import { join } from 'path';
-import { inspect } from 'util';
+import { join } from 'node:path';
+import { inspect } from 'node:util';
 import { RootDirectory } from './environment';
 
 const _autosaveInterval = 30000;
@@ -22,13 +22,14 @@ const getDate = () => {
   return now.toISOString();
 };
 
-const prepareContent = (...content: any) => {
+const prepareContent = (...content: unknown[]) => {
   const result = new Array<string>();
   for (const element of content) {
+    if (!element) continue;
     result.push(
       typeof element === 'object'
         ? `${inspect(element, { showHidden: false, depth: undefined })}`
-        : element,
+        : element.toString(),
     );
   }
   return result;
@@ -45,11 +46,11 @@ const outputWriter = outputFile.writer({
 const writeToLog = () => {
   const sizeBefore = Bun.file(path).size;
   let writtenChunks = '';
-  stack.forEach((line: string) => {
+  for (const line of stack) {
     const chunk = `${line}\n`;
     outputWriter.write(chunk);
     writtenChunks += chunk;
-  });
+  }
   outputWriter.flush();
   const written = Bun.file(path).size - sizeBefore;
 
@@ -61,28 +62,28 @@ const writeToLog = () => {
 
 setInterval(() => writeToLog(), _autosaveInterval);
 
-const info = (...content: any) => {
+const info = (...content: unknown[]) => {
   const lines = [`[INFO|${getDate()}]`, ...prepareContent(...content)].join('\n');
   stack.add(lines);
   if (logLevel >= LogLevel.Info) console.log(lines);
   shouldWrite();
 };
 
-const log = (...content: any) => {
+const log = (...content: unknown[]) => {
   const lines = [`[LOG|${getDate()}]`, ...prepareContent(...content)].join('\n');
   stack.add(lines);
   if (logLevel >= LogLevel.Log) console.log(lines);
   shouldWrite();
 };
 
-const warn = (...content: any) => {
+const warn = (...content: unknown[]) => {
   const lines = [`[WARN|${getDate()}]`, ...prepareContent(...content)].join('\n');
   stack.add(lines);
   if (logLevel >= LogLevel.Warn) console.log(lines);
   shouldWrite();
 };
 
-const err = (...content: any) => {
+const err = (...content: unknown[]) => {
   const _stack = new Error().stack;
   const lines = [
     `[ERR|${getDate()}]`,
@@ -92,6 +93,7 @@ const err = (...content: any) => {
   stack.add(lines);
   if (logLevel >= LogLevel.Error) console.log(lines);
   shouldWrite();
+  return false;
 };
 
 process.on('exit', code => {

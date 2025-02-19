@@ -2,10 +2,10 @@ import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import {
   Collection,
+  type IStrippedUserData,
   isAnnotation,
   isInstitution,
   isPerson,
-  type IStrippedUserData,
 } from 'src/common';
 import { isEntitySettings } from 'src/common/typeguards';
 import { err, info, warn } from 'src/logger';
@@ -15,9 +15,9 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { updatePreviewImage } from 'src/util/image-helpers';
 import { authService, signInBody } from './handlers/auth.service';
 import {
+  ExploreRequest,
   exploreCompilations,
   exploreEntities,
-  ExploreRequest,
 } from './modules/api.v1/explore-strategies';
 import {
   findAll,
@@ -42,7 +42,9 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
       ({ params, userdata }) => findSingleHandler(params, userdata),
       { params: findSingleParams },
     )
-    .get('/get/findall/:collection', ({ params }) => findAll(params), { params: findAllParams })
+    .get('/get/findall/:collection', ({ params }) => findAll(params), {
+      params: findAllParams,
+    })
     .get('/get/id', () => new ObjectId())
     .post(
       '/post/explore',
@@ -65,7 +67,9 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier).toString() : identifier;
 
         if (!userdata) return error('Not Found');
-        const user = await userCollection.findOne({ _id: new ObjectId(userdata._id) });
+        const user = await userCollection.findOne({
+          _id: new ObjectId(userdata._id),
+        });
         if (!user) return error('Not Found');
 
         if (user.username !== username) {
@@ -77,7 +81,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         }
 
         // Flatten account.data so its an array of ObjectId.toString()
-        const userEntities = Object.values(user.data).flat().map(e => e?.toString()).filter((e): e is string => !!e);
+        const userEntities = Object.values(user.data)
+          .flat()
+          .map(e => e?.toString())
+          .filter((e): e is string => !!e);
 
         if (!userEntities.includes(_id)) {
           const message = 'Entity removal failed because Entity does not belong to user';
@@ -85,7 +92,9 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           return error(401, message);
         }
 
-        const deleteResult = await collectionMap[collection].deleteOne({ _id: new ObjectId(_id) });
+        const deleteResult = await collectionMap[collection].deleteOne({
+          _id: new ObjectId(_id),
+        });
         if (!deleteResult) {
           const message = `Failed deleting ${collection} ${identifier}`;
           warn(message);
@@ -93,7 +102,11 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         }
 
         // Delete from User
-        const undoResult = await undoUserOwnerOf({ docs: { _id }, collection, userdata });
+        const undoResult = await undoUserOwnerOf({
+          docs: { _id },
+          collection,
+          userdata,
+        });
         if (!undoResult) {
           const message = `Failed removing owner of ${collection} ${identifier}`;
           warn(message);
@@ -138,7 +151,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           async ({ error, params: { collection }, body, userdata }) => {
             if (!body || typeof body !== 'object') return error(400);
             if (!userdata) return error(401);
-            const isDocument = (obj: any): obj is { _id: string } => {
+            const isDocument = (obj: unknown): obj is { _id: string } => {
               return typeof obj === 'object' && obj !== null && '_id' in obj;
             };
             if (!isDocument(body)) return error(400);
@@ -146,8 +159,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             const isValidObjectId = ObjectId.isValid(_id);
             const doesEntityExist = await (async () => {
               if (!isValidObjectId) return false;
-              const result = await collectionMap[collection]?.findOne({ _id: new ObjectId(_id) });
-              return result ? true : false;
+              const result = await collectionMap[collection]?.findOne({
+                _id: new ObjectId(_id),
+              });
+              return !!result;
             })();
 
             /**
@@ -170,13 +185,19 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               if (!isOwner) return error(403);
             }
 
-            const saveResult = await saveHandler({ collection, body, userdata }).catch(error => {
+            const saveResult = await saveHandler({
+              collection,
+              body,
+              userdata,
+            }).catch(error => {
               err(error);
               return false;
             });
             if (!saveResult) return error(500);
 
-            const resolveResult = await resolveAny(collection, { _id: body._id }).catch(error => {
+            const resolveResult = await resolveAny(collection, {
+              _id: body._id,
+            }).catch(error => {
               err(error);
               return undefined;
             });

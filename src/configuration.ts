@@ -93,6 +93,12 @@ export const isMailConfiguration = (obj: any, checkAuth?: boolean): obj is IMail
   );
 };
 
+interface IKompressorConfiguration {
+  Enabled: boolean;
+  Hostname: string;
+  Port: number;
+}
+
 export interface IConfiguration<T = Record<string, unknown>> {
   Mongo: IMongoConfiguration;
   Redis: IRedisConfiguration;
@@ -104,6 +110,7 @@ export interface IConfiguration<T = Record<string, unknown>> {
       endpoint: string;
     };
   };
+  Kompressor: IKompressorConfiguration;
   Mailer?: IMailerConfiguration;
   Extensions?: T;
 }
@@ -131,6 +138,11 @@ const LoadConfig = async () => {
       OriginWhitelist: [],
       enableHTTPS: false,
       PassportSecret: 'change me',
+    },
+    Kompressor: {
+      Enabled: true,
+      Hostname: 'kompressor',
+      Port: 7999,
     },
     Extensions: {},
   };

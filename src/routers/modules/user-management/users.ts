@@ -1,10 +1,14 @@
 import { ObjectId } from 'mongodb';
-import { type IDocument, type IUserData, Collection } from 'src/common';
+import { Collection, type IDocument, type IUserData } from 'src/common';
 import { userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny } from '../api.v1/resolving-strategies';
 
-export const makeUserOwnerOf = async ({ docs, collection, userdata }: {
+export const makeUserOwnerOf = async ({
+  docs,
+  collection,
+  userdata,
+}: {
   docs: ServerDocument<IDocument> | ServerDocument<IDocument>[];
   collection: Collection;
   userdata: ServerDocument<IUserData>;
@@ -27,7 +31,7 @@ export const undoUserOwnerOf = async (obj: {
 }): Promise<boolean> => {
   const docs = Array.isArray(obj.docs) ? obj.docs : [obj.docs];
   const docIds = docs.map(doc => doc._id.toString());
-  obj.userdata.data[obj.collection] = obj.userdata.data[obj.collection]!.filter(
+  obj.userdata.data[obj.collection] = obj.userdata.data[obj.collection]?.filter(
     docId => docId && !docIds.includes(docId.toString()),
   );
   const updateResult = await userCollection.updateOne(
@@ -63,16 +67,18 @@ export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData
             return resolveAny(collection, { _id: new ObjectId(docId) });
           if (typeof docId === 'object') {
             if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId });
-            return resolveAny(collection, { _id: new ObjectId(docId._id.toString()) });
+            return resolveAny(collection, {
+              _id: new ObjectId(docId._id.toString()),
+            });
           }
           return undefined;
         }),
       );
-      const filtered = resolved.filter(obj => obj !== undefined).map(obj => obj!);
-      (user.data[collection] as any) = filtered;
+      const filtered = resolved.filter((obj): obj is IDocument => obj !== undefined);
+      user.data[collection] = filtered;
     }
   } catch (e) {
     console.log(e);
   }
   return user;
-}
+};

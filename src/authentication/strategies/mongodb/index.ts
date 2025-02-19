@@ -1,13 +1,13 @@
 import { mongoClient, passwordCollection, userCollection } from 'src/mongo';
 import { verifyPassword } from 'src/util/authentication-helpers';
 import {
-  AuthenticationStrategy,
   type AuthResult,
   type AuthWithUsernamePassword,
+  AuthenticationStrategy,
 } from '../strategy';
 
 export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
-  strategyName: string = 'MongoDbStrategy';
+  strategyName = 'MongoDbStrategy';
 
   async isAvailable(): Promise<boolean> {
     return mongoClient

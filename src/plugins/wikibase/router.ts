@@ -1,9 +1,9 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import Elysia from 'elysia';
 import { mongoClient } from 'src/mongo';
 import configServer from 'src/server.config';
-import { WikibaseService } from './service';
 import { WikibaseConfiguration } from './config';
+import { WikibaseService } from './service';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)

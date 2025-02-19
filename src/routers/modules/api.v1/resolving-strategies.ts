@@ -1,18 +1,6 @@
-import { ObjectId, type WithId, type Collection as DbCollection } from 'mongodb';
+import { type Collection as DbCollection, ObjectId, type WithId } from 'mongodb';
 import {
   Collection,
-  isAddress,
-  isAnnotation,
-  isCompilation,
-  isContact,
-  isDigitalEntity,
-  isEntity,
-  isGroup,
-  isInstitution,
-  isPerson,
-  isPhysicalEntity,
-  isTag,
-  isUnresolved,
   type IAddress,
   type IAnnotation,
   type ICompilation,
@@ -25,6 +13,18 @@ import {
   type IPerson,
   type IPhysicalEntity,
   type ITag,
+  isAddress,
+  isAnnotation,
+  isCompilation,
+  isContact,
+  isDigitalEntity,
+  isEntity,
+  isGroup,
+  isInstitution,
+  isPerson,
+  isPhysicalEntity,
+  isTag,
+  isUnresolved,
 } from 'src/common';
 import {
   addressCollection,
@@ -197,8 +197,10 @@ const createResolver = <T extends ServerDocument<T>>(
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
   return async (obj: any) => {
-    const cachedEntity = (!!obj?._id) ? (await entitiesCache.get<ServerDocument<T>>((`${collection.collectionName}::${obj._id}`))) : undefined;
-    const entity = cachedEntity ?? await resolveDocument(obj, collection, isTypeGuard);
+    const cachedEntity = obj?._id
+      ? await entitiesCache.get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
+      : undefined;
+    const entity = cachedEntity ?? (await resolveDocument(obj, collection, isTypeGuard));
     if (!entity) return undefined;
 
     await entitiesCache.set(`${collection.collectionName}::${entity._id}`, entity);

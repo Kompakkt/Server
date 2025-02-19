@@ -1,4 +1,4 @@
-import { t, type Static } from 'elysia';
+import { type Static, t } from 'elysia';
 import type { ICompilation, IEntity, IUserData } from 'src/common';
 import { isAnnotation, isEntity } from 'src/common';
 import { compilationCollection, entityCollection } from 'src/mongo';
@@ -68,7 +68,7 @@ const getAnnotations = (entity: ServerDocument<IEntity>) => {
 };
 
 const getAge = (entity: ServerDocument<IEntity>) => {
-  return parseInt(entity._id.toString().slice(0, 8), 16);
+  return Number.parseInt(entity._id.toString().slice(0, 8), 16);
 };
 
 const byName = (a: ServerDocument<IEntity>, b: ServerDocument<IEntity>) =>
@@ -81,18 +81,21 @@ const sortEntities = async (entities: ServerDocument<IEntity>[], order: SortOrde
   switch (order) {
     case SortOrder.name:
       return entities.sort(byName);
-    case SortOrder.popularity:
+    case SortOrder.popularity: {
       const popMap = new Array<IWeightedItem>();
       for (const entity of entities) popMap.push({ entity, value: await getPopularity(entity) });
       return popMap.sort(byWeight).map(item => item.entity);
-    case SortOrder.usage:
+    }
+    case SortOrder.usage: {
       const useMap = new Array<IWeightedItem>();
       for (const entity of entities) useMap.push({ entity, value: await getUsage(entity) });
       return useMap.sort(byWeight).map(item => item.entity);
-    case SortOrder.annotations:
+    }
+    case SortOrder.annotations: {
       const annMap = new Array<IWeightedItem>();
       for (const entity of entities) annMap.push({ entity, value: getAnnotations(entity) });
       return annMap.sort(byWeight).map(item => item.entity);
+    }
     case SortOrder.newest:
       return entities.sort(byAge);
   }
@@ -103,7 +106,7 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
   const limit = body.limit ?? 30;
 
   const entities = await (async () => {
-    const key = `explore::entities`;
+    const key = 'explore::entities';
     const cached = await exploreCache.get<ServerDocument<IEntity>[]>(key);
     const entities =
       cached ?? (await entityCollection.find({ finished: true, online: true }).toArray());
@@ -247,4 +250,3 @@ const exploreCompilations = async (body: ExploreRequest & IPossibleUserdata) => 
 };
 
 export { exploreCompilations, exploreEntities };
-

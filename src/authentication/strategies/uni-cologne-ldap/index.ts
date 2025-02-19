@@ -1,12 +1,12 @@
+import { ObjectId } from 'mongodb';
 import { type IUserData, UserRank } from 'src/common';
-import {
-  AuthenticationStrategy,
-  type AuthResult,
-  type AuthWithUsernamePassword,
-} from '../strategy';
 import { err, log } from 'src/logger';
 import { userCollection } from 'src/mongo';
-import { ObjectId } from 'mongodb';
+import {
+  type AuthResult,
+  type AuthWithUsernamePassword,
+  AuthenticationStrategy,
+} from '../strategy';
 
 export type UniCologneLDAPResponse = {
   objectClass: string[];
@@ -26,7 +26,7 @@ const sendLDAPSearchRequest = async (
   username: string,
   password: string,
 ): Promise<UniCologneLDAPResponse | Error> => {
-  return Bun.fetch(`localhost:3000/search`, {
+  return Bun.fetch('localhost:3000/search', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -45,11 +45,11 @@ const sendLDAPSearchRequest = async (
 };
 
 export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
-  strategyName: string = 'UniCologneLDAPStrategy';
+  strategyName = 'UniCologneLDAPStrategy';
 
   async isAvailable(): Promise<boolean> {
     const result = await sendLDAPSearchRequest('test', 'test');
-    return result instanceof Error || !result ? false : true;
+    return !(result instanceof Error || !result);
   }
 
   async authenticate(authObj: AuthWithUsernamePassword): Promise<AuthResult> {

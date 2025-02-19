@@ -1,15 +1,16 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { UserRank, type IUserData } from 'src/common';
+import { type IUserData, UserRank } from 'src/common';
 import { sendJSXMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { updateUserPassword } from 'src/util/authentication-helpers';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { forgotUsername, passwordResetRequest, welcomeNewAccount } from '../mail-templates';
-import { resolveUsersDataObject } from './modules/user-management/users';
 import { authService, signInBody } from './handlers/auth.service';
+import { resolveUsersDataObject } from './modules/user-management/users';
+import { info } from 'src/logger';
 
 const userManagementRouter = new Elysia()
   .use(configServer)
@@ -43,6 +44,7 @@ const userManagementRouter = new Elysia()
       .post(
         '/register',
         async ({ error, body, set }) => {
+          info('Registering new user');
           // First user gets admin
           const isFirstUser = (await userCollection.findOne({})) === undefined;
           const role = isFirstUser ? UserRank.admin : UserRank.uploader;
@@ -66,6 +68,7 @@ const userManagementRouter = new Elysia()
             sessionID: '',
           };
 
+          info('Creating user', adjustedUser);
           const transactionResult = await Promise.allSettled([
             updateUserPassword(username, password),
             userCollection.insertOne(adjustedUser),
@@ -75,6 +78,7 @@ const userManagementRouter = new Elysia()
             return error(500, 'Failed creating user');
           }
 
+          info('Sending welcome mail');
           const success = await sendJSXMail({
             from: 'noreply@kompakkt.de',
             to: mail,

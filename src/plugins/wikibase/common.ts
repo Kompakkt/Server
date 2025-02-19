@@ -196,7 +196,7 @@ export const WBValues = {
 } as const;
 
 export const getIDfromWBEntity = (qnumber: string): number => {
-  return parseInt(qnumber.slice(1));
+  return Number.parseInt(qnumber.slice(1));
 };
 
 export const getQNumberFromURL = (url: string): string => {
@@ -231,7 +231,7 @@ export class WikibaseID {
       this.namespace = nsSplit[0];
       this.itemID = nsSplit[1];
     }
-    this.numericID = parseInt(this.itemID.slice(1));
+    this.numericID = Number.parseInt(this.itemID.slice(1));
   }
 }
 
@@ -337,7 +337,7 @@ export const getAnnotationMetadataSpark = (wikibaseId: string) => {
 };
 
 export const getWikibaseClassAndSubclassSpark = (classes: string[]) => {
-  const class_string = 'tib:' + classes.join(' tib:');
+  const class_string = `tib:${classes.join(' tib:')}`;
   const spark = `SELECT ?id ?label_en ?desc ?media WHERE {
     values ?class {${class_string}}
     {
@@ -356,7 +356,7 @@ export const getWikibaseClassAndSubclassSpark = (classes: string[]) => {
 };
 
 export const getWikibaseClassInstancesSpark = (classes: string[]) => {
-  const class_string = 'tib:' + classes.join(' tib:');
+  const class_string = `tib:${classes.join(' tib:')}`;
 
   const spark = `select DISTINCT ?id ?label_en ?description ?media where {
       values ?class {${class_string}}

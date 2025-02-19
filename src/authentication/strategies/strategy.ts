@@ -1,4 +1,4 @@
-import { type IUserData } from 'src/common';
+import type { IUserData } from 'src/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export type AuthResult = ServerDocument<IUserData> | Error;

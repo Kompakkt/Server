@@ -1,8 +1,8 @@
 {
-	"name": "sso-nfdi4culture",
-	"module": "index.ts",
-	"type": "module",
-	"devDependencies": {
-		"@node-saml/node-saml": "^5.0.0"
-	}
+  "name": "sso-nfdi4culture",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@node-saml/node-saml": "^5.0.0"
+  }
 }

@@ -1,37 +1,37 @@
-import {
-  WBPredicates,
-  WBClasses,
-  WBValues,
-  WikibaseID,
-  getIDfromWBEntity,
-  getQNumberFromURL,
-  type IMediaHierarchy,
-  type IMetadataChoices,
-  type IAnnotationLinkChoices,
-  isWikibaseConfiguration,
-  type IWikibaseItem,
-  type IMediaAgent,
-  type IWikibaseDigitalEntityExtensionData,
-  type IWikibaseAnnotationExtensionData,
-  getDigitalEntityMetadataSpark,
-  getAnnotationMetadataSpark,
-  getWikibaseClassAndSubclassSpark,
-  getWikibaseClassInstancesSpark,
-  getHierarchySpark,
-} from './common';
-import WBEdit from 'wikibase-edit';
-import WBK from 'wikibase-sdk';
-import { WikibaseConnector } from './connector';
-import {
-  WikibaseConfiguration,
-  type WikibaseAnnotation,
-  type WikibaseDigitalEntity,
-} from './config';
 import { ObjectId } from 'mongodb';
+import { Configuration } from 'src/configuration';
 import { err, info, log } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
-import { get, RequestClient } from 'src/util/requests';
-import { Configuration } from 'src/configuration';
+import { RequestClient, get } from 'src/util/requests';
+import WBEdit from 'wikibase-edit';
+import WBK from 'wikibase-sdk';
+import {
+  type IAnnotationLinkChoices,
+  type IMediaAgent,
+  type IMediaHierarchy,
+  type IMetadataChoices,
+  type IWikibaseAnnotationExtensionData,
+  type IWikibaseDigitalEntityExtensionData,
+  type IWikibaseItem,
+  WBClasses,
+  WBPredicates,
+  WBValues,
+  WikibaseID,
+  getAnnotationMetadataSpark,
+  getDigitalEntityMetadataSpark,
+  getHierarchySpark,
+  getIDfromWBEntity,
+  getQNumberFromURL,
+  getWikibaseClassAndSubclassSpark,
+  getWikibaseClassInstancesSpark,
+  isWikibaseConfiguration,
+} from './common';
+import {
+  type WikibaseAnnotation,
+  WikibaseConfiguration,
+  type WikibaseDigitalEntity,
+} from './config';
+import { WikibaseConnector } from './connector';
 
 type UndoPartial<T> = T extends Partial<infer R> ? R : T;
 
@@ -131,7 +131,7 @@ export class WikibaseService {
   private extractWikibaseExtensionData<T extends WikibaseAnnotation | WikibaseDigitalEntity>(
     obj: T,
   ) {
-    return obj.extensions!.wikibase! as UndoPartial<
+    return obj.extensions?.wikibase! as UndoPartial<
       NonNullable<NonNullable<T['extensions']>['wikibase']>
     >;
   }
@@ -157,18 +157,18 @@ export class WikibaseService {
       console.log('id is undefined');
       const create = await this.wbEdit.entity.create({
         type: 'item',
-        labels: { en: annotation.label['en'] },
+        labels: { en: annotation.label.en },
         descriptions: { en: annotation.description },
       });
       id = create.entity.id;
-      console.log('created new item with id ' + id);
+      console.log(`created new item with id ${id}`);
     }
 
     let preview_path = '';
     try {
-      console.log('writing image with id ' + id + ' and preview ' + preview);
+      console.log(`writing image with id ${id} and preview ${preview}`);
       preview_path = await this.wbConnect.writeImage(id ?? '', preview ?? '');
-      console.log('wrote image, path is ' + preview_path);
+      console.log(`wrote image, path is ${preview_path}`);
     } catch (error) {
       console.log('error writing image');
       err(error);
@@ -178,11 +178,11 @@ export class WikibaseService {
     await this.wbConnect.writeAnnotation(id ?? '', annotation.description ?? '');
     //TODO shouldnt this be in the writeAnnotation function?
     const fixedPos = 6;
-    log('related Media (kmpkt): ' + JSON.stringify(annotation.media));
+    log(`related Media (kmpkt): ${JSON.stringify(annotation.media)}`);
     const spark = {
       id: id,
       clear: true,
-      labels: { en: annotation.label['en'] },
+      labels: { en: annotation.label.en },
       descriptions: { en: annotation.description },
       claims: {
         [WBPredicates.instance_of]: [WBClasses.annotation],
@@ -203,26 +203,26 @@ export class WikibaseService {
         [WBPredicates.annotationVerified]: [WBValues.true],
         [WBPredicates.annotationMotivation]: [WBValues.motivationDescribing],
         // P12: annotation.created, // library does not include support for edtf!
-        [WBPredicates.targetEntity]: ['Q' + annotation.targetMetadata],
-        [WBPredicates.annotationRelatedConcepts]: annotation.entities.map(d => d['id']),
-        [WBPredicates.annotationRelatedMedia]: annotation.media.map(d => d['id']), //  this should work, issue with prefixes for now.
+        [WBPredicates.targetEntity]: [`Q${annotation.targetMetadata}`],
+        [WBPredicates.annotationRelatedConcepts]: annotation.entities.map(d => d.id),
+        [WBPredicates.annotationRelatedMedia]: annotation.media.map(d => d.id), //  this should work, issue with prefixes for now.
         [WBPredicates.image]: preview_path ?? '',
         [WBPredicates.annotationDescriptionLink]: [
           {
-            value: WikibaseConfiguration?.Public + '/wiki/Annotation:' + id,
+            value: `${WikibaseConfiguration?.Public}/wiki/Annotation:${id}`,
             qualifiers: {
-              [WBPredicates.rightsOwner]: annotation.authors.map(d => d['id']),
-              [WBPredicates.license]: annotation.licenses.map(d => d['id']),
+              [WBPredicates.rightsOwner]: annotation.authors.map(d => d.id),
+              [WBPredicates.license]: annotation.licenses.map(d => d.id),
             },
           },
         ],
       },
     };
     //console.log(spark)
-    let edititem = await this.wbEdit.entity.edit(spark);
+    const edititem = await this.wbEdit.entity.edit(spark);
 
-    let linkback = await this.wbEdit.entity.edit({
-      id: 'Q' + annotation.targetMetadata,
+    const linkback = await this.wbEdit.entity.edit({
+      id: `Q${annotation.targetMetadata}`,
       claims: {
         [WBPredicates.hasAnnotation]: [id],
       },
@@ -253,7 +253,7 @@ export class WikibaseService {
     if (id === undefined) {
       const created = await this.wbEdit.entity.create({
         type: 'item',
-        labels: { en: entity.label['en'] },
+        labels: { en: entity.label.en },
         descriptions: { en: entity.description },
       });
       id = created.entity.id;
@@ -261,9 +261,9 @@ export class WikibaseService {
     log(`Now updating digital entity with id ${id}`);
     // traverse to pull back kompakkt link for object page.
 
-    let digital_entity_data = await digitalEntityCollection.findOne({ wikibase_id: id });
-    let entity_data = await entityCollection.findOne({
-      'relatedDigitalEntity._id': '' + digital_entity_data?._id,
+    const digital_entity_data = await digitalEntityCollection.findOne({ wikibase_id: id });
+    const entity_data = await entityCollection.findOne({
+      'relatedDigitalEntity._id': `${digital_entity_data?._id}`,
     });
 
     const wikibase_annotation_ids = await (async () => {
@@ -277,33 +277,33 @@ export class WikibaseService {
 
     this.wbConnect.writeImage(id ?? '', entity_data?.settings.preview ?? '');
 
-    let entity_id = '' + entity_data?._id;
+    const entity_id = `${entity_data?._id}`;
 
     const model_events = new Array<{ value: string; qualifiers: { [x: string]: string[] } }>();
 
-    let model_claims = {
+    const model_claims = {
       [WBPredicates.instance_of]: [WBClasses.media],
-      [WBPredicates.license]: ['Q' + entity.licence],
-      [WBPredicates.technique]: entity.techniques.map(d => d['id']),
-      [WBPredicates.software]: entity.software.map(d => d['id']),
-      [WBPredicates.objectOfRepresentation]: entity.physicalObjs.map(d => d['id']),
-      [WBPredicates.bibliographicRef]: entity.bibliographicRefs.map(d => d['id']),
+      [WBPredicates.license]: [`Q${entity.licence}`],
+      [WBPredicates.technique]: entity.techniques.map(d => d.id),
+      [WBPredicates.software]: entity.software.map(d => d.id),
+      [WBPredicates.objectOfRepresentation]: entity.physicalObjs.map(d => d.id),
+      [WBPredicates.bibliographicRef]: entity.bibliographicRefs.map(d => d.id),
       [WBPredicates.equipment]: entity.equipment,
-      [WBPredicates.entityLink]: 'https://' + Configuration.Express.Host + '/entity/' + entity_id,
-      [WBPredicates.image]: 'Preview' + id + '.png',
-      [WBPredicates.hasAnnotation]: wikibase_annotation_ids?.map(d => d['wikibase_id']) ?? [],
+      [WBPredicates.entityLink]: `https://${Configuration.Express.Host}/entity/${entity_id}`,
+      [WBPredicates.image]: `Preview${id}.png`,
+      [WBPredicates.hasAnnotation]: wikibase_annotation_ids?.map(d => d.wikibase_id) ?? [],
       [WBPredicates.externalLink]: entity.externalLinks,
       [WBPredicates.rightsOwner]: entity.agents
-        .filter(d => d.roleTitle == 'Rightsowner')
-        .map(d => d['id']),
+        .filter(d => d.roleTitle === 'Rightsowner')
+        .map(d => d.id),
       [WBPredicates.contactPerson]: entity.agents
-        .filter(d => d.roleTitle == 'Contact Person')
-        .map(d => d['id']),
+        .filter(d => d.roleTitle === 'Contact Person')
+        .map(d => d.id),
     };
 
-    let model_creator: any[] = entity.agents
-      .filter(d => d.roleTitle == 'Creator')
-      .map(d => d['id']);
+    const model_creator: any[] = entity.agents
+      .filter(d => d.roleTitle === 'Creator')
+      .map(d => d.id);
     if (model_creator.length > 0) {
       model_events.push({
         value: WBClasses.creation,
@@ -311,7 +311,7 @@ export class WikibaseService {
       });
     }
 
-    let model_editor: any[] = entity.agents.filter(d => d.roleTitle == 'Editor').map(d => d['id']);
+    const model_editor: any[] = entity.agents.filter(d => d.roleTitle === 'Editor').map(d => d.id);
     if (model_editor.length > 0) {
       model_events.push({
         value: WBClasses.modification,
@@ -319,9 +319,9 @@ export class WikibaseService {
       });
     }
 
-    let model_data_creator: any[] = entity.agents
-      .filter(d => d.roleTitle == 'Data Creator')
-      .map(d => d['id']);
+    const model_data_creator: any[] = entity.agents
+      .filter(d => d.roleTitle === 'Data Creator')
+      .map(d => d.id);
     if (model_data_creator.length > 0) {
       model_events.push({
         value: WBClasses.rawDataCreation,
@@ -335,14 +335,14 @@ export class WikibaseService {
       id: id,
       clear: true,
       labels: {
-        en: Array.isArray(entity.label['en']) ? entity.label['en'][0] : entity.label['en'],
+        en: Array.isArray(entity.label.en) ? entity.label.en[0] : entity.label.en,
       },
       descriptions: {
         en: Array.isArray(entity.description) ? entity.description[0] : entity.description,
       },
       claims: model_claims,
     };
-    let edititem = await this.wbEdit.entity.edit(edit_params);
+    const edititem = await this.wbEdit.entity.edit(edit_params);
     console.log(edititem);
     // TODO not sure why error thrown if the following redundant code is removed
 
@@ -356,7 +356,7 @@ export class WikibaseService {
     // - siblings and parents together seem to cause reprint of subject
     // - resulting ids are q-code only not full path
 
-    const object_array = entity.physicalObjs.map(d => d['id']);
+    const object_array = entity.physicalObjs.map(d => d.id);
     const process_hierarchies: IMediaHierarchy[][] = await Promise.all(
       object_array.map(d => this.fetchHierarchy(d)),
     );
@@ -365,7 +365,7 @@ export class WikibaseService {
   }
 
   public async fetchHierarchy(id: string): Promise<IMediaHierarchy[]> {
-    console.log('fetching hierarchy for ' + id);
+    console.log(`fetching hierarchy for ${id}`);
 
     const spark = getHierarchySpark(id);
     const results = (await this.wikibase_read<HierarchiesResponseItem>(spark)) ?? [];
@@ -375,9 +375,9 @@ export class WikibaseService {
 
     for (const item of results) {
       const wikibaseItem = {
-        id: item['item']['value'],
-        label: { en: item['item']['label'] },
-        type: item['type'],
+        id: item.item.value,
+        label: { en: item.item.label },
+        type: item.type,
       };
       if (wikibaseItem.type === 'parent') {
         parents.push(wikibaseItem);
@@ -442,7 +442,7 @@ export class WikibaseService {
     this.wbEdit.entity.delete({ id: id });
   }
 
-  public async wikibase_read<T extends unknown>(spark: string): Promise<T[] | undefined> {
+  public async wikibase_read<T>(spark: string): Promise<T[] | undefined> {
     const query = this.wbSDK.sparqlQuery(spark);
     // info('wikibase_read wikibase-sdk sparqlQuery', query);
 
@@ -471,10 +471,10 @@ export class WikibaseService {
     return class_items.map(d => {
       // TODO: IWikibaseItem Typeguard
       const copy = structuredClone(d) as unknown as IWikibaseItem;
-      if (copy['media'] !== undefined && typeof copy['media'] === 'string') {
-        copy['media'] = copy['media'].replace('wiki/File:', 'wiki/Special:FilePath/');
+      if (copy.media !== undefined && typeof copy.media === 'string') {
+        copy.media = copy.media.replace('wiki/File:', 'wiki/Special:FilePath/');
       }
-      copy['label'] = { en: (copy as any)['label_en'] ?? copy.label.en };
+      copy.label = { en: (copy as any).label_en ?? copy.label.en };
       return copy;
     });
   }
@@ -487,7 +487,7 @@ export class WikibaseService {
 
     return class_items.map(d => {
       // TODO: IWikibaseItem Typeguard
-      (d as any)['label'] = { en: d['label_en'] };
+      (d as any).label = { en: d.label_en };
       return d as unknown as IWikibaseItem;
     });
   }
@@ -521,7 +521,7 @@ export class WikibaseService {
       return undefined;
     }
 
-    let annotation = processedMetadata as any;
+    const annotation = processedMetadata as any;
 
     const descriptionAuthors: IWikibaseItem[] = [];
     const descriptionLicenses: IWikibaseItem[] = [];
@@ -560,28 +560,28 @@ export class WikibaseService {
       motivation: annotation.motiv,
       cameraType: annotation.camType,
       cameraPosition: {
-        x: parseFloat(annotation.cx),
-        y: parseFloat(annotation.cy),
-        z: parseFloat(annotation.cz),
+        x: Number.parseFloat(annotation.cx),
+        y: Number.parseFloat(annotation.cy),
+        z: Number.parseFloat(annotation.cz),
       },
       cameraTarget: {
-        x: parseFloat(annotation.ctx),
-        y: parseFloat(annotation.cty),
-        z: parseFloat(annotation.ctz),
+        x: Number.parseFloat(annotation.ctx),
+        y: Number.parseFloat(annotation.cty),
+        z: Number.parseFloat(annotation.ctz),
       },
       selectorNormal: {
-        x: parseFloat(annotation.sx),
-        y: parseFloat(annotation.sy),
-        z: parseFloat(annotation.sz),
+        x: Number.parseFloat(annotation.sx),
+        y: Number.parseFloat(annotation.sy),
+        z: Number.parseFloat(annotation.sz),
       },
       targetMetadata: annotation.target,
       descriptionAuthors: descriptionAuthors,
       descriptionLicenses: descriptionLicenses,
       relatedMedia: relatedMedia,
       selectorPoint: {
-        x: parseFloat(annotation.snx),
-        y: parseFloat(annotation.sny),
-        z: parseFloat(annotation.snz),
+        x: Number.parseFloat(annotation.snx),
+        y: Number.parseFloat(annotation.sny),
+        z: Number.parseFloat(annotation.snz),
       },
       relatedEntities: this.processWikibaseItems(processedMetadata, 'concept') as IWikibaseItem[],
       relatedMediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL') as string[],
@@ -600,7 +600,7 @@ export class WikibaseService {
   public async fetchWikibaseMetadata(
     wikibase_id: any,
   ): Promise<IWikibaseDigitalEntityExtensionData | undefined> {
-    log('Fetching metadata from Wikibase for ' + wikibase_id);
+    log(`Fetching metadata from Wikibase for ${wikibase_id}`);
 
     const spark = getDigitalEntityMetadataSpark(wikibase_id);
     const metadata = await this.wikibase_read<MetadataResponseItem>(spark);
@@ -615,9 +615,8 @@ export class WikibaseService {
       return undefined;
     }
 
-    const licence = new WikibaseID(
-      processedMetadata['licence'] ? processedMetadata['licence']['value'] : '',
-    ).numericID;
+    const licence = new WikibaseID(processedMetadata.licence ? processedMetadata.licence.value : '')
+      .numericID;
     const digitalEntity = {
       id: wikibase_id,
       description: this.processWikibaseItems(processedMetadata, 'desc')
@@ -637,8 +636,8 @@ export class WikibaseService {
       externalLinks: this.processWikibaseItems(processedMetadata, 'externalLinks'),
       bibliographicRefs: this.processWikibaseItems(processedMetadata, 'bibliographicRefs'),
       physicalObjs: this.processWikibaseItems(processedMetadata, 'physicalObjs'),
-      hierarchies: processedMetadata['physicalObjs']
-        ? await this.fetchHierarchy(processedMetadata['physicalObjs']['value'] as string)
+      hierarchies: processedMetadata.physicalObjs
+        ? await this.fetchHierarchy(processedMetadata.physicalObjs.value as string)
         : [],
     } satisfies IWikibaseDigitalEntityExtensionData;
 
@@ -682,7 +681,8 @@ export class WikibaseService {
         (typeof a === 'number' && typeof b === 'number')
       ) {
         return a === b;
-      } else if ((isValueLabelItem(a) && isValueLabelItem(b)) || (isDescItem(a) && isDescItem(b))) {
+      }
+      if ((isValueLabelItem(a) && isValueLabelItem(b)) || (isDescItem(a) && isDescItem(b))) {
         return a.value === b.value;
       }
       return false;

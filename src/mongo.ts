@@ -1,6 +1,5 @@
-import { MongoClient, ObjectId } from 'mongodb';
-import { Configuration } from './configuration';
-import { info, log } from './logger';
+import type { BinaryLike } from 'node:crypto';
+import { MongoClient, type ObjectId } from 'mongodb';
 import type {
   IAddress,
   IAnnotation,
@@ -17,9 +16,10 @@ import type {
   IUserData,
 } from './common';
 import { Collection } from './common';
-import type { BinaryLike } from 'crypto';
-import type { ServerDocument } from './util/document-with-objectid-type';
+import { Configuration } from './configuration';
+import { info, log } from './logger';
 import type { ETarget } from './mailer';
+import type { ServerDocument } from './util/document-with-objectid-type';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
 const url = ClientURL ?? `mongodb://${Hostname}:${Port}`;

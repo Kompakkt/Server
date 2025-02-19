@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { UserRank } from 'src/common';
@@ -7,9 +7,9 @@ import { passwordResetRequest, updatedUserRole } from 'src/mail-templates';
 import { sendJSXMail } from 'src/mailer';
 import { entityCollection, userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
+import { authService, signInBody } from './handlers/auth.service';
 import { resolveEntity } from './modules/api.v1/resolving-strategies';
 import { resolveUsersDataObject } from './modules/user-management/users';
-import { authService, signInBody } from './handlers/auth.service';
 
 const adminRouter = new Elysia()
   .use(configServer)
@@ -61,9 +61,9 @@ const adminRouter = new Elysia()
           const updateResult = await userCollection.updateOne({ _id }, { $set: { role } });
           if (!updateResult) return error('Internal Server Error');
 
-          if (Configuration.Mailer && Configuration.Mailer.Target) {
+          if (Configuration.Mailer?.Target) {
             sendJSXMail({
-              from: Configuration.Mailer.Target['contact'],
+              from: Configuration.Mailer.Target.contact,
               to: user.mail,
               subject: 'Your Kompakkt status has been updated',
               jsx: updatedUserRole({

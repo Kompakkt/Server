@@ -1,9 +1,9 @@
-import sharp from 'sharp';
 import type { ObjectId } from 'mongodb';
-import { ensure } from './file-related-helpers';
-import { RootDirectory } from 'src/environment';
+import sharp from 'sharp';
 import { Configuration } from 'src/configuration';
+import { RootDirectory } from 'src/environment';
 import { err } from 'src/logger';
+import { ensure } from './file-related-helpers';
 
 /**
  * Takes a base64 PNG image string, saves it to disk, and returns the URL of the file.

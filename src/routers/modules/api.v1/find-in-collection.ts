@@ -1,8 +1,8 @@
-import { Collection, type IUserData } from 'src/common';
-import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { resolveCompilation, resolveEntity, resolveAny } from './resolving-strategies';
 import { t } from 'elysia';
+import { Collection, type IUserData } from 'src/common';
 import { collectionMap } from 'src/mongo';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { resolveAny, resolveCompilation, resolveEntity } from './resolving-strategies';
 
 export const findSingleHandler = async (
   {

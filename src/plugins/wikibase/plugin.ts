@@ -1,9 +1,9 @@
 import { info, log } from 'src/logger';
 import { Plugin } from '../plugin-base';
-import { getDigitalEntityMetadataSpark, isWikibaseConfiguration, IWikibaseItem } from './common';
+import { IWikibaseItem, getDigitalEntityMetadataSpark, isWikibaseConfiguration } from './common';
 import { WikibaseConfiguration } from './config';
 import wikibaseRouter from './router';
-import { WikibaseService, type MetadataResponseItem } from './service';
+import { type MetadataResponseItem, WikibaseService } from './service';
 
 const ids = [
   'Q574',

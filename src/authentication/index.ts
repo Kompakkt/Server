@@ -1,11 +1,11 @@
+import { info } from 'src/logger';
 import { MongoDbStrategy } from './strategies/mongodb';
 import {
-  AuthenticationStrategy,
   type AuthResult,
   type AuthWithUsernamePassword,
+  AuthenticationStrategy,
 } from './strategies/strategy';
 import { UniCologneLDAPStrategy } from './strategies/uni-cologne-ldap';
-import { info } from 'src/logger';
 
 export const AuthController = new (class {
   readonly strategies = {
@@ -54,7 +54,6 @@ export const AuthController = new (class {
     for (const strategy of ['MongoDbStrategy', 'UniCologneLDAPStrategy']) {
       result = await this.authenticate(strategy as keyof typeof this.strategies, authObj);
       if (result instanceof Error) {
-        continue;
       } else {
         break;
       }

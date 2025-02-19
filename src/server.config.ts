@@ -1,7 +1,6 @@
 import corsPlugin from '@elysiajs/cors';
-import { jwt, type JWTOption } from '@elysiajs/jwt';
+import { type JWTOption, jwt } from '@elysiajs/jwt';
 import timingPlugin from '@elysiajs/server-timing';
-import { swagger } from '@elysiajs/swagger';
 import { Elysia } from 'elysia';
 import { helmet } from 'elysia-helmet';
 import { Logestic } from 'logestic';
@@ -9,7 +8,7 @@ import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
 
 export const jwtOptions: JWTOption = {
-  secret: Bun.env['JWT_SECRET'] ?? 'secret',
+  secret: Bun.env.JWT_SECRET ?? 'secret',
 };
 
 // This Elysia instance is used for setting up plugins.
@@ -31,7 +30,8 @@ const configServer = new Elysia({
     }
     console.error(error);
   })
-  .use(Logestic.preset('fancy'))
+  // These are as any because type inference in other routers is bugged otherwise
+  .use(Logestic.preset('fancy') as any)
   .use(
     helmet({
       contentSecurityPolicy: {
@@ -42,20 +42,14 @@ const configServer = new Elysia({
           imgSrc: ["'self'", 'data:', 'https:'],
         },
       },
-    }),
+    }) as any,
   )
-  .use(
-    swagger({
-      documentation: {
-        info: {
-          title: 'Kompakkt Server Documentation',
-          description: 'The Kompakkt Server API Documentation',
-          version: '1.0.0',
-        },
-      },
-    }),
-  )
-  .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
+  .get('/health', ({ set }) => {
+    set.status = 200;
+    return {
+      status: 'OK',
+    };
+  })
   .get('/favicon.ico', ({ redirect }) => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))

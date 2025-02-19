@@ -25,7 +25,7 @@ export const updatedUserRole = ({
       </p>
       <p>
         Visit your profile on{' '}
-        <a href="https://kompakkt.de/" target="_blank">
+        <a href="https://kompakkt.de/" target="_blank" rel="noreferrer">
           https://kompakkt.de/
         </a>{' '}
         to see what has changed`,

@@ -1,15 +1,17 @@
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
-import { info, err } from 'src/logger';
+import { err, info } from 'src/logger';
 import { ensure } from 'src/util/file-related-helpers';
 
-const { TempDirectory, UploadDirectory } = Configuration.Uploads
+const { TempDirectory, UploadDirectory } = Configuration.Uploads;
 
 export const ensureUploadStructure = async () => {
   const directories = [
     `${RootDirectory}/${UploadDirectory}`,
     `${RootDirectory}/${TempDirectory}`,
-    ...['audio', 'image', 'metadata_files', 'model', 'previews', 'video'].map(folder => `${RootDirectory}/${UploadDirectory}/${folder}`),
+    ...['audio', 'image', 'metadata_files', 'model', 'previews', 'video'].map(
+      folder => `${RootDirectory}/${UploadDirectory}/${folder}`,
+    ),
   ];
 
   const allExist = await Promise.all(directories.map(d => Bun.file(d).exists()));

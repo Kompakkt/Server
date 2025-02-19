@@ -1,4 +1,4 @@
-import { info } from "src/logger";
+import { info } from 'src/logger';
 
 type ResponseFormat = 'json' | 'text' | 'blob' | 'arrayBuffer';
 
@@ -55,9 +55,9 @@ const request = (method: string, url: string, obj: RequestOptions) => {
   for (const [key, value] of Object.entries(obj.params || {})) {
     urlObj.searchParams.set(key, value.toString());
   }
-  url = urlObj.toString();
-  info(`Making ${method} request to ${url}`, obj);
-  return Bun.fetch(url, {
+  const finalUrl = urlObj.toString();
+  info(`Making ${method} request to ${finalUrl}`, obj);
+  return Bun.fetch(finalUrl, {
     ...options,
     headers: {
       ...options?.headers,
@@ -73,11 +73,10 @@ const request = (method: string, url: string, obj: RequestOptions) => {
         return response.arrayBuffer();
       case 'text':
         return response.text();
-      case 'json':
       default:
         return response.json();
     }
-  })
+  });
 };
 
 export const get = (url: string, obj: RequestOptions) => request('get', url, obj);

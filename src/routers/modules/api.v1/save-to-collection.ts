@@ -1,13 +1,6 @@
-import { ObjectId, type Collection as DbCollection } from 'mongodb';
+import { type Collection as DbCollection, ObjectId } from 'mongodb';
 import {
   Collection,
-  isCompilation,
-  isDigitalEntity,
-  isEntity,
-  isInstitution,
-  isPerson,
-  isPhysicalEntity,
-  isUnresolved,
   type ICompilation,
   type IDigitalEntity,
   type IDocument,
@@ -16,6 +9,13 @@ import {
   type IPerson,
   type IPhysicalEntity,
   type IUserData,
+  isCompilation,
+  isDigitalEntity,
+  isEntity,
+  isInstitution,
+  isPerson,
+  isPhysicalEntity,
+  isUnresolved,
 } from 'src/common';
 import { err, log } from 'src/logger';
 import {
@@ -100,7 +100,7 @@ const transformEntity: TransformFn<IEntity> = async body => {
       preview:
         asEntity.settings?.preview && asEntity._id
           ? await updatePreviewImage(asEntity.settings?.preview, 'entity', asEntity._id)
-          : asEntity.settings!.preview!,
+          : asEntity.settings?.preview!,
     },
     whitelist: asEntity.whitelist,
   };
@@ -284,6 +284,7 @@ const createSaver = <T extends ServerDocument<T>>(
     const transformed = await transform(structuredClone(obj));
     log(`Transformed ${obj._id}`);
     log(`Saving ${obj._id}`);
+    transformed._id = undefined;
     delete transformed._id;
     return await collection
       .updateOne({ _id: new ObjectId(obj._id) } as any, { $set: transformed }, { upsert: true })

@@ -1,12 +1,12 @@
 import { ObjectId } from 'mongodb';
-import { createTransport, type Transporter, type SendMailOptions } from 'nodemailer';
-import { UserRank, type IUserData } from './common';
+import { type SendMailOptions, type Transporter, createTransport } from 'nodemailer';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { type IUserData, UserRank } from './common';
 import { Configuration, isMailConfiguration } from './configuration';
 import { err, info } from './logger';
+import { wrapInMailBody } from './mail-templates/mail-body.template';
 import { mailCollection, userCollection } from './mongo';
 import type { ServerDocument } from './util/document-with-objectid-type';
-import { wrapInMailBody } from './mail-templates/mail-body.template';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export enum ETarget {
   contact = 'contact',
@@ -122,7 +122,6 @@ export const sendMailRequest = async (
         throw new Error('You already requested upload capabilities!');
       }
       break;
-    case ETarget.bugreport:
     default:
   }
 
@@ -175,10 +174,9 @@ const addUserToDatabase = async (
   if (!insertResult) {
     info('Failed adding user to mail database');
     return false;
-  } else {
-    info(`Added user to DB ${document}`);
-    return true;
   }
+  info(`Added user to DB ${document}`);
+  return true;
 };
 
 const countUserMails = async (userdata: ServerDocument<IUserData>, target: ETarget) => {

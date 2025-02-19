@@ -1,16 +1,16 @@
 import { Elysia, t } from 'elysia';
+import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
+  Command,
   addAnnotationsToAnnotationList,
   applyActionToEntityOwner,
-  Command,
   countEntityUses,
   findEntityOwnersQuery,
   findUserInCompilations,
   findUserInGroups,
 } from './modules/utility/utility';
-import { md5Cache } from 'src/redis';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app

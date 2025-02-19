@@ -24,7 +24,11 @@ export const passwordResetRequest = ({
       <p>
         To reset your password, follow this link and choose a new password:
         <br />
-        <a href={`https://kompakkt.de/?action=passwordreset&token=${resetToken}`} target="_blank">
+        <a
+          href={`https://kompakkt.de/?action=passwordreset&token=${resetToken}`}
+          target="_blank"
+          rel="noreferrer"
+        >
           https://kompakkt.de/?action=passwordreset&token={resetToken}
         </a>
       </p>

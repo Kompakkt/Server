@@ -1,13 +1,14 @@
 import Elysia from 'elysia';
-import configServer from './server.config';
 import adminRouter from './routers/admin.router';
-import userManagementRouter from './routers/user-management.router';
-import utilityRouter from './routers/utility.router';
 import apiV1Router from './routers/api.v1.router';
 import cleaningRouter from './routers/cleaning.router';
 import mailRouter from './routers/mail.router';
 import testingRouter from './routers/testing.router';
 import uploadRouter from './routers/upload.router';
+import userManagementRouter from './routers/user-management.router';
+import utilityRouter from './routers/utility.router';
+import configServer from './server.config';
+import { Configuration, getPrefix } from './configuration';
 
 const finalServer = new Elysia()
   .use(configServer)

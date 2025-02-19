@@ -1,13 +1,14 @@
+import type { Server } from 'node:http';
+import { type Filter, ObjectId } from 'mongodb';
 import {
   Collection,
-  isAnnotation,
   type IAnnotation,
   type ICompilation,
   type IEntity,
   type IStrippedUserData,
   type IUserData,
+  isAnnotation,
 } from 'src/common';
-import { ObjectId, type Filter } from 'mongodb';
 import {
   annotationCollection,
   compilationCollection,
@@ -16,7 +17,6 @@ import {
   userCollection,
 } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import type { Server } from 'http';
 import {
   resolveAnnotation,
   resolveCompilation,
@@ -41,7 +41,7 @@ const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
     const groupQuery = {
       $elemMatch: { _id: { $in: groups.flatMap(g => [g._id, new ObjectId(g._id)]) } },
     };
-    query.$or!.push({ 'whitelist.groups': groupQuery });
+    query.$or?.push({ 'whitelist.groups': groupQuery });
   }
 
   return query;
@@ -79,8 +79,8 @@ export const countEntityUses = async (
   // (Not password protected || user is creator || user is whitelisted) && has entity
   const filter: Filter<ServerDocument<ICompilation>> = { $or: [{ password: { $eq: '' } }] };
   if (userdata) {
-    filter.$or!.push({ 'creator._id': { $in: [userdata._id, new ObjectId(userdata._id)] } });
-    filter.$or!.push(await userInWhitelistQuery(userdata));
+    filter.$or?.push({ 'creator._id': { $in: [userdata._id, new ObjectId(userdata._id)] } });
+    filter.$or?.push(await userInWhitelistQuery(userdata));
   }
   filter[`entities.${identifier.toString()}`] = { $exists: true };
 

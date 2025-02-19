@@ -1,4 +1,5 @@
-import { join } from 'path';
+import { join } from 'node:path';
+import { t } from 'elysia';
 import { Configuration } from 'src/configuration';
 import { err, info, log } from 'src/logger';
 import { RequestClient } from 'src/util/requests';
@@ -42,12 +43,35 @@ type ClientLoginResponse = {
       };
 };
 
+type WikibaseImageResponse = {
+  error?: {
+    code: string;
+    info?: string;
+  };
+  upload?: {
+    result: 'Success';
+    filename: string;
+  };
+};
+const isWikibaseImageResponse = (response: unknown): response is WikibaseImageResponse => {
+  if (response === null || typeof response !== 'object') return false;
+  if (Object.hasOwn(response, 'error')) {
+    const error = (response as WikibaseImageResponse).error;
+    if (error && Object.hasOwn(error, 'code')) return true;
+  }
+  if (Object.hasOwn(response, 'upload')) {
+    const upload = (response as WikibaseImageResponse).upload;
+    if (upload && upload.result === 'Success' && Object.hasOwn(upload, 'filename')) return true;
+  }
+  return false;
+};
+
 export class WikibaseConnector implements TokenManager {
   private wikibaseUrl: string;
   private login: string;
   private password: string;
   private client: RequestClient;
-  private requestAttempts: number = 0;
+  private requestAttempts = 0;
 
   loginToken: string | null;
   csrfToken: string | null;
@@ -99,7 +123,7 @@ export class WikibaseConnector implements TokenManager {
     this.csrfToken = token;
   }
 
-  public async createAccount(username: string, password: string): Promise<any> {
+  public async createAccount(username: string, password: string): Promise<unknown> {
     const csrfToken = await this.getCreateAccountToken();
     const params = {
       action: 'createaccount',
@@ -193,7 +217,7 @@ export class WikibaseConnector implements TokenManager {
     return this.loginToken;
   }
 
-  async getCsrfToken(forceRefresh: boolean = false): Promise<string> {
+  async getCsrfToken(forceRefresh = false): Promise<string> {
     if (forceRefresh || !this.csrfToken || this.csrfToken === '+\\') {
       await this.refreshToken();
     }
@@ -207,7 +231,7 @@ export class WikibaseConnector implements TokenManager {
     const csrfToken = await this.getCsrfToken();
     const params = {
       action: 'edit',
-      title: 'Annotation:' + id,
+      title: `Annotation:${id}`,
       text: text,
       token: csrfToken,
       format: 'json',
@@ -219,7 +243,7 @@ export class WikibaseConnector implements TokenManager {
   public async writeImage(id: string, img: string): Promise<string> {
     if (img !== '') {
       const csrfToken = await this.getCsrfToken();
-      const filename = 'Preview' + id + '.png';
+      const filename = `Preview${id}.png`;
       const params = {
         action: 'upload',
         filename: filename,
@@ -235,17 +259,13 @@ export class WikibaseConnector implements TokenManager {
         .post('/api.php', { params, options: { body: formData } })
         .then(response => {
           console.log('writeImage', response);
-          if (!response) {
-            console.error('No response received.');
+          if (!isWikibaseImageResponse(response)) {
+            console.error('Invalid response received.');
             return '';
           }
 
           // Check if error exists and has a code property
-          if (
-            response.hasOwnProperty('error') &&
-            response.error &&
-            response.error.hasOwnProperty('code')
-          ) {
+          if (response.error?.code) {
             const info = response.error.info;
             if (info && typeof info === 'string') {
               const start = info.indexOf('[[:File:') + 8;
@@ -257,12 +277,7 @@ export class WikibaseConnector implements TokenManager {
             }
           }
           // Check if upload result is "Success"
-          else if (
-            response.hasOwnProperty('upload') &&
-            response.upload &&
-            response.upload.result === 'Success' &&
-            response.upload.hasOwnProperty('filename')
-          ) {
+          else if (response.upload?.filename) {
             return response.upload.filename;
           }
 
@@ -279,7 +294,7 @@ export class WikibaseConnector implements TokenManager {
 
   // SDK query methods
 
-  public async requestSDKquery(query: string): Promise<any> {
+  public async requestSDKquery(query: string): Promise<unknown> {
     const params = {
       action: 'wbgetentities',
       ids: query,

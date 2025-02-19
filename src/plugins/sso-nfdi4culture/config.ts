@@ -1,4 +1,4 @@
-import { type SamlConfig } from '@node-saml/node-saml';
+import type { SamlConfig } from '@node-saml/node-saml';
 
 export const getSAMLConfig = async () => {
   const { SAML_CERT_PATH, SAML_KEY_PATH, SAML_ENTRYPOINT, SAML_CALLBACK, SAML_ISSUER } =
