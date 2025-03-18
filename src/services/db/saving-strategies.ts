@@ -321,19 +321,25 @@ const saveDigitalEntity = async (digitalentity: IDigitalEntity, user: IUserData)
   }
 
   for (let i = 0; i < newEntity.phyObjs.length; i++) {
-    newEntity.phyObjs[i]._id = ObjectId.isValid(newEntity.phyObjs[i]._id)
-      ? newEntity.phyObjs[i]._id
+    const existingId = newEntity.phyObjs[i]._id;
+    const newId = ObjectId.isValid(existingId)
+      ? new ObjectId(existingId.toString())
       : new ObjectId();
-    const savedEntity = (await saveMetaDataEntity(newEntity.phyObjs[i], user)) as IPhysicalEntity;
-    newEntity.phyObjs[i] = (await Repo.physicalentity
-      .updateOne(query(savedEntity._id), { $set: { ...savedEntity } }, { upsert: true })
-      .then(res => {
-        if (!res) throw new Error('Failed saving physicalentity');
+    newEntity.phyObjs[i]._id = newId;
 
-        const _id = res.upsertedId ?? savedEntity._id;
-        Users.makeOwnerOf(user, _id, 'physicalentity');
-        return _id;
-      })) as any;
+    const savedEntity = (await saveMetaDataEntity(newEntity.phyObjs[i], user)) as IPhysicalEntity;
+    savedEntity._id = newId;
+
+    const result = await Repo.physicalentity.updateOne(
+      { _id: newId },
+      { $set: { ...savedEntity, _id: newId } },
+      { upsert: true },
+    );
+    if (!result) throw new Error('Failed saving physicalentity');
+
+    const _id = result.upsertedId ?? savedEntity._id;
+    Users.makeOwnerOf(user, _id, 'physicalentity');
+    newEntity.phyObjs[i] = (newId as any).toString();
   }
 
   await Users.makeOwnerOf(user, newEntity._id, 'digitalentity');
