@@ -14,7 +14,8 @@ import LocalStrategy from 'passport-local';
 import SocketIo from 'socket.io';
 import resTime from 'response-time';
 import { RootDirectory } from '../environment';
-import { IUserData, UserRank, ObjectId } from '../common';
+import { IUserData, UserRank } from '../common';
+import { ObjectId } from 'mongodb';
 import { Accounts, getEmptyUserData } from './db';
 import { Configuration } from './configuration';
 import { SessionCache } from './cache';
@@ -136,7 +137,7 @@ const registerUser = async (req: Request<any, any, IRegisterBody>, res: Response
     ...user,
     role,
     data: getEmptyUserData(),
-    _id: new ObjectId(),
+    _id: new ObjectId() as unknown as string,
     sessionID: '',
     password: undefined,
   };

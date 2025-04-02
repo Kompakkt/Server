@@ -84,10 +84,14 @@ const resolveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity) =
       if (!deep) continue;
       entity.persons[i] = removeUnrelatedEntities(deep, _id);
 
+      // @ts-ignore-next-line
       if (!entity.persons[i].roles) {
+        // @ts-ignore-next-line
         entity.persons[i].roles = {};
       }
+      // @ts-ignore-next-line
       if (!entity.persons[i].roles[_id]) {
+        // @ts-ignore-next-line
         entity.persons[i].roles[_id] = [];
       }
     }

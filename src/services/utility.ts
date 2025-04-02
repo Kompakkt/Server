@@ -98,7 +98,7 @@ const addAnnotationsToAnnotationList = async (
   const resolvedList = await Promise.all(list.map(a => Entities.resolve(a, 'annotation')));
   const filteredList = resolvedList.filter(_ => _) as IAnnotation[];
   const correctedList = filteredList.map(ann => {
-    ann._id = new ObjectId();
+    (ann as any)._id = new ObjectId();
     ann.target.source.relatedCompilation = _id;
     ann.lastModificationDate = new Date().toISOString();
     return ann;

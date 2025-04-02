@@ -2,11 +2,18 @@
 import { randomBytes } from 'crypto';
 import { ObjectId } from 'mongodb';
 import { Request, Response, NextFunction } from 'express';
-import { IUserData, UserRank, isAnnotation, isPerson, isInstitution } from '../../common';
+import {
+  IUserData,
+  UserRank,
+  isAnnotation,
+  isPerson,
+  isInstitution,
+  IDocument,
+} from '../../common';
 import { UserCache } from '../cache';
 import { Logger } from '../logger';
 import { Mailer } from '../mailer';
-import { query, areIdsEqual, getEmptyUserData } from './functions';
+import { query, areIdsEqual, getEmptyUserData, getDocumentId } from './functions';
 import { updateUserPassword } from '../express';
 import { Accounts, Repo } from './controllers';
 import { IEntityHeadsUp, isValidCollection, ICollectionParam, PushableEntry } from './definitions';
@@ -182,11 +189,12 @@ const makeOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   if (!ObjectId.isValid(_id) || !user) return false;
   if (!isValidCollection(coll)) return false;
 
-  const arr = user.data[coll].filter(_ => _);
+  const arr = user.data[coll]?.filter(_ => _) ?? [];
 
-  const doesExist = arr.find(id => areIdsEqual(id, _id));
+  const doesExist = arr.find(id => areIdsEqual(getDocumentId(id!), _id));
   if (doesExist) return true;
 
+  // @ts-ignore-next-line
   arr.push(new ObjectId(_id));
 
   user.data[coll] = arr;
@@ -206,7 +214,8 @@ const undoOwnerOf = async (req: Request<any> | IUserData, _id: string | ObjectId
   if (!ObjectId.isValid(_id) || !user) return false;
   if (!isValidCollection(coll)) return false;
 
-  const arr = user.data[coll].filter(_ => _).filter(id => !areIdsEqual(id, _id));
+  const arr =
+    user.data[coll]?.filter(_ => _).filter(id => !areIdsEqual(getDocumentId(id!), _id)) ?? [];
   user.data[coll] = arr;
 
   const updateResult = await Accounts.users.updateOne(query(user._id), {
@@ -235,9 +244,11 @@ const resolve = async (req: Request<any> | IUserData) => {
   for (const coll in { ...data }) {
     if (!isValidCollection(coll)) continue;
     if (data[coll] === undefined) continue;
-    data[coll] = await Promise.all(data[coll]!.map(async obj => Entities.resolve(obj, coll)));
+    const result = await Promise.all(
+      data[coll]!.map(async obj => Entities.resolve<IDocument>(obj, coll)),
+    );
     // Filter possible null's
-    data[coll] = data[coll]!.filter(obj => obj && Object.keys(obj).length > 0);
+    data[coll] = result.filter((obj): obj is IDocument => !!obj && Object.keys(obj).length > 0);
   }
 
   // Replace new resolved data and update cache

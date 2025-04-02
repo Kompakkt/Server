@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
-import { UserRank, IEntity } from '../common';
+import { UserRank, IEntity, IDocument } from '../common';
 import { updateUserPassword } from './express';
 import { generateSecurePassword } from './generate-password';
 import { Configuration } from './configuration';
@@ -68,7 +68,9 @@ const getUser = async (req: Request<IIdentifierRequest>, res: Response) => {
     if (user.data[coll] === undefined) continue;
     for (let i = 0; i < user.data[coll]!.length; i++) {
       const obj = user.data[coll]![i];
-      user.data[coll]![i] = await Entities.resolve(obj, coll, 0);
+      const result = await Entities.resolve<IDocument>(obj, coll, 0);
+      if (!result) continue;
+      user.data[coll]![i] = result;
     }
     // Filter null entities
     user.data[coll] = user.data[coll]!.filter(obj => obj);

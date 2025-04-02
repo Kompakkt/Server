@@ -24,6 +24,7 @@ const updateAnnotationList = async (
   const obj = await Entities.resolve<EntityOrComp>(entityOrCompId, coll, 0);
   if (!obj) return undefined;
   annotationId = annotationId.toString();
+  // @ts-ignore-next-line
   obj.annotations[annotationId] = { _id: new ObjectId(annotationId) };
 
   const updateResult = await Repo.get<EntityOrComp>(coll)?.updateOne(query(entityOrCompId), {
@@ -301,6 +302,7 @@ const saveMetaDataEntity = async (entity: IDigitalEntity | IPhysicalEntity, user
   if (isDigitalEntity(newEntity)) {
     for (let i = 0; i < newEntity.tags.length; i++) {
       const tag = newEntity.tags[i];
+      // @ts-ignore-next-line
       newEntity.tags[i] = (await saveTag(tag, user))._id as any;
     }
   }
@@ -312,11 +314,13 @@ const saveDigitalEntity = async (digitalentity: IDigitalEntity, user: IUserData)
   const newEntity = (await saveMetaDataEntity(digitalentity, user)) as IDigitalEntity;
 
   for (let i = 0; i < newEntity.persons.length; i++) {
+    // @ts-ignore-next-line
     newEntity.persons[i] = ((await savePerson(newEntity.persons[i], user, true)) as any)._id;
   }
 
   for (let i = 0; i < newEntity.institutions.length; i++) {
     const institution = newEntity.institutions[i];
+    // @ts-ignore-next-line
     newEntity.institutions[i] = ((await saveInstitution(institution, user, true)) as any)._id;
   }
 
@@ -325,12 +329,16 @@ const saveDigitalEntity = async (digitalentity: IDigitalEntity, user: IUserData)
     const newId = ObjectId.isValid(existingId)
       ? new ObjectId(existingId.toString())
       : new ObjectId();
+    // @ts-ignore-next-line
     newEntity.phyObjs[i]._id = newId;
 
+    // @ts-ignore-next-line
     const savedEntity = (await saveMetaDataEntity(newEntity.phyObjs[i], user)) as IPhysicalEntity;
+    // @ts-ignore-next-line
     savedEntity._id = newId;
 
     const result = await Repo.physicalentity.updateOne(
+      // @ts-ignore-next-line
       { _id: newId },
       { $set: { ...savedEntity, _id: newId } },
       { upsert: true },

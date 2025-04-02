@@ -5,7 +5,7 @@ import imageminPngquant from 'imagemin-pngquant';
 import { RootDirectory } from '../../environment';
 import { Configuration } from '../configuration';
 import { Logger } from '../logger';
-import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../common';
+import { IUserData, IStrippedUserData, ICompilation, Collection, IDocument } from '../../common';
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
@@ -40,15 +40,17 @@ const query = <TDocument extends { [key: string]: any }>(
  * @param _id The ID value to include in the $in query
  * @returns A MongoDB $in operator that matches both string and ObjectId representations
  */
-const queryIn = <TDocument extends { [key: string]: any }, TField = string | ObjectId>(
-  _id: string | ObjectId,
-): {
-  $in: TField[];
-} => {
-  return {
-    $in: [_id.toString(), new ObjectId(_id.toString())] as unknown as TField[],
+const queryIn =
+  // @ts-ignore-next-line
+  <TDocument extends { [key: string]: any }, TField = string | ObjectId>(
+    _id: string | ObjectId,
+  ): {
+    $in: TField[];
+  } => {
+    return {
+      $in: [_id.toString(), new ObjectId(_id.toString())] as unknown as TField[],
+    };
   };
-};
 
 /**
  * Sets the password property of a compilation to a boolean,
@@ -60,13 +62,24 @@ const lockCompilation = (comp: ICompilation): ICompilation => {
 };
 
 /**
+ * Returns the ID of a document, regardless of its type
+ * @param document The document whose ID to retrieve
+ * @returns The ID of the document
+ */
+const getDocumentId = (document: string | ObjectId | IDocument) => {
+  if (typeof document === 'string') return document;
+  if (document instanceof ObjectId) return document;
+  return document._id;
+};
+
+/**
  * Checks whether two _id's are equal by making sure they are considered as ObjectIds
  * @param {string | ObjectId} firstId  [description]
  * @param {string | ObjectId} secondId [description]
  */
-const areIdsEqual = (firstId: string | ObjectId, secondId: string | ObjectId) => {
-  if (!ObjectId.isValid(firstId)) return false;
-  if (!ObjectId.isValid(secondId)) return false;
+const areIdsEqual = (firstId: string | ObjectId | null, secondId: string | ObjectId | null) => {
+  if (!firstId || !ObjectId.isValid(firstId)) return false;
+  if (!secondId || !ObjectId.isValid(secondId)) return false;
   return new ObjectId(firstId).toString() === new ObjectId(secondId).toString();
 };
 
@@ -163,6 +176,7 @@ export {
   query,
   queryIn,
   areIdsEqual,
+  getDocumentId,
   updatePreviewImage,
   stripUserData,
   isValidId,

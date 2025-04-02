@@ -18,6 +18,7 @@ class Controller<T> {
     this.db = database;
   }
   get collection() {
+    // @ts-ignore-next-line
     return this.db.collection<T>(this.coll);
   }
   public findOne(filter: Filter<T>) {
@@ -27,30 +28,37 @@ class Controller<T> {
     });
   }
   public find(filter: Filter<T>, options: FindOptions = {}) {
-    return this.collection
-      .find<T>(filter, options)
-      .toArray()
-      .catch(err => {
-        Logger.err('Failed findOne', this.db.databaseName, this.coll, filter, err);
-        return undefined;
-      });
+    return (
+      this.collection
+        // @ts-ignore-next-line
+        .find<T>(filter, options)
+        .toArray()
+        .catch(err => {
+          Logger.err('Failed findOne', this.db.databaseName, this.coll, filter, err);
+          return undefined;
+        })
+    );
   }
   public findCursor(filter: Filter<T>, options: FindOptions = {}) {
+    // @ts-ignore-next-line
     return this.collection.find<T>(filter, options);
   }
   public findAllCursor() {
+    // @ts-ignore-next-line
     return this.collection.find<T>({});
   }
   public findAll() {
     return this.findAllCursor().toArray();
   }
   public insertOne(doc: OptionalId<T>) {
+    // @ts-ignore-next-line
     return this.collection.insertOne(doc).catch(err => {
       Logger.err('Failed insertOne', this.db.databaseName, this.coll, doc, err);
       return undefined;
     });
   }
   public insertMany(docs: Array<OptionalId<T>>) {
+    // @ts-ignore-next-line
     return this.collection.insertMany(docs).catch(err => {
       Logger.err('Failed insertMany', this.db.databaseName, this.coll, docs, err);
       return undefined;

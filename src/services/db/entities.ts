@@ -77,6 +77,7 @@ const addEntityToCollection = async (
 
   let entity = req.body;
   const _id = isValidObjectId ? new ObjectId(entity._id) : new ObjectId();
+  // @ts-ignore-next-line
   entity._id = _id;
 
   const savingPromise = saveEntity(entity, { coll, user, doesEntityExist });
@@ -120,6 +121,7 @@ const updateEntitySettings = async (req: Request<IEntityRequestParams>, res: Res
 
   // Overwrite old settings
   const settings = { ...req.body, preview: finalImagePath };
+  // @ts-ignore-next-line
   const result = await Repo.entity.updateOne({ _id: identifier }, { $set: { settings } });
 
   if (!result) return res.status(500).send('Failed updating settings');
@@ -228,7 +230,7 @@ const removeEntityFromCollection = async (req: Request<IEntityRequestParams>, re
 
   const message = `Deleted ${coll} ${req.params.identifier}`;
   Logger.info(message);
-  res.status(200).send({message});
+  res.status(200).send({ message });
 
   return RepoCache.flush();
 };
@@ -363,7 +365,9 @@ const explore = async (req: Request<any, any, IExploreRequest>, res: Response) =
   RepoCache.get<IEntity[] | ICompilation[]>(reqHash)
     .then(cachedItems => {
       if (cachedItems) return cachedItems;
+      // @ts-ignore-next-line
       if (searchEntity) return exploreEntities(fixedBody);
+      // @ts-ignore-next-line
       return exploreCompilations(fixedBody);
     })
     .then(finalItems => {

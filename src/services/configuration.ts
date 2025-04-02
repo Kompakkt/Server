@@ -1,4 +1,3 @@
-import { isMaster } from 'cluster';
 import deepmerge from 'deepmerge';
 import { readJsonSync } from 'fs-extra';
 import { ConfigFile } from '../environment';
@@ -144,15 +143,13 @@ const LoadConfig = () => {
 
     return confObj;
   } catch (error: any) {
-    if (isMaster) {
-      if (error.code === 'ENOENT') {
-        Logger.err('Config file not found. Falling back to default configuration');
-      } else {
-        Logger.err('Failed loading configuration file. Falling back to default configuration');
-        Logger.err(error);
-      }
-      Logger.log('Configuration loaded from defaults');
+    if (error.code === 'ENOENT') {
+      Logger.err('Config file not found. Falling back to default configuration');
+    } else {
+      Logger.err('Failed loading configuration file. Falling back to default configuration');
+      Logger.err(error);
     }
+    Logger.log('Configuration loaded from defaults');
     return DefaultConfiguration;
   }
 };

@@ -1,6 +1,5 @@
 import { Repo, Accounts, query, stripUserData } from '../services/db';
-import { ObjectId } from 'mongodb';
-import { IStrippedUserData } from 'src/common';
+import { IDocument, IStrippedUserData } from 'src/common';
 
 (async () => {
   const entities = await Repo.entity.find({}).catch(e => {
@@ -28,9 +27,11 @@ import { IStrippedUserData } from 'src/common';
 
     const owners = users
       .filter(user => {
-        const arr: Array<ObjectId | string> | undefined = user?.data?.entity;
-        const ownerIds = arr?.map(id => id.toString());
-        return ownerIds?.includes(entityId);
+        const arr: Array<string | IDocument | null> = user?.data?.entity ?? [];
+        const ownerIds = arr
+          .filter((id): id is string | IDocument => !!id)
+          .map(id => (typeof id === 'string' ? id : id._id.toString()));
+        return ownerIds.includes(entityId);
       })
       .map(user => stripUserData(user));
 
