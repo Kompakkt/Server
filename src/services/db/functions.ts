@@ -9,25 +9,44 @@ import { IUserData, IStrippedUserData, ICompilation, Collection } from '../../co
 
 /**
  * Turns an _id into a more forgiving Query by allowing both ObjectId as well as string
- * @type {[type]}
+ * @template TDocument The document type being queried
+ * @param _id The ID value to query for
+ * @param targetProp The property name to query against (default: '_id')
+ * @returns A MongoDB Filter that matches both string and ObjectId representations
  */
-const query = (_id: string | ObjectId, targetProp = '_id'): Filter<any> => {
-  const query: Filter<any> = { $or: [] };
-  const obj: { [key: string]: string | ObjectId } = {};
-  obj[targetProp] = _id.toString();
-  query.$or!.push(obj);
-  obj[targetProp] = new ObjectId(_id.toString());
-  query.$or!.push(obj);
+const query = <TDocument extends { [key: string]: any }>(
+  _id: string | ObjectId,
+  targetProp = '_id',
+): Filter<TDocument> => {
+  const query: Filter<TDocument> = { $or: [] };
+
+  // First condition: match as string
+  const stringCondition: Partial<TDocument> = {} as Partial<TDocument>;
+  stringCondition[targetProp as keyof TDocument] = _id.toString() as any;
+  query.$or!.push(stringCondition as any);
+
+  // Second condition: match as ObjectId
+  const objectIdCondition: Partial<TDocument> = {} as Partial<TDocument>;
+  objectIdCondition[targetProp as keyof TDocument] = new ObjectId(_id.toString()) as any;
+  query.$or!.push(objectIdCondition as any);
+
   return query;
 };
 
 /**
- * Turns an _id into a more forgiving Query (Array) by allowing both ObjectId as well as string
- * @type {[type]}
+ * Turns an _id into a more forgiving $in query by allowing both ObjectId and string formats
+ * @template TDocument The document type being queried
+ * @template TField The type of the field being queried (typically string | ObjectId)
+ * @param _id The ID value to include in the $in query
+ * @returns A MongoDB $in operator that matches both string and ObjectId representations
  */
-const queryIn = (_id: string | ObjectId): Filter<any> => {
+const queryIn = <TDocument extends { [key: string]: any }, TField = string | ObjectId>(
+  _id: string | ObjectId,
+): {
+  $in: TField[];
+} => {
   return {
-    $in: [_id.toString(), new ObjectId(_id.toString())],
+    $in: [_id.toString(), new ObjectId(_id.toString())] as unknown as TField[],
   };
 };
 
@@ -135,7 +154,7 @@ const stripUserData = ({
   username,
   fullname,
 }: IUserData | IStrippedUserData): IStrippedUserData => ({
-  _id,
+  _id: _id.toString(),
   username,
   fullname,
 });

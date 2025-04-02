@@ -49,17 +49,18 @@ class DBClient {
     return DBClient.isConnected;
   }
 
-  private connect() {
-    this.Client.connect(error => {
-      if (!error) {
+  private async connect() {
+    return this.Client.connect()
+      .then(() => {
         DBClient.isConnected = true;
         Logger.info('Connected to MongoDB', MongoURL);
-      } else {
+      })
+      .catch(error => {
         Logger.err(`Couldn't connect to MongoDB.
           Make sure it is running and check your configuration`);
+        Logger.err(error);
         process.exit(1);
-      }
-    });
+      });
   }
 
   public getUnusedObjectId(_: Request, res: Response) {
