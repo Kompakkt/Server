@@ -8,7 +8,6 @@ import uploadRouter from './routers/upload.router';
 import userManagementRouter from './routers/user-management.router';
 import utilityRouter from './routers/utility.router';
 import configServer from './server.config';
-import { Configuration, getPrefix } from './configuration';
 
 const finalServer = new Elysia()
   .use(configServer)

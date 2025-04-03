@@ -1,6 +1,10 @@
 import { info, log } from 'src/logger';
 import { Plugin } from '../plugin-base';
-import { IWikibaseItem, getDigitalEntityMetadataSpark, isWikibaseConfiguration } from './common';
+import {
+  type IWikibaseItem,
+  getDigitalEntityMetadataSpark,
+  isWikibaseConfiguration,
+} from './common';
 import { WikibaseConfiguration } from './config';
 import wikibaseRouter from './router';
 import { type MetadataResponseItem, WikibaseService } from './service';

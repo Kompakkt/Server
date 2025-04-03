@@ -63,7 +63,11 @@ export const authService = new Elysia({ name: 'Service.Auth' })
       onBeforeHandle(async ({ error, body, params, useAuthController }) => {
         const loginBody = body as SignInBody;
         if (!loginBody?.username || !loginBody?.password) return error('Forbidden');
-        const strategy = params?.strategy;
+
+        // TODO: maybe params can be typed as part of onBeforeHandle
+        const typedParams = params as Static<typeof strategyParams>;
+        const strategy = typedParams.strategy;
+
         const authResult = await useAuthController(loginBody, strategy);
         if (authResult instanceof Error) return error('Forbidden');
         return;

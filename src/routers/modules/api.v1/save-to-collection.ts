@@ -34,8 +34,12 @@ import {
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { updatePreviewImage } from 'src/util/image-helpers';
 import { makeUserOwnerOf } from '../user-management/users';
+import { stripUser } from 'src/util/userdata-transformation';
 
-type TransformFn<T> = (obj: ServerDocument<IDocument>) => Promise<Partial<T>>;
+type TransformFn<T> = (
+  obj: ServerDocument<IDocument>,
+  user: ServerDocument<IUserData>,
+) => Promise<Partial<T>>;
 
 const flattenRecordArray = (obj?: Record<string, any>): Record<string, IDocument[]> => {
   if (!obj) return {};
@@ -78,12 +82,14 @@ const transformDocument: TransformFn<any> = async <T>(body: ServerDocument<IDocu
   return asDocument;
 };
 
-const transformEntity: TransformFn<IEntity> = async body => {
+const transformEntity: TransformFn<IEntity> = async (body, user) => {
   const asEntity = body as unknown as Partial<IEntity>;
+
+  const strippedUser = stripUser(user);
 
   return {
     annotations: flattenRecord(asEntity.annotations),
-    creator: asEntity.creator,
+    creator: asEntity.creator ?? strippedUser,
     dataSource: asEntity.dataSource,
     externalFile: asEntity.externalFile,
     files: asEntity.files,
@@ -103,6 +109,12 @@ const transformEntity: TransformFn<IEntity> = async body => {
           : asEntity.settings?.preview!,
     },
     whitelist: asEntity.whitelist,
+    access: asEntity.access ?? {
+      [strippedUser._id]: {
+        ...strippedUser,
+        role: 'owner',
+      },
+    },
   };
 };
 
@@ -281,7 +293,7 @@ const createSaver = <T extends ServerDocument<T>>(
       log(`Finished additional processing on ${obj._id}`);
     }
     log(`Transforming ${obj._id}`);
-    const transformed = await transform(structuredClone(obj));
+    const transformed = await transform(structuredClone(obj), userdata);
     log(`Transformed ${obj._id}`);
     log(`Saving ${obj._id}`);
     transformed._id = undefined;

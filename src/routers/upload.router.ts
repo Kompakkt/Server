@@ -1,4 +1,4 @@
-import { readdir, rmdir, stat, symlink, realpath, exists } from 'node:fs/promises';
+import { readdir, rmdir, stat, symlink, realpath, exists, watch } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import { Elysia, t } from 'elysia';
 import slugify from 'slugify';
@@ -10,10 +10,12 @@ import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
 import { ensure } from 'src/util/file-related-helpers';
 import { authService } from './handlers/auth.service';
-import { compressFile } from 'src/util/compress-file';
+import { compressFile, COMPRESSION_ENCODINGS } from 'src/util/compress-file';
 import { fetch } from 'bun';
 import { unique } from 'src/util/array-helpers';
 import type { Dirent } from 'node:fs';
+import { typedObjectEntries } from 'src/util/typed-object-entries';
+import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
 
 declare global {
   // biome-ignore lint: Any is expected here
@@ -110,15 +112,19 @@ const getUploadedFiles = async ({
       case 'model':
         return ['.obj', '.babylon', '.gltf', '.glb', '.stl'];
       case 'cloud':
-        return ['.las', '.laz'];
+        return ['.las', '.laz', '.json'];
       default:
         return [];
     }
   })();
 
-  const filteredFiles = files.filter(file =>
-    filter.length > 0 ? filter.some(ext => file.toLowerCase().endsWith(ext)) : true,
-  );
+  const ignoredSubdirectories = ['ept-data', 'ept-hierarchy', 'ept-sources'];
+
+  const filteredFiles = files
+    .filter(file => !ignoredSubdirectories.some(dir => file.includes(dir)))
+    .filter(file =>
+      filter.length > 0 ? filter.some(ext => file.toLowerCase().endsWith(ext)) : true,
+    );
 
   const ids = filteredFiles.map(
     file => file.replace(`${RootDirectory}/${UploadDirectory}/${type}/`, '').split('/').at(0)!,
@@ -127,28 +133,35 @@ const getUploadedFiles = async ({
   return { files: filteredFiles, ids: unique(ids) };
 };
 
-const getProcessedFiles = async (path: string) => {
-  try {
-    log(`Globbing for processed files`, path);
-    const glbGlob = new Bun.Glob(`*.compressed.glb`);
-    const eptJsonPath = `${path}/out/ept.json`;
-    const eptJsonExists = await Bun.file(eptJsonPath).exists();
+const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait = false) => {
+  console.log('getProcessedFiles', { paths, mediaType });
+  const processedFiles = new Set<string>();
 
-    const globResult = await Array.fromAsync(glbGlob.scan({ cwd: path }));
-    if (eptJsonExists) {
-      globResult.push(eptJsonPath);
+  for (const path of paths) {
+    if (mediaType === 'cloud') {
+      const eptJsonPath = `${path}/out/ept.json`;
+      const eptJsonExists = await waitUntilFileExists(eptJsonPath, shouldWait ? 10_000 : 0);
+
+      console.log({ eptJsonPath, eptJsonExists });
+
+      if (eptJsonExists) {
+        processedFiles.add(eptJsonPath);
+      }
     }
 
-    log('getProcessedFiles', globResult);
-
-    return globResult;
-  } catch (error) {
-    log('No processed files found');
-    return [];
+    if (mediaType === 'model' || mediaType === 'entity') {
+      const glbGlob = new Bun.Glob(`*.compressed.glb`);
+      const globResult = await Array.fromAsync(glbGlob.scan({ cwd: path }));
+      for (const file of globResult) {
+        processedFiles.add(file);
+      }
+    }
   }
+
+  return Array.from(processedFiles);
 };
 
-const compressedFileTypes = ['.glb', '.laz', '.zip'];
+const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip'];
 
 // Prepare folder structure
 const { UploadDirectory } = Configuration.Uploads;
@@ -159,76 +172,57 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ params: { '*': path }, set, headers }) => {
+    async ({ params: { '*': path }, set, headers, error }) => {
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
-      const filePath = join(uploadDir, path.split('/uploads').at(-1)!);
-      const decodedPath = filePath
+
+      const requestedPath = path.split('/uploads').at(-1)!;
+      const decodedPath = requestedPath
         .split('/')
         .map(part => decodeURIComponent(part))
-        .join('/');
-      const realPath = await realpath(decodedPath);
+        .filter(Boolean);
+
+      const filePath = join(uploadDir, ...decodedPath);
+      // Security check - Ensure the file path is within the upload directory
+      if (!filePath.startsWith(uploadDir)) {
+        return error(403, 'Forbidden');
+      }
+      // Security check - Ensure the file exists
+      if (!(await Bun.file(filePath).exists())) {
+        return error(404, 'Not Found');
+      }
+
+      const realPath = await realpath(filePath);
       const realFile = Bun.file(realPath);
 
-      const isCompressed = compressedFileTypes.some(type => realPath.toLowerCase().endsWith(type));
+      const isCompressed = PRECOMPRESSED_TYPES.some(type => realPath.toLowerCase().endsWith(type));
+      info({
+        isCompressed,
+        realPath,
+        size: realFile.size,
+        encodings: headers['accept-encoding'],
+      });
       if (realFile.size <= 65_536 || isCompressed) {
         return realFile;
       }
 
       const supportedEncodings = headers['accept-encoding']?.split(',').map(e => e.trim()) ?? [];
 
-      zsdt: {
-        if (supportedEncodings.includes('zstd')) {
-          const zstFile = Bun.file(`${realPath}.zst`);
-          if (!(await zstFile.exists())) {
-            const result = await compressFile(realPath, 'zstd').catch(error => {
-              err(`Failed compressing new file ${realPath}`, error);
-              return false;
-            });
-            if (!result) break zsdt;
-          }
-          // info(`Serving zstd file ${realPath}.zst`);
-          set.headers['content-encoding'] = 'zstd';
-          set.headers['content-type'] = realFile.type;
-          return zstFile;
+      for (const [encoding, extension] of typedObjectEntries(COMPRESSION_ENCODINGS)) {
+        if (!supportedEncodings.includes(encoding)) continue;
+        const compressedFile = () => Bun.file(`${realPath}${extension}`);
+        if (!(await compressedFile().exists())) {
+          const result = await compressFile(realPath, encoding).catch(error => {
+            err(`Failed compressing new file ${realPath}`, error);
+            return false;
+          });
+          if (!result) break;
         }
-      }
-
-      brotli: {
-        if (supportedEncodings.includes('br')) {
-          const brFile = Bun.file(`${realPath}.br`);
-          if (!(await brFile.exists())) {
-            const result = await compressFile(realPath, 'brotli').catch(error => {
-              err(`Failed compressing new file ${realPath}`, error);
-              return false;
-            });
-            if (!result) break brotli;
-          }
-          // info(`Serving brotli file ${realPath}.br`);
-          set.headers['content-encoding'] = 'br';
-          set.headers['content-type'] = realFile.type;
-          return brFile;
-        }
-      }
-
-      gzip: {
-        if (supportedEncodings.includes('gzip')) {
-          const gzFile = Bun.file(`${realPath}.gz`);
-          if (!(await gzFile.exists())) {
-            const result = await compressFile(realPath, 'gzip').catch(error => {
-              err(`Failed compressing new file ${realPath}`, error);
-              return false;
-            });
-            if (!result) break gzip;
-          }
-          // info(`Serving gzip file ${realPath}.gz`);
-          set.headers['content-encoding'] = 'gzip';
-          set.headers['content-type'] = realFile.type;
-          return gzFile;
-        }
+        set.headers['content-encoding'] = encoding;
+        set.headers['content-type'] = realFile.type;
+        return compressedFile();
       }
 
       return realFile;
-      //     http://localhost:3030/uploads/model/66f1524a93ae4c138e26f96f/DamagedHelmet.glb
     },
     {
       params: t.Object({
@@ -282,7 +276,9 @@ const uploadRouter = new Elysia()
         },
         {
           body: t.Object({
-            file: t.File(),
+            file: t.File({
+              maxSize: '4096m',
+            }),
             relativePath: t.String(),
             token: t.String(),
             type: t.String(),
@@ -309,9 +305,11 @@ const uploadRouter = new Elysia()
           if (files.length === 0) return error(404, 'No files found');
           if (ids.length <= 0) return error(404, 'No files found');
 
-          const hasBeenProcessed =
-            (await Promise.all(files.flatMap(file => getProcessedFiles(dirname(file))))).flat()
-              .length > 0;
+          const hasBeenProcessed = await getProcessedFiles(
+            ids.map(id => `${RootDirectory}/${UploadDirectory}/${type}/${id}`),
+            type,
+          ).then(result => result.length > 0);
+
           const hasObjFiles = files.some(file => file.toLowerCase().endsWith('.obj'));
           const hasLasFiles = files.some(
             file => file.toLowerCase().endsWith('.las') || file.toLowerCase().endsWith('.laz'),
@@ -380,12 +378,14 @@ const uploadRouter = new Elysia()
         '/finish',
         async ({ error, body: { uuid, type } }) => {
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
-          const { files } = await getUploadedFiles({ type, path });
+          const { files, ids } = await getUploadedFiles({ type, path });
           if (files.length === 0) return error(404, 'No files found');
 
-          const processedFiles = (
-            await Promise.all(files.map(async file => await getProcessedFiles(dirname(file))))
-          ).flat();
+          const processedFiles = await getProcessedFiles(
+            ids.map(id => `${RootDirectory}/${UploadDirectory}/${type}/${id}`),
+            type,
+            true,
+          );
 
           console.log(processedFiles, files);
 
