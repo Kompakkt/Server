@@ -1,6 +1,7 @@
 import { type Collection as DbCollection, ObjectId } from 'mongodb';
 import {
   Collection,
+  type IAnnotation,
   type ICompilation,
   type IDigitalEntity,
   type IDocument,
@@ -31,10 +32,12 @@ import {
   physicalEntityCollection,
   tagCollection,
 } from 'src/mongo';
+import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { updatePreviewImage } from 'src/util/image-helpers';
-import { makeUserOwnerOf } from '../user-management/users';
 import { stripUser } from 'src/util/userdata-transformation';
+import { makeUserOwnerOf } from '../user-management/users';
+import { HookManager } from './hooks';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,
@@ -82,12 +85,29 @@ const transformDocument: TransformFn<any> = async <T>(body: ServerDocument<IDocu
   return asDocument;
 };
 
+const transformAnnotation: TransformFn<IAnnotation> = async (body, user) => {
+  const asAnnotation = body as unknown as Partial<IAnnotation>;
+
+  try {
+    asAnnotation!.body!.content!.relatedPerspective!.preview = await updatePreviewImage(
+      asAnnotation!.body!.content!.relatedPerspective!.preview,
+      'annotation',
+      asAnnotation._id!,
+    );
+  } catch (error) {
+    err('Error updating preview image:', error);
+  }
+
+  return asAnnotation;
+};
+
 const transformEntity: TransformFn<IEntity> = async (body, user) => {
   const asEntity = body as unknown as Partial<IEntity>;
 
   const strippedUser = stripUser(user);
 
   return {
+    _id: asEntity._id,
     annotations: flattenRecord(asEntity.annotations),
     creator: asEntity.creator ?? strippedUser,
     dataSource: asEntity.dataSource,
@@ -121,6 +141,7 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
 const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
   const asDigitalEntity = body as unknown as Partial<IDigitalEntity>;
   return {
+    _id: asDigitalEntity._id,
     biblioRefs: asDigitalEntity.biblioRefs ?? [],
     creation: asDigitalEntity.creation ?? [],
     description: asDigitalEntity.description ?? '',
@@ -147,6 +168,7 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
 const transformCompilation: TransformFn<ICompilation> = async body => {
   const asCompilation = body as unknown as Partial<ICompilation>;
   return {
+    _id: asCompilation._id,
     annotations: flattenRecord(asCompilation.annotations),
     creator: asCompilation.creator,
     description: asCompilation.description ?? '',
@@ -175,6 +197,7 @@ const transformInstitution: TransformFn<IInstitution> = async body => {
   };
 
   return {
+    _id: asInstitution._id,
     addresses: combinedAddresses,
     name: asInstitution.name,
     notes: asInstitution.notes,
@@ -209,6 +232,7 @@ const transformPerson: TransformFn<IPerson> = async body => {
   }
 
   return {
+    _id: asPerson._id,
     contact_references: combinedContactReferences,
     name: asPerson.name,
     prename: asPerson.prename,
@@ -220,6 +244,7 @@ const transformPerson: TransformFn<IPerson> = async body => {
 const transformPhysicalEntity: TransformFn<IPhysicalEntity> = async body => {
   const asPhysicalEntity = body as unknown as Partial<IPhysicalEntity>;
   return {
+    _id: asPhysicalEntity._id,
     biblioRefs: asPhysicalEntity.biblioRefs ?? [],
     description: asPhysicalEntity.description ?? '',
     externalId: asPhysicalEntity.externalId ?? [],
@@ -274,7 +299,8 @@ const createSaver = <T extends ServerDocument<T>>(
       obj._id = new ObjectId().toString();
     }
 
-    log(`Saving ${obj._id} to ${collection.collectionName}`);
+    log(`Running Saver for ${obj._id} to ${collection.collectionName}`);
+    entitiesCache.del(`${collection.collectionName}::${obj._id}`);
 
     log(`Making user owner of ${obj._id} to ${collection.collectionName}`);
     await makeUserOwnerOf({
@@ -286,34 +312,54 @@ const createSaver = <T extends ServerDocument<T>>(
     });
 
     if (additionalProcessing) {
-      log(`Running additional processing on ${obj._id}`);
+      log(`Running additional processing on ${collection.collectionName} ${obj._id}`);
       await additionalProcessing(obj, userdata).catch(error => {
-        err(`Error running additional processing on ${obj._id}`, error);
+        err(
+          `Error running additional processing on ${collection.collectionName} ${obj._id}`,
+          error,
+        );
       });
-      log(`Finished additional processing on ${obj._id}`);
+      log(`Finished additional processing on ${collection.collectionName} ${obj._id}`);
     }
-    log(`Transforming ${obj._id}`);
-    const transformed = await transform(structuredClone(obj), userdata);
-    log(`Transformed ${obj._id}`);
-    log(`Saving ${obj._id}`);
+    log(`Transforming ${collection.collectionName} ${obj._id}`);
+    const transformedPreHook = await transform(structuredClone(obj), userdata);
+    log(`Transformed ${collection.collectionName} ${obj._id}`);
+
+    log(`Running onTransform hooks ${collection.collectionName} ${obj._id}`);
+    const transformed = (await HookManager.runHooks(
+      collection.collectionName as Collection,
+      'onTransform',
+      transformedPreHook as T,
+    )) as Partial<T>;
+    log(`Finished onTransform hooks ${collection.collectionName} ${obj._id}`);
+
+    log(`Saving ${collection.collectionName} ${obj._id}`);
     transformed._id = undefined;
     delete transformed._id;
-    return await collection
+    const saved = await collection
       .updateOne({ _id: new ObjectId(obj._id) } as any, { $set: transformed }, { upsert: true })
       .then(result => {
-        log(`Saved ${obj._id}`, result);
+        log(`Saved ${collection.collectionName} ${obj._id}`, result);
         return result.modifiedCount + result.upsertedCount > 0 || result.matchedCount > 0;
       })
       .catch(error => {
-        err(`Error saving ${obj._id}`, error);
+        err(`Error saving ${collection.collectionName} ${obj._id}`, error);
         return false;
       });
+    log(`Running afterSave hooks ${collection.collectionName} ${obj._id}`);
+    await HookManager.runHooks(
+      collection.collectionName as Collection,
+      'afterSave',
+      transformed as T,
+    );
+    log(`Finished afterSave hooks ${collection.collectionName} ${obj._id}`);
+    return saved;
   };
 };
 
 // TODO: Check strategies against old strategies, to see whats missing from transformers
 const addressSaver = createSaver(addressCollection, transformDocument);
-const annotationSaver = createSaver(annotationCollection, transformDocument);
+const annotationSaver = createSaver(annotationCollection, transformAnnotation);
 const contactSaver = createSaver(contactCollection, transformDocument);
 const groupSaver = createSaver(groupCollection, transformDocument);
 const tagSaver = createSaver(tagCollection, transformDocument);

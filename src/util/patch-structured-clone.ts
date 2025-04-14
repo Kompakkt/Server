@@ -33,7 +33,7 @@ const patchedStructureClone = <T = unknown>(
   return cloned;
 };
 
-// biome-ignore lint: Any is expected here to overwrite the global variable
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).structuredClone = patchedStructureClone;
 
 log('Patched structured clone to support cloning ObjectId');

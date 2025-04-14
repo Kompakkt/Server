@@ -1,6 +1,6 @@
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
-import { err, info } from 'src/logger';
+import { err, info, log } from 'src/logger';
 import { basename, dirname } from 'node:path';
 import { waitUntilFileExists } from './wait-until-file-exists';
 
@@ -15,21 +15,21 @@ const { UploadDirectory } = Configuration.Uploads;
 const compressBrotli = async (path: string) => {
   const dir = dirname(path);
   const name = basename(path);
-  console.log('brotli', { dir, name });
+  log('brotli', { dir, name });
   return Bun.$`brotli -4 ${name}`.cwd(dir).quiet();
 };
 
 const compressZstd = async (path: string) => {
   const dir = dirname(path);
   const name = basename(path);
-  console.log('zstd', { dir, name });
+  log('zstd', { dir, name });
   return Bun.$`zstd -1 ${name}`.cwd(dir).quiet();
 };
 
 const compressGzip = async (path: string) => {
   const dir = dirname(path);
   const name = basename(path);
-  console.log('gzip -6 -k', { dir, name });
+  log('gzip -6 -k', { dir, name });
   // We use pigz instead of gzip because it's faster
   return Bun.$`pigz -6 -k ${name}`.cwd(dir).quiet();
 };

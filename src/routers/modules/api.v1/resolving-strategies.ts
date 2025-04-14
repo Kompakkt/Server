@@ -132,7 +132,7 @@ type ResolverFunction<T extends ServerDocument<T>> = (
 const resolveAndFilterArray = async <T extends string | IDocument>(
   items: DangerousArray,
   resolverFn: ResolveFn<T>,
-  typeGuard: (item: any) => item is T,
+  typeGuard: (item: unknown) => item is T,
 ) => {
   const promises = items
     .filter((item): item is T | string => !!item)
@@ -276,6 +276,18 @@ export const resolveEntity: ResolveFn<IEntity> = createResolver(
   isEntity,
   async entity => {
     await resolveObjectProperties(entity.annotations, resolveAnnotation, isAnnotation);
+    const seperateAnnotations = await annotationCollection
+      .find({
+        'target.source.relatedEntity': entity._id.toString(),
+        '$or': [
+          { 'target.source.relatedCompilation': { $exists: false } },
+          { 'target.source.relatedCompilation': '' },
+        ],
+      })
+      .toArray();
+    for (const annotation of seperateAnnotations) {
+      entity.annotations[annotation._id.toString()] = annotation as IAnnotation;
+    }
     if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
       const resolved = await resolveDigitalEntity(entity.relatedDigitalEntity);
       if (resolved) entity.relatedDigitalEntity = withStringId(resolved);
@@ -288,6 +300,12 @@ export const resolveCompilation: ResolveFn<ICompilation> = createResolver(
   compilationCollection,
   isCompilation,
   async entity => {
+    const seperateAnnotations = await annotationCollection
+      .find({ 'target.source.relatedCompilation': entity._id.toString() })
+      .toArray();
+    for (const annotation of seperateAnnotations) {
+      entity.annotations[annotation._id.toString()] = annotation as IAnnotation;
+    }
     await resolveObjectProperties(entity.entities, resolveEntity, isEntity);
     return entity;
   },

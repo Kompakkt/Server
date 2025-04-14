@@ -1,33 +1,24 @@
-import { info, log } from 'src/logger';
+import { Collection, type IAnnotation, type IDigitalEntity } from 'src/common';
+import { log } from 'src/logger';
+import { HookManager } from 'src/routers/modules/api.v1/hooks';
+import { type ServerDocument } from 'src/util/document-with-objectid-type';
 import { Plugin } from '../plugin-base';
 import {
-  type IWikibaseItem,
-  getDigitalEntityMetadataSpark,
+  type IWikibaseAnnotationExtension,
+  type IWikibaseDigitalEntityExtension,
   isWikibaseConfiguration,
 } from './common';
-import { WikibaseConfiguration } from './config';
+import {
+  type WikibaseAnnotation,
+  WikibaseConfiguration,
+  type WikibaseDigitalEntity,
+} from './config';
 import wikibaseRouter from './router';
-import { type MetadataResponseItem, WikibaseService } from './service';
-
-const ids = [
-  'Q574',
-  'Q779',
-  'Q1041',
-  'Q1037',
-  'Q1031',
-  'Q1029',
-  'Q1084',
-  'Q1100',
-  'Q1036',
-  'Q1032',
-  'Q1061',
-  'Q1038',
-  'Q1034',
-  'Q1035',
-  'Q1088',
-];
-
-const combinedResult: Record<string, any> = {};
+import { WikibaseService } from './service';
+import {
+  ensureAnnotationExtensionData,
+  ensureDigitalEntityExtensionData,
+} from './ensure-extension-data';
 
 class WikibasePlugin extends Plugin {
   routers = [wikibaseRouter];
@@ -43,34 +34,37 @@ class WikibasePlugin extends Plugin {
     const service = new WikibaseService();
     this.#service = service;
 
-    // Create and delete test entity
-    /*const createdTestEntity = await service.wbEdit.entity.create({
-      type: 'item',
-      labels: { en: 'Test entity' },
-      descriptions: { en: 'Test entity for testing' },
+    log('Registering hooks');
+    HookManager.addHook<ServerDocument<IDigitalEntity>>({
+      collection: Collection.digitalentity,
+      type: 'onTransform',
+      callback: async digitalEntity => {
+        const doc = ensureDigitalEntityExtensionData(digitalEntity);
+        const result = await service.updateDigitalEntity(doc, {});
+        if (!result) {
+          throw new Error('Failed to update wikibase digital entity');
+        }
+        doc.extensions!.wikibase!.id = result.itemId;
+        doc.extensions!.wikibase!.address = WikibaseConfiguration?.Domain;
+        // log('After Wikibase transform', Bun.inspect(doc));
+        return doc;
+      },
     });
-
-    info('test entity', createdTestEntity);
-
-    const deletedTestEntity = await service.wbEdit.entity.delete({
-      id: createdTestEntity.entity.id,
+    HookManager.addHook<ServerDocument<IAnnotation>>({
+      collection: Collection.annotation,
+      type: 'onTransform',
+      callback: async annotation => {
+        const doc = ensureAnnotationExtensionData(annotation);
+        const result = await service.updateAnnotation(doc, {});
+        if (!result) {
+          throw new Error('Failed to update wikibase annotation');
+        }
+        doc.extensions!.wikibase!.id = result.itemId;
+        doc.extensions!.wikibase!.address = WikibaseConfiguration?.Domain;
+        // log('After Wikibase transform', Bun.inspect(doc));
+        return doc;
+      },
     });
-    info('deleted test entity', deletedTestEntity);*/
-
-    /*for (const id of ids) {
-      const data = await service.wikibase_read<MetadataResponseItem>(
-        getDigitalEntityMetadataSpark(id),
-      );
-      if (!data) {
-        info('Failed getting', id);
-        combinedResult[id] = 'Error';
-        continue;
-      }
-      const processed = service.processRawMetadata(data);
-      info('Processed', id, processed);
-      combinedResult[id] = processed;
-    }
-    info(combinedResult);*/
 
     return true;
   }

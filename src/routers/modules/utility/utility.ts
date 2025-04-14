@@ -1,10 +1,8 @@
-import type { Server } from 'node:http';
 import { type Filter, ObjectId } from 'mongodb';
 import {
   Collection,
   type IAnnotation,
   type ICompilation,
-  type IEntity,
   type IStrippedUserData,
   type IUserData,
   isAnnotation,

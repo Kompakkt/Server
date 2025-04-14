@@ -4,6 +4,7 @@ import { Configuration } from 'src/configuration';
 import { err, info, log } from 'src/logger';
 import { RequestClient } from 'src/util/requests';
 import { RootDirectory } from '../../environment';
+import { CacheClient } from 'src/redis';
 
 interface TokenManager {
   loginToken: string | null;
@@ -53,6 +54,11 @@ type WikibaseImageResponse = {
     filename: string;
   };
 };
+
+type LinkbackResponse = {
+  success: number;
+};
+
 const isWikibaseImageResponse = (response: unknown): response is WikibaseImageResponse => {
   if (response === null || typeof response !== 'object') return false;
   if (Object.hasOwn(response, 'error')) {
@@ -65,6 +71,8 @@ const isWikibaseImageResponse = (response: unknown): response is WikibaseImageRe
   }
   return false;
 };
+
+const { DBOffset: offset } = Configuration.Redis;
 
 export class WikibaseConnector implements TokenManager {
   private wikibaseUrl: string;
@@ -195,15 +203,15 @@ export class WikibaseConnector implements TokenManager {
       return this.requestCsrfToken();
     }
     this.requestAttempts = 0;
-    console.log('requestCsrfToken', token);
+    log('requestCsrfToken', token);
     return token;
   }
 
   async refreshToken() {
     const token = await this.requestCsrfToken();
-    if (!token) return false;
+    if (!token) return undefined;
     this.csrfToken = token;
-    return true;
+    return token;
   }
 
   async getLoginToken() {
@@ -217,79 +225,106 @@ export class WikibaseConnector implements TokenManager {
     return this.loginToken;
   }
 
-  async getCsrfToken(forceRefresh = false): Promise<string> {
+  async getCsrfToken(forceRefresh = false): Promise<string | undefined> {
     if (forceRefresh || !this.csrfToken || this.csrfToken === '+\\') {
-      await this.refreshToken();
+      const token = await this.refreshToken();
+      if (!token) {
+        return undefined;
+      }
+      this.csrfToken = token;
     }
-    console.log('csrfToken', this.csrfToken);
-    return this.csrfToken as string;
+    log('csrfToken', this.csrfToken);
+    return this.csrfToken;
   }
 
   // Annotation methods
 
-  public async writeAnnotation(id: string, text: string): Promise<void> {
+  public async writeAnnotation(id: string, text: string) {
     const csrfToken = await this.getCsrfToken();
-    const params = {
-      action: 'edit',
-      title: `Annotation:${id}`,
-      text: text,
-      token: csrfToken,
-      format: 'json',
-    };
-
-    await this.client.post('/api.php', { params });
-  }
-
-  public async writeImage(id: string, img: string): Promise<string> {
-    if (img !== '') {
-      const csrfToken = await this.getCsrfToken();
-      const filename = `Preview${id}.png`;
-      const params = {
-        action: 'upload',
-        filename: filename,
-        ignorewarnings: '1',
-        token: csrfToken,
-        format: 'json',
-      };
-
-      const my_img = join(RootDirectory, Configuration.Uploads.UploadDirectory, img);
-      const formData = await Bun.file(my_img).formData();
-
-      return this.client
-        .post('/api.php', { params, options: { body: formData } })
-        .then(response => {
-          console.log('writeImage', response);
-          if (!isWikibaseImageResponse(response)) {
-            console.error('Invalid response received.');
-            return '';
-          }
-
-          // Check if error exists and has a code property
-          if (response.error?.code) {
-            const info = response.error.info;
-            if (info && typeof info === 'string') {
-              const start = info.indexOf('[[:File:') + 8;
-              const end = info.indexOf(']]');
-              if (start > -1 && end > -1 && end > start) {
-                const filename = info.substring(start, end);
-                return filename;
-              }
-            }
-          }
-          // Check if upload result is "Success"
-          else if (response.upload?.filename) {
-            return response.upload.filename;
-          }
-
-          return '';
-        })
-        .catch(error => {
-          console.log(error);
-          return '';
-        });
+    if (!csrfToken) {
+      throw new Error('Failed to get CSRF token');
     }
 
-    return Promise.resolve('');
+    const formData = new FormData();
+    formData.append('ignorewarnings', '1');
+    formData.append('title', `Annotation:${id}`);
+    formData.append('text', text);
+    formData.append('token', csrfToken);
+    formData.append('action', 'edit');
+    formData.append('format', 'json');
+
+    return await this.client
+      .post('/api.php', {
+        options: {
+          body: formData,
+        },
+      })
+      .then(response => {
+        const asLinkbackResponse = response as Partial<LinkbackResponse>;
+        if (asLinkbackResponse.success === 1) {
+          return true;
+        }
+        throw new Error('Failed to write annotation');
+      });
+  }
+
+  public async writeImage(id: string, path: string) {
+    if (!path) return undefined;
+
+    const csrfToken = await this.getCsrfToken();
+    if (!csrfToken) {
+      throw new Error('Failed to get CSRF token');
+    }
+
+    const file = Bun.file(join(RootDirectory, Configuration.Uploads.UploadDirectory, path));
+    const extension = path.split('.').pop();
+    const filename = `Preview${id}.${extension}`;
+
+    const formData = new FormData();
+    const blob = await Bun.readableStreamToBlob(file.stream());
+    formData.append('file', blob, filename);
+    formData.append('filename', filename);
+    formData.append('ignorewarnings', '1');
+    formData.append('token', csrfToken);
+    formData.append('action', 'upload');
+    formData.append('format', 'json');
+
+    return this.client
+      .post('/api.php', {
+        options: {
+          body: formData,
+        },
+      })
+      .then(response => {
+        log('writeImage', response);
+        if (!isWikibaseImageResponse(response)) {
+          err('Invalid response received.');
+          return '';
+        }
+
+        // Check if error exists and has a code property
+        if (response.error?.code) {
+          const info = response.error.info;
+          if (info && typeof info === 'string') {
+            const start = info.indexOf('[[:File:') + 8;
+            const end = info.indexOf(']]');
+            if (start > -1 && end > -1 && end > start) {
+              const filename = info.substring(start, end);
+              return filename;
+            }
+          }
+        }
+        // Check if upload result is "Success"
+        else if (response.upload?.filename) {
+          return response.upload.filename;
+        }
+
+        return undefined;
+      })
+      .catch(error => {
+        log(error);
+        return undefined;
+      });
   }
 
   // SDK query methods

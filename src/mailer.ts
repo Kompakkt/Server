@@ -1,9 +1,9 @@
 import { ObjectId } from 'mongodb';
-import { type SendMailOptions, type Transporter, createTransport } from 'nodemailer';
+import { type SendMailOptions, createTransport } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { type IUserData, UserRank } from './common';
 import { Configuration, isMailConfiguration } from './configuration';
-import { err, info } from './logger';
+import { err, info, log } from './logger';
 import { wrapInMailBody } from './mail-templates/mail-body.template';
 import { mailCollection, userCollection } from './mongo';
 import type { ServerDocument } from './util/document-with-objectid-type';
@@ -63,7 +63,7 @@ export const sendMail = async (mail: SendMailOptions): Promise<boolean> =>
       : reject('No transporter'),
   )
     .then(mailInfo => {
-      info(mailInfo);
+      info('Mail sent', mailInfo);
       return true;
     })
     .catch(error => {
@@ -82,7 +82,7 @@ export const sendJSXMail = async ({
   to: string;
   subject: string;
 }): Promise<boolean> => {
-  console.log(jsx, wrapInMailBody({ jsx, subject }));
+  log('Preparing JSX mail', jsx, wrapInMailBody({ jsx, subject }));
   return sendMail({
     from,
     to,
@@ -135,8 +135,8 @@ export const sendMailRequest = async (
       return false;
     });
 
-  return addUserToDatabase(obj, userdata, result).catch((e: any) => {
-    err('Failed adding users mail request to DB', e);
+  return addUserToDatabase(obj, userdata, result).catch(error => {
+    err('Failed adding users mail request to DB', error);
   });
 };
 

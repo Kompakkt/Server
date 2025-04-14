@@ -1,24 +1,26 @@
-import { readdir, rmdir, stat, symlink, realpath, exists, watch } from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
+import { fetch } from 'bun';
 import { Elysia, t } from 'elysia';
+import { ObjectId } from 'mongodb';
+import type { Dirent } from 'node:fs';
+import { readdir, realpath, rmdir, stat, symlink } from 'node:fs/promises';
+import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
 import type { IFile } from 'src/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { err, info, log } from 'src/logger';
+import { entityCollection } from 'src/mongo';
 import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
-import { ensure } from 'src/util/file-related-helpers';
-import { authService } from './handlers/auth.service';
-import { compressFile, COMPRESSION_ENCODINGS } from 'src/util/compress-file';
-import { fetch } from 'bun';
 import { unique } from 'src/util/array-helpers';
-import type { Dirent } from 'node:fs';
+import { compressFile, COMPRESSION_ENCODINGS } from 'src/util/compress-file';
+import { ensure } from 'src/util/file-related-helpers';
 import { typedObjectEntries } from 'src/util/typed-object-entries';
 import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
+import { authService } from './handlers/auth.service';
 
 declare global {
-  // biome-ignore lint: Any is expected here
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
   interface ReadableStream<R = any> {
     [Symbol.asyncIterator](): AsyncIterableIterator<R>;
   }
@@ -53,14 +55,22 @@ type KompressorQueueResponse = {
 // Helper functions
 const slug = (text: string) => slugify(text, { remove: /[^\w\s$*_+~.()'"!\-:@/]/g });
 
-const calculateMD5 = (readableStream: ReadableStream<Uint8Array>) =>
-  new Promise<string>(async resolve => {
+const calculateMD5 = (readableStream: ReadableStream<Uint8Array>): Promise<string> => {
+  return new Promise<string>((resolve, reject) => {
     const hash = new Bun.CryptoHasher('md5');
-    for await (const chunk of readableStream) {
-      hash.update(chunk);
-    }
-    resolve(hash.digest('hex'));
+
+    (async () => {
+      try {
+        for await (const chunk of readableStream) {
+          hash.update(chunk);
+        }
+        resolve(hash.digest('hex'));
+      } catch (error) {
+        reject(error);
+      }
+    })();
   });
+};
 
 const writeStreamToDisk = async (readableStream: ReadableStream<Uint8Array>, destPath: string) => {
   try {
@@ -134,7 +144,7 @@ const getUploadedFiles = async ({
 };
 
 const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait = false) => {
-  console.log('getProcessedFiles', { paths, mediaType });
+  log('getProcessedFiles', { paths, mediaType });
   const processedFiles = new Set<string>();
 
   for (const path of paths) {
@@ -142,7 +152,7 @@ const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait 
       const eptJsonPath = `${path}/out/ept.json`;
       const eptJsonExists = await waitUntilFileExists(eptJsonPath, shouldWait ? 10_000 : 0);
 
-      console.log({ eptJsonPath, eptJsonExists });
+      log({ eptJsonPath, eptJsonExists });
 
       if (eptJsonExists) {
         processedFiles.add(eptJsonPath);
@@ -230,11 +240,68 @@ const uploadRouter = new Elysia()
       }),
     },
   )
+  .get(
+    '/download/:entityId',
+    async function* ({ error, params: { entityId } }) {
+      const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+      if (!entity) return error(404, 'Entity not found');
+      const dirnames = Array.from(new Set(entity.files.map(file => dirname(file.file_link))));
+      const uniqueFiles = new Set<string>();
+      for (const dirname of dirnames) {
+        const entries = await readdir(join(RootDirectory, dirname), {
+          recursive: true,
+          withFileTypes: true,
+        });
+        const filesPromises = entries
+          .filter(entry => entry.isFile())
+          .filter(entry => !entry.parentPath.includes('out/ept'))
+          .map(entry =>
+            entry.isSymbolicLink()
+              ? realpath(join(entry.parentPath, entry.name))
+              : Promise.resolve(join(entry.parentPath, entry.name)),
+          );
+        const files = await Promise.all(filesPromises);
+        files.forEach(file => uniqueFiles.add(file));
+      }
+
+      const fileList = Array.from(uniqueFiles);
+      const cwd = join(RootDirectory, dirnames[0]!);
+
+      const existingZipArchive = fileList.find(file => file.endsWith(`${entityId}.zip`));
+      if (existingZipArchive) {
+        return {
+          progress: 1,
+          url: existingZipArchive.replace(RootDirectory, ''),
+        };
+      }
+
+      try {
+        for (let i = 0; i < fileList.length; i++) {
+          const file = fileList[i];
+          await Bun.$`7zz a "${entityId}.zip" "${file}"`.cwd(cwd).quiet();
+          yield { progress: (i + 1) / fileList.length };
+        }
+      } catch (error) {
+        err('Error creating zip file:', error);
+      }
+
+      return {
+        progress: 1,
+        url: join(cwd, `${entityId}.zip`).replace(RootDirectory, ''),
+      };
+    },
+    {
+      // isLoggedIn: true,
+      params: t.Object({
+        entityId: t.String(),
+      }),
+    },
+  )
   .group('/upload', { isLoggedIn: true }, group =>
     group
       .post(
         '/file',
-        async ({ error, userdata, body: { file, checksum, token, type, relativePath } }) => {
+        async ({ error, body: { file, checksum, token, type, relativePath } }) => {
           const serverChecksum = await calculateMD5(file.stream());
           const destPath = join(
             uploadDir,
@@ -344,7 +411,7 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/process/info',
-        async ({ error, body: { uuid, type } }) => {
+        async ({ body: { uuid, type } }) => {
           const { Enabled, Hostname, Port } = Configuration.Kompressor;
           if (!Enabled) {
             return {
@@ -387,21 +454,26 @@ const uploadRouter = new Elysia()
             true,
           );
 
-          console.log(processedFiles, files);
+          log({ processedFiles, files });
 
           const finalFiles: IFile[] = (processedFiles.length > 0 ? processedFiles : files).map(
             file => {
               let relPath = dirname(file).replace(RootDirectory, '');
               relPath = relPath.charAt(0) === '/' ? relPath.slice(1) : relPath;
+              if (!relPath.startsWith(`${UploadDirectory}/${type}/${uuid}`)) {
+                relPath = join(UploadDirectory, type, uuid, relPath);
+              }
 
               return {
                 file_name: basename(file),
                 file_link: join(relPath, basename(file)),
-                file_size: Bun.file(file).size,
+                file_size: Bun.file(join(RootDirectory, relPath, basename(file))).size,
                 file_format: extname(file),
               } satisfies IFile;
             },
           );
+
+          log({ finalFiles });
 
           return { status: 'OK', files: finalFiles };
         },

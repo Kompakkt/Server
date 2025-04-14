@@ -30,6 +30,7 @@ export default tseslint.config(
       'quotes': ['error', 'single'],
       'semi': ['error', 'always'],
       'prettier/prettier': 'error',
+      'no-console': 'warn',
       '@typescript-eslint/camelcase': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/naming-convention': [

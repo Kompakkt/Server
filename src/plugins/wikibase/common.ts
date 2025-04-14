@@ -34,7 +34,7 @@ export type IMediaHierarchy = {
   siblings: IWikibaseItem[];
 };
 
-export type IWikibaseLabel = Record<string, string | string[]>;
+export type IWikibaseLabel = Record<string, string>;
 
 export type IWikibaseDigitalEntityExtension = {
   wikibase?: IWikibaseDigitalEntityExtensionData;
@@ -42,7 +42,7 @@ export type IWikibaseDigitalEntityExtension = {
 
 export type IWikibaseDigitalEntityExtensionData = Partial<{
   label: IWikibaseLabel;
-  description: string | Array<string | IWikibaseItem>;
+  description: IWikibaseLabel;
   id: string;
   address: string;
   agents: IMediaAgent[];
@@ -63,8 +63,10 @@ export type IWikibaseAnnotationExtension = {
 };
 
 export type IWikibaseAnnotationExtensionData = Partial<{
+  id: string;
+  address: string;
   label: IWikibaseLabel;
-  description: string | Array<string | IWikibaseItem>;
+  description: IWikibaseLabel;
   authors: IWikibaseItem[];
   licenses: IWikibaseItem[];
   media: IWikibaseItem[];

@@ -1,3 +1,5 @@
+import { log } from 'src/logger';
+
 /**
  * Wait until a file exists.
  * @param path - The path to the file.
@@ -9,14 +11,15 @@ export const waitUntilFileExists = async (path: string, timeout: number) => {
     const result = await Bun.file(path).exists();
     return result;
   }
-  console.log('Waiting for file to exist:', path);
-  console.time('waitUntilFileExists' + path);
+  log(`Waiting for file to exist: ${path}`);
+  const startTime = performance.now();
   return new Promise<boolean>(resolve => {
     const checkIfFileExists = async () => {
       const result = await Bun.file(path).exists();
       if (result) {
-        console.log('File exists:', path);
-        console.timeEnd('waitUntilFileExists' + path);
+        const endTime = performance.now();
+        const duration = endTime - startTime;
+        log(`File exists after ${duration}ms at ${path}`);
         return resolve(true);
       }
       setTimeout(() => checkIfFileExists(), 0);

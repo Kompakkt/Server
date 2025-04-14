@@ -1,4 +1,3 @@
-import { Redis } from 'ioredis';
 import hash from 'object-hash';
 import { Configuration } from './configuration';
 import { log } from './logger';
@@ -6,24 +5,27 @@ import { log } from './logger';
 const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
 export class CacheClient {
-  private redis: Redis;
+  private redis: Bun.RedisClient;
   private db: number;
   private defaultSeconds: number;
   public hash = hash;
 
+  public static readonly takenDbs = new Set<number>();
+
   constructor(db: number, defaultSeconds: number) {
+    if (CacheClient.takenDbs.has(db)) {
+      throw new Error(`DB ${db} is already in use`);
+    }
+    CacheClient.takenDbs.add(db);
     this.db = db;
-    this.redis = new Redis({ db, host, port });
+    this.redis = new Bun.RedisClient(`redis://${host}:${port}/${db}`);
     this.defaultSeconds = defaultSeconds;
     log(`Initialized Redis using DB ${db}`);
   }
 
-  get client() {
-    return this.redis;
-  }
-
   public async flush() {
-    return this.redis.flushdb().then(() => log(`Flushed Redis DB ${this.db}`));
+    // flushdb().then(() => log(`Flushed Redis DB ${this.db}`));
+    return this.redis.send('FLUSHDB', ['SYNC']).then(() => log(`Flushed Redis DB ${this.db}`));
   }
 
   public async del(key: string) {
@@ -43,7 +45,7 @@ export class CacheClient {
     return Promise.all(matches.map(m => this.get<T>(m)));
   }
 
-  public async set(key: string, value: any, seconds = this.defaultSeconds) {
+  public async set(key: string, value: unknown, seconds = this.defaultSeconds) {
     if (seconds <= 0) {
       return this.redis.set(key, JSON.stringify(value));
     }

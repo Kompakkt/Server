@@ -6,6 +6,7 @@ import { helmet } from 'elysia-helmet';
 import { Logestic } from 'logestic';
 import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
+import { err } from './logger';
 
 export const jwtOptions: JWTOption = {
   secret: Bun.env.JWT_SECRET ?? 'secret',
@@ -28,9 +29,10 @@ const configServer = new Elysia({
     if (code === 'NOT_FOUND') {
       return;
     }
-    console.error(error);
+    err(error);
   })
   // These are as any because type inference in other routers is bugged otherwise
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   .use(Logestic.preset('fancy') as any)
   .use(
     helmet({
@@ -42,6 +44,7 @@ const configServer = new Elysia({
           imgSrc: ["'self'", 'data:', 'https:'],
         },
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any,
   )
   .get('/health', ({ set }) => {
@@ -50,15 +53,12 @@ const configServer = new Elysia({
       status: 'OK',
     };
   })
-  .get('/favicon.ico', ({ redirect }) => Bun.file(`${RootDirectory}/assets/favicon.ico`))
+  .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
   .use(timingPlugin({}))
-  .get(
-    '/previews/*',
-    ({ redirect, params }) =>
-      Bun.file(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`),
-    // redirect(`https://kompakkt.de/server/previews/${params['*']}`),
+  .get('/previews/*', ({ params }) =>
+    Bun.file(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`),
   );
 
 export default configServer;

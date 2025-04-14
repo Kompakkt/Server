@@ -43,7 +43,7 @@ const userManagementRouter = new Elysia()
       )
       .post(
         '/register',
-        async ({ error, body, set }) => {
+        async ({ error, body }) => {
           info('Registering new user');
           // First user gets admin
           const isFirstUser = (await userCollection.findOne({})) === undefined;
@@ -114,7 +114,7 @@ const userManagementRouter = new Elysia()
           isLoggedIn: true,
         },
       )
-      .get('/auth', async ({ cookie: { auth }, error, jwt, set }) => {
+      .get('/auth', async ({ cookie: { auth }, error, jwt }) => {
         if (!auth.value) {
           return error(401, 'No session');
         }

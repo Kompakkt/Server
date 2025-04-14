@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { type IUserData, UserRank } from 'src/common';
-import { err, log } from 'src/logger';
+import { log } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import {
   type AuthResult,

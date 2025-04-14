@@ -1,4 +1,4 @@
-import { info } from 'src/logger';
+import { info, log } from 'src/logger';
 
 type ResponseFormat = 'json' | 'text' | 'blob' | 'arrayBuffer';
 
@@ -66,6 +66,7 @@ const request = (method: string, url: string, obj: RequestOptions) => {
     method,
   }).then(response => {
     cookieJar.append(response.headers.getSetCookie());
+    log('Got response for', finalUrl);
     switch (responseFormat) {
       case 'blob':
         return response.blob();

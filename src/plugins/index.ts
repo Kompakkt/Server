@@ -43,7 +43,6 @@ export const initializePlugins = async () => {
     .map(file => join(file.parentPath, file.name));
 
   for (const file of pluginFiles) {
-    continue;
     try {
       const plugin = await import(file).then(module => module.default);
       await PluginController.loadPlugin(plugin);

@@ -3,6 +3,7 @@ import { Collection, type IDocument, type IUserData } from 'src/common';
 import { userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny } from '../api.v1/resolving-strategies';
+import { log } from 'src/logger';
 
 export const makeUserOwnerOf = async ({
   docs,
@@ -78,7 +79,7 @@ export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData
       user.data[collection] = filtered;
     }
   } catch (e) {
-    console.log(e);
+    log(e);
   }
   return user;
 };

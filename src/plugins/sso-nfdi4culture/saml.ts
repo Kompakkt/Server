@@ -5,7 +5,7 @@ import { err, log, warn } from 'src/logger';
 export const samlProfileToUser = (profile: any) => {
   try {
     // TODO remove after debugging
-    console.log('SAML Profile:', profile);
+    log('SAML Profile:', profile);
     if (!profile.uid || !profile.mail || !profile.givenName || !profile.sn) {
       warn('Missing required fields from SAML response');
       return false;
