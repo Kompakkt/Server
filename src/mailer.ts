@@ -47,6 +47,9 @@ const transporter = (() => {
   return createTransport({
     host: Configuration.Mailer.Host,
     port: Configuration.Mailer.Port,
+    tls: {
+      rejectUnauthorized: false,
+    },
   });
 })();
 
@@ -55,7 +58,7 @@ export const sendMail = async (mail: SendMailOptions): Promise<boolean> =>
     transporter
       ? transporter.sendMail(mail, (error, info) => {
           if (error) {
-            err(error);
+            err(error.toString());
             reject({ err, info });
           }
           resolve(info);
@@ -67,7 +70,7 @@ export const sendMail = async (mail: SendMailOptions): Promise<boolean> =>
       return true;
     })
     .catch(error => {
-      err(error);
+      err(error.toString());
       return true;
     });
 
