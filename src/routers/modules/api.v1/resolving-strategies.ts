@@ -26,6 +26,7 @@ import {
   isTag,
   isUnresolved,
 } from 'src/common';
+import { err, log } from 'src/logger';
 import {
   addressCollection,
   annotationCollection,
@@ -43,7 +44,7 @@ import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 type ResolveFn<T> = (obj: ServerDocument<IDocument | T>) => Promise<ServerDocument<T> | undefined>;
-type DangerousArray = (IDocument | string | undefined | null)[];
+type DangerousArray = (IDocument | ObjectId | string | undefined | null)[];
 
 // TODO: Can this method be removed?
 const withStringId = <T extends { _id: string | ObjectId }>(entity: T): { _id: string } & T => ({
@@ -51,8 +52,8 @@ const withStringId = <T extends { _id: string | ObjectId }>(entity: T): { _id: s
   _id: entity._id.toString(),
 });
 
-const toDocument = <T extends IDocument>(obj: string | T): IDocument =>
-  typeof obj === 'string' ? { _id: obj } : obj;
+const toDocument = <T extends IDocument>(obj: string | ObjectId | T): IDocument =>
+  typeof obj === 'string' ? { _id: obj } : obj instanceof ObjectId ? { _id: obj.toString() } : obj;
 
 const removeUnrelatedEntities = <T extends ServerDocument<IPerson> | ServerDocument<IInstitution>>(
   obj: T,
@@ -198,15 +199,32 @@ const createResolver = <T extends ServerDocument<T>>(
 ): ResolveFn<T> => {
   return async (obj: any) => {
     const cachedEntity = obj?._id
-      ? await entitiesCache.get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
+      ? await entitiesCache
+          .get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
+          .catch(error => {
+            err(`Error fetching entity from cache: ${error.toString()}`);
+            return undefined;
+          })
       : undefined;
-    const entity = cachedEntity ?? (await resolveDocument(obj, collection, isTypeGuard));
+    const entity =
+      cachedEntity ??
+      (await resolveDocument(obj, collection, isTypeGuard).catch(error => {
+        err(`Error resolving document: ${error.toString()}`);
+        return undefined;
+      }));
+
     if (!entity) return undefined;
 
-    await entitiesCache.set(`${collection.collectionName}::${entity._id}`, entity);
+    await entitiesCache.set(`${collection.collectionName}::${entity._id}`, entity).catch(error => {
+      err(`Error caching document: ${error.toString()}`);
+      return undefined;
+    });
 
     if (additionalProcessing) {
-      return await additionalProcessing(entity);
+      return await additionalProcessing(entity).catch(error => {
+        err(`Failed running additional processing on entity: ${error.toString()}`);
+        return undefined;
+      });
     }
 
     return entity;

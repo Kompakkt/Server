@@ -30,7 +30,7 @@ info('Connected to MongoDB');
 
 const db = (name: string) => mongoClient.db(name);
 
-const accountsDb = db(Configuration.Mongo.AccountsDB);
+export const accountsDb = db(Configuration.Mongo.AccountsDB);
 export const userCollection = accountsDb.collection<ServerDocument<IUserData>>('users');
 export type PasswordDocument = {
   username: string;
@@ -57,7 +57,7 @@ export const userTokenCollection = accountsDb.collection<{
   tokenExpiration?: number;
 }>('tokens');
 
-const entitiesDb = db(Configuration.Mongo.RepositoryDB);
+export const entitiesDb = db(Configuration.Mongo.RepositoryDB);
 export const entityCollection = entitiesDb.collection<ServerDocument<IEntity>>('entity');
 export const groupCollection = entitiesDb.collection<ServerDocument<IGroup>>('group');
 export const addressCollection = entitiesDb.collection<ServerDocument<IAddress>>('address');

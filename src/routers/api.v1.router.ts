@@ -8,7 +8,7 @@ import {
   isPerson,
 } from 'src/common';
 import { isEntitySettings } from 'src/common/typeguards';
-import { err, info, warn } from 'src/logger';
+import { err, info, log, warn } from 'src/logger';
 import { collectionMap, entityCollection, groupCollection, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -27,7 +27,8 @@ import {
 } from './modules/api.v1/find-in-collection';
 import { resolveAny } from './modules/api.v1/resolving-strategies';
 import { saveHandler } from './modules/api.v1/save-to-collection';
-import { checkIsOwner, undoUserOwnerOf } from './modules/user-management/users';
+import { checkIsOwner, makeUserOwnerOf, undoUserOwnerOf } from './modules/user-management/users';
+import { deleteAny } from './modules/api.v1/deletion-strategies';
 
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
@@ -92,24 +93,14 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           return error(401, message);
         }
 
-        const deleteResult = await collectionMap[collection].deleteOne({
-          _id: new ObjectId(_id),
-        });
-        if (!deleteResult) {
-          const message = `Failed deleting ${collection} ${identifier}`;
-          warn(message);
-          return error(500, message);
-        }
-
-        // Delete from User
-        const undoResult = await undoUserOwnerOf({
-          docs: { _id },
+        const success = await deleteAny({
+          _id,
           collection,
           userdata,
         });
-        if (!undoResult) {
-          const message = `Failed removing owner of ${collection} ${identifier}`;
-          warn(message);
+        if (!success) {
+          const message = 'Entity removal failed';
+          err(message);
           return error(500, message);
         }
 
@@ -194,6 +185,13 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               return false;
             });
             if (!saveResult) return error(500);
+
+            if (!doesEntityExist) {
+              log(`Making user owner of ${body._id} to ${collection}`);
+              await makeUserOwnerOf({ docs: body, collection, userdata }).catch(error => {
+                err(`Error making user owner of ${body._id} to ${collection}`, error);
+              });
+            }
 
             const resolveResult = await resolveAny(collection, {
               _id: body._id,

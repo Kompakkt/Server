@@ -21,6 +21,7 @@ import {
   resolveEntity,
 } from '../api.v1/resolving-strategies';
 import { makeUserOwnerOf, undoUserOwnerOf } from '../user-management/users';
+import { log } from 'src/logger';
 
 // Query helpers
 // TODO: This can be cached without trouble
@@ -153,13 +154,13 @@ export enum Command {
 
 export const applyActionToEntityOwner = async ({
   command,
-  otherUsername,
+  ownerUsername,
   entityId,
   userdata,
 }: {
   entityId: string | ObjectId;
   command: Command;
-  otherUsername: string;
+  ownerUsername: string;
   userdata: ServerDocument<IUserData>;
 }) => {
   const entity = await resolveEntity({ _id: new ObjectId(entityId) });
@@ -168,10 +169,12 @@ export const applyActionToEntityOwner = async ({
   const isUserOwner = userdata.data.entity?.includes(entityId.toString());
   if (!isUserOwner) throw new Error('User is not an owner of the entity');
 
-  const otherUser = await userCollection.findOne({ username: otherUsername });
+  const otherUser = await userCollection.findOne({ username: ownerUsername });
   if (!otherUser) throw new Error('User not found by username');
 
   otherUser.data.entity = otherUser.data.entity?.filter(_ => _) ?? [];
+
+  log('applyActionToEntityOwner', otherUser._id, command, entityId);
 
   if (command === 'remove') {
     const entityUses = (await findEntityOwnersQuery(entityId)).length;

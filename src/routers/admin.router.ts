@@ -16,7 +16,7 @@ const adminRouter = new Elysia()
   .use(authService)
   .group('/admin', { body: signInBody, isAdmin: true }, group =>
     group
-      .post('/getusers', async ({ error }) => {
+      .post('/getusers', async () => {
         const allAccounts = await userCollection
           .find(
             {},

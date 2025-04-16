@@ -302,15 +302,6 @@ const createSaver = <T extends ServerDocument<T>>(
     log(`Running Saver for ${obj._id} to ${collection.collectionName}`);
     entitiesCache.del(`${collection.collectionName}::${obj._id}`);
 
-    log(`Making user owner of ${obj._id} to ${collection.collectionName}`);
-    await makeUserOwnerOf({
-      docs: obj,
-      collection: collection.collectionName as Collection,
-      userdata,
-    }).catch(error => {
-      err(`Error making user owner of ${obj._id} to ${collection.collectionName}`, error);
-    });
-
     if (additionalProcessing) {
       log(`Running additional processing on ${collection.collectionName} ${obj._id}`);
       await additionalProcessing(obj, userdata).catch(error => {

@@ -3,6 +3,7 @@ import Elysia, { t, type Static } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
 import { UserRank } from 'src/common';
+import { log } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import configServer, { jwtOptions } from 'src/server.config';
 

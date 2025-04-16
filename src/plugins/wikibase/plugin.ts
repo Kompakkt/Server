@@ -3,27 +3,17 @@ import { log } from 'src/logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';
 import { Plugin } from '../plugin-base';
-import {
-  type IWikibaseAnnotationExtension,
-  type IWikibaseDigitalEntityExtension,
-  isWikibaseConfiguration,
-} from './common';
-import {
-  type WikibaseAnnotation,
-  WikibaseConfiguration,
-  type WikibaseDigitalEntity,
-} from './config';
-import wikibaseRouter from './router';
-import { WikibaseService } from './service';
+import { isWikibaseConfiguration } from './common';
+import { WikibaseConfiguration } from './config';
 import {
   ensureAnnotationExtensionData,
   ensureDigitalEntityExtensionData,
 } from './ensure-extension-data';
+import wikibaseRouter from './router';
+import { WikibaseService } from './service';
 
 class WikibasePlugin extends Plugin {
   routers = [wikibaseRouter];
-
-  #service: WikibaseService | undefined;
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     if (!WikibaseConfiguration || !isWikibaseConfiguration(WikibaseConfiguration)) {
@@ -32,7 +22,6 @@ class WikibasePlugin extends Plugin {
     }
 
     const service = new WikibaseService();
-    this.#service = service;
 
     log('Registering hooks');
     HookManager.addHook<ServerDocument<IDigitalEntity>>({

@@ -37,20 +37,20 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         app
           .post(
             '/applyactiontoentityowner',
-            ({ error, userdata, params: { command, entityId, otherUsername } }) =>
+            ({ error, userdata, body: { command, entityId, ownerUsername } }) =>
               userdata
                 ? applyActionToEntityOwner({
                     command,
                     entityId,
-                    otherUsername,
+                    ownerUsername,
                     userdata,
                   })
                 : error('Forbidden'),
             {
-              params: t.Object({
+              body: t.Object({
                 command: t.Enum(Command),
                 entityId: t.String(),
-                otherUsername: t.String(),
+                ownerUsername: t.String(),
               }),
             },
           )

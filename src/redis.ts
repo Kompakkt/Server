@@ -1,11 +1,12 @@
 import hash from 'object-hash';
 import { Configuration } from './configuration';
 import { log } from './logger';
+import { Redis } from 'ioredis';
 
 const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
 export class CacheClient {
-  private redis: Bun.RedisClient;
+  private redis: Redis;
   private db: number;
   private defaultSeconds: number;
   public hash = hash;
@@ -18,14 +19,31 @@ export class CacheClient {
     }
     CacheClient.takenDbs.add(db);
     this.db = db;
-    this.redis = new Bun.RedisClient(`redis://${host}:${port}/${db}`);
+    const client = new Redis(`redis://${host}:${port}/${db}`);
+    // TODO: Switch to Bun.RedisClient when its stable
+    // TODO: Manually switch DB number until the following issue is fixed: https://github.com/oven-sh/bun/issues/19041
+    /*client
+      .send('select', [db.toString()])
+      .then(() => {
+        log(`Initialized Redis using DB ${db}`);
+      })
+      .catch(() => {
+        log(`Failed to initialized DB ${db}`);
+        });*/
+    this.redis = client;
     this.defaultSeconds = defaultSeconds;
-    log(`Initialized Redis using DB ${db}`);
+  }
+
+  public async waitForConnection() {
+    return await this.redis.connect();
   }
 
   public async flush() {
-    // flushdb().then(() => log(`Flushed Redis DB ${this.db}`));
-    return this.redis.send('FLUSHDB', ['SYNC']).then(() => log(`Flushed Redis DB ${this.db}`));
+    return this.redis.flushdb().then(() => log(`Flushed Redis DB ${this.db}`));
+    /* For Bun.RedisClient return this.redis
+      .send('FLUSHDB', [])
+      .then(() => log(`Flushed Redis DB ${this.db}`))
+      .catch(err => err('Failed to flush Redis DB', err));*/
   }
 
   public async del(key: string) {
@@ -37,7 +55,10 @@ export class CacheClient {
   }
 
   public async get<T>(key: string) {
-    return this.redis.get(key).then(value => (value ? (JSON.parse(value) as T) : undefined));
+    return this.redis.get(key).then(value => {
+      if (!value) return undefined;
+      return JSON.parse(value) as T;
+    });
   }
 
   public async getAll<T>(key: string) {
