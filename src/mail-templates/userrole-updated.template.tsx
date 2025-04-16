@@ -18,8 +18,8 @@ export const updatedUserRole = ({
 }) => {
   return (
     <div>
-      <h1>Hello {prename}!</h1>
-      <p>
+      <h1 safe>Hello {prename}!</h1>
+      <p safe>
         Your status on Kompakkt has been changed from "{roleStrings[prevRole]}" to "
         {roleStrings[newRole]}".
       </p>

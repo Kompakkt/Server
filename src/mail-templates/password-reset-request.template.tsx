@@ -9,7 +9,7 @@ export const passwordResetRequest = ({
 }) => {
   return (
     <div>
-      <h1>Hello {prename}!</h1>
+      <h1 safe>Hello {prename}!</h1>
       {requestedByAdministrator ? (
         <div>
           <p>An administrator has initiated a password reset for your Kompakkt account.</p>
@@ -25,6 +25,7 @@ export const passwordResetRequest = ({
         To reset your password, follow this link and choose a new password:
         <br />
         <a
+          safe
           href={`https://kompakkt.de/?action=passwordreset&token=${resetToken}`}
           target="_blank"
           rel="noreferrer"
