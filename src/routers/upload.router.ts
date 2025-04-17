@@ -311,9 +311,13 @@ const uploadRouter = new Elysia()
             file.name,
           );
 
-          const existing = await md5Cache.get<string>(serverChecksum);
-          if (existing) {
-            // Create symlink
+          symlinkToExisting: {
+            const existing = await md5Cache.get<string>(serverChecksum);
+            if (!existing) break symlinkToExisting;
+
+            const doesFileExist = await Bun.file(existing).exists();
+            if (!doesFileExist) break symlinkToExisting;
+
             info(
               `File already exists, creating symlink from ${join(uploadDir, existing)} to ${destPath}`,
             );

@@ -8,6 +8,7 @@ import { WikibaseConfiguration } from './config';
 import {
   ensureAnnotationExtensionData,
   ensureDigitalEntityExtensionData,
+  hasWikibaseExtension,
 } from './ensure-extension-data';
 import wikibaseRouter from './router';
 import { WikibaseService } from './service';
@@ -28,6 +29,11 @@ class WikibasePlugin extends Plugin {
       collection: Collection.digitalentity,
       type: 'onTransform',
       callback: async digitalEntity => {
+        if (!hasWikibaseExtension(digitalEntity)) {
+          log(`Item is probably not a wikibase digital entity`);
+          return digitalEntity;
+        }
+
         const doc = ensureDigitalEntityExtensionData(digitalEntity);
         const result = await service.updateDigitalEntity(doc, {});
         if (!result) {
@@ -43,6 +49,11 @@ class WikibasePlugin extends Plugin {
       collection: Collection.annotation,
       type: 'onTransform',
       callback: async annotation => {
+        if (!hasWikibaseExtension(annotation)) {
+          log(`Item is probably not a wikibase annotation`);
+          return annotation;
+        }
+
         const doc = ensureAnnotationExtensionData(annotation);
         const result = await service.updateAnnotation(doc, {});
         if (!result) {

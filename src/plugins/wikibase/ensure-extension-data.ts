@@ -3,6 +3,12 @@ import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } fr
 import type { WikibaseAnnotation, WikibaseDigitalEntity } from './config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
+export const hasWikibaseExtension = (
+  entity: ServerDocument<IDigitalEntity | IAnnotation>,
+): entity is ServerDocument<WikibaseDigitalEntity | WikibaseAnnotation> => {
+  return entity.extensions?.wikibase !== undefined;
+};
+
 export const ensureDigitalEntityExtensionData = (
   digitalEntity: ServerDocument<IDigitalEntity<Partial<IWikibaseDigitalEntityExtension>>>,
 ): ServerDocument<WikibaseDigitalEntity> => {
