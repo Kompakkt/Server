@@ -26,7 +26,7 @@ const sendLDAPSearchRequest = async (
   username: string,
   password: string,
 ): Promise<UniCologneLDAPResponse | Error> => {
-  return Bun.fetch('localhost:3000/search', {
+  return Bun.fetch('openldap-search:3000/search', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
