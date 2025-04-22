@@ -68,6 +68,9 @@ export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData
             return resolveAny(collection, { _id: new ObjectId(docId) });
           if (typeof docId === 'object') {
             if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId });
+            // TODO: Why are some objects { buffer: [] }?
+            // @ts-ignore-next-line
+            if (!!docId.buffer) return resolveAny(collection, { _id: new ObjectId(docId.buffer) });
             return resolveAny(collection, {
               _id: new ObjectId(docId._id.toString()),
             });
