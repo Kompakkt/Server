@@ -291,7 +291,6 @@ const uploadRouter = new Elysia()
       };
     },
     {
-      // isLoggedIn: true,
       params: t.Object({
         entityId: t.String(),
       }),
@@ -311,7 +310,8 @@ const uploadRouter = new Elysia()
             file.name,
           );
 
-          symlinkToExisting: {
+          // TODO: Improve linking logic or do this outside of upload
+          /*symlinkToExisting: {
             const existing = await md5Cache.get<string>(serverChecksum);
             if (!existing) break symlinkToExisting;
 
@@ -332,7 +332,7 @@ const uploadRouter = new Elysia()
               serverChecksum,
               usingExisting: true,
             };
-          }
+          }*/
 
           const success = await writeStreamToDisk(file.stream(), destPath);
 
