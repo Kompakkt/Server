@@ -24,6 +24,8 @@ new Elysia({
   serve: {
     // 4096MB
     maxRequestBodySize: 4096 * 1024 * 1024,
+    // Long timeout
+    idleTimeout: 255,
   },
 })
   .use(app)
