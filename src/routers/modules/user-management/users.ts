@@ -51,7 +51,14 @@ export const checkIsOwner = async (obj: {
   return obj.userdata.data[obj.collection]?.includes(docId) ?? false;
 };
 
-export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData>) => {
+const isBufferObject = (obj: object): obj is { buffer: Uint8Array } => {
+  return obj && typeof obj === 'object' && 'buffer' in obj;
+};
+
+export const resolveUsersDataObject = async (
+  inputUser: ServerDocument<IUserData>,
+  dataTypes?: Array<keyof typeof Collection>,
+) => {
   const user = structuredClone(inputUser);
   try {
     if (!user.data) {
@@ -61,6 +68,9 @@ export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData
       if (!user.data?.[collection]) {
         user.data[collection] = [];
       }
+      if (dataTypes && !dataTypes.includes(collection)) {
+        continue;
+      }
       const resolved = await Promise.all(
         Array.from(new Set(user.data[collection])).map(docId => {
           if (!docId) return undefined;
@@ -69,8 +79,8 @@ export const resolveUsersDataObject = async (inputUser: ServerDocument<IUserData
           if (typeof docId === 'object') {
             if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId });
             // TODO: Why are some objects { buffer: [] }?
-            // @ts-ignore-next-line
-            if (!!docId.buffer) return resolveAny(collection, { _id: new ObjectId(docId.buffer) });
+            if (isBufferObject(docId))
+              return resolveAny(collection, { _id: new ObjectId(docId.buffer) });
             return resolveAny(collection, {
               _id: new ObjectId(docId._id.toString()),
             });

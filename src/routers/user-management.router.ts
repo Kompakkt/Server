@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { type IUserData, UserRank } from 'src/common';
+import { Collection, type IUserData, UserRank } from 'src/common';
 import { sendJSXMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
@@ -114,26 +114,41 @@ const userManagementRouter = new Elysia()
           isLoggedIn: true,
         },
       )
-      .get('/auth', async ({ cookie: { auth }, error, jwt }) => {
-        if (!auth.value) {
-          return error(401, 'No session');
-        }
-        const result = await jwt.verify(auth.value);
-        if (!result) {
-          return error(401, 'Invalid session');
-        }
-        const { username, _id } = result;
-        if (!username || typeof username !== 'string' || !_id || typeof _id !== 'string') {
-          return error(401, 'Invalid session');
-        }
-        const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
-        if (!user) {
-          return error(401, 'User not found');
-        }
+      .get(
+        '/auth',
+        async ({ cookie: { auth }, error, jwt, query: { data } }) => {
+          if (!auth.value) {
+            return error(401, 'No session');
+          }
+          const result = await jwt.verify(auth.value);
+          if (!result) {
+            return error(401, 'Invalid session');
+          }
+          const { username, _id } = result;
+          if (!username || typeof username !== 'string' || !_id || typeof _id !== 'string') {
+            return error(401, 'Invalid session');
+          }
+          const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
+          if (!user) {
+            return error(401, 'User not found');
+          }
 
-        const userWithData = resolveUsersDataObject(user);
-        return userWithData;
-      })
+          const dataTypes = data
+            ?.split(',')
+            .map(v => v.trim())
+            .filter((v): v is keyof typeof Collection => Object.keys(Collection).includes(v));
+
+          const userWithData = resolveUsersDataObject(user, dataTypes);
+          return userWithData;
+        },
+        {
+          query: t.Optional(
+            t.Object({
+              data: t.String(),
+            }),
+          ),
+        },
+      )
       .post(
         '/help/request-reset',
         async ({ error, body: { username } }) => {

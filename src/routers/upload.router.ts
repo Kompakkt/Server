@@ -121,6 +121,8 @@ const getUploadedFiles = async ({
       case 'entity':
       case 'model':
         return ['.obj', '.babylon', '.gltf', '.glb', '.stl'];
+      case 'splat':
+        return ['.splat', '.spz', '.ply'];
       case 'cloud':
         return ['.las', '.laz', '.json'];
       default:
@@ -171,7 +173,7 @@ const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait 
   return Array.from(processedFiles);
 };
 
-const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip'];
+const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip', '.splat'];
 
 // Prepare folder structure
 const { UploadDirectory } = Configuration.Uploads;
