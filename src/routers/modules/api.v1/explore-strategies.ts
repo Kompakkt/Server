@@ -103,6 +103,10 @@ const sortEntities = async (entities: ServerDocument<IEntity>[], order: SortOrde
 
 const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
   const { types, offset, userData, filters, sortBy, searchText } = body;
+  if (types.includes('entity') || types.includes('model')) {
+    types.push('splat', 'cloud');
+  }
+
   const limit = body.limit ?? 30;
 
   const entities = await (async () => {

@@ -29,6 +29,7 @@ import { resolveAny } from './modules/api.v1/resolving-strategies';
 import { saveHandler } from './modules/api.v1/save-to-collection';
 import { checkIsOwner, makeUserOwnerOf, undoUserOwnerOf } from './modules/user-management/users';
 import { deleteAny } from './modules/api.v1/deletion-strategies';
+import { exploreCache } from 'src/redis';
 
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
@@ -200,6 +201,8 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               return undefined;
             });
             if (!resolveResult) return error(500);
+
+            exploreCache.flush();
 
             return resolveResult;
           },

@@ -16,6 +16,7 @@ import configServer from 'src/server.config';
 import { authService, signInBody } from './handlers/auth.service';
 import { resolveEntity } from './modules/api.v1/resolving-strategies';
 import { resolveUsersDataObject } from './modules/user-management/users';
+import { exploreCache } from 'src/redis';
 
 const gatherDbCollectionStats = async <T extends Document>(collection: Collection<T>) => {
   const items = await collection.find().toArray();
@@ -147,6 +148,9 @@ const adminRouter = new Elysia()
             },
           );
           if (!updateResult) return error('Internal Server Error');
+
+          exploreCache.flush();
+
           return resolveEntity({ _id });
         },
         {

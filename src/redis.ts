@@ -91,7 +91,7 @@ export const sessionCache = new CacheClient(offset + 3, 60);
 // Cache information about who uploaded files
 export const uploadCache = new CacheClient(offset + 4, 3.6e4);
 // Cache explore requests
-export const exploreCache = new CacheClient(offset + 5, 300);
+export const exploreCache = new CacheClient(offset + 5, 60);
 
 // MD5 Checksum cache for uploads
 export const md5Cache = new CacheClient(offset + 6, -1);
