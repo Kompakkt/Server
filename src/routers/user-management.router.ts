@@ -19,17 +19,29 @@ const userManagementRouter = new Elysia()
     app
       .post(
         '/login/:strategy?',
-        async ({ params: { strategy }, body, error, cookie: { auth }, jwt, useAuthController }) => {
+        async ({
+          params: { strategy },
+          body,
+          error,
+          cookie: { auth },
+          jwt,
+          useAuthController,
+          request,
+        }) => {
           const userdata = await useAuthController(body, strategy);
           if (userdata instanceof Error) {
             return error(401, userdata);
           }
 
+          const origin = request.headers.get('origin') ?? '';
+          const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+
           auth.set({
             value: await jwt.sign({ username: userdata.username, _id: userdata._id.toString() }),
             path: '/',
             httpOnly: true,
-            sameSite: 'lax',
+            sameSite: isLocalhost ? 'none' : 'lax',
+            secure: isLocalhost ? true : undefined,
           });
 
           return userdata;
