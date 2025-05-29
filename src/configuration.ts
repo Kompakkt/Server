@@ -182,7 +182,7 @@ const LoadConfig = async () => {
     Extensions: {},
   };
 
-  const keepUppercase = ['DB', 'HTTPS', 'SPARQL', 'SAML', 'API', 'URL'];
+  const keepUppercase = ['DB', 'HTTPS', 'SPARQL', 'SAML', 'API', 'URL', 'TTL'];
 
   const extensionKeys = Object.keys(Bun.env).filter(key =>
     key.startsWith('CONFIGURATION_EXTENSION_'),
