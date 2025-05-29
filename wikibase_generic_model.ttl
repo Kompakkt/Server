@@ -1,0 +1,2089 @@
+@prefix dc11: <http://purl.org/dc/elements/1.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix wgm: <https://gitlab.com/nfdi4culture/wikibase4research/model/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+wgm: a owl:Ontology ;
+    dc11:creator "Lozana Rossenova",
+        "Lucia Sohmen",
+        "Paul Duchesne" ;
+    dc11:title "Wikibase Generic Model for Digital Objects" ;
+    owl:versionInfo "2025-03-27" .
+
+wgm:actor a owl:Class ;
+    rdfs:label "Akteur:in"@de,
+        "Actor"@en ;
+    dc11:description "umfasst Menschen, entweder einzeln oder in Gruppen, die das Potenzial haben, vorsätzliche Handlungen zu begehen, für die jemand zur Verantwortung gezogen werden kann"@de,
+        "comprises people, either individually or in groups, who have the potential to perform intentional actions of kinds for which someone may be held responsible"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E39_CRM_Actor>,
+        <http://xmlns.com/foaf/0.1/#term_Agent> ;
+    skos:note "Wikibase ID: Q1"@en .
+
+wgm:address a owl:DatatypeProperty ;
+    rdfs:label "Adresse"@de,
+        "address"@en ;
+    dc11:description "Adresse eines Objektes, in der Regel eines Gebäudes oder einer Organisation"@de,
+        "street address of an item, usually a building or organisation"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P6375>,
+        <https://schema.org/address> ;
+    skos:note "Wikibase ID: P36"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:affiliation a owl:ObjectProperty ;
+    rdfs:label "Zugehörigkeit"@de,
+        "affiliation"@en ;
+    dc11:description "Zugehörigkeit einer Person oder Organisation zu einem Gegenstand"@de,
+        "affiliation of a person or organisation to an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P107_has_current_or_former_member>,
+        <http://www.wikidata.org/entity/P1416>,
+        <https://schema.org/affiliation> ;
+    skos:note "Wikibase ID: P50"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:all_rights_reserved a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Alle Rechte vorbehalten"@de,
+        "All Rights Reserved"@en ;
+    dc11:description "Rechtserklärung zu Werken, die dem Urheberrecht unterliegen"@de,
+        "rights statement pertaining to works which are in copyright"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q1752207> ;
+    skos:note "Wikibase ID: Q54"@en .
+
+wgm:annotates a owl:ObjectProperty ;
+    rdfs:label "ist Annotation von"@de,
+        "annotates"@en ;
+    dc11:description "identifiziert die Entität, die das Ziel einer Anmerkung ist"@de,
+        "identifies the entity that is the target of an annotation"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    owl:equivalentProperty <http://www.ics.forth.gr/isl/CRMdig/L43_annotates> ;
+    skos:note "Wikibase ID: P77"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:annotation a owl:Class ;
+    rdfs:label "Annotation"@de,
+        "Annotation"@en ;
+    dc11:description "Text, der an ein Medienelement oder einen anderen Text angehängt ist, um weitere Informationen zu liefern"@de,
+        "text that is attached to a media item or another text to provide more information"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentClass <http://www.ics.forth.gr/isl/CRMdig/D29_Annotation_Object>,
+        <http://www.w3.org/ns/oa#Annotation>,
+        <http://www.wikidata.org/entity/Q857525> ;
+    skos:note "Wikibase ID: Q15"@en .
+
+wgm:annotation_text a owl:DatatypeProperty ;
+    rdfs:label "Anmerkungstext"@de,
+        "annotation text"@en ;
+    dc11:description "Link zur URL, die den vollständigen Text enthält"@de,
+        "link to the URL that has the full text"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P76"@en,
+        "Wikibase datatype: url"@en .
+
+wgm:assessing a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "beurteilen"@de,
+        "assessing"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, die Zielentität zu bewerten, anstatt nur eine Bemerkung über sie zu machen"@de,
+        "used with P80 (motivation) for when the user intends to assess the target entity in some way, rather than simply make a comment about it"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#assessing> ;
+    skos:note "Wikibase ID: Q58"@en .
+
+wgm:author a owl:ObjectProperty ;
+    rdfs:label "Autor:in"@de,
+        "author"@en ;
+    dc11:description "Urheber eines Texts"@de,
+        "creator of a text"@en ;
+    skos:note "Wikibase ID: P106"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:bears_feature a owl:DatatypeProperty ;
+    rdfs:label "trägt Merkmal"@de,
+        "bears feature"@en ;
+    dc11:description "Merkmal eines Gegenstand"@de,
+        "feature of an object"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P56_bears_feature> ;
+    skos:note "Wikibase ID: P24"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:bibliographic_work a owl:Class ;
+    rdfs:label "Bibliografisches Werk"@de,
+        "Bibliographic Work"@en ;
+    dc11:description "Instanzen dieser Klasse können zitiert werden, um eine Behauptung zu belegen"@de,
+        "instances of this class can be cited to support a claim"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentClass <http://iflastandards.info/ns/fr/frbr/frbroo/F19_Publication_Work>,
+        <http://www.wikidata.org/entity/Q59156095> ;
+    skos:note "Wikibase ID: Q14"@en .
+
+wgm:biological_object a owl:Class ;
+    rdfs:label "Biologischer Gegenstand"@de,
+        "Biological Object"@en ;
+    dc11:description "umfasst einzelne Gegenstände materieller Natur, die leben, gelebt haben oder natürliche Produkte von oder aus lebenden Organismen sind"@de,
+        "comprises individual items of a material nature, which live, have lived or are natural products of or from living organisms"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/E20_Biological_Object> ;
+    skos:note "Wikibase ID: Q4"@en .
+
+wgm:birth a owl:Class ;
+    rdfs:label "Geburt"@de,
+        "Birth"@en ;
+    dc11:description "ein biologisches Ereignis, das sich auf den Kontext konzentriert, in dem Menschen auf die Welt kommen"@de,
+        "a biological event focussing on the context of people coming into life"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/7.1.2/E67_Birth> ;
+    skos:note "Wikibase ID: Q71"@en .
+
+wgm:bookmarking a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "Lesezeichen setzen"@de,
+        "bookmarking"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, ein Lesezeichen für die Zielentität oder einen Teil davon zu setzen"@de,
+        "used with P80 (motivation) for when the user intends to create a bookmark to the target entity or part thereof"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#bookmarking> ;
+    skos:note "Wikibase ID: Q59"@en .
+
+wgm:by_mother a owl:ObjectProperty ;
+    rdfs:label "durch Mutter"@de,
+        "by mother"@en ;
+    dc11:description "verknüpft das Ereignis Geburt mit einer Instanz eines Akteurs in der Rolle der gebärenden Mutter"@de,
+        "links the event Birth to an instance of an actor in the role of birth-giving mother"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://cidoc-crm.org/cidoc-crm/7.1.2/P96_by_mother> ;
+    skos:note "Wikibase ID: P40"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:byte a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Byte"@de,
+        "byte"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q91"@en .
+
+wgm:camera_type a owl:DatatypeProperty ;
+    rdfs:label "Kameratyp"@de,
+        "camera type"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft, die sich auf die Perspektive der Kamera bei der Beschriftung eines 3D-Modells bezieht"@de,
+        "Kompakkt-specific property relating to the perspective of the camera when annotating a 3D model"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P78"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:carried_out_by a owl:ObjectProperty ;
+    rdfs:label "wurde ausgeführt von"@de,
+        "carried out by"@en ;
+    dc11:description "aktiver Akteur eines Ereignisses"@de,
+        "active agent of an event"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P14_carried_out_by>,
+        <https://schema.org/agent> ;
+    skos:note "Wikibase ID: P14"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:cc0 a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "CC0"@de,
+        "CC0"@en ;
+    dc11:description "Rechtsdokument, mit dem ein urheberrechtlich geschütztes Werk der Öffentlichkeit zugänglich gemacht wird"@de,
+        "legal document dedicating a copyrighted work to the public domain"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6938433> ;
+    skos:note "Wikibase ID: Q46"@en .
+
+wgm:centimetre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Zentimeter"@de,
+        "centimetre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q76"@en .
+
+wgm:change_of_custody a owl:Class ;
+    rdfs:label "Besitzwechsel"@de,
+        "Change of custody"@en ;
+    dc11:description "Ereignis, bei dem der Verwahrer einer Sache wechselt"@de,
+        "event where the custodian of an item changes"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E10_Transfer_of_Custody> ;
+    skos:note "Wikibase ID: Q23"@en .
+
+wgm:change_of_ownership a owl:Class ;
+    rdfs:label "Eigentumswechsel"@de,
+        "Change of ownership"@en ;
+    dc11:description "Ereignis, bei dem der Eigentümer einer Sache wechselt"@de,
+        "event where the owner of an item changes"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E8_Acquisition> ;
+    skos:note "Wikibase ID: Q24"@en .
+
+wgm:city a owl:Class ;
+    rdfs:label "Stadt"@de,
+        "city"@en ;
+    dc11:description "Ortstyp"@de,
+        "type of location"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    skos:note "Wikibase ID: Q74"@en .
+
+wgm:classified_as a owl:ObjectProperty ;
+    rdfs:label "klassifiziert als"@de,
+        "classified as"@en ;
+    dc11:description "ermöglicht die Subtypisierung von Kernentitäten der Ontologie – eine Form der Spezialisierung – durch die Verwendung einer terminologischen Hierarchie oder eines Thesaurus"@de,
+        "allows sub-typing of core ontology entities – a form of specialisation – through the use of a terminological hierarchy, or thesaurus"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    owl:equivalentProperty <https://cidoc-crm.org/html/cidoc_crm_v7.1.2.html#P2> ;
+    skos:note "Wikibase ID: P97"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:classifying a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "klassifizieren"@de,
+        "classifying"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, die Zielentität als etwas zu klassifizieren"@de,
+        "used with P80 (motivation) for when the user intends to classify the target entity as something"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#classifying> ;
+    skos:note "Wikibase ID: Q60"@en .
+
+wgm:collection a owl:Class ;
+    rdfs:label "Sammlung"@de,
+        "Collection"@en ;
+    dc11:description "Zusammenstellung von physischen Dingen, die von einem Akteur kuratiert werden – nicht für digitale Objekte, stattdessen »digitale Sammlung« verwenden"@de,
+        "aggregation of physical things that are being curated by an actor - not for digital objects, use Digital collection instead"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E78_Collection> ;
+    skos:note "Wikibase ID: Q7"@en .
+
+wgm:commenting a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "kommentieren"@de,
+        "commenting"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, einen Kommentar über die Zielentität abzugeben"@de,
+        "used with P80 (motivation) for when the user intends to comment about the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#commenting> ;
+    skos:note "Wikibase ID: Q61"@en .
+
+wgm:conceptual_object a owl:Class ;
+    rdfs:label "Begrifflicher Gegenstand"@de,
+        "Conceptual Object"@en ;
+    dc11:description "umfasst nicht materielle Produkte unseres Geistes und andere von Menschen produzierte Daten"@de,
+        "comprises non-material products of our minds and other human produced data"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E28_Conceptual_Object> ;
+    skos:note "Wikibase ID: Q8"@en .
+
+wgm:condition a owl:Class ;
+    rdfs:label "Zustand"@de,
+        "Condition"@en ;
+    dc11:description "Zustand eines Gegenstands"@de,
+        "condition of an object"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E3_Condition_State>,
+        <http://www.wikidata.org/entity/Q813912> ;
+    skos:note "Wikibase ID: Q20"@en .
+
+wgm:conforms_to a owl:DatatypeProperty ;
+    rdfs:label "stimmt überein mit"@de,
+        "conforms to"@en ;
+    dc11:description "Norm, welcher die Datei entspricht"@de,
+        "which standard the file conforms to"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/digital_object> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P72"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:consists_of a owl:ObjectProperty ;
+    rdfs:label "besteht aus"@de,
+        "consists of"@en ;
+    dc11:description "Material, aus dem ein Objekt hergestellt ist"@de,
+        "material an item is made from"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/material> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P45_consists_of>,
+        <http://www.wikidata.org/entity/P186>,
+        <https://schema.org/material> ;
+    skos:note "Wikibase ID: P23"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:contact_person a owl:ObjectProperty ;
+    rdfs:label "Kontaktperson"@de,
+        "contact person"@en ;
+    dc11:description "Akteur, welcher die offizielle Anlaufstelle für ein Objekt ist"@de,
+        "agent who is the official contact point about an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    skos:note "Wikibase ID: P51"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:contact_point a owl:DatatypeProperty ;
+    rdfs:label "Kontaktpunkt"@de,
+        "contact point"@en ;
+    dc11:description "wie eine Organisation oder Gruppe kontaktiert werden kann"@de,
+        "how an organisation or group can be contacted"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/group> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P76_has_contact_point> ;
+    skos:note "Wikibase ID: P110"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:coordinate_location a owl:DatatypeProperty ;
+    rdfs:label "geographische Koordinaten"@de,
+        "coordinate location"@en ;
+    dc11:description "genauer Standort eines Objekts"@de,
+        "exact location of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P625>,
+        <https://schema.org/geo> ;
+    skos:note "Wikibase ID: P37"@en,
+        "Wikibase datatype: globe-coordinate"@en .
+
+wgm:copyright_statement a owl:DatatypeProperty ;
+    rdfs:label "Urheberrechtserklärung"@de,
+        "copyright statement"@en ;
+    dc11:description "wie Sie den Artikel in Übereinstimmung mit der Lizenz zitieren (verwenden Sie die Eigenschaft „Lizenz“, um die Nutzungsrechte anzugeben)"@de,
+        "how to cite this item in compliance with the license (also use property 'license' to indicate usage rights)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P105_right_held_by> ;
+    skos:note "Wikibase ID: P113"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:country a owl:Class ;
+    rdfs:label "Land"@de,
+        "Country"@en ;
+    dc11:description "bestehendes oder ehemals bestehendes Land"@de,
+        "existing or previously existing country"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    owl:equivalentClass <https://nfdi4culture.de/ontology#Country> ;
+    skos:note "Wikibase ID: Q73"@en .
+
+wgm:creation a owl:Class ;
+    rdfs:label "Herstellung"@de,
+        "Creation"@en ;
+    dc11:description "Ereignis, das zur Erstellung eines Objekts führt"@de,
+        "event that results in an item being created"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E12_Production> ;
+    skos:note "Wikibase ID: Q25"@en .
+
+wgm:creative_commons_attribution a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung"@de,
+        "Creative Commons Attribution"@en ;
+    dc11:description "Lizenz, die die freie Nutzung Copyright geschützten Materials unter Nennung des Namens erlaubt"@de,
+        "license allowing free use of a copyrighted work, with attribution"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6905323> ;
+    skos:note "Wikibase ID: Q47"@en .
+
+wgm:creative_commons_attribution-noderivatives a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung-KeineBearbeitung"@de,
+        "Creative Commons Attribution-NoDerivatives"@en ;
+    dc11:description "Lizenzsatz, der die Verbreitung ohne Änderungen erlaubt und die Nennung des Namens erfordert"@de,
+        "set of licenses allowing distribution without modification, and requiring attribution"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6999319> ;
+    skos:note "Wikibase ID: Q51"@en .
+
+wgm:creative_commons_attribution-noncommercial a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung-NichtKommerziell"@de,
+        "Creative Commons Attribution-NonCommercial"@en ;
+    dc11:description "Lizenzsatz, der die nicht kommerzielle Verbreitung erlaubt und die Nennung des Namens erfordert"@de,
+        "set of licenses allowing free noncommercial use, and requiring attribution"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6936496> ;
+    skos:note "Wikibase ID: Q49"@en .
+
+wgm:creative_commons_attribution-noncommercial-noderivatives a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung-NichtKommerziell-KeineBearbeitung"@de,
+        "Creative Commons Attribution-NonCommercial-NoDerivatives"@en ;
+    dc11:description "Lizenzsatz, der die nicht kommerzielle Verbreitung ohne Änderungen erlaubt und die Nennung des Namens erfordert"@de,
+        "set of licenses allowing noncommercial distribution without modification, and requiring attribution"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6937225> ;
+    skos:note "Wikibase ID: Q50"@en .
+
+wgm:creative_commons_attribution-noncommercial-sharealike a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung-NichtKommerziell-WeitergabeUnterGleichenBedingungen"@de,
+        "Creative Commons Attribution-NonCommercial-ShareAlike"@en ;
+    dc11:description "Lizenz, die die nicht kommerzielle Nutzung und Verbreitung unter derselben Lizenz und der Nennung des Namens erlaubt"@de,
+        "license allowing noncommercial use and distribution, with attribution, under the same license"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6998997> ;
+    skos:note "Wikibase ID: Q52"@en .
+
+wgm:creative_commons_attribution-sharealike a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "Creative Commons Namensnennung-WeitergabeUnterGleichenBedingungen"@de,
+        "Creative Commons Attribution-ShareAlike"@en ;
+    dc11:description "Lizenzsatz, der die Nutzung unter derselben Lizenz erlaubt und die Nennung des Namens erfordert"@de,
+        "set of licenses allowing free use of a work, with attribution, under the same conditions"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q6905942> ;
+    skos:note "Wikibase ID: Q48"@en .
+
+wgm:curator a owl:ObjectProperty ;
+    rdfs:label "Kurator"@de,
+        "curator"@en ;
+    dc11:description "Akteur, welcher eine Sammlung kuratiert"@de,
+        "agent who curates a collection"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/collection> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P109_has_current_or_former_curator>,
+        <http://www.wikidata.org/entity/P1640> ;
+    skos:note "Wikibase ID: P46"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:custody_received_by a owl:ObjectProperty ;
+    rdfs:label "Gewahrsam übertragen auf"@de,
+        "custody received by"@en ;
+    dc11:description "neuer Verwahrer dieses Objekts"@de,
+        "new custodian of this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P29_custody_received_by> ;
+    skos:note "Wikibase ID: P20"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:custody_surrendered_by a owl:ObjectProperty ;
+    rdfs:label "Gewahrsam übergeben von"@de,
+        "custody surrendered by"@en ;
+    dc11:description "vorheriger Verwahrer dieses Objekts"@de,
+        "previous custodian of this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/group>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P28_custody_surrendered_by> ;
+    skos:note "Wikibase ID: P19"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:date a owl:DatatypeProperty ;
+    rdfs:label "Datum"@de,
+        "date"@en ;
+    dc11:description "wird für Ereignisse verwendet, die mit einem Zeitpunkt und nicht mit einer Zeitspanne verbunden sind (verwenden Sie Start- und Enddatum zur Angabe einer Zeitspanne)"@de,
+        "used for events that are associated with a point in time instead of a time span (use start date and end date for indicating a time span)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range xsd:date ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P585> ;
+    skos:note "Wikibase ID: P12"@en,
+        "Wikibase datatype: edtf"@en .
+
+wgm:death a owl:Class ;
+    rdfs:label "Tod"@de,
+        "Death"@en ;
+    dc11:description "umfasst den Tod von Menschen"@de,
+        "comprises the deaths of human beings"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/7.1.2/E69_Death> ;
+    skos:note "Wikibase ID: Q72"@en .
+
+wgm:degree_of_certainty a owl:ObjectProperty ;
+    rdfs:label "Grad der Sicherheit"@de,
+        "degree of certainty"@en ;
+    dc11:description "Grad der Sicherheit einer Aussage; kann niedrig, mittel, hoch oder unbekannt sein"@de,
+        "degree of certainty for a statement, can be low, mid, high or unknown"@en ;
+    skos:note "Wikibase ID: P114"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:depicts a owl:ObjectProperty ;
+    rdfs:label "bildet ab"@de,
+        "depicts"@en ;
+    dc11:description "Konzept, das auf einem Objekt abgebildet ist"@de,
+        "concept that is depicted on an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P62_depicts>,
+        <http://www.wikidata.org/entity/P180> ;
+    skos:note "Wikibase ID: P64"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:describing a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "beschreiben"@de,
+        "describing"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, die Zielentität zu beschreiben"@de,
+        "used with P80 (motivation) for when the user intends to describe the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#describing> ;
+    skos:note "Wikibase ID: Q62"@en .
+
+wgm:destruction a owl:Class ;
+    rdfs:label "Zerstörung"@de,
+        "Destruction"@en ;
+    dc11:description "Ereignis, das dazu führt, dass ein Objekt nicht mehr existiert"@de,
+        "event that results in an item no longer existing"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E6_Destruction> ;
+    skos:note "Wikibase ID: Q26"@en .
+
+wgm:digital_collection a owl:Class ;
+    rdfs:label "Digitale Sammlung"@de,
+        "Digital Collection"@en ;
+    dc11:description "Gruppierung digitaler Gegenstände"@de,
+        "aggregation of digital objects"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/information_object> ;
+    owl:equivalentClass <http://www.wikidata.org/entity/Q60474998> ;
+    skos:note "Wikibase ID: Q10"@en .
+
+wgm:digital_object a owl:Class ;
+    rdfs:label "Digitales Objekt"@de,
+        "Digital Object"@en ;
+    dc11:description "umfasst identifizierbare immaterielle Güter, die als Mengen von Bitfolgen dargestellt werden können, wie Datensätze, elektronische Texte, Bilder, Audio- oder Videoelemente, Software usw., und die als einzelne Einheiten dokumentiert werden"@de,
+        "comprises identifiable immaterial items that can be represented as sets of bit sequences, such as data sets, e-texts, images, audio or video items, software, etc., and are documented as single units"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/information_object> ;
+    owl:equivalentClass <http://www.ics.forth.gr/isl/CRMdig/D1_Digital_Object>,
+        <http://www.wikidata.org/entity/Q59138870> ;
+    skos:note "Wikibase ID: Q11"@en .
+
+wgm:digitization a owl:Class ;
+    rdfs:label "Digitalisierung"@de,
+        "Digitization"@en ;
+    dc11:description "Ereignis, das zu einer neuen digitalen Objektdarstellung eines Gegenstands führt"@de,
+        "event that results in a new digital object representation of an item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/creation> ;
+    owl:equivalentClass <http://www.ics.forth.gr/isl/CRMdig/D2_Digitization_Process> ;
+    skos:note "Wikibase ID: Q27"@en .
+
+wgm:dimension a owl:DatatypeProperty ;
+    rdfs:label "hat Dimension"@de,
+        "dimension"@en ;
+    dc11:description "übergeordnete Eigenschaft für Abmessungen wie Höhe und Breite"@de,
+        "superproperty for dimensions like height and width"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P43_has_dimension> ;
+    skos:note "Wikibase ID: P31"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:documented_in a owl:ObjectProperty ;
+    rdfs:label "wird belegt in"@de,
+        "documented in"@en ;
+    dc11:description "verweist auf einen bibliografischen Titel, der diesen Titel dokumentiert oder weitere Informationen über ihn liefert"@de,
+        "points to a bibliographic item which documents this item or provides further information about it"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/bibliographic_work> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P70_documents> ;
+    skos:note "Wikibase ID: P58"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:doi a owl:DatatypeProperty ;
+    rdfs:label "DOI"@de,
+        "DOI"@en ;
+    dc11:description "Seriencode zur eindeutigen Identifizierung digitaler Objekte wie wissenschaftlicher Arbeiten (nur Großbuchstaben verwenden)"@de,
+        "serial code used to uniquely identify digital objects like academic papers (use upper case letters only)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/digital_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P356> ;
+    skos:note "Wikibase ID: P103"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:duration a owl:DatatypeProperty ;
+    rdfs:label "Dauer"@de,
+        "duration"@en ;
+    dc11:description "Dauer eines Objekts, in der Regel Video oder Audio"@de,
+        "duration of an item, usually video or audio"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    rdfs:subPropertyOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/has_dimension> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2047>,
+        <https://schema.org/duration> ;
+    skos:note "Wikibase ID: P68"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:editing a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "bearbeiten"@de,
+        "editing"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, eine Änderung oder Bearbeitung der Zielentität zu beantragen"@de,
+        "used with P80 (motivation) for when the user intends to request a change or edit to the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#editing> ;
+    skos:note "Wikibase ID: Q63"@en .
+
+wgm:end_date a owl:DatatypeProperty ;
+    rdfs:label "Enddatum"@de,
+        "end date"@en ;
+    dc11:description "wenn ein Ereignis beendet wurde, auch die Eigenschaft »Startdatum« verwenden (die Eigenschaft »Datum« sollte alternativ verwendet werden, wenn ein Ereignis nur einen Zeitpunkt statt einer Zeitspanne hat)"@de,
+        "when an event finished, use property 'start date' as well (the property 'date' should be used alternatively when an event only has a point in time instead of a time span)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range xsd:date ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P582>,
+        <https://schema.org/endDate> ;
+    skos:note "Wikibase ID: P11"@en,
+        "Wikibase datatype: edtf"@en .
+
+wgm:equipment a owl:DatatypeProperty ;
+    rdfs:label "Ausrüstung"@de,
+        "equipment"@en ;
+    dc11:description "für die Erstellung von Medienobjekten verwendete Ausrüstung"@de,
+        "equipment used for creation of media item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P67"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:event a owl:Class ;
+    rdfs:label "Ereignis"@de,
+        "Event"@en ;
+    dc11:description "Oberklasse für Ereignisse"@de,
+        "superclass for events"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E5_Event> ;
+    skos:note "Wikibase ID: Q22"@en .
+
+wgm:external_link a owl:DatatypeProperty ;
+    rdfs:label "externer Link"@de,
+        "external link"@en ;
+    dc11:description "verweist auf externe Ressourcen oder Mediendarstellungen"@de,
+        "links to external resources or media representations"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P57"@en,
+        "Wikibase datatype: url"@en .
+
+wgm:false a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    rdfs:label "FALSE"@de,
+        "FALSE"@en ;
+    dc11:description "Wert für bestimmte Eigenschaften, wie P83 (verifiziert)"@de,
+        "value for specific properties, like P83 (verified)"@en ;
+    owl:equivalentClass <https://schema.org/False> ;
+    skos:note "Wikibase ID: Q45"@en .
+
+wgm:female a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/sex_or_gender> ;
+    rdfs:label "weiblich"@de,
+        "female"@en ;
+    dc11:description "gibt an, dass es sich bei der Person um eine Frau handelt"@de,
+        "indicates that the human subject is a female"@en ;
+    owl:sameAs <https://www.wikidata.org/wiki/Q6581072> ;
+    skos:note "Wikibase ID: Q55"@en .
+
+wgm:file_extension a owl:DatatypeProperty ;
+    rdfs:label "Dateierweiterung"@de,
+        "file extension"@en ;
+    dc11:description "Dateierweiterung, die das Dateiformat angibt, das mit dem Klassen-Dateiformat verwendet wird"@de,
+        "file extension that denotes the file format use with class file format"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/file_format> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1195> ;
+    skos:note "Wikibase ID: P71"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:file_format a owl:Class ;
+    rdfs:label "Datenformat"@de,
+        "File Format"@en ;
+    dc11:description "Kodierungsformat einer digitalen Datei"@de,
+        "encoding format of a digital file"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/digital_object> ;
+    owl:equivalentClass <http://purl.org/dc/terms/FileFormat> ;
+    skos:note "Wikibase ID: Q39"@en .
+
+wgm:file_size a owl:DatatypeProperty ;
+    rdfs:label "Dateigröße"@de,
+        "file size"@en ;
+    dc11:description "Größe einer Medienelement-Datei"@de,
+        "size of media item file"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P3575> ;
+    skos:note "Wikibase ID: P69"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:file_storage a owl:DatatypeProperty ;
+    rdfs:label "Dateispeicher"@de,
+        "file storage"@en ;
+    dc11:description "URL, unter der die Datei gespeichert ist"@de,
+        "URL where file is stored"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P43_has_dimension> ;
+    skos:note "Wikibase ID: P73"@en,
+        "Wikibase datatype: url"@en .
+
+wgm:file_view a owl:DatatypeProperty ;
+    rdfs:label "Dateiansicht"@de,
+        "file view"@en ;
+    dc11:description "URL, unter der die Datei eingesehen werden kann"@de,
+        "URL where file can be viewed"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P74"@en,
+        "Wikibase datatype: url"@en .
+
+wgm:formatter_uri a owl:DatatypeProperty ;
+    rdfs:label "URI-Formatierer für RDF-Ressource"@de,
+        "formatter uri for rdf resource"@en ;
+    dc11:description "URI-ähnliche Zeichenkette, wie \"https://wikidata.org/wiki/$1/\", bei der \"$1\" automatisch ersetzt wird mit dem tatsächlichen Eigenschaftswert eines Datenobjekts (URI der Ressource, nicht der RDF-Datei)"@de,
+        "URI template from which \"$1\" can be automatically replaced with the effective property value on items (it is the URI of the resources, not the URI of the RDF file describing it)"@en ;
+    skos:note "Wikibase ID: P54"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:formatter_url a owl:DatatypeProperty ;
+    rdfs:label "URL-Formatierer"@de,
+        "formatter url"@en ;
+    dc11:description "URL-ähnliche Zeichenkette, wie \"https://wikidata.org/wiki/$1/\", bei der \"$1\" automatisch ersetzt wird mit dem tatsächlichen Eigenschaftswert eines Datenobjekts (genutzt bei der Definition von Eigenschaften)"@de,
+        "web page URL; URI template from which \"$1\" can be automatically replaced with the effective property value on items. If the site goes offline, set it to deprecated rank. If the formatter URL changes, add a new statement with preferred rank."@en ;
+    skos:note "Wikibase ID: P52"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:from_father a owl:ObjectProperty ;
+    rdfs:label "gab Vaterschaft"@de,
+        "from father"@en ;
+    dc11:description "verknüpft das Ereignis Geburt mit einer Instanz eines Akteurs in der Rolle des biologischen Vaters"@de,
+        "links the event Birth to an instance of an actor in the role of biological father"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://cidoc-crm.org/cidoc-crm/7.1.2/P97_from_father> ;
+    skos:note "Wikibase ID: P41"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:full_citation a owl:DatatypeProperty ;
+    rdfs:label "vollständige Quellenangabe"@de,
+        "full citation"@en ;
+    dc11:description "wie ein bibliographischer Titel zitiert werden soll"@de,
+        "how a bibliographic item a would be cited"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/bibliographic_work> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P59"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:function a owl:Class ;
+    rdfs:label "Funktion"@de,
+        "Function"@en ;
+    dc11:description "beschreibt die Verwendung eines Objekts"@de,
+        "describes the use of an item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    skos:note "Wikibase ID: Q40"@en .
+
+wgm:geonames a owl:DatatypeProperty ;
+    rdfs:label "Geonames"@de,
+        "Geonames"@en ;
+    dc11:description "Kennung in der GeoNames geographical database"@de,
+        "identifier in the GeoNames geographical database"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1566> ;
+    skos:note "Wikibase ID: P101"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:getty_aat a owl:DatatypeProperty ;
+    rdfs:label "Getty AAT"@de,
+        "Getty AAT"@en ;
+    dc11:description "Kennung im Art & Architecture Thesaurus des Getty Research Institute"@de,
+        "identifier in the Art & Architecture Thesaurus by the Getty Research Institute"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1014> ;
+    skos:note "Wikibase ID: P99"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:getty_ulan a owl:DatatypeProperty ;
+    rdfs:label "Getty ULAN"@de,
+        "Getty ULAN"@en ;
+    dc11:description "Kennung aus der Union List of Artist Names des Getty Research Institute"@de,
+        "identifier from the Union List of Artist Names by the Getty Research Institute"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P245> ;
+    skos:note "Wikibase ID: P100"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:gigabyte a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Gigabyte"@de,
+        "gigabyte"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q77"@en .
+
+wgm:gnd a owl:DatatypeProperty ;
+    rdfs:label "GND"@de,
+        "GND"@en ;
+    dc11:description "Kennung aus einer internationalen Normdatei für Personennamen, Körperschaften und Schlagwörter – Deutsche Nationalbibliothek"@de,
+        "identifier from an international authority file of names, subjects, and organizations - Deutsche Nationalbibliothek"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P227> ;
+    skos:note "Wikibase ID: P102"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:gram a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Gramm"@de,
+        "gram"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q78"@en .
+
+wgm:group a owl:Class ;
+    rdfs:label "Menschliche Gruppe"@de,
+        "Group"@en ;
+    dc11:description "alle Ansammlungen oder Organisationen menschlicher Individuen oder Gruppen, die aufgrund irgendeiner Form von verbindenden Beziehungen kollektiv oder in ähnlicher Weise handeln"@de,
+        "any gatherings or organizations of human individuals or groups that act collectively or in a similar way due to any form of unifying relationship"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E74_Group>,
+        <http://www.wikidata.org/entity/Q16887380>,
+        <http://xmlns.com/foaf/0.1/#term_Group> ;
+    skos:note "Wikibase ID: Q2"@en .
+
+wgm:has_annotation a owl:ObjectProperty ;
+    rdfs:label "hat Annotation"@de,
+        "annotation"@en ;
+    dc11:description "Anmerkung, die für dieses Medienelement gemacht wurde"@de,
+        "annotation that was done for this media item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    owl:equivalentProperty <http://www.ics.forth.gr/isl/CRMdig/L43_annotates> ;
+    skos:note "Wikibase ID: P75"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_condition a owl:ObjectProperty ;
+    rdfs:label "hat Zustand"@de,
+        "condition"@en ;
+    dc11:description "Zustand eines Gegenstands"@de,
+        "condition of an object"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/condition> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P44_has_condition> ;
+    skos:note "Wikibase ID: P26"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_degree_of_certainty a owl:Class ;
+    rdfs:label "Grad der Sicherheit"@de,
+        "degree of certainty"@en ;
+    dc11:description "wird für Aussagen verwendet, um den Grad der Sicherheit auszudrücken"@de,
+        "used in statements for expressing the degree of certainty"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    skos:note "Wikibase ID: Q92"@en .
+
+wgm:has_event a owl:ObjectProperty ;
+    rdfs:label "hat Ereignis"@de,
+        "event"@en ;
+    dc11:description "etwas, das mit diesem Objekt passiert ist"@de,
+        "something that happened to this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    skos:note "Wikibase ID: P8"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_file_format a owl:ObjectProperty ;
+    rdfs:label "hat Datenformat"@de,
+        "file format"@en ;
+    dc11:description "Format der Datei"@de,
+        "format of the file"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/file_format> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2701>,
+        <https://schema.org/encodingFormat> ;
+    skos:note "Wikibase ID: P70"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_motivation a owl:ObjectProperty ;
+    rdfs:label "hat Motivation"@de,
+        "motivation"@en ;
+    dc11:description "eine Eigenschaft aus dem W3C-Anmerkungsstandard, die die Gründe für die Erstellung einer Anmerkung angibt"@de,
+        "a property from the W3C annotation standard providing the reasons why an annotation was made"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    owl:equivalentProperty <http://www.w3.org/ns/oa#motivatedBy> ;
+    skos:note "Wikibase ID: P80"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_parent a owl:ObjectProperty ;
+    rdfs:label "hat Elternteil"@de,
+        "has parent"@en ;
+    dc11:description "familiäre Beziehung"@de,
+        "familial relationship"@en ;
+    skos:note "Wikibase ID: P105"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_part a owl:ObjectProperty ;
+    rdfs:label "hat Teil"@de,
+        "has part"@en ;
+    dc11:description "ein anderes Objekt, das Teil dieses Objekts ist"@de,
+        "another item that is part of this item"@en ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P45_consists_of>,
+        <http://www.wikidata.org/entity/P527>,
+        <https://schema.org/hasPart> ;
+    skos:note "Wikibase ID: P5"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_position a owl:ObjectProperty ;
+    rdfs:label "hat Position"@de,
+        "position"@en ;
+    dc11:description "gibt die Position eines Objekts innerhalb eines Standorts an"@de,
+        "indicates the position of an item within a location"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/position> ;
+    skos:note "Wikibase ID: P39"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:has_sex_or_gender a owl:ObjectProperty ;
+    rdfs:label "hat Geschlecht"@de,
+        "sex or gender"@en ;
+    dc11:description "Geschlecht oder Geschlechtsidentität einer Person"@de,
+        "sex or gender identity of a person"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/sex_or_gender> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P21> ;
+    skos:note "Wikibase ID: P49"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:height a owl:DatatypeProperty ;
+    rdfs:label "Höhe"@de,
+        "height"@en ;
+    dc11:description "Höhe eines Objekts"@de,
+        "height of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:float ;
+    rdfs:subPropertyOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/has_dimension> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2048>,
+        <https://schema.org/height> ;
+    skos:note "Wikibase ID: P32"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:high a owl:Class ;
+    rdfs:label "hoch"@de,
+        "high"@en ;
+    dc11:description "Grad der Sicherheit einer Aussage"@de,
+        "degree of certainty of a statement"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/degree_of_certainty> ;
+    skos:note "Wikibase ID: Q93"@en .
+
+wgm:highlighting a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "hervorheben"@de,
+        "highlighting"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, die Zielentität oder ein Segment davon zu markieren"@de,
+        "used with P80 (motivation) for when the user intends to highlight the target entity or segment of it"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#highlighting> ;
+    skos:note "Wikibase ID: Q64"@en .
+
+wgm:hour a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Stunde"@de,
+        "hour"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q79"@en .
+
+wgm:human a owl:Class ;
+    rdfs:label "Mensch"@de,
+        "Human"@en ;
+    dc11:description "(realer) toter oder lebender Mensch"@de,
+        "(real) dead or living human being"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/biological_object> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E21_Person>,
+        <http://www.wikidata.org/entity/Q5>,
+        <http://xmlns.com/foaf/0.1/#term_Person>,
+        <https://schema.org/Person> ;
+    skos:note "Wikibase ID: Q5"@en .
+
+wgm:human-made_object a owl:Class ;
+    rdfs:label "Menschengemachter Gegenstand"@de,
+        "Human-Made Object"@en ;
+    dc11:description "alle dauerhaften physischen Gegenstände jeglicher Größe, die absichtlich durch menschliche Aktivitäten geschaffen werden"@de,
+        "all persistent physical objects of any size that are purposely created by human activity"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E22_Human-Made_Object>,
+        <http://www.wikidata.org/entity/Q223557> ;
+    skos:note "Wikibase ID: Q6"@en .
+
+wgm:iconclass a owl:DatatypeProperty ;
+    rdfs:label "Iconclass"@de,
+        "Iconclass"@en ;
+    dc11:description "Iconclass-Code, der einem künstlerischen Motiv oder Konzept entspricht"@de,
+        "Iconclass code that corresponds with an artistic theme or concept"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/iconographic_concept> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1256> ;
+    skos:note "Wikibase ID: P98"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:iconographic_concept a owl:Class ;
+    rdfs:label "Ikonografisches Konzept"@de,
+        "Iconographic Concept"@en ;
+    dc11:description "etwas, das auf einem Gegenstand abgebildet werden kann"@de,
+        "something that can be depicted on an object"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    skos:note "Wikibase ID: Q43"@en .
+
+wgm:identifying a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "identifizieren"@de,
+        "identifying"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, der Zielentität eine Identität zuzuweisen"@de,
+        "used with P80 (motivation) for when the user intends to assign an identity to the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#identifying> ;
+    skos:note "Wikibase ID: Q65"@en .
+
+wgm:image a owl:DatatypeProperty ;
+    rdfs:label "Bild"@de,
+        "image"@en ;
+    dc11:description "visuelle Darstellung dieses Objekts, die in der Regel nur zur Dokumentation und nicht zur Darstellung verwendet wird (siehe auch P32)"@de,
+        "visual depiction of this item, typically used for documentation only rather than representation (see also P32)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/medial_item> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P18>,
+        <https://schema.org/image> ;
+    skos:note "Wikibase ID: P61"@en,
+        "Wikibase datatype: localMedia"@en .
+
+wgm:in_custody_of a owl:ObjectProperty ;
+    rdfs:label "in Gewahrsam von"@de,
+        "in custody of"@en ;
+    dc11:description "Agent, welcher eine Objekt verwahrt"@de,
+        "agent who holds an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P49_has_former_or_current_keeper> ;
+    skos:note "Wikibase ID: P43"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:information_object a owl:Class ;
+    rdfs:label "Informationsgegenstand"@de,
+        "Information Object"@en ;
+    dc11:description "umfasst identifizierbare immaterielle Güter wie Datensätze, Bilder, Texte, Multimedia-Objekte, Computercode, Algorithmen oder mathematische Formeln, die eine objektiv erkennbare Struktur aufweisen und als einzelne Einheiten dokumentiert sind"@de,
+        "comprises identifiable immaterial items, such as data sets, images, texts, multimedia objects, computer code, algorithm or mathematical formulae, that have an objectively recognizable structure and are documented as single units"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/E73_Information_Object> ;
+    skos:note "Wikibase ID: Q9"@en .
+
+wgm:inscription a owl:DatatypeProperty ;
+    rdfs:label "Inschrift"@de,
+        "inscription"@en ;
+    dc11:description "Textstück auf einem Gegenstand"@de,
+        "piece of text on an object"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1684> ;
+    skos:note "Wikibase ID: P25"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:instance_of a owl:ObjectProperty ;
+    rdfs:label "ist ein(e)"@de,
+        "instance of"@en ;
+    dc11:description "dieses Objekt ist ein spezifisches Beispiel und gehört zu dieser Klasse"@de,
+        "this item is a specific example and a member of that class"@en ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P31> ;
+    skos:note "Wikibase ID: P1"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:internal_id a owl:DatatypeProperty ;
+    rdfs:label "interne ID"@de,
+        "internal ID"@en ;
+    dc11:description "interne Kennung für diesen Artikel"@de,
+        "Internal identifier for this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    skos:note "Wikibase ID: P96"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:issn a owl:DatatypeProperty ;
+    rdfs:label "issn"@de,
+        "issn"@en ;
+    dc11:description "Identifikator für Zeitschriften"@de,
+        "identifier for journals"@en ;
+    skos:note "Wikibase ID: P108"@en,
+        "Wikibase datatype: external-id"@en .
+
+wgm:kilogram a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Kilogramm"@de,
+        "kilogram"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q80"@en .
+
+wgm:kilometre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Kilometer"@de,
+        "kilometre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q82"@en .
+
+wgm:language_of_work_or_name a owl:ObjectProperty ;
+    rdfs:label "Sprache des Werks oder des Namens"@de,
+        "language of work or name"@en ;
+    dc11:description "Sprache dieses Werkes oder Namens"@de,
+        "language associated with this creative work or a name"@en ;
+    skos:note "Wikibase ID: P111"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:length a owl:DatatypeProperty ;
+    rdfs:label "Länge"@de,
+        "length"@en ;
+    dc11:description "Länge eines Objekts"@de,
+        "length of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:float ;
+    rdfs:subPropertyOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/has_dimension> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2043> ;
+    skos:note "Wikibase ID: P33"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:licence a owl:Class ;
+    rdfs:label "Lizenz"@de,
+        "Licence"@en ;
+    dc11:description "Art der Nutzungsrechte"@de,
+        "type of usage right"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/information_object> ;
+    owl:equivalentClass <http://www.ebi.ac.uk/swo/SWO_0000002> ;
+    skos:note "Wikibase ID: Q37"@en .
+
+wgm:license a owl:ObjectProperty ;
+    rdfs:label "Lizenz"@de,
+        "license"@en ;
+    dc11:description "die Lizenz, die die Nutzungsrechte für diesen Artikel klärt (verwenden Sie gegebenenfalls auch die Eigenschaft »zitieren als«, um die richtige Zitierung anzugeben)"@de,
+        "the license that clarifies use rights for this item (also use property 'cite as' to indicate the proper citation if applicable)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/license> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P104_is_subject_to>,
+        <http://www.wikidata.org/entity/P275>,
+        <https://schema.org/license> ;
+    skos:note "Wikibase ID: P53"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:linking a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "verlinken"@de,
+        "linking"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, einen Link zu einer Ressource zu erstellen, die mit der Zielentität in Verbindung steht"@de,
+        "used with P80 (motivation) for when the user intends to link to a resource related to the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#linking> ;
+    skos:note "Wikibase ID: Q66"@en .
+
+wgm:litre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Liter"@de,
+        "litre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q83"@en .
+
+wgm:location a owl:ObjectProperty ;
+    rdfs:label "Standort"@de,
+        "location"@en ;
+    dc11:description "beschreibt, wo sich ein Objekt befindet"@de,
+        "describes where an item is located"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P53_has_former_or_current_location>,
+        <http://www.wikidata.org/entity/P276>,
+        <https://schema.org/location> ;
+    skos:note "Wikibase ID: P38"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:low a owl:Class ;
+    rdfs:label "niedrig"@de,
+        "low"@en ;
+    dc11:description "Grad der Sicherheit einer Aussage"@de,
+        "degree of certainty of a statement"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/degree_of_certainty> ;
+    skos:note "Wikibase ID: Q95"@en .
+
+wgm:male a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/sex_or_gender> ;
+    rdfs:label "männlich"@de,
+        "male"@en ;
+    dc11:description "gibt an, dass es sich bei der Person um einen Mann handelt"@de,
+        "indicates that the human subject is a male"@en ;
+    owl:sameAs <https://www.wikidata.org/wiki/Q6581097> ;
+    skos:note "Wikibase ID: Q56"@en .
+
+wgm:material a owl:Class ;
+    rdfs:label "Material"@de,
+        "Material"@en ;
+    dc11:description "Material, aus dem ein Gegenstand hergestellt ist"@de,
+        "material that an object is made from"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E57_Material>,
+        <http://www.wikidata.org/entity/Q214609>,
+        <https://schema.org/material> ;
+    skos:note "Wikibase ID: Q18"@en .
+
+wgm:material_used a owl:ObjectProperty ;
+    rdfs:label "verwendetes Material"@de,
+        "material used"@en ;
+    dc11:description "Material, das zur Erstellung oder Modifikation eines Objekts verwendet wird"@de,
+        "material used for creating or changing an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/material> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P126_employed> ;
+    skos:note "Wikibase ID: P22"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:measurement_unit a owl:Class ;
+    rdfs:label "Maßeinheit"@de,
+        "Measurement Unit"@en ;
+    dc11:description "Einheit zur Angabe eines Maßes, z. B. Meter oder Liter"@de,
+        "unit for giving a measurement, for example metres or litres"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E58_Measurement_Unit>,
+        <http://www.wikidata.org/entity/Q47574> ;
+    skos:note "Wikibase ID: Q19"@en .
+
+wgm:media_item a owl:Class ;
+    rdfs:label "Medienelement"@de,
+        "Media item"@en ;
+    dc11:description "digitale Darstellung von Medien, etwa Video oder Audio"@de,
+        "digital representation of media, for example video or audio"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/digital_object> ;
+    owl:equivalentClass <https://schema.org/MediaObject> ;
+    skos:note "Wikibase ID: Q12"@en .
+
+wgm:method a owl:ObjectProperty ;
+    rdfs:label "hat Verfahren"@de,
+        "method"@en ;
+    dc11:description "Technik oder Methode, die zur Erstellung oder Änderung eines Gegenstands verwendet wird"@de,
+        "technique or method that is used for creating or changing an object"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/technique> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P32_used_general_technique> ;
+    skos:note "Wikibase ID: P65"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:metre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Meter"@de,
+        "metre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q89"@en .
+
+wgm:mid a owl:Class ;
+    rdfs:label "mittel"@de,
+        "mid"@en ;
+    dc11:description "Grad der Sicherheit einer Aussage"@de,
+        "degree of certainty of a statement"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/degree_of_certainty> ;
+    skos:note "Wikibase ID: Q94"@en .
+
+wgm:milligram a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Milligramm"@de,
+        "milligram"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q84"@en .
+
+wgm:millilitre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Milliliter"@de,
+        "millilitre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q86"@en .
+
+wgm:millimetre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Millimeter"@de,
+        "millimetre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q87"@en .
+
+wgm:minute a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Minute"@de,
+        "minute"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q85"@en .
+
+wgm:moderating a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "moderieren"@de,
+        "moderating"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, der Zielentität einen Wert oder eine Qualität zuzuweisen"@de,
+        "used with P80 (motivation) for when the user intends to assign some value or quality to the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#moderating> ;
+    skos:note "Wikibase ID: Q67"@en .
+
+wgm:modification a owl:Class ;
+    rdfs:label "Bearbeitung"@de,
+        "Modification"@en ;
+    dc11:description "Ereignis, bei dem sich ein Objekt ändert, aber immer noch als dasselbe Objekt betrachtet wird (spezifischere Ereignisse können Teil Hinzufügen und Teil Entfernen sein)"@de,
+        "event where an item changes but is still considered the same item (more specific events can be part addition and part removal)"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E11_Modification> ;
+    skos:note "Wikibase ID: Q28"@en .
+
+wgm:motivation a owl:Class ;
+    rdfs:label "Motivation"@de,
+        "Motivation"@en ;
+    dc11:description "für Anmerkungen zu verwenden"@de,
+        "to be used for annotations"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentClass <http://www.w3.org/ns/oa#Motivation>,
+        <http://www.wikidata.org/entity/Q644302> ;
+    skos:note "Wikibase ID: Q16"@en .
+
+wgm:move a owl:Class ;
+    rdfs:label "Ortswechsel"@de,
+        "Move"@en ;
+    dc11:description "Ereignis, bei dem ein Objekt von einem Ort zu einem anderen bewegt wird"@de,
+        "event where an item is moved from one place to another"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E9_Move> ;
+    skos:note "Wikibase ID: Q29"@en .
+
+wgm:moved_from a owl:ObjectProperty ;
+    rdfs:label "Ortswechsel von"@de,
+        "moved from"@en ;
+    dc11:description "früherer Standort dieses Objekts"@de,
+        "previous location of this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P27_moved_from> ;
+    skos:note "Wikibase ID: P18"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:moved_to a owl:ObjectProperty ;
+    rdfs:label "Ortswechsel nach"@de,
+        "moved to"@en ;
+    dc11:description "neuer Standort dieses Objekts"@de,
+        "new location of this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P26_moved_to> ;
+    skos:note "Wikibase ID: P17"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:non-binary a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/sex_or_gender> ;
+    rdfs:label "nicht-binär"@de,
+        "non-binary"@en ;
+    dc11:description "andere Geschlechtsidentitäten als männlich oder weiblich"@de,
+        "gender identities other than male or female"@en ;
+    owl:sameAs <https://www.wikidata.org/wiki/Q48270> ;
+    skos:note "Wikibase ID: Q57"@en .
+
+wgm:number_of_parts a owl:DatatypeProperty ;
+    rdfs:label "hat Anzahl Teile"@de,
+        "number of parts"@en ;
+    dc11:description "bei Objekten, die aus Teilen bestehen: wie viele Teile es gibt"@de,
+        "for items that have parts: how many parts there are"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    rdfs:range xsd:float ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P57_has_number_of_parts> ;
+    skos:note "Wikibase ID: P7"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:object_of_representation a owl:ObjectProperty ;
+    rdfs:label "Gegenstand der Darstellung"@de,
+        "object of representation"@en ;
+    dc11:description "das Objekt, das durch dieses Medienelement dargestellt wird"@de,
+        "the item that is represented by this media item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P138_represents> ;
+    skos:note "Wikibase ID: P63"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:organization a owl:Class ;
+    rdfs:label "Organisation"@de,
+        "Organization"@en ;
+    dc11:description "eine organisierte Gruppe von Menschen, z. B. eine Universität oder eine Forschungsgesellschaft"@de,
+        "organized group of humans such as a university or research society"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentClass <http://www.wikidata.org/entity/Q43229>,
+        <http://xmlns.com/foaf/0.1/#term_Organization>,
+        <https://nfdi4culture.de/ontology#Organization>,
+        <https://schema.org/Organization> ;
+    skos:note "Wikibase ID: Q35"@en .
+
+wgm:owner a owl:ObjectProperty ;
+    rdfs:label "Eigentümer"@de,
+        "owner"@en ;
+    dc11:description "Agent, welcher ein Objekt besitzt"@de,
+        "agent who owns an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner>,
+        <http://www.wikidata.org/entity/P127> ;
+    skos:note "Wikibase ID: P44"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:parent_of a owl:ObjectProperty ;
+    rdfs:label "ist Elternteil von"@de,
+        "parent of"@en ;
+    dc11:description "assoziiert eine Instanz von Mensch mit einer anderen Instanz von Mensch, die die Rolle des Kindes der ersten Instanz spielt"@de,
+        "associates an instance of Human with another instance of Human who plays the role of the first instances child"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    owl:equivalentProperty <http://cidoc-crm.org/cidoc-crm/7.1.2/P152_has_parent> ;
+    skos:note "Wikibase ID: P48"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:part_added a owl:ObjectProperty ;
+    rdfs:label "Teil hinzugefügt"@de,
+        "part added"@en ;
+    dc11:description "welcher Teil zu diesem Objekt hinzugefügt wurde"@de,
+        "which part was added to this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P111_added> ;
+    skos:note "Wikibase ID: P28"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:part_addition a owl:Class ;
+    rdfs:label "Teilhinzufügung"@de,
+        "Part Addition"@en ;
+    dc11:description "Ereignis, bei dem ein Teil zu einem Objekt hinzugefügt wird"@de,
+        "event where a part gets added to an item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E79_Part_Addition> ;
+    skos:note "Wikibase ID: Q30"@en .
+
+wgm:part_of a owl:ObjectProperty ;
+    rdfs:label "ist Teil von"@de,
+        "part of"@en ;
+    dc11:description "das Objekt, zu dem dieses Objekt gehört"@de,
+        "the item that this item is a part of"@en ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P46_is_composed_of>,
+        <http://www.wikidata.org/entity/P361>,
+        <https://schema.org/isPartOf> ;
+    skos:note "Wikibase ID: P6"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:part_removal a owl:Class ;
+    rdfs:label "Teilentfernung"@de,
+        "Part Removal"@en ;
+    dc11:description "Ereignis, bei dem ein Teil von einem Objekt entfernt wird"@de,
+        "event where a part is removed from an item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E80_Part_Removal> ;
+    skos:note "Wikibase ID: Q31"@en .
+
+wgm:part_removed a owl:ObjectProperty ;
+    rdfs:label "Teil entfernt"@de,
+        "part removed"@en ;
+    dc11:description "welcher Teil von diesem Objekt entfernt wurde"@de,
+        "which part was removed from this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P113_removed> ;
+    skos:note "Wikibase ID: P27"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:participant a owl:ObjectProperty ;
+    rdfs:label "hatte Teilnehmer"@de,
+        "participant"@en ;
+    dc11:description "Person, die an einem Ereignis teilgenommen hat"@de,
+        "person who participated in an event"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P11_had_participant>,
+        <http://www.wikidata.org/entity/P710>,
+        <https://schema.org/participant> ;
+    skos:note "Wikibase ID: P13"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:physical_object a owl:Class ;
+    rdfs:label "Materieller Gegenstand"@de,
+        "Physical Object"@en ;
+    dc11:description "umfasst Gegenstände materieller Art, die Dokumentationseinheiten sind und physische Grenzen haben, die sie auf objektive Weise vollständig von anderen Gegenständen trennen"@de,
+        "comprises items of a material nature that are units for documentation and have physical boundaries that separate them completely in an objective way from other objects"@en ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/E19_Physical_Object> ;
+    skos:note "Wikibase ID: Q3"@en .
+
+wgm:place a owl:Class ;
+    rdfs:label "Ort"@de,
+        "Place"@en ;
+    dc11:description "jede Art von Standort"@de,
+        "any kind of location"@en ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E53_Place>,
+        <http://www.wikidata.org/entity/Q2221906>,
+        <https://nfdi4culture.de/ontology#Place>,
+        <https://schema.org/Place> ;
+    skos:note "Wikibase ID: Q21"@en .
+
+wgm:placeholder a owl:ObjectProperty ;
+    rdfs:label "Platzhalter"@de,
+        "placeholder"@en ;
+    dc11:description "Platzhalterobjekt"@de,
+        "placeholder property"@en ;
+    skos:note "Wikibase ID: P21"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:position a owl:Class ;
+    rdfs:label "Position"@de,
+        "Position"@en ;
+    dc11:description "Position eines Objekts innerhalb eines Standorts (etwa an der Wand oder Decke)"@de,
+        "position of an item within a location (for example wall or ceiling)"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    skos:note "Wikibase ID: Q41"@en .
+
+wgm:position_in_3d_model_-_perspective_position_x-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Position x-Achse"@de,
+        "position in 3D model - perspective position x-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P84"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_perspective_position_y-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Position y-Achse"@de,
+        "position in 3D model - perspective position y-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P85"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_perspective_position_z-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Position z-Achse"@de,
+        "position in 3D model - perspective position z-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P86"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_perspective_target_x-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Ziel x-Achse"@de,
+        "position in 3D model - perspective target x-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P87"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_perspective_target_y-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Ziel y-Achse"@de,
+        "position in 3D model - perspective target y-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P88"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_perspective_target_z-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Perspektive Ziel z-Achse"@de,
+        "position in 3D model - perspective target z-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P89"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_normal_x-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Normale x-Achse"@de,
+        "position in 3D model - selector ref normal x-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P93"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_normal_y-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Normale y-Achse"@de,
+        "position in 3D model - selector ref normal y-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P94"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_normal_z-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Normale z-Achse"@de,
+        "position in 3D model - selector ref normal z-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P95"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_point_x-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Punkt x-Achse"@de,
+        "position in 3D model - selector ref point x-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P90"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_point_y-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Punkt y-Achse"@de,
+        "position in 3D model - selector ref point y-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P91"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:position_in_3d_model_-_selector_ref_point_z-axis a owl:DatatypeProperty ;
+    rdfs:label "Position im 3D Modell - Selektor Referenz Punkt z-Achse"@de,
+        "position in 3D model - selector ref point z-axis"@en ;
+    dc11:description "Kompakkt-spezifische Eigenschaft der Annotationssposition - diese Eigenschaft wird nicht manuell ausgefüllt, sondern nur automatisch, wenn eine neue Annotation gespeichert wird"@de,
+        "Kompakkt-specific annotation position property - this property is not meant to be filled out manually, only automatically when a new annotation is saved"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:float ;
+    skos:note "Wikibase ID: P92"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:primitive_value a owl:Class ;
+    rdfs:label "Primitiver Wert"@de,
+        "Primitive Value"@en ;
+    dc11:description "umfasst Werte von primitiven Datentypen von Programmiersprachen oder Datenbankverwaltungssystemen und aus solchen Werten zusammengesetzte Datentypen, die als Dokumentationselemente verwendet werden, sowie deren mathematische Abstraktionen"@de,
+        "comprises values of primitive data types of programming languages or database management systems and data types composed of such values used as documentation elements, as well as their mathematical abstractions"@en ;
+    owl:equivalentClass <http://cidoc-crm.org/cidoc-crm/7.1.2/E59_Primitive_Value> ;
+    skos:note "Wikibase ID: Q34"@en .
+
+wgm:publication_date a owl:DatatypeProperty ;
+    rdfs:label "Veröffentlichungsdatum"@de,
+        "publication date"@en ;
+    dc11:description "Zeitpunkt, zu dem ein bibliografischer Titel veröffentlicht wurde"@de,
+        "point in time when a bibliographic item was published"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/bibliographic_work> ;
+    rdfs:range xsd:date ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P577>,
+        <https://schema.org/datePublished> ;
+    skos:note "Wikibase ID: P60"@en,
+        "Wikibase datatype: edtf"@en .
+
+wgm:publisher a owl:ObjectProperty ;
+    rdfs:label "Verlag"@de,
+        "publisher"@en ;
+    dc11:description "Herausgeber von Werken"@de,
+        "entity that publishes works"@en ;
+    skos:note "Wikibase ID: P107"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:questioning a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "hinterfragen"@de,
+        "questioning"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, eine Frage über die Zielentität zu stellen"@de,
+        "used with P80 (motivation) for when the user intends to ask a question about the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#questioning> ;
+    skos:note "Wikibase ID: Q68"@en .
+
+wgm:ranking a owl:DatatypeProperty ;
+    rdfs:label "Rang"@de,
+        "ranking"@en ;
+    dc11:description "Rang, der die Reihenfolge der Anmerkungen im Kompakkt-Walkthrough bestimmt"@de,
+        "rank determining the order of annotations in the Kompakkt walkthrough"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:integer ;
+    skos:note "Wikibase ID: P79"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:raw_data_creation a owl:Class ;
+    rdfs:label "Rohdatenerzeugung"@de,
+        "Raw data creation"@en ;
+    dc11:description "Ereignis, das zur Erstellung der Rohdaten eines Objekts führt"@de,
+        "event that results in the raw data for an item being created"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/creation> ;
+    skos:note "Wikibase ID: Q32"@en .
+
+wgm:reference_url a owl:DatatypeProperty ;
+    rdfs:label "Referenz-URL"@de,
+        "reference url"@en ;
+    dc11:description "URL, in der eine Behauptung aufgestellt wurde – unter Stellungnahme im Feld »Referenzen« zu verwenden"@de,
+        "URL where a claim was made - to be used in the references field under a statement"@en ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P854> ;
+    skos:note "Wikibase ID: P56"@en,
+        "Wikibase datatype: url"@en .
+
+wgm:related_concept a owl:ObjectProperty ;
+    rdfs:label "verwandter Begriff"@de,
+        "related concept"@en ;
+    dc11:description "verwenden Sie diese Eigenschaft, um den Anmerkungen Elementbeziehungen hinzuzufügen"@de,
+        "use this property to add item relations to annotations"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    skos:note "Wikibase ID: P81"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:related_media a owl:ObjectProperty ;
+    rdfs:label "zugehörige Medien"@de,
+        "related media"@en ;
+    dc11:description "verwenden Sie diese Eigenschaft, um Medienbeziehungen zu Anmerkungen hinzuzufügen"@de,
+        "use this property to add media relations to annotations"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    skos:note "Wikibase ID: P82"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:replying a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "beantworten"@de,
+        "replying"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, auf eine frühere Aussage zu antworten, entweder auf eine Anmerkung oder eine andere Ressource"@de,
+        "used with P80 (motivation) for when the user intends to reply to a previous statement, either an annotation or another resource"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#replying> ;
+    skos:note "Wikibase ID: Q69"@en .
+
+wgm:representation a owl:ObjectProperty ;
+    rdfs:label "hat Darstellung"@de,
+        "representation"@en ;
+    dc11:description "Medienelement, das dieses Objekt darstellt"@de,
+        "media item that represents this item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/pysical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P138_represents> ;
+    skos:note "Wikibase ID: P62"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:resulted_in a owl:ObjectProperty ;
+    rdfs:label "ergab"@de,
+        "resulted in"@en ;
+    dc11:description "neues Objekt, das durch eine Transformation entstanden ist"@de,
+        "new item created by a transformation"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human-made_object> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P123_resulted_in> ;
+    skos:note "Wikibase ID: P29"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:right_held_by a owl:ObjectProperty ;
+    rdfs:label "Rechte gehalten von"@de,
+        "right held by"@en ;
+    dc11:description "identifiziert den Akteur, der die Rechte an einem Objekt besitzt"@de,
+        "identifies the agent who owns the rights to an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://cidoc-crm.org/cidoc-crm/7.1.2/P105_right_held_by> ;
+    skos:note "Wikibase ID: P45"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:second a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Sekunde"@de,
+        "second"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q90"@en .
+
+wgm:sex_or_gender a owl:Class ;
+    rdfs:label "Geschlecht oder Geschlechtsidentität"@de,
+        "Sex or gender"@en ;
+    dc11:description "für Menschen zu verwenden"@de,
+        "to be used for humans"@en ;
+    owl:equivalentClass <http://purl.obolibrary.org/obo/NCIT_C28421>,
+        <http://www.wikidata.org/entity/Q18382802> ;
+    skos:note "Wikibase ID: Q36"@en .
+
+wgm:sibling_of a owl:ObjectProperty ;
+    rdfs:label "ist Geschwisterteil von"@de,
+        "sibling of"@en ;
+    dc11:description "assoziiert eine Instanz von Mensch mit einer anderen Instanz von Mensch, die die Rolle des Geschwisterteils der ersten Instanz spielt"@de,
+        "associates an instance of Human with another instance of Human who plays the role of the first instances sibling"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/human> ;
+    skos:note "Wikibase ID: P47"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:software a owl:Class ;
+    rdfs:label "Software"@de,
+        "Software"@en ;
+    dc11:description "für die Erstellung von Medienelementen verwendete Software"@de,
+        "software used for creation of media item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/digital_object> ;
+    owl:equivalentClass <http://www.ics.forth.gr/isl/CRMdig/D14_Software>,
+        <http://www.wikidata.org/entity/Q7397>,
+        <https://schema.org/SoftwareApplication> ;
+    skos:note "Wikibase ID: Q13"@en .
+
+wgm:software_used a owl:ObjectProperty ;
+    rdfs:label "hat Software"@de,
+        "software"@en ;
+    dc11:description "die für die Erstellung des Medienelements verwendete Software"@de,
+        "software used for creation of media item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/media_item> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/software> ;
+    skos:note "Wikibase ID: P66"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:some_rights_reserved a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/licence> ;
+    rdfs:label "einige Rechte vorbehalten"@de,
+        "Some rights reserved"@en ;
+    dc11:description "Lizenz, die eine eingeschränkte Nutzung erlaubt"@de,
+        "license that allows limited use"@en ;
+    owl:sameAs <http://www.wikidata.org/entity/Q47530729> ;
+    skos:note "Wikibase ID: Q53"@en .
+
+wgm:spouse a owl:ObjectProperty ;
+    rdfs:label "Ehepartner"@de,
+        "spouse"@en ;
+    dc11:description "das Subjekt hat das Objekt als seinen/ihren Ehepartner (Ehemann, Ehefrau, Partner usw.)"@de,
+        "the subject has the object as their spouse (husband, wife, partner, etc.)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P26> ;
+    skos:note "Wikibase ID: P42"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:square_centimetre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Quadratzentimeter"@de,
+        "square centimetre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q75"@en .
+
+wgm:square_kilometre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Quadratkilometer"@de,
+        "square kilometre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q81"@en .
+
+wgm:square_metre a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/measurement_unit> ;
+    rdfs:label "Quadratmeter"@de,
+        "square metre"@en ;
+    dc11:description "Maßeinheit"@de,
+        "measurement unit"@en ;
+    skos:note "Wikibase ID: Q88"@en .
+
+wgm:start_date a owl:DatatypeProperty ;
+    rdfs:label "Startdatum"@de,
+        "start date"@en ;
+    dc11:description "wenn ein Ereignis begonnen hat, auch die Eigenschaft »Enddatum« verwenden (die Eigenschaft »Datum« sollte alternativ verwendet werden, wenn ein Ereignis nur einen Zeitpunkt statt einer Zeitspanne hat)"@de,
+        "when an event started, use property 'end date' as well (the property 'date' should be used alternatively when an event only has a point in time instead of a time span)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range xsd:date ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P580>,
+        <https://schema.org/startDate> ;
+    skos:note "Wikibase ID: P10"@en,
+        "Wikibase datatype: edtf"@en .
+
+wgm:stated_in a owl:ObjectProperty ;
+    rdfs:label "angegeben in"@de,
+        "stated in"@en ;
+    dc11:description "verweist auf den bibliografischen Eintrag, in dem eine Behauptung angegeben wurde – zu verwenden im Feld Referenzen unter einer Behauptung"@de,
+        "points to the bibliographic item where a claim was stated in - to be used in the references field under a statement"@en ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/bibliographic_work> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P248> ;
+    skos:note "Wikibase ID: P55"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:style a owl:Class ;
+    rdfs:label "Stil"@de,
+        "Style"@en ;
+    dc11:description "Stil eines Kulturguts"@de,
+        "style of a cultural heritage object"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    skos:note "Wikibase ID: Q42"@en .
+
+wgm:style_used a owl:ObjectProperty ;
+    rdfs:label "Stil"@de,
+        "style used"@en ;
+    dc11:description "Stil eines Kulturguts"@de,
+        "style that was used in the creation or modification of an item"@en ;
+    skos:note "Wikibase ID: P109"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:subclass_of a owl:ObjectProperty ;
+    rdfs:label "Unterklasse von"@de,
+        "subclass of"@en ;
+    dc11:description "verweist auf die Oberklasse dieser Klasse"@de,
+        "points to the superclass of this class"@en ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P279> ;
+    skos:note "Wikibase ID: P2"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:subproperty_of a owl:ObjectProperty ;
+    rdfs:label "Untereigenschaft von"@de,
+        "subproperty of"@en ;
+    dc11:description "verweist auf die übergeordnete Eigenschaft dieser Eigenschaft"@de,
+        "points to the superproperty of this property"@en ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1647> ;
+    skos:note "Wikibase ID: P3"@en,
+        "Wikibase datatype: wikibase-property"@en .
+
+wgm:surface_area a owl:DatatypeProperty ;
+    rdfs:label "Fläche"@de,
+        "surface area"@en ;
+    dc11:description "Maß"@de,
+        "measurement"@en ;
+    skos:note "Wikibase ID: P112"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:tagging a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/motivation> ;
+    rdfs:label "markieren"@de,
+        "tagging"@en ;
+    dc11:description "wird zusammen mit P80 (Motivation) verwendet, wenn die/der Benutzende beabsichtigt, die Zielentität"@de,
+        "used with P80 (motivation) for when the user intends to associate a tag with the target entity"@en ;
+    owl:sameAs <http://www.w3.org/ns/oa#tagging> ;
+    skos:note "Wikibase ID: Q70"@en .
+
+wgm:technique a owl:Class ;
+    rdfs:label "Verfahren"@de,
+        "Technique"@en ;
+    dc11:description "Technik oder Methode, die zur Erstellung oder Änderung eines Gegenstands verwendet wird"@de,
+        "technique or method that is used for creating or changing an object"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/type> ;
+    owl:equivalentClass <http://www.wikidata.org/entity/Q2695280> ;
+    skos:note "Wikibase ID: Q38"@en .
+
+wgm:title a owl:DatatypeProperty ;
+    rdfs:label "Titel"@de,
+        "title"@en ;
+    dc11:description "Titel eines kreativen Werks, wenn ausdrücklich angegeben"@de,
+        "title of a creative work when explicitly given"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object>,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:string ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P1476> ;
+    skos:note "Wikibase ID: P4"@en,
+        "Wikibase datatype: string"@en .
+
+wgm:took_place_at a owl:ObjectProperty ;
+    rdfs:label "fand statt in"@de,
+        "took place at"@en ;
+    dc11:description "Ort eines Ereignisses"@de,
+        "location of an event"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/place> ;
+    skos:note "Wikibase ID: P9"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:transferred_title_from a owl:ObjectProperty ;
+    rdfs:label "Eigentum übertragen von"@de,
+        "transferred title from"@en ;
+    dc11:description "bei Eigentümerwechsel: neuer Eigentümer"@de,
+        "for ownership changes: new owner"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P23_transferred_title_from> ;
+    skos:note "Wikibase ID: P16"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:transferred_title_to a owl:ObjectProperty ;
+    rdfs:label "Eigentum übertragen auf"@de,
+        "transferred title to"@en ;
+    dc11:description "bei Besitztitelwechsel: vorheriger Besitzer"@de,
+        "for ownership changes: previous owner"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/actor> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P22_transferred_title_to> ;
+    skos:note "Wikibase ID: P15"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:transformation a owl:Class ;
+    rdfs:label "Umwandlung"@de,
+        "Transformation"@en ;
+    dc11:description "Ereignis, bei dem ein Objekt so stark verändert wird, dass es nicht mehr als dasselbe Objekt angesehen werden kann - das Ergebnis ist ein neues Objekt"@de,
+        "event where one item is changed so significantly it can no longer be considered the same item - the result is a new item"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/event> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E81_Transformation> ;
+    skos:note "Wikibase ID: Q33"@en .
+
+wgm:true a owl:NamedIndividual,
+        <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    rdfs:label "TRUE"@de,
+        "TRUE"@en ;
+    dc11:description "Wert für bestimmte Eigenschaften, wie P83 (verifiziert)"@de,
+        "value for specific properties, like P83 (verified)"@en ;
+    owl:sameAs <https://schema.org/True> ;
+    skos:note "Wikibase ID: Q44"@en .
+
+wgm:type a owl:Class ;
+    rdfs:label "Typus"@de,
+        "Type"@en ;
+    dc11:description "umfasst Konzepte, die durch Begriffe aus Thesauri und kontrollierten Vokabularien bezeichnet werden, die zur Charakterisierung und Klassifizierung von Instanzen der Kernklassen der Ontologie verwendet werden"@de,
+        "comprises concepts denoted by terms from thesauri and controlled vocabularies used to characterize and classify instances of core ontology classes"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/conceptual_object> ;
+    owl:equivalentClass <http://www.cidoc-crm.org/cidoc-crm/E55_Type> ;
+    skos:note "Wikibase ID: Q17"@en .
+
+wgm:unknown a owl:Class ;
+    rdfs:label "unbekannt"@de,
+        "unknown"@en ;
+    dc11:description "Grad der Sicherheit einer Aussage"@de,
+        "degree of certainty of a statement"@en ;
+    rdfs:subClassOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/degree_of_certainty> ;
+    skos:note "Wikibase ID: Q96"@en .
+
+wgm:used_for a owl:ObjectProperty ;
+    rdfs:label "benutzt für"@de,
+        "used for"@en ;
+    dc11:description "Zweck oder Verwendung eines Objekts"@de,
+        "purpose or use of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/function> ;
+    owl:equivalentProperty <http://www.cidoc-crm.org/cidoc-crm/P101_had_as_general_use>,
+        <http://www.wikidata.org/entity/P366> ;
+    skos:note "Wikibase ID: P30"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:verified a owl:ObjectProperty ;
+    rdfs:label "verifiziert"@de,
+        "verified"@en ;
+    dc11:description "Status einer Anmerkung vor oder nach der Überprüfung durch einen Benutzer mit höheren Bearbeitungsrechten (normalerweise true oder false)"@de,
+        "the status of an annotation before or after review by a user with higher editing privileges (usually true or false)"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/annotation> ;
+    rdfs:range xsd:boolean ;
+    skos:note "Wikibase ID: P83"@en,
+        "Wikibase datatype: wikibase-item"@en .
+
+wgm:weight a owl:DatatypeProperty ;
+    rdfs:label "Gewicht"@de,
+        "weight"@en ;
+    dc11:description "Gewicht eines Objekts"@de,
+        "weight of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:float ;
+    rdfs:subPropertyOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/has_dimension> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2067>,
+        <https://schema.org/weight> ;
+    skos:note "Wikibase ID: P35"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:width a owl:DatatypeProperty ;
+    rdfs:label "Breite"@de,
+        "width"@en ;
+    dc11:description "Breite eines Objekts"@de,
+        "width of an item"@en ;
+    rdfs:domain <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/physical_object> ;
+    rdfs:range xsd:float ;
+    rdfs:subPropertyOf <https://gitlab.com/nfdi4culture/ta1-data-enrichment/wikibase-model/has_dimension> ;
+    owl:equivalentProperty <http://www.wikidata.org/entity/P2049>,
+        <https://schema.org/width> ;
+    skos:note "Wikibase ID: P34"@en,
+        "Wikibase datatype: quantity"@en .
+
+wgm:wikidata_id a owl:DatatypeProperty ;
+    rdfs:label "Wikidata ID"@de,
+        "Wikidata id"@en ;
+    dc11:description "Identifikator aus Wikidata"@de,
+        "identifier from Wikidata"@en ;
+    skos:note "Wikibase ID: P104"@en,
+        "Wikibase datatype: external-id"@en .
+
