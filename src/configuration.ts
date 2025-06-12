@@ -1,6 +1,7 @@
 import deepmerge from 'deepmerge';
 import { ConfigFile } from './environment';
 import { err, info, log } from './logger';
+import { CommandLineArguments } from './arguments';
 
 export interface IMongoConfiguration {
   RepositoryDB: string;
@@ -116,36 +117,56 @@ export interface IConfiguration<T = Record<string, unknown>> {
 }
 
 const LoadConfig = async () => {
+  const environmentVariables = new Array<string>();
+
+  const getEnv = (key: string): string | undefined => {
+    const value = Bun.env[key];
+    environmentVariables.push(key);
+    if (!value) {
+      return undefined;
+    }
+    log(`Environment variable ${key} found`);
+    return value;
+  };
+
   const DefaultConfiguration: IConfiguration = {
     Mongo: {
-      RepositoryDB: 'entitiesrepository',
-      AccountsDB: 'accounts',
-      Port: 27017,
-      Hostname: 'localhost',
+      RepositoryDB: getEnv('CONFIGURATION_MONGO_REPOSITORYDB') || 'entitiesrepository',
+      AccountsDB: getEnv('CONFIGURATION_MONGO_ACCOUNTSDB') || 'accounts',
+      Port: parseInt(getEnv('CONFIGURATION_MONGO_PORT') || '27017', 10),
+      Hostname: getEnv('CONFIGURATION_MONGO_HOSTNAME') || 'localhost',
     },
     Redis: {
-      Hostname: 'localhost',
-      Port: 6379,
-      DBOffset: 1,
+      Hostname: getEnv('CONFIGURATION_REDIS_HOSTNAME') || 'localhost',
+      Port: parseInt(getEnv('CONFIGURATION_REDIS_PORT') || '6379', 10),
+      DBOffset: parseInt(getEnv('CONFIGURATION_REDIS_DBOFFSET') || '1', 10),
     },
     Uploads: {
-      TempDirectory: 'temp',
-      UploadDirectory: 'uploads',
+      TempDirectory: getEnv('CONFIGURATION_UPLOADS_TEMP_DIRECTORY') || 'temp',
+      UploadDirectory: getEnv('CONFIGURATION_UPLOADS_UPLOAD_DIRECTORY') || 'uploads',
     },
     Express: {
-      Host: '127.0.0.1',
-      Port: 8080,
-      OriginWhitelist: [],
-      enableHTTPS: false,
-      PassportSecret: 'change me',
+      Host: getEnv('CONFIGURATION_EXPRESS_HOST') || '127.0.0.1',
+      Port: parseInt(getEnv('CONFIGURATION_EXPRESS_PORT') || '8080', 10),
+      OriginWhitelist: (getEnv('CONFIGURATION_EXPRESS_ORIGIN_WHITELIST') || '')
+        .split(',')
+        .map(s => s.trim()),
+      enableHTTPS: getEnv('CONFIGURATION_EXPRESS_ENABLE_HTTPS') === 'true',
+      PassportSecret: getEnv('CONFIGURATION_EXPRESS_PASSPORT_SECRET') || 'change me',
     },
     Kompressor: {
-      Enabled: true,
-      Hostname: 'kompressor',
-      Port: 7999,
+      Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true',
+      Hostname: getEnv('CONFIGURATION_KOMPRESSOR_HOSTNAME') || 'kompressor',
+      Port: parseInt(getEnv('CONFIGURATION_KOMPRESSOR_PORT') || '7999', 10),
     },
     Extensions: {},
   };
+
+  if (CommandLineArguments.printEnvVars) {
+    log(`--printEnvVars:
+Environment variables used by the server:\n${environmentVariables.join('\n')}
+`);
+  }
 
   info('Loading configuration');
 
@@ -165,14 +186,9 @@ const LoadConfig = async () => {
     info('Configuration loaded from file');
 
     return confObj;
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      err('Config file not found. Falling back to default configuration');
-      Bun.write(ConfigFile, JSON.stringify(DefaultConfiguration, null, 2));
-    } else {
-      err('Failed loading configuration file. Falling back to default configuration');
-      err(error);
-    }
+  } catch (error) {
+    err('Failed loading configuration file. Falling back to default configuration');
+    err(error);
     log('Configuration loaded from defaults');
     return DefaultConfiguration;
   }
