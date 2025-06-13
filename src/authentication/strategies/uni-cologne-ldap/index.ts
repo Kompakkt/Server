@@ -38,6 +38,8 @@ const sendLDAPSearchRequest = async (
       searchBase: 'ou=People,dc=uni-koeln,dc=de',
       searchFilter: `(uid=${username})`,
     }),
+    // 5 seconds timeout
+    signal: AbortSignal.timeout(5000),
   })
     .then(res => res.json())
     .then(res => res as UniCologneLDAPResponse)

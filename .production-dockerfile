@@ -3,10 +3,5 @@ FROM ghcr.io/kompakkt/mono/bun-base-image:latest AS builder
 COPY . /app
 WORKDIR /app
 RUN bun install
-RUN bun build --compile --minify --sourcemap ./src/index.ts --outfile server
 
-FROM ghcr.io/kompakkt/mono/bun-base-image:latest AS runner
-
-COPY --from=builder /app/server /app/server
-
-CMD ["/app/server"]
+CMD ["bun", "run", "./src/index.ts"]

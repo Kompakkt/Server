@@ -1,19 +1,42 @@
 services:
   openldap-search:
     image: ghcr.io/heyitsbatman/openldap-search-server:main
-    network_mode: host
   mongo:
     image: docker.io/mvertes/alpine-mongo:latest
     environment:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=password
-    network_mode: host
   redis:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
-    network_mode: host
     ulimits:
       memlock: -1
     command: --maxmemory=1gb --proactor_threads=1
+  kompressor:
+    image: ghcr.io/kompakkt/kompressor:latest
+    volumes:
+      - uploads:/app/uploads
   mailhog:
     image: mailhog/mailhog:latest
-    network_mode: host
+  server:
+    build:
+      context: .
+      dockerfile: .production-dockerfile
+    depends_on:
+      - openldap-search
+      - mongo
+      - redis
+      - kompressor
+      - mailhog
+    ports:
+      - '127.0.0.1:3030:3030'
+    volumes:
+      - uploads:/app/uploads
+    environment:
+      - CONFIGURATION_MONGO_HOSTNAME=mongo
+      - CONFIGURATION_MONGO_PORT=27017
+      - CONFIGURATION_REDIS_HOSTNAME=redis
+      - CONFIGURATION_REDIS_PORT=6379
+      - CONFIGURATION_EXTENSION_WIKIBASE_SPARQL_ENDPOINT=http://query.wb.local/proxy/wdqs/bigdata/namespace/wdq/sparql
+
+volumes:
+  uploads:

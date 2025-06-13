@@ -18,9 +18,6 @@ export const PluginController = new (class {
 
   async loadPlugin(plugin: Plugin, pluginArgs?: unknown) {
     log(`Loading plugin ${plugin.constructor.name}`);
-    const shouldLoad = await plugin.verifyShouldLoad();
-    info(`${plugin.constructor.name} shouldLoad: ${shouldLoad}`);
-    if (!shouldLoad) return false;
     const loaded = await plugin.load(pluginArgs);
     info(`${plugin.constructor.name} loaded: ${loaded}`);
     if (!loaded) return false;
@@ -43,6 +40,29 @@ export const initializePlugins = async () => {
     .map(file => join(file.parentPath, file.name));
 
   for (const file of pluginFiles) {
+    const requirementsFile = file.replace('plugin.ts', 'plugin.requirements.ts');
+
+    const requirementsMet = await (async () => {
+      const exists = await Bun.file(requirementsFile).exists();
+      if (!exists) return true; // No requirements file means no requirements to check
+      try {
+        log(`Checking requirements for plugin ${file}`);
+        const checkRequirements: () => unknown | Promise<unknown> = await import(
+          requirementsFile
+        ).then(module => module.default);
+        const valid = !!(await checkRequirements());
+        return valid;
+      } catch (error) {
+        err(`Failed loading requirements for plugin ${file}`, error);
+        return false;
+      }
+    })();
+
+    if (!requirementsMet) {
+      log(`Skipping plugin ${file} due to unmet requirements`);
+      continue;
+    }
+
     try {
       const plugin = await import(file).then(module => module.default);
       await PluginController.loadPlugin(plugin);

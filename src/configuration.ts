@@ -2,6 +2,7 @@ import deepmerge from 'deepmerge';
 import { ConfigFile } from './environment';
 import { err, info, log } from './logger';
 import { CommandLineArguments } from './arguments';
+import { capitalize } from './util/string-helpers';
 
 export interface IMongoConfiguration {
   RepositoryDB: string;
@@ -100,7 +101,7 @@ interface IKompressorConfiguration {
   Port: number;
 }
 
-export interface IConfiguration<T = Record<string, unknown>> {
+export interface IConfiguration<T = Record<string, Record<string, string>>> {
   Mongo: IMongoConfiguration;
   Redis: IRedisConfiguration;
   Uploads: IUploadConfiguration;
@@ -131,15 +132,15 @@ const LoadConfig = async () => {
 
   const DefaultConfiguration: IConfiguration = {
     Mongo: {
-      RepositoryDB: getEnv('CONFIGURATION_MONGO_REPOSITORYDB') || 'entitiesrepository',
-      AccountsDB: getEnv('CONFIGURATION_MONGO_ACCOUNTSDB') || 'accounts',
+      RepositoryDB: getEnv('CONFIGURATION_MONGO_REPOSITORY_DB') || 'entitiesrepository',
+      AccountsDB: getEnv('CONFIGURATION_MONGO_ACCOUNTS_DB') || 'accounts',
       Port: parseInt(getEnv('CONFIGURATION_MONGO_PORT') || '27017', 10),
       Hostname: getEnv('CONFIGURATION_MONGO_HOSTNAME') || 'localhost',
     },
     Redis: {
       Hostname: getEnv('CONFIGURATION_REDIS_HOSTNAME') || 'localhost',
       Port: parseInt(getEnv('CONFIGURATION_REDIS_PORT') || '6379', 10),
-      DBOffset: parseInt(getEnv('CONFIGURATION_REDIS_DBOFFSET') || '1', 10),
+      DBOffset: parseInt(getEnv('CONFIGURATION_REDIS_DB_OFFSET') || '1', 10),
     },
     Uploads: {
       TempDirectory: getEnv('CONFIGURATION_UPLOADS_TEMP_DIRECTORY') || 'temp',
@@ -161,6 +162,30 @@ const LoadConfig = async () => {
     },
     Extensions: {},
   };
+
+  const keepUppercase = ['DB', 'HTTPS', 'SPARQL', 'SAML'];
+
+  const extensionKeys = Object.keys(Bun.env).filter(key =>
+    key.startsWith('CONFIGURATION_EXTENSION_'),
+  );
+  for (const key of extensionKeys) {
+    // Capitalized extension name
+    const extensionName = capitalize(key.split('_').at(2));
+    if (!extensionName) continue;
+
+    const envValue = getEnv(key);
+    if (!envValue) continue;
+
+    const envKey = key
+      .split('_')
+      .slice(3)
+      .map(v => capitalize(v, { keepUppercase }))
+      .join('');
+
+    DefaultConfiguration.Extensions ??= {};
+    DefaultConfiguration.Extensions[extensionName] ??= {};
+    DefaultConfiguration.Extensions[extensionName][envKey] = envValue;
+  }
 
   if (CommandLineArguments.printEnvVars) {
     log(`--printEnvVars:
@@ -187,8 +212,7 @@ Environment variables used by the server:\n${environmentVariables.join('\n')}
 
     return confObj;
   } catch (error) {
-    err('Failed loading configuration file. Falling back to default configuration');
-    err(error);
+    err(`Failed loading configuration file. Falling back to default configuration ${error}`);
     log('Configuration loaded from defaults');
     return DefaultConfiguration;
   }
