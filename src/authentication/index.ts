@@ -20,7 +20,7 @@ export const AuthController = new (class {
     for (const [name, strategy] of Object.entries(this.strategies)) {
       strategy.isAvailable().then(isAvailable => {
         if (!isAvailable) {
-          info(`Authentication strategy ${strategy} is configured but not available`);
+          info(`Authentication strategy ${strategy.strategyName} is configured but not available`);
           this.#disabledStrategies.add(name);
         }
       });

@@ -51,6 +51,7 @@ const request = (method: string, url: string, obj: RequestOptions) => {
   const options = obj.options || {};
   const cookieJar = obj.cookieJar || defaultCookieJar;
   const responseFormat = obj.responseFormat || 'json';
+
   const urlObj = new URL(url);
   for (const [key, value] of Object.entries(obj.params || {})) {
     urlObj.searchParams.set(key, value.toString());

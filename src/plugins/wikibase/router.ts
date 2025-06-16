@@ -7,12 +7,11 @@ import { WikibaseService } from './service';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)
-  .decorate('wikibaseService', WikibaseService.getInstance())
-  .get('/wikibase/choices/metadata', async ({ wikibaseService }) => {
-    return wikibaseService.fetchMetadataChoices();
+  .get('/wikibase/choices/metadata', async () => {
+    return WikibaseService.getInstance()?.fetchMetadataChoices();
   })
-  .get('/wikibase/choices/annotation-link', async ({ wikibaseService }) => {
-    return wikibaseService.fetchAnnotationLinkChoices();
+  .get('/wikibase/choices/annotation-link', async () => {
+    return WikibaseService.getInstance()?.fetchAnnotationLinkChoices();
   })
   .get('/wikibase/instance/info', async () => {
     return {

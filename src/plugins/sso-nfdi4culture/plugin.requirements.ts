@@ -11,7 +11,7 @@ const neededEnvironmentVariables = [
 export default async () => {
   let hasMissingEnvVars = false;
   for (const envVar of neededEnvironmentVariables) {
-    if (!process.env[envVar]) {
+    if (!Bun.env[envVar]) {
       warn(`[SSO NFDI4Culture] Missing environment variable ${envVar}`);
       hasMissingEnvVars = true;
     }

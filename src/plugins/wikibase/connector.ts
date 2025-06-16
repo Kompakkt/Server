@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { t } from 'elysia';
 import { Configuration } from 'src/configuration';
-import { err, info, log } from 'src/logger';
+import { err, info, log, warn } from 'src/logger';
 import { RequestClient } from 'src/util/requests';
 import { RootDirectory } from '../../environment';
 import { CacheClient } from 'src/redis';
@@ -85,6 +85,10 @@ export class WikibaseConnector implements TokenManager {
   csrfToken: string | null;
 
   constructor(instance: string, credentials: { username: string; password: string }) {
+    if (!instance.startsWith('http')) {
+      instance = `http://${instance}`;
+    }
+
     this.wikibaseUrl = instance;
     this.login = credentials.username;
     this.password = credentials.password;
@@ -161,17 +165,19 @@ export class WikibaseConnector implements TokenManager {
   // Token management methods
 
   private async requestLoginToken() {
-    const queryLoginTokenResponse: LoginTokenResponse | undefined = await this.client.get(
-      '/api.php',
-      {
+    const queryLoginTokenResponse: LoginTokenResponse | undefined = await this.client
+      .get('/api.php', {
         params: {
           action: 'query',
           meta: 'tokens',
           type: 'login',
           format: 'json',
         },
-      },
-    );
+      })
+      .catch(error => {
+        warn(`Failed getting wikibase login token: ${error}`);
+        return undefined;
+      });
 
     return queryLoginTokenResponse?.query.tokens.logintoken ?? undefined;
   }

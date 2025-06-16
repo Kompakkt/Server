@@ -22,7 +22,11 @@ class WikibasePlugin extends Plugin {
       return false;
     }
 
-    const service = new WikibaseService();
+    const service = WikibaseService.getInstance();
+    if (!service) {
+      log('Wikibase plugin not initialized');
+      return false;
+    }
 
     log('Registering hooks');
     HookManager.addHook<ServerDocument<IDigitalEntity>>({

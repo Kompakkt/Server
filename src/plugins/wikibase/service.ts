@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { Configuration } from 'src/configuration';
-import { err, info, log } from 'src/logger';
+import { err, info, log, warn } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
 import { RequestClient, get } from 'src/util/requests';
 import WBEdit from 'wikibase-edit';
@@ -173,11 +173,16 @@ export class WikibaseService {
     this.wbSDK = WBK({ instance, sparqlEndpoint });
   }
 
-  public static getInstance(): WikibaseService {
-    if (!WikibaseService.instance) {
-      WikibaseService.instance = new WikibaseService();
+  public static getInstance(): WikibaseService | undefined {
+    try {
+      if (!WikibaseService.instance) {
+        WikibaseService.instance = new WikibaseService();
+      }
+      return WikibaseService.instance;
+    } catch (error) {
+      warn(`Could not construct or retrieve WikibaseService instance: ${error}`);
+      return undefined;
     }
-    return WikibaseService.instance;
   }
 
   // update annotation

@@ -57,6 +57,16 @@ export const userTokenCollection = accountsDb.collection<{
   tokenExpiration?: number;
 }>('tokens');
 
+export type ApiKeyDocument = {
+  routes: string[];
+  key: string;
+  description: string;
+  issueDate: number;
+  lastUsed?: number;
+  expirationDate?: number;
+};
+export const apiKeyCollection = accountsDb.collection<ServerDocument<ApiKeyDocument>>('apikeys');
+
 export const entitiesDb = db(Configuration.Mongo.RepositoryDB);
 export const entityCollection = entitiesDb.collection<ServerDocument<IEntity>>('entity');
 export const groupCollection = entitiesDb.collection<ServerDocument<IGroup>>('group');

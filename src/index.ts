@@ -13,9 +13,9 @@ for (const [name, job] of Object.entries(jobs)) {
   log(`Job ${name} completed`);
 }
 
+const app: Elysia = new Elysia();
 const pluginRoutes = await initializePlugins();
 
-const app: Elysia = new Elysia();
 for (const router of pluginRoutes) {
   app.use(router);
 }
