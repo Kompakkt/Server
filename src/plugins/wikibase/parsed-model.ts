@@ -1,36 +1,23 @@
-import { basename } from 'node:path';
 import { WikibaseConfiguration } from './config';
 import { log, err, info } from 'src/logger';
 
 const turtleUrl =
   WikibaseConfiguration?.TTLFileURL ??
-   `https://gitlab.com/nfdi4culture/wikibase4research/auxiliary-service-repositories/wikibase-model/-/raw/main/wikibase_generic_model.ttl`;
-  // `https://gitlab.com/nfdi4culture/wikibase4research/auxiliary-service-repositories/wikibase-model/-/raw/37-update-the-data-model-for-events-and-event-related-properties/wikibase_generic_model.ttl`;
+  `https://gitlab.com/nfdi4culture/wikibase4research/auxiliary-service-repositories/wikibase-model/-/raw/main/wikibase_generic_model.ttl`;
+// `https://gitlab.com/nfdi4culture/wikibase4research/auxiliary-service-repositories/wikibase-model/-/raw/37-update-the-data-model-for-events-and-event-related-properties/wikibase_generic_model.ttl`;
 
-const turtleFileName = basename(turtleUrl);
+log(`Downloading wikibase turtle file from ${turtleUrl}`);
+const ttl = await Bun.fetch(turtleUrl)
+  .then(res => res.text())
+  .catch(error => {
+    err(`Failed to fetch ${turtleUrl}: ${error}`);
+    return undefined;
+  });
 
-const turtleFile = Bun.file(turtleFileName);
-
-info(`Checking for wikibase turtle file`);
-
-if (!(await turtleFile.exists())) {
-  log(`Downloading wikibase turtle file from ${turtleUrl}`);
-  const turtleResponse = await Bun.fetch(turtleUrl)
-    .then(res => res.text())
-    .catch(error => {
-      err(error);
-      return undefined;
-    });
-  if (turtleResponse) {
-    await Bun.write(turtleFileName, turtleResponse);
-    log(`Downloaded wikibase turtle file to ${turtleFileName}`);
-  } else {
-    info(`Failed to fetch ${turtleUrl}`);
-    process.exit(1);
-  }
+if (!ttl) {
+  err(`No Wikibase turtle file found. Exiting`);
+  process.exit(1);
 }
-
-const ttl = await Bun.file(turtleFileName).text();
 
 const snakeToCamel = (str: string) =>
   str
