@@ -50,6 +50,14 @@ const transporter = (() => {
     tls: {
       rejectUnauthorized: false,
     },
+    secure: Configuration.Mailer.Secure ?? undefined,
+    auth:
+      Configuration.Mailer.Auth && isMailConfiguration(Configuration.Mailer, true)
+        ? {
+            user: Configuration.Mailer.Auth.User,
+            pass: Configuration.Mailer.Auth.Pass,
+          }
+        : undefined,
   });
 })();
 

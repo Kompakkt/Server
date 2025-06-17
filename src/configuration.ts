@@ -72,11 +72,11 @@ export interface IMailerConfiguration {
     upload: string;
     bugreport: string;
   };
-  Auth: {
+  Auth?: {
     User: string;
     Pass: string;
   };
-  Secure: boolean;
+  Secure?: boolean;
 }
 
 export const isMailConfiguration = (obj: any, checkAuth?: boolean): obj is IMailerConfiguration => {
@@ -118,11 +118,11 @@ export interface IConfiguration<T = Record<string, Record<string, string>>> {
 }
 
 const LoadConfig = async () => {
-  const environmentVariables = new Array<string>();
+  const environmentVariables = new Set<string>();
 
   const getEnv = (key: string): string | undefined => {
     const value = Bun.env[key];
-    environmentVariables.push(key);
+    environmentVariables.add(key);
     if (!value) {
       return undefined;
     }
@@ -161,6 +161,24 @@ const LoadConfig = async () => {
       Hostname: getEnv('CONFIGURATION_KOMPRESSOR_HOSTNAME') || 'kompressor',
       Port: parseInt(getEnv('CONFIGURATION_KOMPRESSOR_PORT') || '7999', 10),
     },
+    Mailer: {
+      Host: getEnv('CONFIGURATION_MAILER_HOST') || 'localhost',
+      Port: parseInt(getEnv('CONFIGURATION_MAILER_PORT') || '25', 10),
+      Target: {
+        contact: getEnv('CONFIGURATION_MAILER_TARGET_CONTACT') || 'contact@kompakkt.de',
+        upload: getEnv('CONFIGURATION_MAILER_TARGET_UPLOAD') || 'upload@kompakkt.de',
+        bugreport: getEnv('CONFIGURATION_MAILER_TARGET_BUGREPORT') || 'bugreport@kompakkt.de',
+      },
+      Auth: ['CONFIGURATION_MAILER_AUTH_USER', 'CONFIGURATION_MAILER_AUTH_PASS'].every(
+        key => !!getEnv(key),
+      )
+        ? {
+            User: getEnv('CONFIGURATION_MAILER_AUTH_USER') || 'user',
+            Pass: getEnv('CONFIGURATION_MAILER_AUTH_PASS') || 'pass',
+          }
+        : undefined,
+      Secure: getEnv('CONFIGURATION_MAILER_SECURE') === 'true',
+    },
     Extensions: {},
   };
 
@@ -189,8 +207,11 @@ const LoadConfig = async () => {
   }
 
   if (CommandLineArguments.printEnvVars) {
+    const joinedEnvVars = Array.from(environmentVariables)
+      .sort((a, b) => a.localeCompare(b))
+      .join('\n');
     log(`--printEnvVars:
-Environment variables used by the server:\n${environmentVariables.join('\n')}
+Environment variables used by the server:\n${joinedEnvVars}
 `);
   }
 
