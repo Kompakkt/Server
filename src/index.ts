@@ -1,12 +1,13 @@
 import './util/patch-structured-clone';
 import Elysia from 'elysia';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
+import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { err, info, log } from './logger';
 import { initializePlugins } from './plugins';
 import finalServer from './server.final';
 import { swagger } from '@elysiajs/swagger';
 
-const jobs = { ensureUploadStructure } as const;
+const jobs = { ensureUploadStructure, ensureSearchIndex } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);
   await job().catch(err);

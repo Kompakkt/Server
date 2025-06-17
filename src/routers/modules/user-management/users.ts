@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { Collection, type IDocument, type IUserData } from 'src/common';
+import { Collection, isDocument, type IDocument, type ITag, type IUserData } from 'src/common';
 import { userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny } from '../api.v1/resolving-strategies';
@@ -48,16 +48,54 @@ export const checkIsOwner = async (obj: {
   userdata: ServerDocument<IUserData>;
 }): Promise<boolean> => {
   const docId = obj.doc._id.toString();
-  return obj.userdata.data[obj.collection]?.includes(docId) ?? false;
+
+  const normalizedData =
+    obj.userdata.data[obj.collection]?.map(doc => {
+      if (typeof doc === 'string') return doc;
+      if (doc instanceof ObjectId) return doc.toString();
+      if (isDocument(doc)) return doc._id.toString();
+      return undefined;
+    }) ?? [];
+  log(`checkIsOwner`, {
+    collection: obj.collection,
+    data: normalizedData,
+    id: docId,
+  });
+  return normalizedData.includes(docId) ?? false;
 };
 
-const isBufferObject = (obj: object): obj is { buffer: Uint8Array } => {
+type BufferObject = { buffer: Uint8Array };
+const isBufferObject = (obj: object): obj is BufferObject => {
   return obj && typeof obj === 'object' && 'buffer' in obj;
+};
+
+export const resolveUserDocument = async (
+  docId: string | IDocument | ITag | null | ObjectId | BufferObject,
+  collection: Collection,
+  full?: boolean,
+) => {
+  if (!docId) return undefined;
+  if (typeof docId === 'string') return resolveAny(collection, { _id: new ObjectId(docId) }, full);
+  if (typeof docId === 'object') {
+    if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId }, full);
+    // TODO: Why are some objects { buffer: [] }?
+    if (isBufferObject(docId))
+      return resolveAny(collection, { _id: new ObjectId(docId.buffer) }, full);
+    return resolveAny(
+      collection,
+      {
+        _id: new ObjectId(docId._id.toString()),
+      },
+      full,
+    );
+  }
+  return undefined;
 };
 
 export const resolveUsersDataObject = async (
   inputUser: ServerDocument<IUserData>,
   dataTypes?: Array<keyof typeof Collection>,
+  full?: boolean,
 ) => {
   const user = structuredClone(inputUser);
   try {
@@ -72,21 +110,9 @@ export const resolveUsersDataObject = async (
         continue;
       }
       const resolved = await Promise.all(
-        Array.from(new Set(user.data[collection])).map(docId => {
-          if (!docId) return undefined;
-          if (typeof docId === 'string')
-            return resolveAny(collection, { _id: new ObjectId(docId) });
-          if (typeof docId === 'object') {
-            if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId });
-            // TODO: Why are some objects { buffer: [] }?
-            if (isBufferObject(docId))
-              return resolveAny(collection, { _id: new ObjectId(docId.buffer) });
-            return resolveAny(collection, {
-              _id: new ObjectId(docId._id.toString()),
-            });
-          }
-          return undefined;
-        }),
+        Array.from(new Set(user.data[collection])).map(docId =>
+          resolveUserDocument(docId, collection, full),
+        ),
       );
       const filtered = resolved.filter((obj): obj is IDocument => obj !== undefined);
       user.data[collection] = filtered;

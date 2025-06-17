@@ -197,7 +197,7 @@ const createResolver = <T extends ServerDocument<T>>(
   isTypeGuard: (obj: unknown) => obj is T,
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
-  return async (obj: any) => {
+  return async (obj: any, full: boolean = true) => {
     const cachedEntity = obj?._id
       ? await entitiesCache
           .get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
@@ -220,7 +220,7 @@ const createResolver = <T extends ServerDocument<T>>(
       return undefined;
     });
 
-    if (additionalProcessing) {
+    if (additionalProcessing && full) {
       return await additionalProcessing(entity).catch(error => {
         err(`Failed running additional processing on entity: ${error.toString()}`);
         return undefined;
@@ -332,6 +332,7 @@ export const resolveCompilation: ResolveFn<ICompilation> = createResolver(
 export const resolveAny = async <T extends Collection>(
   collection: T,
   obj: Parameters<ResolveFn<unknown>>[0],
+  full: boolean = true,
 ): Promise<ServerDocument<IDocument> | undefined> => {
   switch (collection) {
     case Collection.entity:

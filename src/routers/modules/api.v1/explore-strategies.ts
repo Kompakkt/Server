@@ -1,10 +1,11 @@
 import { type Static, t } from 'elysia';
 import type { ICompilation, IEntity, IUserData } from 'src/common';
-import { isAnnotation, isEntity } from 'src/common';
+import { Collection, isAnnotation, isEntity } from 'src/common';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveCompilation, resolveEntity } from './resolving-strategies';
+import { buildSearchableText, searchService } from 'src/sonic';
 
 enum SortOrder {
   name = 'name',
@@ -107,15 +108,40 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
     types.push('splat', 'cloud');
   }
 
+  const trimmedSearchText = searchText?.trim().toLowerCase() ?? '';
+  const hasSearchText = trimmedSearchText.length > 0;
   const limit = body.limit ?? 30;
 
+  const suggestions = hasSearchText
+    ? await searchService.suggest(Collection.entity, trimmedSearchText).catch(() => [])
+    : [];
+
   const entities = await (async () => {
-    const key = 'explore::entities';
-    const cached = await exploreCache.get<ServerDocument<IEntity>[]>(key);
-    const entities =
-      cached ?? (await entityCollection.find({ finished: true, online: true }).toArray());
-    exploreCache.set(key, entities);
+    console.time('exploreEntities sonic');
+    const foundIds = hasSearchText
+      ? await searchService.search(Collection.entity, trimmedSearchText)
+      : [];
+    console.timeEnd('exploreEntities sonic');
+    console.time('exploreEntities resolve');
+    const entities = await entityCollection
+      .find(
+        hasSearchText
+          ? {
+              _id: { $in: foundIds },
+              finished: true,
+              online: true,
+            }
+          : {
+              finished: true,
+              online: true,
+            },
+      )
+      .toArray();
+
+    console.timeEnd('exploreEntities resolve');
+    console.time('exploreEntities sort');
     const sortedEntities = await sortEntities(entities, sortBy ?? SortOrder.popularity);
+    console.timeEnd('exploreEntities sort');
     return sortedEntities;
   })();
 
@@ -149,7 +175,7 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
     }
     if (filters.restricted && !isRestricted) continue;
 
-    if (filters.associated || searchText !== '') {
+    if (filters.associated) {
       const metadata = await (async () => {
         const cached = await exploreCache.get<string>(
           `explore::entities::metadata::${_entity._id}`,
@@ -168,17 +194,12 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
           metadata.includes(userData.mail.toLowerCase())
         : false;
       if (filters.associated && !isAssociated) continue;
-
-      // Search text filter
-      if (searchText !== '' && !metadata.includes(searchText.toLowerCase())) {
-        continue;
-      }
     }
 
     finalEntities.push(_entity);
   }
 
-  return finalEntities;
+  return { results: finalEntities, suggestions };
 };
 
 const exploreCompilations = async (body: ExploreRequest & IPossibleUserdata) => {
@@ -250,7 +271,7 @@ const exploreCompilations = async (body: ExploreRequest & IPossibleUserdata) => 
     });
   }
 
-  return finalComps;
+  return { results: finalComps, suggestions: [] };
 };
 
 export { exploreCompilations, exploreEntities };

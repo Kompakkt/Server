@@ -338,11 +338,10 @@ const createSaver = <T extends ServerDocument<T>>(
         return false;
       });
     log(`Running afterSave hooks ${collection.collectionName} ${obj._id}`);
-    await HookManager.runHooks(
-      collection.collectionName as Collection,
-      'afterSave',
-      transformed as T,
-    );
+    await HookManager.runHooks(collection.collectionName as Collection, 'afterSave', {
+      ...transformed,
+      _id: obj._id,
+    } as T);
     log(`Finished afterSave hooks ${collection.collectionName} ${obj._id}`);
     return saved;
   };

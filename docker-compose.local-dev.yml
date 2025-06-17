@@ -17,6 +17,16 @@ services:
       - uploads:/app/uploads
   mailhog:
     image: mailhog/mailhog:latest
+    ports:
+      - '127.0.0.1:8025:8025'
+  sonic:
+    build:
+      dockerfile_inline: |
+        FROM docker.io/archivebox/sonic:latest
+        RUN apt-get update && apt-get install -y wget
+        RUN wget 'https://raw.githubusercontent.com/Kompakkt/Mono/refs/heads/main/sonic-config.cfg' -O sonic-config.cfg
+        RUN cp ./sonic-config.cfg /etc/sonic.cfg
+        CMD ["/usr/local/bin/sonic", "-c", "/etc/sonic.cfg"]
   server:
     build:
       context: .
@@ -27,6 +37,7 @@ services:
       - redis
       - kompressor
       - mailhog
+      - sonic
     ports:
       - '127.0.0.1:3030:3030'
     volumes:
@@ -36,6 +47,8 @@ services:
       - CONFIGURATION_MONGO_PORT=27017
       - CONFIGURATION_REDIS_HOSTNAME=redis
       - CONFIGURATION_REDIS_PORT=6379
+      - CONFIGURATION_MAILER_HOST=mailhog
+      - CONFIGURATION_MAILER_PORT=1025
       - CONFIGURATION_EXTENSION_WIKIBASE_SPARQL_ENDPOINT=http://query.wb.local/proxy/wdqs/bigdata/namespace/wdq/sparql
 
 volumes:
