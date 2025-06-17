@@ -136,6 +136,7 @@ const LoadConfig = async () => {
       AccountsDB: getEnv('CONFIGURATION_MONGO_ACCOUNTS_DB') || 'accounts',
       Port: parseInt(getEnv('CONFIGURATION_MONGO_PORT') || '27017', 10),
       Hostname: getEnv('CONFIGURATION_MONGO_HOSTNAME') || 'localhost',
+      ClientURL: getEnv('CONFIGURATION_MONGO_CLIENT_URL') || undefined,
     },
     Redis: {
       Hostname: getEnv('CONFIGURATION_REDIS_HOSTNAME') || 'localhost',
@@ -163,7 +164,7 @@ const LoadConfig = async () => {
     Extensions: {},
   };
 
-  const keepUppercase = ['DB', 'HTTPS', 'SPARQL', 'SAML', 'API'];
+  const keepUppercase = ['DB', 'HTTPS', 'SPARQL', 'SAML', 'API', 'URL'];
 
   const extensionKeys = Object.keys(Bun.env).filter(key =>
     key.startsWith('CONFIGURATION_EXTENSION_'),
