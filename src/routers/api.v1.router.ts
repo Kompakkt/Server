@@ -174,6 +174,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
                 collection,
                 userdata,
               });
+              log(`Checking if user is owner of ${body._id} to ${collection}: ${isOwner}`);
               if (!isOwner) return error(403);
             }
 
