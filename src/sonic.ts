@@ -144,7 +144,15 @@ class SonicSearchService {
     const searchConnectPromise = createConnectPromise(this.#searchChannel, 'Search');
     const ingestConnectPromise = createConnectPromise(this.#ingestChannel, 'Ingest');
 
-    return Promise.all([searchConnectPromise, ingestConnectPromise]);
+    await Promise.all([searchConnectPromise, ingestConnectPromise]);
+  }
+
+  async hasExistingData() {
+    const existingLists = await Promise.all([
+      this.#searchChannel.list(Collection.entity, 'default'),
+      this.#searchChannel.list(Collection.compilation, 'default'),
+    ]);
+    return existingLists.some(list => list.length > 0);
   }
 
   async #processQueue() {

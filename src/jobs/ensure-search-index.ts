@@ -1,10 +1,10 @@
 import { Collection } from 'src/common';
-import { log } from 'src/logger';
+import { err, log } from 'src/logger';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { resolveCompilation, resolveEntity } from 'src/routers/modules/api.v1/resolving-strategies';
 import { searchService } from 'src/sonic';
 
-export const ensureSearchIndex = async () => {
+const buildSearchIndex = async () => {
   const entityCursor = entityCollection.find({ finished: true, online: true });
   let startTime = performance.now();
   for await (const entity of entityCursor) {
@@ -26,4 +26,21 @@ export const ensureSearchIndex = async () => {
   log(
     `Updated search index, entities took ${entitiesDuration}s, compilations took ${compilationsDuration}s`,
   );
+};
+
+export const ensureSearchIndex = async () => {
+  const hasExistingData = await searchService.hasExistingData();
+
+  if (hasExistingData) {
+    log('Existing search index data found, updating index');
+    buildSearchIndex().catch(error => {
+      err(`Failed building search index: ${error}`);
+    });
+    return;
+  }
+
+  log('No existing search index data found, building from scratch');
+  await buildSearchIndex().catch(error => {
+    err(`Failed building search index from scratch: ${error}`);
+  });
 };
