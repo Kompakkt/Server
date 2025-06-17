@@ -10,7 +10,8 @@
     "dev": "bun run --watch src/index.ts",
     "test": "bun test",
     "lint": "eslint src/",
-    "prettier": "prettier --config .prettierrc.json 'src/**/*.{ts,html,scss}' --write"
+    "prettier": "prettier --config .prettierrc.json 'src/**/*.{ts,html,scss}' --write",
+    "postprepare": "git submodule update --remote --merge"
   },
   "repository": {
     "type": "git",
