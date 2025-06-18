@@ -3,7 +3,7 @@ import { Configuration } from 'src/configuration';
 import { err, info, log, warn } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
 import { RequestClient, get } from 'src/util/requests';
-import WBEdit from 'wikibase-edit';
+import WBEdit, { type EntityEdit as WBEditEntityEdit } from 'wikibase-edit';
 import WBK from 'wikibase-sdk';
 import {
   type IAnnotationLinkChoices,
@@ -21,7 +21,6 @@ import {
   getAnnotationMetadataSpark,
   getDigitalEntityMetadataSpark,
   getHierarchySpark,
-  getWikibaseClassAndSubclassSpark,
   getWikibaseClassInstancesSpark,
 } from './sparks';
 import {
@@ -113,9 +112,9 @@ const extractWikibaseExtensionData = <
 >(
   obj: T,
 ) => {
-  return obj.extensions?.wikibase! as UndoPartial<
-    NonNullable<NonNullable<T['extensions']>['wikibase']>
-  >;
+  return obj.extensions?.wikibase as
+    | UndoPartial<NonNullable<NonNullable<T['extensions']>['wikibase']>>
+    | undefined;
 };
 
 const wikibaseLabelToWBEditDescription = (item: IWikibaseLabel) => {
@@ -133,7 +132,8 @@ const getIdFromWikibaseItem = (item: string | IWikibaseItem) => {
   return item.id;
 };
 
-const getIdFromCreationError = (error: any) => {
+const getIdFromCreationError = (error: unknown) => {
+  if (!error) return undefined;
   const errorString = error.toString() as string;
 
   if (!errorString.includes('modification-failed')) {
@@ -204,7 +204,7 @@ export class WikibaseService {
       if (!digitalEntity) return undefined;
       const wikibaseEntity = digitalEntity as WikibaseDigitalEntity;
       const data = extractWikibaseExtensionData(wikibaseEntity);
-      return data.id;
+      return data?.id ?? undefined;
     })().catch(error => {
       log(`Failed retrieving target wikibase item of annotation`, annotation, id, error);
       return undefined;
@@ -255,7 +255,7 @@ export class WikibaseService {
 
     const wikibaseDomain = WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain;
 
-    const spark = {
+    const spark: WBEditEntityEdit = {
       id: id,
       clear: true,
       labels: wikibaseLabelToWBEditDescription(annotation.label),
@@ -332,6 +332,9 @@ export class WikibaseService {
     claims: { [key: string]: string | string[] } = {},
   ) {
     const entity = extractWikibaseExtensionData(fullEntity);
+    if (!entity) {
+      throw new Error('Digital entity is missing wikibase extension data');
+    }
     let id: string | undefined = entity.id;
     log(
       `updateDigitalEntity with id ${id} and entity ${JSON.stringify(entity)}, claims ${JSON.stringify(claims)}`,
@@ -441,13 +444,13 @@ export class WikibaseService {
       }
     }
 
-    const editParams = {
+    const editParams: WBEditEntityEdit = {
       id: id,
       clear: true,
       labels: wikibaseLabelToWBEditDescription(entity.label),
       descriptions: wikibaseLabelToWBEditDescription(entity.description),
       claims: modelClaims,
-    } as const;
+    };
     const edititem = await this.wbEdit.entity.edit(editParams);
     log(edititem);
     // TODO not sure why error thrown if the following redundant code is removed
@@ -584,19 +587,6 @@ export class WikibaseService {
     });
   }
 
-  private async wikibase_class_and_subclass_instances(class_array: string[]) {
-    const spark = getWikibaseClassAndSubclassSpark(class_array);
-    const class_items = await this.wikibase_read<IWikibaseItem>(spark);
-
-    if (!class_items) return [];
-
-    return class_items.map(d => {
-      // TODO: IWikibaseItem Typeguard
-      (d as any).label = { en: d.label_en };
-      return d as unknown as IWikibaseItem;
-    });
-  }
-
   // createAccount
   public async createAccount(username: string, password: string) {
     await this.wbConnect.createAccount(username, password);
@@ -698,7 +688,7 @@ export class WikibaseService {
   }
 
   public async fetchWikibaseMetadata(
-    wikibase_id: any,
+    wikibase_id: string,
   ): Promise<IWikibaseDigitalEntityExtensionData | undefined> {
     log(`Fetching metadata from Wikibase for ${wikibase_id}`);
 

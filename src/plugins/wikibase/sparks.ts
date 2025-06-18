@@ -105,25 +105,6 @@ export const getAnnotationMetadataSpark = (wikibaseId: string) => {
   return spark;
 };
 
-export const getWikibaseClassAndSubclassSpark = (classes: string[]) => {
-  const classString = `tib:${classes.join(' tib:')}`;
-  const spark = `SELECT ?id ?label_en ?desc ?media WHERE {
-    values ?class {${classString}}
-    {
-      ?id tibt:${WBPredicates.instanceOf} ?class.
-    }
-    UNION
-    {
-      ?subclass tibt:${WBPredicates.subclassOf} ?class.
-      ?id tibt:${WBPredicates.instanceOf} ?subclass.
-    }
-    ?id rdfs:label ?label_en filter (lang(?label_en) = "en").
-    OPTIONAL { ?id schema:description ?desc filter (lang(?desc) = "en")}.
-    OPTIONAL { ?media tibt:${WBPredicates.image} ?media. }
-  }`;
-  return spark;
-};
-
 export const getWikibaseClassInstancesSpark = (classes: string[]) => {
   const classString = `tib:${classes.join(' tib:')}`;
 
