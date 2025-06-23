@@ -90,7 +90,7 @@ declare module 'wikibase-edit' {
     type?: string;
     rank?: 'normal' | 'preferred' | 'deprecated';
     value?: unknown;
-    qualifiers?: Record<string, QualifierData[]>;
+    qualifiers?: Record<string, (QualifierData | string)[]>;
     references?: ReferenceData[];
     remove?: boolean;
     snaktype?: 'value' | 'novalue' | 'somevalue';

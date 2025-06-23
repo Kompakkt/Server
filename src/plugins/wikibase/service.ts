@@ -6,7 +6,7 @@ import { annotationCollection, digitalEntityCollection, entityCollection } from 
 import { pluginCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { get } from 'src/util/requests';
-import WBEdit, { type EntityEdit as WBEditEntityEdit } from 'wikibase-edit';
+import WBEdit, { type ClaimData, type EntityEdit as WBEditEntityEdit } from 'wikibase-edit';
 import WBK from 'wikibase-sdk';
 import {
   type IAnnotationLinkChoices,
@@ -107,8 +107,14 @@ const isDescItem = (item: MetadataField): item is DescItem => {
   return typeof item !== 'string' && (item as DescItem).value !== undefined;
 };
 type MetadataField = string | ValueLabelItem | number | DescItem;
+const getMetadataFieldValue = (item: MetadataField): string => {
+  if (typeof item === 'string' || typeof item === 'number') {
+    return item.toString();
+  }
+  return item.value;
+};
 type RawMetadata = Record<string, MetadataField>[];
-type ProcessedMetadata = Record<string, MetadataField | Array<MetadataField>>;
+type ProcessedMetadata = Record<string, Array<MetadataField>>;
 
 type HierarchiesResponseItem = {
   item: ValueLabelItem;
@@ -445,7 +451,7 @@ export class WikibaseService {
 
     if (modelAgents['Data Creator'].length > 0) {
       editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] ??= [];
-      editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent]!.push({
+      (editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
         value: WBClasses.rawDataCreation,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Data Creator'],
@@ -455,7 +461,7 @@ export class WikibaseService {
 
     if (modelAgents['Creator'].length > 0) {
       editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] ??= [];
-      editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent]!.push({
+      (editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
         value: WBClasses.creation,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Creator'],
@@ -465,7 +471,7 @@ export class WikibaseService {
 
     if (modelAgents['Editor'].length > 0) {
       editParams.claims[WBPredicates.modifiedBy ?? WBPredicates.hasEvent] ??= [];
-      editParams.claims[WBPredicates.modifiedBy ?? WBPredicates.hasEvent]!.push({
+      (editParams.claims[WBPredicates.modifiedBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
         value: WBClasses.modification,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Editor'],
@@ -600,9 +606,9 @@ export class WikibaseService {
   }
 
   public async wikibaseRead<T>(spark: string): Promise<T[] | undefined> {
-    info('wikibaseRead wikibase-sdk', spark);
+    // info('wikibaseRead wikibase-sdk', spark);
     const query = this.wbSDK.sparqlQuery(spark);
-    info('wikibaseRead wikibase-sdk sparqlQuery', query);
+    // info('wikibaseRead wikibase-sdk sparqlQuery', query);
 
     const result = await get(query, {}).catch(error => {
       log('wikibaseRead', error.message, error.config?.url);
@@ -613,7 +619,7 @@ export class WikibaseService {
     if (!result) return undefined;
     //const result = await this.wbConnect.requestSDKquery(query);
     const simple = this.wbSDK.simplify.sparqlResults(result);
-    info('wikibaseRead simplified result', Bun.inspect(simple));
+    // info('wikibaseRead simplified result', Bun.inspect(simple));
     return simple as T[];
   }
 
@@ -683,19 +689,23 @@ export class WikibaseService {
     }
 
     if (annotation.desc.agent) {
-      descriptionAuthors.push({
-        id: getPQNumberFromID(annotation.desc.agent),
-        label: { en: annotation.desc.agentLabel },
-      });
+      const agentId = getPQNumberFromID(annotation.desc.agent);
+      if (agentId)
+        descriptionAuthors.push({
+          id: agentId.toString(),
+          label: { en: annotation.desc.agentLabel },
+        });
     }
     if (annotation.desc.license) {
-      descriptionLicenses.push({
-        id: getPQNumberFromID(annotation.desc.license),
-        label: { en: annotation.desc.licenseLabel },
-      });
+      const licenseId = getPQNumberFromID(annotation.desc.license);
+      if (licenseId)
+        descriptionLicenses.push({
+          id: licenseId.toString(),
+          label: { en: annotation.desc.licenseLabel },
+        });
     }
 
-    const annotationData: IWikibaseAnnotationExtensionData = {
+    const annotationData = {
       id: wikibase_id,
       label: { en: annotation.label },
       description: annotation.desc.value,
@@ -796,23 +806,16 @@ export class WikibaseService {
     const value = metadata?.[key];
     if (!value) return [];
 
-    const items: Array<IWikibaseItem | string> = [];
-
-    if (Array.isArray(value)) {
-      const mappedItems = value.map(item => {
-        return isValueLabelItem(item)
-          ? { id: item.value, label: { en: item.label } }
+    const items: Array<IWikibaseItem | string> = value.map(item => {
+      return isValueLabelItem(item)
+        ? { id: item.value, label: { en: item.label } }
+        : isDescItem(item)
+          ? {
+              id: item.value,
+              label: { en: item.value },
+            }
           : item.toString();
-      });
-      items.push(...mappedItems);
-    } else if (typeof value === 'string' || typeof value === 'number') {
-      items.push(value.toString());
-    } else if (typeof value === 'object' && isValueLabelItem(value)) {
-      items.push({
-        id: value.value,
-        label: { en: value.label },
-      });
-    }
+    });
 
     return items;
   }
@@ -837,17 +840,11 @@ export class WikibaseService {
       for (const key of Object.keys(item)) {
         const value = item[key];
         // If the key is not in acc, initialize it
-        if (!processed[key]) processed[key] = value;
-
-        if (Array.isArray(processed[key])) {
-          // Check if the value already exists in the array
-          const valueExists = processed[key].some(item => equals(item, value));
-          // If the value doesn't exist, add it to the array
-          if (!valueExists) processed[key].push(value);
-        } else if (!equals(processed[key], value)) {
-          // If the value is different, convert it into an array and add the new value
-          processed[key] = [processed[key], value];
-        }
+        if (!processed[key]) processed[key] = [value];
+        // Check if the value already exists in the array
+        const valueExists = processed[key].some(item => equals(item, value));
+        // If the value doesn't exist, add it to the array
+        if (!valueExists) processed[key].push(value);
       }
     }
 
