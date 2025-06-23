@@ -1,6 +1,5 @@
 import { log, warn } from 'src/logger';
-import { isWikibaseConfiguration } from './common';
-import { WikibaseConfiguration } from './config';
+import { isWikibaseConfiguration, WikibaseConfiguration } from './config';
 
 export default async () => {
   if (isWikibaseConfiguration(WikibaseConfiguration)) {

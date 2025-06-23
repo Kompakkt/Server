@@ -3,8 +3,7 @@ import { log } from 'src/logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';
 import { Plugin } from '../plugin-base';
-import { isWikibaseConfiguration } from './common';
-import { WikibaseConfiguration } from './config';
+import { isWikibaseConfiguration, WikibaseConfiguration } from './config';
 import {
   ensureAnnotationExtensionData,
   ensureDigitalEntityExtensionData,

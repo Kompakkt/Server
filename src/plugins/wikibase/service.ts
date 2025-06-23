@@ -1,9 +1,12 @@
 import { ObjectId } from 'mongodb';
+import { asVector3 } from 'src/common';
 import { Configuration } from 'src/configuration';
 import { err, info, log, warn } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
-import { RequestClient, get } from 'src/util/requests';
-import WBEdit, { type ClaimData, type EntityEdit as WBEditEntityEdit } from 'wikibase-edit';
+import { pluginCache } from 'src/redis';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { get } from 'src/util/requests';
+import WBEdit, { type EntityEdit as WBEditEntityEdit } from 'wikibase-edit';
 import WBK from 'wikibase-sdk';
 import {
   type IAnnotationLinkChoices,
@@ -15,22 +18,14 @@ import {
   type IWikibaseItem,
   type IWikibaseLabel,
   getPQNumberFromID,
-  isWikibaseConfiguration,
 } from './common';
-import {
-  getAnnotationMetadataSpark,
-  getDigitalEntityMetadataSpark,
-  getHierarchySpark,
-  getWikibaseClassInstancesSpark,
-} from './sparks';
 import {
   type WikibaseAnnotation,
   WikibaseConfiguration,
   type WikibaseDigitalEntity,
+  isWikibaseConfiguration,
 } from './config';
 import { WikibaseConnector } from './connector';
-import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { asVector3 } from 'src/common';
 import {
   WBAnnotationPredicates,
   WBClasses,
@@ -39,7 +34,12 @@ import {
   WBPredicates,
   WBValues,
 } from './parsed-model';
-import { pluginCache } from 'src/redis';
+import {
+  getAnnotationMetadataSpark,
+  getDigitalEntityMetadataSpark,
+  getHierarchySpark,
+  getWikibaseClassInstancesSpark,
+} from './sparks';
 
 type UndoPartial<T> = T extends Partial<infer R> ? R : T;
 
