@@ -1,7 +1,9 @@
 import { WikibaseConfiguration } from './config';
 import { WBAnnotationPredicates, WBClasses, WBPredicates } from './parsed-model';
 
-const standardPrefixes = () => `
+const standardPrefixes = () =>
+  WikibaseConfiguration?.Domain
+    ? `
 PREFIX tib: <${WikibaseConfiguration?.Domain}/entity/>
 PREFIX tibt: <${WikibaseConfiguration?.Domain}/prop/direct/>
 PREFIX tibp: <${WikibaseConfiguration?.Domain}/prop/>
@@ -10,7 +12,8 @@ PREFIX tibpq: <${WikibaseConfiguration?.Domain}/prop/qualifier/>
 PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bd: <http://www.bigdata.com/rdf#>
-`;
+`
+    : '';
 
 export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
   const spark = `SELECT
