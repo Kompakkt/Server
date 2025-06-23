@@ -7,7 +7,7 @@ export type IWikibaseItem = {
 };
 
 export type IMediaAgent = IWikibaseItem & {
-  roleTitle: string | undefined;
+  roleTitle: 'Rightsowner' | 'Creator' | 'Editor' | 'Data Creator' | 'Contact Person' | undefined;
 };
 
 export type IMetadataChoices = {
@@ -49,7 +49,7 @@ export type IWikibaseDigitalEntityExtensionData = Partial<{
   externalLinks: Array<string | IWikibaseItem>; // Is this supposed to happen?
   bibliographicRefs: Array<string | IWikibaseItem>;
   physicalObjs: Array<string | IWikibaseItem>;
-  licence: number;
+  licence: string;
   hierarchies: IMediaHierarchy[];
   claims: Record<string, unknown>;
 }>;
@@ -82,14 +82,16 @@ export type IWikibaseConfiguration = {
   TTLFileURL?: string;
 };
 
-export const isWikibaseConfiguration = (obj: any): obj is IWikibaseConfiguration => {
+export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfiguration => {
   return (
     !!obj &&
-    obj?.Domain !== undefined &&
-    obj?.Username !== undefined &&
-    obj?.Password !== undefined &&
-    obj?.AdminUsername !== undefined &&
-    obj?.AdminPassword !== undefined
+    typeof obj === 'object' &&
+    'Domain' in obj &&
+    'Username' in obj &&
+    'Password' in obj &&
+    'AdminUsername' in obj &&
+    'AdminPassword' in obj &&
+    'SPARQLEndpoint' in obj
   );
 };
 

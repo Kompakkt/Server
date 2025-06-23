@@ -1,6 +1,6 @@
 import deepmerge from 'deepmerge';
 import { ConfigFile } from './environment';
-import { err, info, log } from './logger';
+import { err, info, log, warn } from './logger';
 import { CommandLineArguments } from './arguments';
 import { capitalize } from './util/string-helpers';
 
@@ -23,46 +23,9 @@ export interface IUploadConfiguration {
   UploadDirectory: string;
 }
 
-export interface IExpressConfiguration {
-  Host: string;
-  Port: number;
-  OriginWhitelist: string[];
-  PassportSecret: string;
-  enableHTTPS: boolean;
-  SSLPaths?: IExpressSSLConfiguration;
-  LDAP?: ILDAPConfiguration;
+export interface IServerConfiguration {
+  PublicURL: string;
 }
-
-export interface IExpressSSLConfiguration {
-  PrivateKey: string;
-  Certificate: string;
-  Passphrase?: string;
-}
-
-export interface ILDAPKeys {
-  username: string;
-  prename: string;
-  surname: string;
-  mail: string;
-}
-
-export interface ILDAPConfiguration {
-  DN: string;
-  DNauthUID: boolean;
-  Host: string;
-  searchBase: string;
-  Keys?: ILDAPKeys;
-}
-
-export const isLDAPConfiguration = (obj: any): obj is ILDAPConfiguration => {
-  return (
-    !!obj &&
-    obj?.DN !== undefined &&
-    obj?.DNauthID !== undefined &&
-    obj?.Host !== undefined &&
-    obj?.searchBase !== undefined
-  );
-};
 
 export interface IMailerConfiguration {
   Host: string;
@@ -105,7 +68,7 @@ export interface IConfiguration<T = Record<string, Record<string, string>>> {
   Mongo: IMongoConfiguration;
   Redis: IRedisConfiguration;
   Uploads: IUploadConfiguration;
-  Express: IExpressConfiguration;
+  Server: IServerConfiguration;
   Services?: {
     Europeana?: {
       apiKey: string;
@@ -147,14 +110,8 @@ const LoadConfig = async () => {
       TempDirectory: getEnv('CONFIGURATION_UPLOADS_TEMP_DIRECTORY') || 'temp',
       UploadDirectory: getEnv('CONFIGURATION_UPLOADS_UPLOAD_DIRECTORY') || 'uploads',
     },
-    Express: {
-      Host: getEnv('CONFIGURATION_EXPRESS_HOST') || '127.0.0.1',
-      Port: parseInt(getEnv('CONFIGURATION_EXPRESS_PORT') || '8080', 10),
-      OriginWhitelist: (getEnv('CONFIGURATION_EXPRESS_ORIGIN_WHITELIST') || '')
-        .split(',')
-        .map(s => s.trim()),
-      enableHTTPS: getEnv('CONFIGURATION_EXPRESS_ENABLE_HTTPS') === 'true',
-      PassportSecret: getEnv('CONFIGURATION_EXPRESS_PASSPORT_SECRET') || 'change me',
+    Server: {
+      PublicURL: getEnv('CONFIGURATION_SERVER_PUBLIC_URL') || 'http://localhost',
     },
     Kompressor: {
       Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true',
@@ -241,5 +198,11 @@ Environment variables used by the server:\n${joinedEnvVars}
 };
 
 const Configuration = await LoadConfig();
+
+if (Configuration.Server.PublicURL.includes('localhost')) {
+  warn(
+    `This servers public URL is currently configured to be on localhost. Make sure this is only for development purposes, as data created while configured to localhost might be impacted negatively when switching to a public facing URL later on.`,
+  );
+}
 
 export { Configuration };

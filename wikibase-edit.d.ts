@@ -64,10 +64,11 @@ declare module 'wikibase-edit' {
     id?: string;
     type?: 'item' | 'property';
     datatype?: string;
+    clear?: boolean;
     labels?: Record<string, string | { value: string; remove?: boolean }>;
     descriptions?: Record<string, string | { value: string; remove?: boolean }>;
     aliases?: Record<string, string[] | { value: string[]; remove?: boolean }>;
-    claims?: Record<string, ClaimData | ClaimData[]>;
+    claims?: Record<string, string | string[] | ClaimData | ClaimData[]>;
     sitelinks?: Record<string, string | { title: string; badges?: string[] }>;
     summary?: string;
     baserevid?: number;

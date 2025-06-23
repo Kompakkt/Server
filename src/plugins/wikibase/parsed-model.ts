@@ -76,13 +76,13 @@ const WBPredicatesArr = [
   // Added in june 2025 model changes
   'createdBy',
   'modifiedBy',
-  'rawDataCreatedBy', // might not be added
+  // 'rawDataCreatedBy', // might not be added
 ] as const;
 
 const WBAnnotationPredicatesArr = [
   'cameraType',
   'ranking',
-  'motivation',
+  'hasMotivation',
   'verified',
   'perspectivePositionXAxis',
   'perspectivePositionYAxis',
@@ -116,9 +116,10 @@ const WBClassesArr = [
   'modification',
   'rawDataCreation',
   'organization',
-  'license',
+  'licence',
   'technique',
   'iconographicConcept',
+  'motivation',
 ] as const;
 
 const WBValuesArr = ['true', 'false', 'describing'] as const;
@@ -134,6 +135,22 @@ const WBLicensesArr = [
   'allRightsReserved',
 ];
 
+export const WBLicenseMapping: Record<string, (typeof WBLicensesArr)[number]> = {
+  'CC0': 'cc0',
+  'BY': 'creativeCommonsAttribution',
+  'BY-SA': 'creativeCommonsAttributionSharealike',
+  'BYSA': 'creativeCommonsAttributionSharealike',
+  'BY-ND': 'creativeCommonsAttributionNoderivatives',
+  'BYND': 'creativeCommonsAttributionNoderivatives',
+  'BY-NC': 'creativeCommonsAttributionNoncommercial',
+  'BYNC': 'creativeCommonsAttributionNoncommercial',
+  'BY-NC-SA': 'creativeCommonsAttributionNoncommercialSharealike',
+  'BYNCSA': 'creativeCommonsAttributionNoncommercialSharealike',
+  'BY-NC-ND': 'creativeCommonsAttributionNoncommercialNoderivatives',
+  'BYNCND': 'creativeCommonsAttributionNoncommercialNoderivatives',
+  'AR': 'allRightsReserved',
+};
+
 const createMapping = <T extends readonly string[]>(arr: T, model: Record<string, string>) => {
   return Object.fromEntries(arr.map(key => [key, model[key]])) as Record<T[number], string>;
 };
@@ -147,3 +164,20 @@ export const WBLicenses = createMapping(WBLicensesArr, model);
 log(
   `Full model: ${Bun.inspect({ WBValues, WBPredicates, WBAnnotationPredicates, WBClasses, WBLicenses })}`,
 );
+
+// Check if P and Q values are valid
+[WBPredicates, WBAnnotationPredicates].forEach(obj => {
+  Object.entries(obj).forEach(([key, value]) => {
+    if (value && !value.startsWith('P')) {
+      throw new Error(`Invalid Wikibase predicate or annotation predicate: ${key} ${value}`);
+    }
+  });
+});
+
+[WBValues, WBClasses, WBLicenses].forEach(obj => {
+  Object.entries(obj).forEach(([key, value]) => {
+    if (value && !value.startsWith('Q')) {
+      throw new Error(`Invalid Wikibase value, class or license: ${key} ${value}`);
+    }
+  });
+});

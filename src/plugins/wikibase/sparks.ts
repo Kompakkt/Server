@@ -1,4 +1,16 @@
+import { WikibaseConfiguration } from './config';
 import { WBAnnotationPredicates, WBClasses, WBPredicates } from './parsed-model';
+
+const standardPrefixes = () => `
+PREFIX tib: <${WikibaseConfiguration?.Domain}/entity/>
+PREFIX tibt: <${WikibaseConfiguration?.Domain}/prop/direct/>
+PREFIX tibp: <${WikibaseConfiguration?.Domain}/prop/>
+PREFIX tibps: <${WikibaseConfiguration?.Domain}/prop/statement/>
+PREFIX tibpq: <${WikibaseConfiguration?.Domain}/prop/qualifier/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+`;
 
 export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
   const spark = `SELECT
@@ -32,8 +44,8 @@ export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
       OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.rightHeldBy} ?rightsOwner }
       OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.contactPerson} ?contactperson }
 
-      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.rawDataCreatedBy ?? WBPredicates.hasEvent} ?statement1.
-				          ?statement1 tibps:${WBPredicates.rawDataCreatedBy ?? WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
+      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.createdBy ?? WBPredicates.hasEvent} ?statement1.
+				          ?statement1 tibps:${WBPredicates.createdBy ?? WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
 									tibpq:${WBPredicates.carriedOutBy} ?dataCreator. }
 
       OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.createdBy ?? WBPredicates.hasEvent} ?statement2.
@@ -46,7 +58,7 @@ export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
 
       SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }
     }`;
-  return spark;
+  return [standardPrefixes(), spark].join('\n');
 };
 
 export const getAnnotationMetadataSpark = (wikibaseId: string) => {
@@ -67,7 +79,7 @@ export const getAnnotationMetadataSpark = (wikibaseId: string) => {
         tib:${wikibaseId} schema:description ?desc .
         tib:${wikibaseId} tibt:${WBAnnotationPredicates.verified} ?val .
         tib:${wikibaseId} tibt:${WBAnnotationPredicates.ranking} ?rank .
-        tib:${wikibaseId} tibt:${WBAnnotationPredicates.motivation} ?motiv .
+        tib:${wikibaseId} tibt:${WBAnnotationPredicates.hasMotivation} ?motiv .
         tib:${wikibaseId} tibt:${WBAnnotationPredicates.cameraType} ?camType .
         tib:${wikibaseId} tibt:${WBAnnotationPredicates.perspectivePositionXAxis} ?cx .
         tib:${wikibaseId} tibt:${WBAnnotationPredicates.perspectivePositionYAxis} ?cy .
@@ -102,7 +114,7 @@ export const getAnnotationMetadataSpark = (wikibaseId: string) => {
         OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.externalLink} ?mediaURL }
         OPTIONAL { tib:${wikibaseId} rdfs:label ?label }
       }`;
-  return spark;
+  return [standardPrefixes(), spark].join('\n');
 };
 
 export const getWikibaseClassInstancesSpark = (classes: string[]) => {
@@ -116,7 +128,7 @@ export const getWikibaseClassInstancesSpark = (classes: string[]) => {
       optional { ?id tibt:${WBPredicates.image} ?media. }
     }`;
 
-  return spark;
+  return [standardPrefixes(), spark].join('\n');
 };
 
 export const getHierarchySpark = (wikibaseId: string) => {
@@ -134,5 +146,5 @@ export const getHierarchySpark = (wikibaseId: string) => {
   }
   `;
 
-  return spark;
+  return [standardPrefixes(), spark].join('\n');
 };

@@ -95,3 +95,5 @@ export const exploreCache = new CacheClient(offset + 5, 60);
 
 // MD5 Checksum cache for uploads
 export const md5Cache = new CacheClient(offset + 6, -1);
+
+export const pluginCache = new CacheClient(offset + 7, 60);
