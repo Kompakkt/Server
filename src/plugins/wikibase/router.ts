@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import Elysia from 'elysia';
+import Elysia, { t } from 'elysia';
 import { mongoClient } from 'src/mongo';
 import configServer from 'src/server.config';
 import { WikibaseConfiguration } from './config';
@@ -7,12 +7,28 @@ import { WikibaseService } from './service';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)
-  .get('/wikibase/choices/metadata', async () => {
-    return WikibaseService.getInstance()?.fetchMetadataChoices();
-  })
-  .get('/wikibase/choices/annotation-link', async () => {
-    return WikibaseService.getInstance()?.fetchAnnotationLinkChoices();
-  })
+  .get(
+    '/wikibase/choices/metadata',
+    async ({ query: { force } }) => {
+      return WikibaseService.getInstance()?.fetchMetadataChoices(force ?? false);
+    },
+    {
+      query: t.Object({
+        force: t.Optional(t.Boolean()),
+      }),
+    },
+  )
+  .get(
+    '/wikibase/choices/annotation-link',
+    async ({ query: { force } }) => {
+      return WikibaseService.getInstance()?.fetchAnnotationLinkChoices(force ?? false);
+    },
+    {
+      query: t.Object({
+        force: t.Optional(t.Boolean()),
+      }),
+    },
+  )
   .get('/wikibase/instance/info', async () => {
     return {
       instance: WikibaseConfiguration?.Domain,

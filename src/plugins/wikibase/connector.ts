@@ -58,6 +58,29 @@ type WikibaseImageResponse = {
 type LinkbackResponse = {
   success: number;
 };
+const isLinkbackResponse = (response: unknown): response is LinkbackResponse => {
+  if (response === null || typeof response !== 'object') return false;
+  return 'success' in response && typeof (response as LinkbackResponse).success === 'number';
+};
+
+type EditResponse = {
+  edit?: {
+    result?: 'Success' | 'Failure';
+    title?: string;
+    newrevid?: number;
+    newtimestamp?: string;
+  };
+};
+
+const isEditResponse = (response: unknown): response is EditResponse => {
+  if (response === null || typeof response !== 'object') return false;
+  const edit = (response as EditResponse).edit;
+  return (
+    edit !== undefined &&
+    typeof edit.result === 'string' &&
+    (edit.result === 'Success' || edit.result === 'Failure')
+  );
+};
 
 const isWikibaseImageResponse = (response: unknown): response is WikibaseImageResponse => {
   if (response === null || typeof response !== 'object') return false;
@@ -266,10 +289,13 @@ export class WikibaseConnector implements TokenManager {
         },
       })
       .then(response => {
-        const asLinkbackResponse = response as Partial<LinkbackResponse>;
-        if (asLinkbackResponse.success === 1) {
+        if (isLinkbackResponse(response) && response.success === 1) {
           return true;
         }
+        if (isEditResponse(response) && response?.edit?.result === 'Success') {
+          return true;
+        }
+        warn(`Unknown response type ${response}`);
         throw new Error('Failed to write annotation');
       });
   }

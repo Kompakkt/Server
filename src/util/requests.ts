@@ -57,7 +57,7 @@ const request = (method: string, url: string, obj: RequestOptions) => {
     urlObj.searchParams.set(key, value.toString());
   }
   const finalUrl = urlObj.toString();
-  info(`Making ${method} request to ${finalUrl}`, obj);
+  info(`Making ${method} request to ${finalUrl}`);
   return Bun.fetch(finalUrl, {
     ...options,
     headers: {

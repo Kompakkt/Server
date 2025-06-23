@@ -39,7 +39,7 @@ class WikibasePlugin extends Plugin {
         }
 
         const doc = ensureDigitalEntityExtensionData(digitalEntity);
-        const result = await service.updateDigitalEntity(doc, {});
+        const result = await service.updateDigitalEntity(doc);
         if (!result) {
           throw new Error('Failed to update wikibase digital entity');
         }
@@ -55,6 +55,11 @@ class WikibasePlugin extends Plugin {
       callback: async annotation => {
         if (!hasWikibaseExtension(annotation)) {
           log(`Item is probably not a wikibase annotation`);
+          return annotation;
+        }
+
+        if (!annotation.body.content.title.trim() || !annotation.body.content.description.trim()) {
+          log(`Annotation is missing title or description for wikibase extension`);
           return annotation;
         }
 
