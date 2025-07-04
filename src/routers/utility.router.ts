@@ -37,7 +37,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         app
           .post(
             '/applyactiontoentityowner',
-            ({ error, userdata, body: { command, entityId, ownerUsername } }) =>
+            ({ status, userdata, body: { command, entityId, ownerUsername } }) =>
               userdata
                 ? applyActionToEntityOwner({
                     command,
@@ -45,7 +45,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
                     ownerUsername,
                     userdata,
                   })
-                : error('Forbidden'),
+                : status('Forbidden'),
             {
               body: t.Object({
                 command: t.Enum(Command),
@@ -73,14 +73,14 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           })
           .post(
             '/moveannotations/:id',
-            ({ error, params: { id }, userdata, body: { annotationList } }) =>
+            ({ status, params: { id }, userdata, body: { annotationList } }) =>
               userdata
                 ? addAnnotationsToAnnotationList({
                     identifier: id,
                     annotationList,
                     userdata,
                   })
-                : error('Forbidden'),
+                : status('Forbidden'),
             {
               params: t.Object({
                 id: t.String(),
@@ -90,11 +90,11 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
               }),
             },
           )
-          .get('/finduseringroups', ({ error, userdata }) =>
-            userdata ? findUserInGroups(userdata) : error('Forbidden'),
+          .get('/finduseringroups', ({ status, userdata }) =>
+            userdata ? findUserInGroups(userdata) : status('Forbidden'),
           )
-          .get('/finduserincompilations', ({ error, userdata }) =>
-            userdata ? findUserInCompilations(userdata) : error('Forbidden'),
+          .get('/finduserincompilations', ({ status, userdata }) =>
+            userdata ? findUserInCompilations(userdata) : status('Forbidden'),
           ),
     ),
 );

@@ -17,14 +17,20 @@ import type {
 } from './common';
 import { Collection } from './common';
 import { Configuration } from './configuration';
-import { info, log } from './logger';
+import { info } from './logger';
 import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
+import { type IPublicProfile } from './common/interfaces';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
 const url = ClientURL ?? `mongodb://${Hostname}:${Port}`;
 
-export const mongoClient = new MongoClient(url);
+export const mongoClient = new MongoClient(url, {
+  auth: {
+    username: 'admin',
+    password: 'password',
+  },
+});
 await mongoClient.connect();
 info('Connected to MongoDB');
 
@@ -32,6 +38,7 @@ const db = (name: string) => mongoClient.db(name);
 
 export const accountsDb = db(Configuration.Mongo.AccountsDB);
 export const userCollection = accountsDb.collection<ServerDocument<IUserData>>('users');
+export const profileCollection = accountsDb.collection<ServerDocument<IPublicProfile>>('profiles');
 export type PasswordDocument = {
   username: string;
   password: {
@@ -56,6 +63,12 @@ export const userTokenCollection = accountsDb.collection<{
   resetToken?: string;
   tokenExpiration?: number;
 }>('tokens');
+export const followsCollection = accountsDb.collection<{
+  follower: string | ObjectId;
+  following: string | ObjectId;
+}>('follows');
+
+followsCollection.createIndex({ follower: 1, following: 1 }, { unique: true });
 
 export type ApiKeyDocument = {
   routes: string[];

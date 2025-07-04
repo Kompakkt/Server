@@ -1,5 +1,6 @@
 import { t } from 'elysia';
 import { Collection, type IUserData } from 'src/common';
+import type { IDocument } from 'src/common/interfaces';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny, resolveCompilation, resolveEntity } from './resolving-strategies';
@@ -49,8 +50,11 @@ export const findAll = async ({ collection }: { collection: Collection }) => {
   if (!allowed.includes(collection)) return [];
 
   const docs = await collectionMap[collection].find({}).toArray();
-  const resolved = await Promise.all(docs.map(doc => resolveAny(collection, doc)));
-  return resolved.filter(_ => _);
+  const resolved = await Promise.all(docs.map(doc => resolveAny(collection, doc))).then(arr =>
+    arr.filter((v): v is ServerDocument<IDocument> => !!v),
+  );
+
+  return resolved;
 };
 
 export const findAllParams = t.Object({

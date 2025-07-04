@@ -84,12 +84,12 @@ const adminRouter = new Elysia()
       })
       .post(
         '/getuser/:identifier',
-        async ({ error, params: { identifier } }) => {
+        async ({ status, params: { identifier } }) => {
           const user = await userCollection.findOne(
             { _id: new ObjectId(identifier) },
             { projection: { sessionID: 0, rank: 0, prename: 0, surname: 0 } },
           );
-          if (!user) return error(404);
+          if (!user) return status(404);
 
           const userWithData = resolveUsersDataObject(user);
           return userWithData;
@@ -102,14 +102,14 @@ const adminRouter = new Elysia()
       )
       .post(
         '/promoteuser',
-        async ({ error, body: { identifier, role } }) => {
+        async ({ status, body: { identifier, role } }) => {
           const _id = new ObjectId(identifier);
 
           const user = await userCollection.findOne({ _id });
-          if (!user) return error('Not Found');
+          if (!user) return status('Not Found');
 
           const updateResult = await userCollection.updateOne({ _id }, { $set: { role } });
-          if (!updateResult) return error('Internal Server Error');
+          if (!updateResult) return status('Internal Server Error');
 
           if (Configuration.Mailer?.Target) {
             sendJSXMail({
@@ -135,10 +135,10 @@ const adminRouter = new Elysia()
       )
       .post(
         '/togglepublished',
-        async ({ error, body: { identifier } }) => {
+        async ({ status, body: { identifier } }) => {
           const _id = new ObjectId(identifier);
           const entity = await entityCollection.findOne({ _id });
-          if (!entity) return error('Not Found');
+          if (!entity) return status('Not Found');
 
           const isEntityOnline: boolean = !!entity.online;
           const updateResult = await entityCollection.updateOne(
@@ -147,7 +147,7 @@ const adminRouter = new Elysia()
               $set: { online: !isEntityOnline },
             },
           );
-          if (!updateResult) return error('Internal Server Error');
+          if (!updateResult) return status('Internal Server Error');
 
           exploreCache.flush();
 
@@ -161,9 +161,9 @@ const adminRouter = new Elysia()
       )
       .post(
         '/resetpassword/:username',
-        async ({ error, params: { username } }) => {
+        async ({ status, params: { username } }) => {
           const user = await userCollection.findOne({ username });
-          if (!user) return error('Not Found', 'User not found');
+          if (!user) return status('Not Found', 'User not found');
 
           const resetToken = randomBytes(32).toString('hex');
           const tokenExpiration = Date.now() + 86400000; // 24 hours
@@ -173,7 +173,7 @@ const adminRouter = new Elysia()
             { $set: { resetToken, tokenExpiration } },
             { upsert: true },
           );
-          if (!updateResult) return error('Internal Server Error');
+          if (!updateResult) return status('Internal Server Error');
 
           const success = await sendJSXMail({
             from: Configuration.Mailer?.Target?.contact ?? 'noreply@kompakkt.de',
@@ -185,7 +185,7 @@ const adminRouter = new Elysia()
               requestedByAdministrator: true,
             }),
           });
-          if (!success) return error('Internal Server Error');
+          if (!success) return status('Internal Server Error');
 
           return { status: 'OK' };
         },

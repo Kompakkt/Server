@@ -6,8 +6,9 @@ import { err, info, log } from './logger';
 import { initializePlugins } from './plugins';
 import finalServer from './server.final';
 import { swagger } from '@elysiajs/swagger';
+import { cleanupPersons } from './jobs/cleanup-persons';
 
-const jobs = { ensureUploadStructure, ensureSearchIndex } as const;
+const jobs = { ensureUploadStructure, ensureSearchIndex, cleanupPersons } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);
   await job().catch(err);

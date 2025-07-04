@@ -74,6 +74,27 @@ class WikibasePlugin extends Plugin {
       },
     });
 
+    /*HookManager.addHook<ServerDocument<IDigitalEntity>>({
+      collection: Collection.digitalentity,
+      type: 'onResolve',
+      callback: async digitalEntity => {
+        try {
+          if (!hasWikibaseExtension(digitalEntity)) {
+            log(`Item is probably not a wikibase digital entity`);
+            return digitalEntity as ServerDocument<IDigitalEntity>;
+          }
+
+          log(`Resolving wikibase digital entity ${digitalEntity._id}`);
+
+          const doc = ensureDigitalEntityExtensionData(digitalEntity);
+          await service.fetchWikibaseMetadata(doc.extensions!.wikibase!.id!);
+        } catch (error) {
+          log(`Error resolving wikibase digital entity: ${error}`);
+        }
+        return digitalEntity;
+      },
+    });*/
+
     return true;
   }
 

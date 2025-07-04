@@ -15,7 +15,7 @@ const mailRouter = new Elysia()
     group
       .post(
         '/sendmail',
-        ({ error, body: { mailbody, subject, target }, userdata }) => {
+        ({ status, body: { mailbody, subject, target }, userdata }) => {
           return userdata
             ? sendMailRequest(
                 {
@@ -24,8 +24,8 @@ const mailRouter = new Elysia()
                   target,
                 },
                 userdata,
-              ).catch(() => error('Internal Server Error'))
-            : error('Forbidden');
+              ).catch(() => status('Internal Server Error'))
+            : status('Forbidden');
         },
         {
           body: t.Object({
@@ -37,8 +37,8 @@ const mailRouter = new Elysia()
       )
       .post(
         '/getmailentries',
-        ({ error }) => {
-          return getMailRelatedDatabaseEntries().catch(() => error('Internal Server Error'));
+        async ({ status }) => {
+          return getMailRelatedDatabaseEntries().catch(() => status('Internal Server Error'));
         },
         {
           isAdmin: true,
@@ -46,8 +46,8 @@ const mailRouter = new Elysia()
       )
       .post(
         '/toggleanswered/:target/:identifier',
-        ({ error, params: { identifier } }) => {
-          return toggleMailAnswered(identifier).catch(() => error('Internal Server Error'));
+        async ({ status, params: { identifier } }) => {
+          return toggleMailAnswered(identifier).catch(() => status('Internal Server Error'));
         },
         {
           isAdmin: true,

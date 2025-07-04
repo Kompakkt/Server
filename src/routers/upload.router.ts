@@ -184,7 +184,7 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ params: { '*': path }, set, headers, error }) => {
+    async ({ params: { '*': path }, set, headers, status }) => {
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
 
       const requestedPath = path.split('/uploads').at(-1)!;
@@ -196,11 +196,11 @@ const uploadRouter = new Elysia()
       const filePath = join(uploadDir, ...decodedPath);
       // Security check - Ensure the file path is within the upload directory
       if (!filePath.startsWith(uploadDir)) {
-        return error(403, 'Forbidden');
+        return status(403, 'Forbidden');
       }
       // Security check - Ensure the file exists
       if (!(await Bun.file(filePath).exists())) {
-        return error(404, 'Not Found');
+        return status(404, 'Not Found');
       }
 
       const realPath = await realpath(filePath);
@@ -244,9 +244,9 @@ const uploadRouter = new Elysia()
   )
   .get(
     '/download/:entityId',
-    async function* ({ error, params: { entityId } }) {
+    async function* ({ status, params: { entityId } }) {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
-      if (!entity) return error(404, 'Entity not found');
+      if (!entity) return status(404, 'Entity not found');
       const dirnames = Array.from(new Set(entity.files.map(file => dirname(file.file_link))));
       const uniqueFiles = new Set<string>();
       for (const dirname of dirnames) {
@@ -302,7 +302,7 @@ const uploadRouter = new Elysia()
     group
       .post(
         '/file',
-        async ({ error, body: { file, checksum, token, type, relativePath } }) => {
+        async ({ status, body: { file, checksum, token, type, relativePath } }) => {
           const serverChecksum = await calculateMD5(file.stream());
           const destPath = join(
             uploadDir,
@@ -345,7 +345,7 @@ const uploadRouter = new Elysia()
                 serverChecksum,
                 usingExisting: false,
               }
-            : error('Internal Server Error');
+            : status('Internal Server Error');
         },
         {
           body: t.Object({
@@ -361,7 +361,7 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/process/start',
-        async ({ error, body: { uuid, type } }) => {
+        async ({ status, body: { uuid, type } }) => {
           const { Enabled, Hostname, Port } = Configuration.Kompressor;
           if (!Enabled) {
             return {
@@ -375,8 +375,8 @@ const uploadRouter = new Elysia()
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
           const { files, ids } = await getUploadedFiles({ type, path });
           log(`Processing started for ${type}/${uuid}`, files);
-          if (files.length === 0) return error(404, 'No files found');
-          if (ids.length <= 0) return error(404, 'No files found');
+          if (files.length === 0) return status(404, 'No files found');
+          if (ids.length <= 0) return status(404, 'No files found');
 
           const hasBeenProcessed = await getProcessedFiles(
             ids.map(id => `${RootDirectory}/${UploadDirectory}/${type}/${id}`),
@@ -449,10 +449,10 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/finish',
-        async ({ error, body: { uuid, type } }) => {
+        async ({ status, body: { uuid, type } }) => {
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
           const { files, ids } = await getUploadedFiles({ type, path });
-          if (files.length === 0) return error(404, 'No files found');
+          if (files.length === 0) return status(404, 'No files found');
 
           const processedFiles = await getProcessedFiles(
             ids.map(id => `${RootDirectory}/${UploadDirectory}/${type}/${id}`),
@@ -492,14 +492,14 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/cancel',
-        async ({ error, body: { uuid, type } }) => {
+        async ({ status, body: { uuid, type } }) => {
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
           const pathStat = await stat(path).catch(e => {
             err(e);
             return undefined;
           });
 
-          if (!pathStat || !pathStat.isDirectory()) return error(404);
+          if (!pathStat || !pathStat.isDirectory()) return status(404);
 
           await rmdir(path, { recursive: true }).catch(e => {
             err(e);

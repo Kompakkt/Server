@@ -741,7 +741,7 @@ export class WikibaseService {
       },
       relatedEntities: this.processWikibaseItems(processedMetadata, 'concept') as IWikibaseItem[],
       relatedMediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL') as string[],
-    };
+    } satisfies IWikibaseAnnotationExtensionData;
     return annotationData;
   }
 
@@ -760,6 +760,7 @@ export class WikibaseService {
 
     const spark = getDigitalEntityMetadataSpark(wikibase_id);
     const metadata = await this.wikibaseRead<MetadataResponseItem>(spark);
+    log('fetchWikibaseMetadata metadata', metadata);
     if (!metadata) {
       log('no metadata found');
       return undefined;
@@ -770,19 +771,24 @@ export class WikibaseService {
       log('no metadata found');
       return undefined;
     }
+    log('fetchWikibaseMetadata processedMetadata', processedMetadata);
 
-    const licence = getPQNumberFromID(processedMetadata.licence);
+    const licence = processedMetadata.licence
+      .map(item => getPQNumberFromID(getMetadataFieldValue(item)))
+      .find(Boolean);
     const digitalEntity = {
       id: wikibase_id,
-      description: this.processWikibaseItems(processedMetadata, 'desc')
-        .map(item => (typeof item === 'string' ? item : item.label.en))
-        .join('.\n'),
+      description: {
+        en: this.processWikibaseItems(processedMetadata, 'desc')
+          .map(item => (typeof item === 'string' ? item : item.label.en))
+          .join('.\n'),
+      },
       label: {
         en: this.processWikibaseItems(processedMetadata, 'label')
           .map(item => (typeof item === 'string' ? item : item.label.en))
           .join('.\n'),
       },
-      licence: licence ?? '',
+      licence: licence?.toString() ?? '',
       creationDate: this.processWikibaseItems(processedMetadata, 'date').at(0),
       agents: this.getAgentsFromMetadata(processedMetadata),
       techniques: this.processWikibaseItems(processedMetadata, 'techniques'),
@@ -795,6 +801,8 @@ export class WikibaseService {
         ? await this.fetchHierarchy(processedMetadata.physicalObjs.value as string)
         : [],
     } satisfies IWikibaseDigitalEntityExtensionData;
+
+    log('fetchWikibaseMetadata finalDigitalEntity', digitalEntity);
 
     return digitalEntity;
   }

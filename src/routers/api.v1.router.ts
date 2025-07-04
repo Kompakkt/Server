@@ -50,7 +50,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     .get('/get/id', () => new ObjectId())
     .post(
       '/post/explore',
-      async ({ body, userdata, error }) => {
+      async ({ body, userdata, status }) => {
         const combined = { ...body, userData: userdata ?? undefined };
         return body.searchEntity ? exploreEntities(combined) : exploreCompilations(combined);
       },
@@ -61,22 +61,22 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     .post(
       '/post/remove/:collection/:identifier',
       async ({
-        error,
+        status,
         params: { collection, identifier },
         body: { username, password },
         userdata,
       }) => {
         const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier).toString() : identifier;
 
-        if (!userdata) return error('Not Found');
+        if (!userdata) return status('Not Found');
         const user = await userCollection.findOne({
           _id: new ObjectId(userdata._id),
         });
-        if (!user) return error('Not Found');
+        if (!user) return status('Not Found');
 
         if (user.username !== username) {
           err('Entity removal failed due to username & session not matching');
-          return error(
+          return status(
             'Forbidden',
             'Input username does not match username with current sessionID',
           );
@@ -91,7 +91,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         if (!userEntities.includes(_id)) {
           const message = 'Entity removal failed because Entity does not belong to user';
           err(message);
-          return error(401, message);
+          return status(401, message);
         }
 
         const success = await deleteAny({
@@ -102,7 +102,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         if (!success) {
           const message = 'Entity removal failed';
           err(message);
-          return error(500, message);
+          return status(500, message);
         }
 
         // entitiesCache.flush();
@@ -140,13 +140,13 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         .get('/get/groups', () => groupCollection.find({}).toArray())
         .post(
           '/post/push/:collection',
-          async ({ error, params: { collection }, body, userdata }) => {
-            if (!body || typeof body !== 'object') return error(400);
-            if (!userdata) return error(401);
+          async ({ status, params: { collection }, body, userdata }) => {
+            if (!body || typeof body !== 'object') return status(400);
+            if (!userdata) return status(401);
             const isDocument = (obj: unknown): obj is { _id: string } => {
               return typeof obj === 'object' && obj !== null && '_id' in obj;
             };
-            if (!isDocument(body)) return error(400);
+            if (!isDocument(body)) return status(400);
             const _id = body._id;
             const isValidObjectId = ObjectId.isValid(_id);
             const doesEntityExist = await (async () => {
@@ -175,7 +175,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
                 userdata,
               });
               log(`Checking if user is owner of ${body._id} to ${collection}: ${isOwner}`);
-              if (!isOwner) return error(403);
+              if (!isOwner) return status(403);
             }
 
             const saveResult = await saveHandler({
@@ -186,7 +186,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               err(error);
               return false;
             });
-            if (!saveResult) return error(500);
+            if (!saveResult) return status(500);
 
             if (!doesEntityExist) {
               log(`Making user owner of ${body._id} to ${collection}`);
@@ -201,7 +201,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               err(error);
               return undefined;
             });
-            if (!resolveResult) return error(500);
+            if (!resolveResult) return status(500);
 
             exploreCache.flush();
 
@@ -216,8 +216,8 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         )
         .post(
           '/post/settings/:identifier',
-          async ({ error, params: { identifier }, body }) => {
-            if (!body || !isEntitySettings(body)) return error('Bad Request');
+          async ({ status, params: { identifier }, body }) => {
+            if (!body || !isEntitySettings(body)) return status('Bad Request');
             const preview = body.preview;
             const entityId = ObjectId.isValid(identifier) ? new ObjectId(identifier) : identifier;
 
@@ -231,7 +231,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               { $set: { settings } },
             );
 
-            if (!result || result.modifiedCount !== 1) return error('Internal Server Error');
+            if (!result || result.modifiedCount !== 1) return status('Internal Server Error');
 
             return settings;
           },

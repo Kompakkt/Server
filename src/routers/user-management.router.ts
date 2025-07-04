@@ -22,7 +22,7 @@ const userManagementRouter = new Elysia()
         async ({
           params: { strategy },
           body,
-          error,
+          status,
           cookie: { auth },
           jwt,
           useAuthController,
@@ -30,7 +30,7 @@ const userManagementRouter = new Elysia()
         }) => {
           const userdata = await useAuthController(body, strategy);
           if (userdata instanceof Error) {
-            return error(401, userdata);
+            return status(401, userdata);
           }
 
           const origin = request.headers.get('origin') ?? '';
@@ -55,7 +55,7 @@ const userManagementRouter = new Elysia()
       )
       .post(
         '/register',
-        async ({ error, body }) => {
+        async ({ status, body }) => {
           info('Registering new user');
           // First user gets admin
           const isFirstUser = (await userCollection.findOne({})) === undefined;
@@ -64,7 +64,7 @@ const userManagementRouter = new Elysia()
           const { username, password } = body;
           const existingFindResult = await userCollection.findOne({ username });
           if (existingFindResult !== null) {
-            return error(409, 'User already exists');
+            return status(409, 'User already exists');
           }
 
           const { prename, surname, mail, fullname } = body;
@@ -87,7 +87,7 @@ const userManagementRouter = new Elysia()
           ]).then(results => results.every(result => result.status === 'fulfilled'));
 
           if (!transactionResult) {
-            return error(500, 'Failed creating user');
+            return status(500, 'Failed creating user');
           }
 
           info('Sending welcome mail');
@@ -97,7 +97,7 @@ const userManagementRouter = new Elysia()
             subject: 'Welcome to Kompakkt!',
             jsx: welcomeNewAccount(adjustedUser),
           });
-          if (!success) return error(500, 'Failed sending welcome mail');
+          if (!success) return status(500, 'Failed sending welcome mail');
 
           return adjustedUser;
         },
@@ -114,9 +114,9 @@ const userManagementRouter = new Elysia()
       )
       .get(
         '/logout',
-        ({ error, cookie: { auth }, set }) => {
+        ({ status, cookie: { auth }, set }) => {
           if (!auth.value) {
-            return error(401, 'No session');
+            return status(401, 'No session');
           }
           auth.set({ value: '', path: '/', sameSite: 'lax', maxAge: 0, expires: new Date(0) });
           set.headers['Set-Cookie'] = 'auth=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -128,25 +128,26 @@ const userManagementRouter = new Elysia()
       )
       .get(
         '/auth',
-        async ({ cookie: { auth }, error, jwt, query: { data } }) => {
+        async ({ cookie: { auth }, status, jwt, query: { data } }) => {
           if (!auth.value) {
-            return error(401, 'No session');
+            return status(401, 'No session');
           }
           const result = await jwt.verify(auth.value);
           if (!result) {
-            return error(401, 'Invalid session');
+            return status(401, 'Invalid session');
           }
           const { username, _id } = result;
           if (!username || typeof username !== 'string' || !_id || typeof _id !== 'string') {
-            return error(401, 'Invalid session');
+            return status(401, 'Invalid session');
           }
           const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
           if (!user) {
-            return error(401, 'User not found');
+            return status(401, 'User not found');
           }
 
           const dataTypes = data
-            ?.split(',')
+            ?.toLowerCase()
+            .split(',')
             .map(v => v.trim())
             .filter((v): v is keyof typeof Collection => Object.keys(Collection).includes(v));
 
@@ -163,9 +164,9 @@ const userManagementRouter = new Elysia()
       )
       .post(
         '/help/request-reset',
-        async ({ error, body: { username } }) => {
+        async ({ status, body: { username } }) => {
           const user = await userCollection.findOne({ username });
-          if (!user) return error('Not Found');
+          if (!user) return status('Not Found');
 
           const resetToken = randomBytes(32).toString('hex');
           const tokenExpiration = Date.now() + 86400000; // 24 hours
@@ -177,7 +178,7 @@ const userManagementRouter = new Elysia()
             },
             { upsert: true },
           );
-          if (!updateResult) return error('Internal Server Error');
+          if (!updateResult) return status('Internal Server Error');
 
           const success = await sendJSXMail({
             from: 'noreply@kompakkt.de',
@@ -185,7 +186,7 @@ const userManagementRouter = new Elysia()
             subject: 'Kompakkt password reset request',
             jsx: passwordResetRequest({ prename: user.prename, resetToken }),
           });
-          if (!success) return error('Internal Server Error');
+          if (!success) return status('Internal Server Error');
 
           return { status: 'OK' };
         },
@@ -197,11 +198,11 @@ const userManagementRouter = new Elysia()
       )
       .post(
         '/help/confirm-reset',
-        async ({ error, body: { username, token, password } }) => {
+        async ({ status, body: { username, token, password } }) => {
           const user = await userCollection.findOne({ username });
-          if (!user) return error(400);
+          if (!user) return status(400);
           const userToken = await userTokenCollection.findOne({ username });
-          if (!userToken) return error(400);
+          if (!userToken) return status(400);
 
           const { resetToken, tokenExpiration } = userToken;
 
@@ -211,7 +212,7 @@ const userManagementRouter = new Elysia()
             tokenExpiration < Date.now() ||
             resetToken !== token
           )
-            return error(500);
+            return status(500);
 
           // Remove token
           const updateResult = await userTokenCollection.updateOne(
@@ -220,11 +221,11 @@ const userManagementRouter = new Elysia()
               $unset: { resetToken: '', tokenExpiration: '' },
             },
           );
-          if (!updateResult) return error(500);
+          if (!updateResult) return status(500);
 
           // Update password
           const success = await updateUserPassword(user.username, password);
-          if (!success) return error(500);
+          if (!success) return status(500);
 
           return { status: 'OK' };
         },
@@ -238,9 +239,9 @@ const userManagementRouter = new Elysia()
       )
       .post(
         '/help/forgot-username',
-        async ({ error, body: { mail } }) => {
+        async ({ status, body: { mail } }) => {
           const user = await userCollection.findOne({ mail });
-          if (!user) return error(400);
+          if (!user) return status(400);
 
           const success = await sendJSXMail({
             from: 'noreply@kompakkt.de',
@@ -248,7 +249,7 @@ const userManagementRouter = new Elysia()
             subject: 'Your Kompakkt username',
             jsx: forgotUsername(user),
           });
-          if (!success) return error(500);
+          if (!success) return status(500);
 
           return { status: 'OK' };
         },

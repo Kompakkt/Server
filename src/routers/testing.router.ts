@@ -14,12 +14,12 @@ const testingRouter = new Elysia()
     },
     group =>
       group
-        .post('/test/:collection', ({ error }) => error(501), {
+        .post('/test/:collection', ({ status }) => status(501), {
           params: t.Object({
             collection: t.String(),
           }),
         })
-        .post('/testall', ({ error }) => error(501)),
+        .post('/testall', ({ status }) => status(501)),
   );
 
 export default testingRouter;

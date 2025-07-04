@@ -47,30 +47,30 @@ export const authService = new Elysia({ name: 'Service.Auth' })
   .macro(({ onBeforeHandle }) => ({
     isLoggedIn(needed?: boolean) {
       if (!needed) return;
-      onBeforeHandle(({ error, userdata }) => {
-        if (!userdata) return error('Forbidden');
+      onBeforeHandle(({ status, userdata }) => {
+        if (!userdata) return status('Forbidden');
         return;
       });
     },
     isAdmin(needed?: boolean) {
       if (!needed) return;
-      onBeforeHandle(({ error, userdata }) => {
-        if (userdata?.role !== UserRank.admin) return error('Forbidden');
+      onBeforeHandle(({ status, userdata }) => {
+        if (userdata?.role !== UserRank.admin) return status('Forbidden');
         return;
       });
     },
     verifyLoginData(needed?: boolean) {
       if (!needed) return;
-      onBeforeHandle(async ({ error, body, params, useAuthController }) => {
+      onBeforeHandle(async ({ status, body, params, useAuthController }) => {
         const loginBody = body as SignInBody;
-        if (!loginBody?.username || !loginBody?.password) return error('Forbidden');
+        if (!loginBody?.username || !loginBody?.password) return status('Forbidden');
 
         // TODO: maybe params can be typed as part of onBeforeHandle
         const typedParams = params as Static<typeof strategyParams>;
         const strategy = typedParams.strategy;
 
         const authResult = await useAuthController(loginBody, strategy);
-        if (authResult instanceof Error) return error('Forbidden');
+        if (authResult instanceof Error) return status('Forbidden');
         return;
       });
     },

@@ -1,25 +1,16 @@
-import { Elysia, t } from 'elysia';
+import { Elysia } from 'elysia';
 import configServer from 'src/server.config';
-import { authService, signInBody } from './handlers/auth.service';
+import { authService } from './handlers/auth.service';
 
 const cleaningRouter = new Elysia()
   .use(configServer)
   .use(authService)
-  .group(
-    '/cleaning',
-    {
-      isAdmin: true,
-      verifyLoginData: true,
-      body: signInBody,
-      params: t.Object({
-        confirm: t.Optional(t.String()),
-      }),
-    },
-    group =>
-      group
-        .post('/deletenullrefs/:confirm?', ({ error }) => error(501))
-        .post('/deleteunused/:confirm?', ({ error }) => error(501))
-        .post('/cleanuploadedfiles/:confirm?', ({ error }) => error(501)),
+  .group('/cleaning', group =>
+    group
+      .post('/deletenullrefs/:confirm?', ({ status }) => status(501))
+      .post('/deleteunused/:confirm?', ({ status }) => status(501))
+      .post('/cleanuploadedfiles/:confirm?', ({ status }) => status(501))
+      .post('/combinepersons/:confirm?', async ({ status }) => {}),
   );
 
 export default cleaningRouter;

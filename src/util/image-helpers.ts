@@ -17,13 +17,19 @@ export const updatePreviewImage = async (
   base64OrUrl: string,
   subfolder: string,
   identifier: string | ObjectId,
+  maxResolution: number = 1024,
 ) => {
   const convertBase64ToBuffer = (input: string) => {
     const replaced = input.replace(/^data:image\/\w+;base64,/, '');
     return Buffer.from(replaced, 'base64');
   };
 
-  const minifyBuffer = (buffer: Buffer) => sharp(buffer).webp({ quality: 80 }).toBuffer();
+  const minifyBuffer = (buffer: Buffer) =>
+    sharp(buffer)
+      // TODO: should we resize the image to fit within maxResolution?
+      // .resize({ fit: 'inside', width: maxResolution, height: maxResolution })
+      .webp({ quality: 80 })
+      .toBuffer();
 
   const writeBufferToFile = async (buffer: Buffer) => {
     const subfolderPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${subfolder}/`;
