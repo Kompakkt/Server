@@ -47,8 +47,8 @@ export const getDigitalEntityMetadataSpark = (wikibaseId: string) => {
       OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.rightHeldBy} ?rightsOwner }
       OPTIONAL { tib:${wikibaseId} tibt:${WBPredicates.contactPerson} ?contactperson }
 
-      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.createdBy ?? WBPredicates.hasEvent} ?statement1.
-				          ?statement1 tibps:${WBPredicates.createdBy ?? WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
+      OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.rawDataCreatedBy ?? WBPredicates.createdBy ?? WBPredicates.hasEvent} ?statement1.
+				          ?statement1 tibps:${WBPredicates.rawDataCreatedBy ?? WBPredicates.createdBy ?? WBPredicates.hasEvent} tib:${WBClasses.rawDataCreation} ;
 									tibpq:${WBPredicates.carriedOutBy} ?dataCreator. }
 
       OPTIONAL { tib:${wikibaseId} tibp:${WBPredicates.createdBy ?? WBPredicates.hasEvent} ?statement2.

@@ -450,8 +450,10 @@ export class WikibaseService {
     }
 
     if (modelAgents['Data Creator'].length > 0) {
-      editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] ??= [];
-      (editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
+      const predicate =
+        WBPredicates.rawDataCreatedBy ?? WBPredicates.createdBy ?? WBPredicates.hasEvent;
+      editParams.claims[predicate] ??= [];
+      (editParams.claims[predicate] as ClaimData[]).push({
         value: WBClasses.rawDataCreation,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Data Creator'],
@@ -460,8 +462,9 @@ export class WikibaseService {
     }
 
     if (modelAgents['Creator'].length > 0) {
-      editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] ??= [];
-      (editParams.claims[WBPredicates.createdBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
+      const predicate = WBPredicates.createdBy ?? WBPredicates.hasEvent;
+      editParams.claims[predicate] ??= [];
+      (editParams.claims[predicate] as ClaimData[]).push({
         value: WBClasses.creation,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Creator'],
@@ -470,8 +473,9 @@ export class WikibaseService {
     }
 
     if (modelAgents['Editor'].length > 0) {
-      editParams.claims[WBPredicates.modifiedBy ?? WBPredicates.hasEvent] ??= [];
-      (editParams.claims[WBPredicates.modifiedBy ?? WBPredicates.hasEvent] as ClaimData[]).push({
+      const predicate = WBPredicates.modifiedBy ?? WBPredicates.hasEvent;
+      editParams.claims[predicate] ??= [];
+      (editParams.claims[predicate] as ClaimData[]).push({
         value: WBClasses.modification,
         qualifiers: {
           [WBPredicates.carriedOutBy]: modelAgents['Editor'],

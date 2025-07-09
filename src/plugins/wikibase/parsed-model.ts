@@ -26,8 +26,7 @@ const snakeToCamel = (str: string) =>
 
 const model = ttl
   .split('\n')
-  .map(line => line.trim())
-  .filter(line => line.match(/^wgm:\w+/) || line.match(/^skos:note\s+"Wikibase ID:\s+[PQ]\d+/))
+  .filter(line => line.match(/^wgm:\w+/) || line.match(/^\s+skos:note\s+"Wikibase ID:\s+[PQ]\d+/))
   .map(line =>
     line.includes('wgm')
       ? line.split(/\s+/).at(0)?.replace('wgm:', '')
@@ -76,7 +75,7 @@ const WBPredicatesArr = [
   // Added in june 2025 model changes
   'createdBy',
   'modifiedBy',
-  // 'rawDataCreatedBy', // might not be added
+  'rawDataCreatedBy', // might not be added
 ] as const;
 
 const WBAnnotationPredicatesArr = [
