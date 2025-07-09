@@ -17,6 +17,7 @@ import { authService, signInBody } from './handlers/auth.service';
 import { resolveEntity } from './modules/api.v1/resolving-strategies';
 import { resolveUsersDataObject } from './modules/user-management/users';
 import { exploreCache } from 'src/redis';
+import { RouterTags } from './tags';
 
 const gatherDbCollectionStats = async <T extends Document>(collection: Collection<T>) => {
   const items = await collection.find().toArray();
@@ -58,30 +59,48 @@ const adminRouter = new Elysia()
   .use(authService)
   .group('/admin', { body: signInBody, isAdmin: true }, group =>
     group
-      .post('/stats', async () => {
-        const entities = await gatherDbCollectionStats(entityCollection);
-        const compilations = await gatherDbCollectionStats(compilationCollection);
-        const users = await gatherDbCollectionStats(userCollection);
-        const annotations = await gatherDbCollectionStats(annotationCollection);
+      .post(
+        '/stats',
+        async () => {
+          const entities = await gatherDbCollectionStats(entityCollection);
+          const compilations = await gatherDbCollectionStats(compilationCollection);
+          const users = await gatherDbCollectionStats(userCollection);
+          const annotations = await gatherDbCollectionStats(annotationCollection);
 
-        return { entities, compilations, users, annotations };
-      })
-      .post('/getusers', async () => {
-        const allAccounts = await userCollection
-          .find(
-            {},
-            {
-              projection: {
-                sessionID: 0,
-                rank: 0,
-                prename: 0,
-                surname: 0,
+          return { entities, compilations, users, annotations };
+        },
+        {
+          detail: {
+            description: 'Get statistics about the database collections',
+            tags: [RouterTags.Admin],
+          },
+        },
+      )
+      .post(
+        '/getusers',
+        async () => {
+          const allAccounts = await userCollection
+            .find(
+              {},
+              {
+                projection: {
+                  sessionID: 0,
+                  rank: 0,
+                  prename: 0,
+                  surname: 0,
+                },
               },
-            },
-          )
-          .toArray();
-        return allAccounts;
-      })
+            )
+            .toArray();
+          return allAccounts;
+        },
+        {
+          detail: {
+            description: 'Get all users with limited data',
+            tags: [RouterTags.Admin],
+          },
+        },
+      )
       .post(
         '/getuser/:identifier',
         async ({ status, params: { identifier } }) => {
@@ -98,6 +117,10 @@ const adminRouter = new Elysia()
           params: t.Object({
             identifier: t.String(),
           }),
+          detail: {
+            description: 'Get a specific user by identifier with limited data',
+            tags: [RouterTags.Admin],
+          },
         },
       )
       .post(
@@ -131,6 +154,10 @@ const adminRouter = new Elysia()
             identifier: t.String(),
             role: t.Enum(UserRank),
           }),
+          detail: {
+            description: 'Promote a user to a different role',
+            tags: [RouterTags.Admin],
+          },
         },
       )
       .post(
@@ -157,6 +184,10 @@ const adminRouter = new Elysia()
           body: t.Object({
             identifier: t.String(),
           }),
+          detail: {
+            description: 'Toggle the online/published status of an entity',
+            tags: [RouterTags.Admin],
+          },
         },
       )
       .post(
@@ -193,6 +224,10 @@ const adminRouter = new Elysia()
           params: t.Object({
             username: t.String(),
           }),
+          detail: {
+            description: 'Request a password reset for a user by username',
+            tags: [RouterTags.Admin],
+          },
         },
       ),
   );

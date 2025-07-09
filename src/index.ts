@@ -7,6 +7,7 @@ import { initializePlugins } from './plugins';
 import finalServer from './server.final';
 import { swagger } from '@elysiajs/swagger';
 import { cleanupPersons } from './jobs/cleanup-persons';
+import { openApiUI } from './templates/openapi-ui';
 
 const jobs = { ensureUploadStructure, ensureSearchIndex, cleanupPersons } as const;
 for (const [name, job] of Object.entries(jobs)) {
@@ -23,6 +24,7 @@ for (const router of pluginRoutes) {
 }
 
 new Elysia({
+  prefix: '/server',
   serve: {
     // 4096MB
     maxRequestBodySize: 4096 * 1024 * 1024,
@@ -30,10 +32,9 @@ new Elysia({
     idleTimeout: 255,
   },
 })
-  .use(app)
-  .use(finalServer)
   .use(
     swagger({
+      provider: 'scalar',
       documentation: {
         info: {
           title: 'Kompakkt Server Documentation',
@@ -43,8 +44,30 @@ new Elysia({
       },
     }),
   )
-  .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
+  .get(
+    '/documentation',
+    async ({ set }) => {
+      set.headers['Content-Type'] = 'text/html';
+      set.headers['Content-Security-Policy'] =
+        `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`;
+      return await openApiUI();
+    },
+    {
+      detail: {
+        summary: 'OpenAPI Documentation',
+        description: 'Provides the OpenAPI documentation in a user-friendly HTML format.',
+        responses: {
+          200: {
+            description: 'OpenAPI documentation in HTML format',
+          },
+        },
+      },
+    },
+  )
+  .use(app)
+  .use(finalServer)
+
+  // .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
   .listen(3030, () => {
     info('Listening on port 3030');
-    info('Swagger UI available at http://localhost:3030/swagger');
   });

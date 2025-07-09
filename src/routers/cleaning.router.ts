@@ -10,7 +10,7 @@ const cleaningRouter = new Elysia()
       .post('/deletenullrefs/:confirm?', ({ status }) => status(501))
       .post('/deleteunused/:confirm?', ({ status }) => status(501))
       .post('/cleanuploadedfiles/:confirm?', ({ status }) => status(501))
-      .post('/combinepersons/:confirm?', async ({ status }) => {}),
+      .post('/combinepersons/:confirm?', async ({ status }) => status(501)),
   );
 
 export default cleaningRouter;

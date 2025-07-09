@@ -21,6 +21,7 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { warn } from 'src/logger';
 import { updatePreviewImage } from 'src/util/image-helpers';
+import { RouterTags } from './tags';
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
   app
@@ -52,6 +53,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             }),
           ),
         }),
+        detail: {
+          description:
+            'Retrieves user data from the specified collection, resolving document IDs to full documents if requested.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     )
     .get(
@@ -108,6 +114,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }),
         detail: {
           description: 'Retrieves entities the user has access to based on the specified role.',
+          tags: [RouterTags.API, RouterTags['API V2']],
         },
       },
     )
@@ -191,6 +198,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             }),
           ),
         }),
+        detail: {
+          description:
+            'Updates the access permissions for an entity, ensuring at least one owner remains.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     )
     .post(
@@ -262,6 +274,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           entityId: t.String({ description: 'The ID of the entity to transfer ownership of.' }),
           targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
         }),
+        detail: {
+          description:
+            'Transfers ownership of an entity to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     )
     .get(
@@ -283,6 +300,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }),
         detail: {
           description: 'Retrieves a user profile by its ID or display name.',
+          tags: [RouterTags.API, RouterTags['API V2']],
         },
         isLoggedIn: false,
       },
@@ -331,7 +349,13 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }
         return profile;
       },
-      { isLoggedIn: true, detail: { description: "Retrieves the logged-in user's profile." } },
+      {
+        isLoggedIn: true,
+        detail: {
+          description: "Retrieves the logged-in user's profile.",
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
+      },
     )
     .post(
       '/institution/profile',
@@ -375,7 +399,10 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
       {
         isLoggedIn: true,
-        detail: { description: 'Creates a new institutional profile.' },
+        detail: {
+          description: 'Creates a new institutional profile.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     )
     .post(
@@ -417,7 +444,10 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
       {
         isLoggedIn: true,
-        detail: { description: 'Updates an existing institutional profile.' },
+        detail: {
+          description: 'Updates an existing institutional profile.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
         params: t.Object({
           id: t.String({
             description: 'The ID of the institutional profile to update.',
@@ -482,27 +512,37 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: "Updates the logged-in user's profile with the provided data.",
+          tags: [RouterTags.API, RouterTags['API V2']],
         },
       },
     )
-    .get('/list-entity-formats', async () => {
-      const result = await entityCollection.distinct('processed.raw', {
-        'online': true,
-        'finished': true,
-        'processed.raw': { $exists: true, $ne: null },
-      });
+    .get(
+      '/list-entity-formats',
+      async () => {
+        const result = await entityCollection.distinct('processed.raw', {
+          'online': true,
+          'finished': true,
+          'processed.raw': { $exists: true, $ne: null },
+        });
 
-      const formats = new Set<string>();
+        const formats = new Set<string>();
 
-      result.forEach(rawPath => {
-        if (typeof rawPath === 'string') {
-          const format = rawPath.split('.').pop()?.toLowerCase();
-          if (format) formats.add(format);
-        }
-      });
+        result.forEach(rawPath => {
+          if (typeof rawPath === 'string') {
+            const format = rawPath.split('.').pop()?.toLowerCase();
+            if (format) formats.add(format);
+          }
+        });
 
-      return Array.from(formats).sort();
-    })
+        return Array.from(formats).sort();
+      },
+      {
+        detail: {
+          description: 'Lists all unique file formats of processed entities.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
+      },
+    )
     .get(
       '/entities-by-format/:formats',
       async ({ params: { formats } }) => {
@@ -552,6 +592,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
               'The format to filter entities by to retrieve, e.g., "glb", "obj", etc.\nCan be a comma separated list of formats.',
           }),
         }),
+        detail: {
+          description:
+            'Retrieves entities that match the specified file formats, filtering by processed raw paths.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     ),
 );

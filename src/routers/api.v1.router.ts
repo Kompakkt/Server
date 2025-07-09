@@ -30,6 +30,7 @@ import { saveHandler } from './modules/api.v1/save-to-collection';
 import { checkIsOwner, makeUserOwnerOf, undoUserOwnerOf } from './modules/user-management/users';
 import { deleteAny } from './modules/api.v1/deletion-strategies';
 import { exploreCache } from 'src/redis';
+import { RouterTags } from './tags';
 
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
@@ -37,17 +38,39 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     .get(
       '/get/find/:collection/:identifier',
       ({ params, userdata }) => findSingleHandler(params, userdata),
-      { params: findSingleParams },
+      {
+        params: findSingleParams,
+        detail: {
+          description: 'Find a single entity in a collection by its identifier',
+          tags: [RouterTags.API, RouterTags['API V1']],
+        },
+      },
     )
     .get(
       '/get/find/:collection/:identifier/:password?',
       ({ params, userdata }) => findSingleHandler(params, userdata),
-      { params: findSingleParams },
+      {
+        params: findSingleParams,
+        detail: {
+          description:
+            'Find a single entity in a collection, and decode it with the provided password',
+          tags: [RouterTags.API, RouterTags['API V1']],
+        },
+      },
     )
     .get('/get/findall/:collection', ({ params }) => findAll(params), {
       params: findAllParams,
+      detail: {
+        description: 'Find all entities in a collection',
+        tags: [RouterTags.API, RouterTags['API V1']],
+      },
     })
-    .get('/get/id', () => new ObjectId())
+    .get('/get/id', () => new ObjectId(), {
+      detail: {
+        description: 'Get a new ObjectId',
+        tags: [RouterTags.API, RouterTags['API V1']],
+      },
+    })
     .post(
       '/post/explore',
       async ({ body, userdata, status }) => {
@@ -56,6 +79,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
       },
       {
         body: ExploreRequest,
+        detail: {
+          description: 'Explore entities or compilations based on search criteria',
+          tags: [RouterTags.API, RouterTags['API V1']],
+        },
       },
     )
     .post(
@@ -118,26 +145,43 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         }),
         body: signInBody,
         verifyLoginData: true,
+        detail: {
+          description: 'Remove an entity from a collection',
+          tags: [RouterTags.API, RouterTags['API V1']],
+        },
       },
     )
     .guard({ isLoggedIn: true }, app =>
       app
-        .get('/get/users', () =>
-          userCollection
-            .find()
-            .toArray()
-            .then(users => {
-              return users.map(
-                ({ _id, username, fullname }) =>
-                  ({
-                    _id,
-                    username,
-                    fullname,
-                  }) satisfies ServerDocument<IStrippedUserData>,
-              );
-            }),
+        .get(
+          '/get/users',
+          () =>
+            userCollection
+              .find()
+              .toArray()
+              .then(users => {
+                return users.map(
+                  ({ _id, username, fullname }) =>
+                    ({
+                      _id,
+                      username,
+                      fullname,
+                    }) satisfies ServerDocument<IStrippedUserData>,
+                );
+              }),
+          {
+            detail: {
+              description: 'Get all users with stripped data',
+              tags: [RouterTags.API, RouterTags['API V1']],
+            },
+          },
         )
-        .get('/get/groups', () => groupCollection.find({}).toArray())
+        .get('/get/groups', () => groupCollection.find({}).toArray(), {
+          detail: {
+            description: 'Get all groups',
+            tags: [RouterTags.API, RouterTags['API V1']],
+          },
+        })
         .post(
           '/post/push/:collection',
           async ({ status, params: { collection }, body, userdata }) => {
@@ -212,6 +256,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               collection: t.Enum(Collection),
             }),
             body: t.Unknown(),
+            detail: {
+              description: 'Push an entity to a collection',
+              tags: [RouterTags.API, RouterTags['API V1']],
+            },
           },
         )
         .post(
@@ -240,6 +288,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               identifier: t.String(),
             }),
             body: t.Unknown(),
+            detail: {
+              description: 'Update settings of an entity',
+              tags: [RouterTags.API, RouterTags['API V1']],
+            },
           },
         ),
     ),

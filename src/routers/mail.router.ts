@@ -7,6 +7,7 @@ import {
 } from 'src/mailer';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
+import { RouterTags } from './tags';
 
 const mailRouter = new Elysia()
   .use(configServer)
@@ -33,6 +34,10 @@ const mailRouter = new Elysia()
             subject: t.String(),
             target: t.Enum(ETarget),
           }),
+          detail: {
+            description: 'Send a mail to a target',
+            tags: [RouterTags.Mail],
+          },
         },
       )
       .post(
@@ -42,6 +47,10 @@ const mailRouter = new Elysia()
         },
         {
           isAdmin: true,
+          detail: {
+            description: 'Get all mail entries from the database',
+            tags: [RouterTags.Mail, RouterTags.Admin],
+          },
         },
       )
       .post(
@@ -55,6 +64,10 @@ const mailRouter = new Elysia()
             target: t.String(),
             identifier: t.String(),
           }),
+          detail: {
+            description: 'Toggle the answered status of a mail entry',
+            tags: [RouterTags.Mail, RouterTags.Admin],
+          },
         },
       ),
   );
