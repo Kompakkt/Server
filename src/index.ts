@@ -1,5 +1,5 @@
 import './util/patch-structured-clone';
-import Elysia from 'elysia';
+import Elysia, { t } from 'elysia';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
 import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { err, info, log } from './logger';
@@ -9,7 +9,11 @@ import { swagger } from '@elysiajs/swagger';
 import { cleanupPersons } from './jobs/cleanup-persons';
 import { openApiUI } from './templates/openapi-ui';
 
-const jobs = { ensureUploadStructure, ensureSearchIndex, cleanupPersons } as const;
+const jobs = {
+  ensureUploadStructure,
+  ensureSearchIndex,
+  cleanupPersons,
+} as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);
   await job().catch(err);
@@ -44,6 +48,8 @@ new Elysia({
       },
     }),
   )
+  .use(app)
+  .use(finalServer)
   .get(
     '/documentation',
     async ({ set }) => {
@@ -64,8 +70,6 @@ new Elysia({
       },
     },
   )
-  .use(app)
-  .use(finalServer)
 
   // .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
   .listen(3030, () => {

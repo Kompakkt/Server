@@ -3,6 +3,7 @@ import { ConfigFile } from './environment';
 import { err, info, log, warn } from './logger';
 import { CommandLineArguments } from './arguments';
 import { capitalize } from './util/string-helpers';
+import { randomBytes } from 'node:crypto';
 
 export interface IMongoConfiguration {
   RepositoryDB: string;
@@ -25,6 +26,7 @@ export interface IUploadConfiguration {
 
 export interface IServerConfiguration {
   PublicURL: string;
+  MonitoringToken: string;
 }
 
 export interface IMailerConfiguration {
@@ -112,6 +114,8 @@ const LoadConfig = async () => {
     },
     Server: {
       PublicURL: getEnv('CONFIGURATION_SERVER_PUBLIC_URL') || 'http://localhost',
+      MonitoringToken:
+        getEnv('CONFIGURATION_SERVER_MONITORING_TOKEN') || randomBytes(32).toString('hex'),
     },
     Kompressor: {
       Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true',
@@ -198,6 +202,8 @@ Environment variables used by the server:\n${joinedEnvVars}
 };
 
 const Configuration = await LoadConfig();
+
+info(`Monitoring token: ${Configuration.Server.MonitoringToken}`);
 
 if (Configuration.Server.PublicURL.includes('localhost')) {
   warn(

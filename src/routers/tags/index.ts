@@ -9,6 +9,7 @@ export const RouterTags = {
   'Upload': 'Upload',
   'Testing': 'Testing',
   'Utility': 'Utility',
+  'Monitoring': 'Monitoring',
 
   'Profile': 'Profile',
   'Entity Management': 'Entity Management',

@@ -97,155 +97,226 @@ const Responses = (props: { responses: OpenAPISpecMethodProperties['responses'] 
   );
 
   return Object.keys(responses).length > 0 ? (
-    <div>
-      <strong>Responses:</strong>
-      <ul>
+    <div class="mt-4">
+      <h4 class="font-semibold text-gray-900 mb-2">Responses:</h4>
+      <div class="space-y-2">
         {Object.entries(responses).map(([code, response]) => (
-          <li id={code}>
-            <code safe>{code}</code> - <span safe>{response.description}</span>
-          </li>
+          <div class="flex items-start space-x-2">
+            <code class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono" safe>
+              {code}
+            </code>
+            <span class="text-gray-700 text-sm" safe>
+              {response.description}
+            </span>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   ) : (
-    <div>
-      <strong>Responses:</strong>
-      <p>No responses defined</p>
+    <div class="mt-4">
+      <h4 class="font-semibold text-gray-900 mb-2">Responses:</h4>
+      <p class="text-gray-500 text-sm">No responses defined</p>
     </div>
   );
 };
 
 const Tags = (props: { tags: OpenAPISpecMethodProperties['tags'] } | undefined) => {
-  return props?.tags ? (
-    <p>
-      <strong>Tags:</strong>
-      {props.tags.map(tag => (
-        <span
-          style={{
-            background: '#e9ecef',
-            padding: '2px 6px',
-            margin: '0 4px',
-            borderRadius: '3px',
-          }}
-          safe
-        >
-          {tag}
-        </span>
-      ))}
-    </p>
-  ) : (
-    <p>
-      <strong>Tags:</strong> None
-    </p>
+  return (
+    <div class="mt-4">
+      <h4 class="font-semibold text-gray-900 mb-2">Tags:</h4>
+      {props?.tags?.length ? (
+        <div class="flex flex-wrap gap-2">
+          {props.tags.map(tag => (
+            <span safe class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+              {tag}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p class="text-gray-500 text-sm">None</p>
+      )}
+    </div>
+  );
+};
+
+const MethodBadge = ({ method }: { method: string }) => {
+  const methodColors = {
+    get: 'bg-blue-500 text-white',
+    post: 'bg-green-500 text-white',
+    put: 'bg-yellow-500 text-white',
+    delete: 'bg-red-500 text-white',
+    patch: 'bg-purple-500 text-white',
+    head: 'bg-gray-500 text-white',
+    options: 'bg-indigo-500 text-white',
+    trace: 'bg-pink-500 text-white',
+  };
+
+  return (
+    <span
+      class={`inline-block px-2 py-1 rounded text-xs font-bold uppercase ${methodColors[method.toLowerCase() as keyof typeof methodColors] || 'bg-gray-500 text-white'}`}
+      safe
+    >
+      {method}
+    </span>
+  );
+};
+
+const Sidebar = ({ paths }: { paths: OpenAPISpec['paths'] }) => {
+  return (
+    <div class="fixed left-0 top-0 h-full w-64 md:w-72 lg:w-80 xl:w-96 bg-white border-r border-gray-200 overflow-y-auto z-10">
+      <div class="p-4 border-b border-gray-200">
+        <h3 class="font-semibold text-gray-900">Routes</h3>
+      </div>
+      <div class="p-2">
+        {Object.entries(paths).map(([path, methods]) => (
+          <div class="mb-2">
+            <a
+              href={`#${path}`}
+              class="block px-3 py-2 rounded-md text-sm font-mono text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              safe
+            >
+              {path}
+            </a>
+            <div class="ml-4 mt-1 space-y-1">
+              {Object.entries(methods).map(([method, operation]) => (
+                <a
+                  href={`#${path}-${method}`}
+                  class="flex items-center space-x-2 px-2 py-1 rounded text-xs hover:bg-gray-50 transition-colors"
+                >
+                  <MethodBadge method={method} />
+                  <span class="text-gray-600 truncate" safe>
+                    {operation.summary || operation.description || 'No summary'}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
 const Endpoint = ({ path, methods }: { path: string; methods: OpenAPISpec['paths'][string] }) => {
   return (
-    <div id={path} class="endpoint">
-      <div class="endpoint-header">
-        <h3 safe>{path}</h3>
+    <div
+      id={path}
+      class="bg-white border border-gray-200 rounded-lg shadow-sm mb-6 overflow-hidden"
+    >
+      <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 font-mono" safe>
+          {path}
+        </h3>
       </div>
-      {Object.entries(methods).map(([method, operation]) => (
-        <details id={`${path}-${method}`} style={{ margin: '8px' }}>
-          <summary>
-            <span class={`method-badge ${method.toLowerCase()}`} safe>
-              {method.toUpperCase()}
-            </span>
-            <span safe>{operation.summary || operation.description || 'No summary'}</span>
-          </summary>
-          <div style={{ padding: '12px' }}>
-            {operation.description ? <p safe>{operation.description}</p> : ''}
-            <Tags tags={operation.tags} />
-            {operation.parameters?.length ? (
-              <div>
-                <strong>Parameters:</strong>
-                <ul>
-                  {operation.parameters.map((param, idx) => (
-                    <li id={idx}>
-                      <code safe>{param.name}</code> ({param.in})
-                      {param.required && <span style={{ color: 'red' }}> *</span>}
-                      {param.description ? <span safe> - {param.description}</span> : ''}
-                    </li>
-                  ))}
-                </ul>
+      <div class="divide-y divide-gray-200">
+        {Object.entries(methods).map(([method, operation]) => (
+          <details class="group" id={`${path}-${method}`}>
+            <summary class="cursor-pointer px-6 py-4 hover:bg-gray-50 transition-colors duration-150 flex">
+              <div class="flex items-center space-x-3">
+                <MethodBadge method={method} />
+                <span class="text-gray-900 font-medium" safe>
+                  {operation.summary || operation.description || 'No summary'}
+                </span>
               </div>
-            ) : (
-              ''
-            )}
-            {operation.requestBody?.content['application/json'] ? (
-              <div>
-                <strong>Request Body:</strong>
-                {operation.requestBody.required && <span style={{ color: 'red' }}> *</span>}
-                {operation.requestBody.description ? (
-                  <p safe>{operation.requestBody.description}</p>
-                ) : (
-                  ''
-                )}
+            </summary>
+            <div class="px-6 py-4 bg-gray-50">
+              {operation.description ? (
+                <p class="text-gray-700 mb-4" safe>
+                  {operation.description}
+                </p>
+              ) : (
+                ''
+              )}
 
-                <div style={{ marginTop: '8px' }}>
-                  {operation.requestBody?.content['application/json'].example ? (
-                    <details>
-                      <summary>Example</summary>
-                      <pre
-                        style={{
-                          background: '#f8f9fa',
-                          padding: '12px',
-                          borderRadius: '4px',
-                          overflow: 'auto',
-                          fontSize: '0.9em',
-                        }}
-                      >
-                        <code safe>
-                          {JSON.stringify(
-                            operation.requestBody?.content['application/json'].example,
-                            null,
-                            2,
-                          )}
+              <Tags tags={operation.tags} />
+
+              {operation.parameters?.length ? (
+                <div class="mt-4">
+                  <h4 class="font-semibold text-gray-900 mb-2">Parameters:</h4>
+                  <div class="space-y-2">
+                    {operation.parameters.map(param => (
+                      <div class="flex items-start space-x-2">
+                        <code
+                          class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm font-mono"
+                          safe
+                        >
+                          {param.name}
                         </code>
-                      </pre>
-                    </details>
-                  ) : (
-                    ''
-                  )}
-                  {operation.requestBody?.content['application/json'].schema &&
-                  !operation.requestBody?.content['application/json'].example ? (
-                    <details>
-                      <summary>Schema</summary>
-                      <pre
-                        style={{
-                          background: '#f8f9fa',
-                          padding: '12px',
-                          borderRadius: '4px',
-                          overflow: 'auto',
-                          fontSize: '0.9em',
-                        }}
-                      >
-                        <code safe>
-                          {JSON.stringify(
-                            operation.requestBody?.content['application/json'].schema,
-                            null,
-                            2,
-                          )}
-                        </code>
-                      </pre>
-                    </details>
-                  ) : (
-                    ''
-                  )}
+                        <span class="text-gray-600 text-sm">({param.in})</span>
+                        {param.required && <span class="text-red-500 text-sm">*</span>}
+                        {param.description ? (
+                          <span class="text-gray-700 text-sm" safe>
+                            - {param.description}
+                          </span>
+                        ) : (
+                          ''
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              ''
-            )}
-            {operation.responses && Object.keys(operation.responses).length > 0 ? (
-              <Responses responses={operation.responses} />
-            ) : (
-              ''
-            )}
-          </div>
-        </details>
-      ))}
+              ) : null}
+
+              {operation.requestBody?.content['application/json'] ? (
+                <div class="mt-4">
+                  <h4 class="font-semibold text-gray-900 mb-2">
+                    Request Body:
+                    {operation.requestBody.required && <span class="text-red-500 ml-1">*</span>}
+                  </h4>
+                  {operation.requestBody.description ? (
+                    <p class="text-gray-700 mb-2 text-sm" safe>
+                      {operation.requestBody.description}
+                    </p>
+                  ) : (
+                    ''
+                  )}
+
+                  <div class="space-y-2">
+                    {operation.requestBody?.content['application/json'].example ? (
+                      <details class="group/example">
+                        <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800">
+                          Example
+                        </summary>
+                        <pre class="mt-2 bg-gray-800 text-gray-100 p-4 rounded-lg overflow-auto text-sm">
+                          <code safe>
+                            {JSON.stringify(
+                              operation.requestBody?.content['application/json'].example,
+                              null,
+                              2,
+                            )}
+                          </code>
+                        </pre>
+                      </details>
+                    ) : null}
+
+                    {operation.requestBody?.content['application/json'].schema &&
+                    !operation.requestBody?.content['application/json'].example ? (
+                      <details class="group/schema">
+                        <summary class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800 flex align-center">
+                          Schema
+                        </summary>
+                        <pre class="mt-2 bg-gray-800 text-gray-100 p-4 rounded-lg overflow-auto text-sm">
+                          <code safe>
+                            {JSON.stringify(
+                              operation.requestBody?.content['application/json'].schema,
+                              null,
+                              2,
+                            )}
+                          </code>
+                        </pre>
+                      </details>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {operation.responses && Object.keys(operation.responses).length > 0 ? (
+                <Responses responses={operation.responses} />
+              ) : null}
+            </div>
+          </details>
+        ))}
+      </div>
     </div>
   );
 };
@@ -257,41 +328,61 @@ export const openApiUI = async () => {
   return (
     '<!DOCTYPE html>' +
     (
-      <html>
+      <html lang="en">
         <head>
-          <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" />
-          <style>{`
-                  .method-badge {
-                    display: inline-block;
-                    padding: 2px 6px;
-                    border-radius: 3px;
-                    color: white;
-                    font-size: 0.8em;
-                    font-weight: bold;
-                    margin-right: 8px;
-                  }
-                  .get { background-color: #61affe; }
-                  .post { background-color: #49cc90; }
-                  .put { background-color: #fca130; }
-                  .delete { background-color: #f93e3e; }
-                  .patch { background-color: #50e3c2; }
-                  .endpoint { margin: 16px 0; border: 1px solid #ddd; border-radius: 4px; }
-                  .endpoint-header { padding: 12px; background-color: #f8f9fa; }
-                  h1, h2, h3 { margin: 0; }
-                `}</style>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title safe>{OpenAPI.info.title} - API Documentation</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            {`
+              html {
+                scroll-behavior: smooth;
+              }
+              body {
+                scroll-padding-top: 20px;
+              }
+            `}
+          </style>
         </head>
-        <body>
-          <div>
-            <h1 safe>{OpenAPI.info.title}</h1>
-            <p safe>{OpenAPI.info.description}</p>
-            <p safe>
-              Version: {OpenAPI.info.version} - OpenAPI {OpenAPI.openapi}
-            </p>
+        <body class="bg-gray-50 min-h-screen">
+          <Sidebar paths={OpenAPI.paths} />
+          <div class="ml-64 md:ml-72 lg:ml-80 xl:ml-96 min-h-screen">
+            <div class="container mx-auto px-4 py-8 max-w-4xl">
+              <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-8">
+                <div class="px-8 py-6">
+                  <h1 class="text-3xl font-bold text-gray-900 mb-2" safe>
+                    {OpenAPI.info.title}
+                  </h1>
+                  <p class="text-gray-600 mb-4 text-lg" safe>
+                    {OpenAPI.info.description}
+                  </p>
+                  <div class="flex items-center space-x-4 text-sm text-gray-500">
+                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded" safe>
+                      Version: {OpenAPI.info.version}
+                    </span>
+                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded" safe>
+                      OpenAPI {OpenAPI.openapi}
+                    </span>
+                  </div>
+                  <p class="mt-4 text-gray-500 text-sm">
+                    Spec URL:{' '}
+                    <a href="/server/swagger/json" class="text-blue-600 hover:underline">
+                      /server/swagger/json
+                    </a>
+                  </p>
+                </div>
+              </div>
 
-            <h2>Endpoints</h2>
-            {Object.entries(OpenAPI.paths).map(([path, methods]) => (
-              <Endpoint path={path} methods={methods} />
-            ))}
+              <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">Endpoints</h2>
+                <div class="space-y-4">
+                  {Object.entries(OpenAPI.paths).map(([path, methods]) => (
+                    <Endpoint path={path} methods={methods} />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </body>
       </html>

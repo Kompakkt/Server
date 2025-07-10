@@ -8,6 +8,7 @@ import testingRouter from './routers/testing.router';
 import uploadRouter from './routers/upload.router';
 import userManagementRouter from './routers/user-management.router';
 import utilityRouter from './routers/utility.router';
+import monitoringRouter from './routers/monitoring.router';
 import configServer from './server.config';
 
 const finalServer = new Elysia()
@@ -20,6 +21,7 @@ const finalServer = new Elysia()
   .use(cleaningRouter)
   .use(mailRouter)
   .use(testingRouter)
-  .use(uploadRouter);
+  .use(uploadRouter)
+  .use(monitoringRouter);
 
 export default finalServer;

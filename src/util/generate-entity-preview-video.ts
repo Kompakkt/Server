@@ -192,6 +192,7 @@ export const generateVideoPreview = async (entityId: string): Promise<string> =>
       const angle = angles[i];
       info(`Taking screenshot ${i + 1}/${angles.length} at angle: ${angle} degrees`);
 
+      const startTime = process.hrtime();
       // Rotate camera to the desired angle
       await page.evaluate(angleDegrees => {
         (window as any).rotateCameraToAngle(angleDegrees);
@@ -202,6 +203,14 @@ export const generateVideoPreview = async (entityId: string): Promise<string> =>
 
       // Take screenshot
       const screenshot = await page.screenshot({ encoding: 'base64' });
+      const elapsedTime = process.hrtime(startTime);
+
+      // If screenshotting takes too long, abort for this model
+      if (elapsedTime[0] > 10) {
+        info(`Screenshotting ${entityId} took too long, aborting`);
+        throw new Error('Screenshotting took too long, aborting');
+      }
+
       const imageBuffer = Buffer.from(screenshot, 'base64');
       const filename = `${tmpDir}/frame_${i.toString().padStart(4, '0')}.png`;
       await Bun.write(filename, imageBuffer);
