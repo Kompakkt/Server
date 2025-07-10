@@ -160,9 +160,10 @@ export const WBAnnotationPredicates = createMapping(WBAnnotationPredicatesArr, m
 export const WBClasses = createMapping(WBClassesArr, model);
 export const WBLicenses = createMapping(WBLicensesArr, model);
 
-log(
+// Available as route now
+/*log(
   `Full model: ${Bun.inspect({ WBValues, WBPredicates, WBAnnotationPredicates, WBClasses, WBLicenses })}`,
-);
+  );*/
 
 // Check if P and Q values are valid
 [WBPredicates, WBAnnotationPredicates].forEach(obj => {

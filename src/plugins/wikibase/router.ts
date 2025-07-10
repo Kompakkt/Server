@@ -4,9 +4,26 @@ import { mongoClient } from 'src/mongo';
 import configServer from 'src/server.config';
 import { WikibaseConfiguration } from './config';
 import { WikibaseService } from './service';
+import {
+  WBAnnotationPredicates,
+  WBClasses,
+  WBLicenses,
+  WBPredicates,
+  WBValues,
+} from './parsed-model';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)
+  .get('/wikibase/parsed-model', ({ set }) => {
+    set.headers['Content-Type'] = 'application/json';
+    return {
+      WBValues,
+      WBPredicates,
+      WBAnnotationPredicates,
+      WBClasses,
+      WBLicenses,
+    };
+  })
   .get(
     '/wikibase/choices/metadata',
     async ({ query: { force } }) => {
