@@ -4,6 +4,7 @@ import type { IDocument } from 'src/common/interfaces';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny, resolveCompilation, resolveEntity } from './resolving-strategies';
+import { checkIsOwner } from '../user-management/users';
 
 export const findSingleHandler = async (
   {
@@ -19,7 +20,33 @@ export const findSingleHandler = async (
 ) => {
   switch (collection) {
     case Collection.entity: {
-      return resolveEntity({ _id: identifier });
+      const entity = await resolveEntity({ _id: identifier });
+      if (!entity) return undefined;
+      // Check if user has access to the entity
+      // TODO: Remove whitelist after migration to new access system
+      const isWhitelistEnabled = entity.whitelist.enabled;
+      const entityExistsInUserdata = userdata
+        ? await checkIsOwner({
+            collection: Collection.entity,
+            doc: entity,
+            userdata,
+          })
+        : false;
+      const userInAccess = userdata ? entity.access?.[userdata._id.toString()] : undefined;
+      const isUserWhitelisted = entity.whitelist.persons
+        .concat(entity.whitelist.groups.flatMap(g => g.members))
+        .some(p => p._id === userdata?._id.toString());
+
+      const userHasAccess = entityExistsInUserdata || isUserWhitelisted || userInAccess;
+
+      if (entity.online && isWhitelistEnabled) {
+        return userHasAccess ? entity : undefined;
+      } else if (entity.online && !isWhitelistEnabled) {
+        return entity;
+      } else if (!entity.online) {
+        return userInAccess || entityExistsInUserdata ? entity : undefined;
+      }
+      return undefined;
     }
     case Collection.compilation: {
       const compilation = await resolveCompilation({ _id: identifier });
