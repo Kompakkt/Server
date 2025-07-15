@@ -264,18 +264,32 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         )
         .post(
           '/post/settings/:identifier',
-          async ({ status, params: { identifier }, body }) => {
-            if (!body || !isEntitySettings(body)) return status('Bad Request');
+          async ({ status, params: { identifier }, body, userdata }) => {
+            if (!body || !isEntitySettings(body) || !userdata) return status('Bad Request');
             const preview = body.preview;
-            const entityId = ObjectId.isValid(identifier) ? new ObjectId(identifier) : identifier;
+            const existingEntity = await entityCollection.findOne({
+              _id: new ObjectId(identifier),
+            });
+            if (!existingEntity) return status(404, 'Entity not found');
+
+            const isOwner = await checkIsOwner({
+              doc: existingEntity,
+              collection: Collection.entity,
+              userdata,
+            });
+            if (!isOwner) return status(403);
 
             // Save preview to file, if not yet done
-            const finalImagePath = await updatePreviewImage(preview, 'entity', entityId);
+            const finalImagePath = await updatePreviewImage(
+              preview,
+              'entity',
+              existingEntity._id.toString(),
+            );
 
             // Overwrite old settings
             const settings = { ...body, preview: finalImagePath };
             const result = await entityCollection.updateOne(
-              { _id: new ObjectId(entityId) },
+              { _id: new ObjectId(existingEntity._id.toString()) },
               { $set: { settings } },
             );
 
@@ -292,6 +306,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               description: 'Update settings of an entity',
               tags: [RouterTags.API, RouterTags['API V1']],
             },
+            isLoggedIn: true,
           },
         ),
     ),
