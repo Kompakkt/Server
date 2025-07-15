@@ -35,7 +35,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         const resolved = await Promise.all(
           Array.from(new Set(data)).map(docId => resolveUserDocument(docId, collection, full)),
         );
-        const filtered = resolved.filter((obj): obj is IDocument => obj !== undefined);
+        const filtered = resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
         return filtered;
       },
       {

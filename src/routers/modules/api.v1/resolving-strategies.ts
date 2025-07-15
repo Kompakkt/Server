@@ -18,6 +18,7 @@ import {
   isCompilation,
   isContact,
   isDigitalEntity,
+  isDocument,
   isEntity,
   isGroup,
   isInstitution,
@@ -43,7 +44,8 @@ import {
 import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
-type ResolveFn<T> = (obj: ServerDocument<IDocument | T>) => Promise<ServerDocument<T> | undefined>;
+type Resolvable<T> = ServerDocument<IDocument | T> | string | ObjectId;
+type ResolveFn<T> = (obj: Resolvable<T>) => Promise<ServerDocument<T> | undefined>;
 type DangerousArray = (IDocument | ObjectId | string | undefined | null)[];
 
 // TODO: Can this method be removed?
@@ -150,12 +152,25 @@ const resolveAndFilterArray = async <T extends string | IDocument>(
  * @param typeGuard
  */
 const resolveObjectProperties = async <T>(
-  obj: { [key: string]: any },
+  obj: { [key: string]: unknown },
   resolverFn: ResolveFn<T>,
   typeGuard: (item: any) => item is T,
 ): Promise<void> => {
-  for (const [id, item] of Object.entries(obj)) {
+  for (const [id, undetermined] of Object.entries(obj)) {
+    if (!undetermined) continue;
+
+    let item =
+      typeof undetermined === 'object' && undetermined !== null && isDocument(undetermined)
+        ? (undetermined as ServerDocument<T>)
+        : undefined;
+
+    item ??=
+      typeof undetermined === 'string' || undetermined instanceof ObjectId
+        ? ({ _id: new ObjectId(undetermined.toString()) } as ServerDocument<T>)
+        : undefined;
+
     if (!item) continue;
+
     const resolved = await resolverFn(item);
     if (resolved && typeGuard(resolved)) {
       obj[id] = withStringId(resolved);
@@ -197,7 +212,7 @@ const createResolver = <T extends ServerDocument<T>>(
   isTypeGuard: (obj: unknown) => obj is T,
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
-  return async (obj: any, full: boolean = true) => {
+  return async (obj: ServerDocument<T>, full: boolean = true) => {
     const cachedEntity = obj?._id
       ? await entitiesCache
           .get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
