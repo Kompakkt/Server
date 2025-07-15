@@ -118,7 +118,7 @@ const LoadConfig = async () => {
         getEnv('CONFIGURATION_SERVER_MONITORING_TOKEN') || randomBytes(32).toString('hex'),
     },
     Kompressor: {
-      Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true',
+      Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true' || true,
       Hostname: getEnv('CONFIGURATION_KOMPRESSOR_HOSTNAME') || 'kompressor',
       Port: parseInt(getEnv('CONFIGURATION_KOMPRESSOR_PORT') || '7999', 10),
     },
