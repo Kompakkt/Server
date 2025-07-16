@@ -72,30 +72,26 @@ const isBufferObject = (obj: object): obj is BufferObject => {
 export const resolveUserDocument = async (
   docId: string | IDocument | ITag | null | ObjectId | BufferObject,
   collection: Collection,
-  full?: boolean,
+  depth?: number,
 ) => {
   if (!docId) return undefined;
-  if (typeof docId === 'string') return resolveAny(collection, { _id: new ObjectId(docId) }, full);
-  if (typeof docId === 'object') {
-    if (docId instanceof ObjectId) return resolveAny(collection, { _id: docId }, full);
-    // TODO: Why are some objects { buffer: [] }?
-    if (isBufferObject(docId))
-      return resolveAny(collection, { _id: new ObjectId(docId.buffer) }, full);
-    return resolveAny(
-      collection,
-      {
-        _id: new ObjectId(docId._id.toString()),
-      },
-      full,
-    );
-  }
-  return undefined;
+  const query =
+    typeof docId === 'string'
+      ? { _id: new ObjectId(docId) }
+      : typeof docId === 'object'
+        ? docId instanceof ObjectId
+          ? { _id: docId }
+          : isBufferObject(docId)
+            ? { _id: new ObjectId(docId.buffer) }
+            : { _id: new ObjectId(docId._id.toString()) }
+        : undefined;
+  return query ? resolveAny(collection, query, depth) : undefined;
 };
 
 export const resolveUsersDataObject = async (
   inputUser: ServerDocument<IUserData>,
   dataTypes?: Array<keyof typeof Collection>,
-  full?: boolean,
+  depth?: number,
 ) => {
   const user = structuredClone(inputUser);
   try {
@@ -111,7 +107,7 @@ export const resolveUsersDataObject = async (
       }
       const resolved = await Promise.all(
         Array.from(new Set(user.data[collection])).map(docId =>
-          resolveUserDocument(docId, collection, full),
+          resolveUserDocument(docId, collection, depth),
         ),
       );
       const filtered = resolved.filter((obj): obj is IDocument => obj !== undefined);

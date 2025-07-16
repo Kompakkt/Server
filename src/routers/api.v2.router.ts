@@ -15,7 +15,7 @@ import {
   resolveUserDocument,
   undoUserOwnerOf,
 } from './modules/user-management/users';
-import { resolveEntity } from './modules/api.v1/resolving-strategies';
+import { resolveEntity, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
 import type { IPublicProfile } from 'src/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
@@ -28,12 +28,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     .use(authService)
     .get(
       '/user-data/:collection',
-      async ({ userdata, status, params: { collection }, query: { full } }) => {
+      async ({ userdata, status, params: { collection }, query: { full, depth } }) => {
         const user = structuredClone(userdata);
         if (!user) return status(500);
         const data = user.data[collection] ?? [];
         const resolved = await Promise.all(
-          Array.from(new Set(data)).map(docId => resolveUserDocument(docId, collection, full)),
+          Array.from(new Set(data)).map(docId =>
+            resolveUserDocument(docId, collection, depth ? depth : full ? RESOLVE_FULL_DEPTH : 0),
+          ),
         );
         const filtered = resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
         return filtered;
@@ -50,6 +52,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           full: t.Optional(
             t.Boolean({
               description: 'If true, deeply resolves documents of the requested collection',
+            }),
+          ),
+          depth: t.Optional(
+            t.Number({
+              description:
+                'If provided, specifies the depth to which documents should be resolved. Will override "full" if set.',
             }),
           ),
         }),

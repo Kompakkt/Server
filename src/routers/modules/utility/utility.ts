@@ -163,7 +163,7 @@ export const applyActionToEntityOwner = async ({
   ownerUsername: string;
   userdata: ServerDocument<IUserData>;
 }) => {
-  const entity = await resolveEntity({ _id: new ObjectId(entityId) });
+  const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
   if (!entity) throw new Error('Entity not found');
 
   const isUserOwner = userdata.data.entity?.includes(entityId.toString());

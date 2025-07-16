@@ -45,8 +45,16 @@ import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 type Resolvable<T> = ServerDocument<IDocument | T> | string | ObjectId;
-type ResolveFn<T> = (obj: Resolvable<T>) => Promise<ServerDocument<T> | undefined>;
+type ResolveFn<T> = (obj: Resolvable<T>, depth: number) => Promise<ServerDocument<T> | undefined>;
 type DangerousArray = (IDocument | ObjectId | string | undefined | null)[];
+
+/**
+ * Defines the maximum depth, if we ever need to pass the depth argument for full-depth resolving.
+ * The maximum resolve depth possible is:
+ * Compilation -> Entity -> DigitalEntity -> PhysicalEntity -> Person/Institution
+ * With a depth of 10, we are safely above the actual maximum possible depth of 5.
+ */
+export const RESOLVE_FULL_DEPTH = 10;
 
 // TODO: Can this method be removed?
 const withStringId = <T extends { _id: string | ObjectId }>(entity: T): { _id: string } & T => ({
@@ -86,11 +94,12 @@ const resolveAndCleanRelatedEntities = async <T extends IPerson | IInstitution>(
   items: DangerousArray,
   resolverFn: ResolveFn<T>,
   entityId: string,
+  depth: number,
 ) => {
   return (
     await Promise.all(
       items.filter(Boolean).map(async item => {
-        const resolved = await resolverFn(toDocument(item!));
+        const resolved = await resolverFn(toDocument(item!), depth);
         return resolved && (isPerson(resolved) || isInstitution(resolved))
           ? withStringId(removeUnrelatedEntities(resolved, entityId))
           : null;
@@ -103,6 +112,7 @@ export const resolveMetadataEntity = async <
   T extends ServerDocument<IDigitalEntity | IPhysicalEntity>,
 >(
   entity: T,
+  depth: number,
 ) => {
   if (!entity || !entity._id) return entity;
   const entityId = entity._id.toString();
@@ -111,11 +121,13 @@ export const resolveMetadataEntity = async <
     entity.persons ?? [],
     resolvePerson,
     entityId,
+    depth,
   );
   entity.institutions = await resolveAndCleanRelatedEntities(
     entity.institutions ?? [],
     resolveInstitution,
     entityId,
+    depth,
   );
 
   return entity;
@@ -123,6 +135,7 @@ export const resolveMetadataEntity = async <
 
 type ResolverFunction<T extends ServerDocument<T>> = (
   entity: ServerDocument<T>,
+  depth: number,
 ) => Promise<T | undefined>;
 
 /**
@@ -136,10 +149,11 @@ const resolveAndFilterArray = async <T extends string | IDocument>(
   items: DangerousArray,
   resolverFn: ResolveFn<T>,
   typeGuard: (item: unknown) => item is T,
+  depth: number,
 ) => {
   const promises = items
     .filter((item): item is T | string => !!item)
-    .map(item => resolverFn(toDocument(item)));
+    .map(item => resolverFn(toDocument(item), depth));
   const resolved = await Promise.all(promises);
   const filtered = resolved.filter(item => !!item).filter(typeGuard);
   return filtered.map(withStringId);
@@ -155,6 +169,7 @@ const resolveObjectProperties = async <T>(
   obj: { [key: string]: unknown },
   resolverFn: ResolveFn<T>,
   typeGuard: (item: any) => item is T,
+  depth: number,
 ): Promise<void> => {
   for (const [id, undetermined] of Object.entries(obj)) {
     if (!undetermined) continue;
@@ -171,7 +186,7 @@ const resolveObjectProperties = async <T>(
 
     if (!item) continue;
 
-    const resolved = await resolverFn(item);
+    const resolved = await resolverFn(item, depth);
     if (resolved && typeGuard(resolved)) {
       obj[id] = withStringId(resolved);
     } else {
@@ -212,7 +227,7 @@ const createResolver = <T extends ServerDocument<T>>(
   isTypeGuard: (obj: unknown) => obj is T,
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
-  return async (obj: ServerDocument<T>, full: boolean = true) => {
+  return async (obj: ServerDocument<T>, depth: number = RESOLVE_FULL_DEPTH) => {
     const cachedEntity = obj?._id
       ? await entitiesCache
           .get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
@@ -235,8 +250,8 @@ const createResolver = <T extends ServerDocument<T>>(
       return undefined;
     });
 
-    if (additionalProcessing && full) {
-      return await additionalProcessing(entity).catch(error => {
+    if (additionalProcessing && depth > 0) {
+      return await additionalProcessing(entity, depth - 1).catch(error => {
         err(`Failed running additional processing on entity: ${error.toString()}`);
         return undefined;
       });
@@ -258,13 +273,19 @@ export const resolveAnnotation: ResolveFn<IAnnotation> = createResolver(
 export const resolvePerson: ResolveFn<IPerson> = createResolver(
   personCollection,
   isPerson,
-  async entity => {
-    await resolveObjectProperties(entity.contact_references ?? {}, resolveContact, isContact);
+  async (entity, depth) => {
+    await resolveObjectProperties(
+      entity.contact_references ?? {},
+      resolveContact,
+      isContact,
+      depth,
+    );
     for (const [id, institutions] of Object.entries(entity.institutions ?? {})) {
       entity.institutions[id] = await resolveAndFilterArray(
         institutions ?? [],
         resolveInstitution,
         isInstitution,
+        depth,
       );
     }
     return entity;
@@ -274,8 +295,8 @@ export const resolvePerson: ResolveFn<IPerson> = createResolver(
 export const resolveInstitution: ResolveFn<IInstitution> = createResolver(
   institutionCollection,
   isInstitution,
-  async entity => {
-    await resolveObjectProperties(entity.addresses ?? {}, resolveAddress, isAddress);
+  async (entity, depth) => {
+    await resolveObjectProperties(entity.addresses ?? {}, resolveAddress, isAddress, depth);
     return entity;
   },
 );
@@ -283,8 +304,8 @@ export const resolveInstitution: ResolveFn<IInstitution> = createResolver(
 export const resolvePhysicalEntity: ResolveFn<IPhysicalEntity> = createResolver(
   physicalEntityCollection,
   isPhysicalEntity,
-  async entity => {
-    const withResolvedBase = await resolveMetadataEntity(entity);
+  async (entity, depth) => {
+    const withResolvedBase = await resolveMetadataEntity(entity, depth);
     return withResolvedBase;
   },
 );
@@ -292,14 +313,15 @@ export const resolvePhysicalEntity: ResolveFn<IPhysicalEntity> = createResolver(
 export const resolveDigitalEntity: ResolveFn<IDigitalEntity> = createResolver(
   digitalEntityCollection,
   isDigitalEntity,
-  async entity => {
-    entity.tags = await resolveAndFilterArray(entity.tags ?? [], resolveTag, isTag);
+  async (entity, depth) => {
+    entity.tags = await resolveAndFilterArray(entity.tags ?? [], resolveTag, isTag, depth);
     entity.phyObjs = await resolveAndFilterArray(
       entity.phyObjs ?? [],
       resolvePhysicalEntity,
       isPhysicalEntity,
+      depth,
     );
-    const withResolvedBase = await resolveMetadataEntity(entity);
+    const withResolvedBase = await resolveMetadataEntity(entity, depth);
     return withResolvedBase;
   },
 );
@@ -307,8 +329,8 @@ export const resolveDigitalEntity: ResolveFn<IDigitalEntity> = createResolver(
 export const resolveEntity: ResolveFn<IEntity> = createResolver(
   entityCollection,
   isEntity,
-  async entity => {
-    await resolveObjectProperties(entity.annotations, resolveAnnotation, isAnnotation);
+  async (entity, depth) => {
+    await resolveObjectProperties(entity.annotations, resolveAnnotation, isAnnotation, depth);
     const seperateAnnotations = await annotationCollection
       .find({
         'target.source.relatedEntity': entity._id.toString(),
@@ -322,7 +344,7 @@ export const resolveEntity: ResolveFn<IEntity> = createResolver(
       entity.annotations[annotation._id.toString()] = annotation as IAnnotation;
     }
     if (entity.relatedDigitalEntity && !isDigitalEntity(entity.relatedDigitalEntity)) {
-      const resolved = await resolveDigitalEntity(entity.relatedDigitalEntity);
+      const resolved = await resolveDigitalEntity(entity.relatedDigitalEntity, depth);
       if (resolved) entity.relatedDigitalEntity = withStringId(resolved);
     }
     return entity;
@@ -332,14 +354,14 @@ export const resolveEntity: ResolveFn<IEntity> = createResolver(
 export const resolveCompilation: ResolveFn<ICompilation> = createResolver(
   compilationCollection,
   isCompilation,
-  async entity => {
+  async (entity, depth) => {
     const seperateAnnotations = await annotationCollection
       .find({ 'target.source.relatedCompilation': entity._id.toString() })
       .toArray();
     for (const annotation of seperateAnnotations) {
       entity.annotations[annotation._id.toString()] = annotation as IAnnotation;
     }
-    await resolveObjectProperties(entity.entities, resolveEntity, isEntity);
+    await resolveObjectProperties(entity.entities, resolveEntity, isEntity, depth);
     return entity;
   },
 );
@@ -347,31 +369,31 @@ export const resolveCompilation: ResolveFn<ICompilation> = createResolver(
 export const resolveAny = async <T extends Collection>(
   collection: T,
   obj: Parameters<ResolveFn<unknown>>[0],
-  full: boolean = true,
+  depth: number = RESOLVE_FULL_DEPTH,
 ): Promise<ServerDocument<IDocument> | undefined> => {
   switch (collection) {
     case Collection.entity:
-      return resolveEntity(obj);
+      return resolveEntity(obj, depth);
     case Collection.group:
-      return resolveGroup(obj);
+      return resolveGroup(obj, depth);
     case Collection.address:
-      return resolveAddress(obj);
+      return resolveAddress(obj, depth);
     case Collection.annotation:
-      return resolveAnnotation(obj);
+      return resolveAnnotation(obj, depth);
     case Collection.compilation:
-      return resolveCompilation(obj);
+      return resolveCompilation(obj, depth);
     case Collection.contact:
-      return resolveContact(obj);
+      return resolveContact(obj, depth);
     case Collection.digitalentity:
-      return resolveDigitalEntity(obj);
+      return resolveDigitalEntity(obj, depth);
     case Collection.institution:
-      return resolveInstitution(obj);
+      return resolveInstitution(obj, depth);
     case Collection.person:
-      return resolvePerson(obj);
+      return resolvePerson(obj, depth);
     case Collection.physicalentity:
-      return resolvePhysicalEntity(obj);
+      return resolvePhysicalEntity(obj, depth);
     case Collection.tag:
-      return resolveTag(obj);
+      return resolveTag(obj, depth);
     default:
       return undefined;
   }
