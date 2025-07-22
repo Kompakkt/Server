@@ -171,13 +171,17 @@ export class WikibaseService {
   wbSDK: ReturnType<typeof WBK>;
 
   constructor() {
-    const instance = WikibaseConfiguration?.Domain;
+    let instance = WikibaseConfiguration?.Domain;
     const username = WikibaseConfiguration?.AdminUsername;
     const password = WikibaseConfiguration?.AdminPassword;
     const sparqlEndpoint = WikibaseConfiguration?.SPARQLEndpoint;
 
     if (!instance || !username || !password || !sparqlEndpoint) {
       throw new Error('Wikibase configuration not found');
+    }
+
+    if (!instance.startsWith('http')) {
+      instance = `http://${instance}`;
     }
 
     this.wbConnect = new WikibaseConnector(instance, { username, password });

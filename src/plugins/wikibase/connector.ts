@@ -108,10 +108,6 @@ export class WikibaseConnector implements TokenManager {
   csrfToken: string | null;
 
   constructor(instance: string, credentials: { username: string; password: string }) {
-    if (!instance.startsWith('http')) {
-      instance = `http://${instance}`;
-    }
-
     this.wikibaseUrl = instance;
     this.login = credentials.username;
     this.password = credentials.password;
