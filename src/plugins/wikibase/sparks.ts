@@ -2,13 +2,13 @@ import { WikibaseConfiguration } from './config';
 import { WBAnnotationPredicates, WBClasses, WBPredicates } from './parsed-model';
 
 const standardPrefixes = () =>
-  false // WikibaseConfiguration?.Domain
+  WikibaseConfiguration?.PrefixDomain
     ? `
-PREFIX tib: <${WikibaseConfiguration?.Domain}/entity/>
-PREFIX tibt: <${WikibaseConfiguration?.Domain}/prop/direct/>
-PREFIX tibp: <${WikibaseConfiguration?.Domain}/prop/>
-PREFIX tibps: <${WikibaseConfiguration?.Domain}/prop/statement/>
-PREFIX tibpq: <${WikibaseConfiguration?.Domain}/prop/qualifier/>
+PREFIX tib: <${WikibaseConfiguration?.PrefixDomain}/entity/>
+PREFIX tibt: <${WikibaseConfiguration?.PrefixDomain}/prop/direct/>
+PREFIX tibp: <${WikibaseConfiguration?.PrefixDomain}/prop/>
+PREFIX tibps: <${WikibaseConfiguration?.PrefixDomain}/prop/statement/>
+PREFIX tibpq: <${WikibaseConfiguration?.PrefixDomain}/prop/qualifier/>
 PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX bd: <http://www.bigdata.com/rdf#>

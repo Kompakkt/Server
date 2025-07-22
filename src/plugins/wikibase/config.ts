@@ -5,6 +5,7 @@ import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } fr
 export type IWikibaseConfiguration = {
   KompakktAddress?: string;
   Public?: string;
+  PrefixDomain?: string;
   Domain: string;
   SPARQLEndpoint: string;
   Username: string;
