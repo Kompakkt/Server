@@ -1,4 +1,4 @@
-import { info } from 'src/logger';
+import { info, warn } from 'src/logger';
 
 export type CPUInfo = {
   usage: number;
@@ -20,56 +20,60 @@ class HostMonitor {
   }>();
 
   async #update() {
-    const cpuInfo = await (async () => {
-      const cpuData = await Bun.file('/host/proc/stat').text();
-      const cpuLine = cpuData.split('\n').at(0)?.split(/\s+/);
-      if (!cpuLine) return undefined;
+    try {
+      const cpuInfo = await (async () => {
+        const cpuData = await Bun.file('/host/proc/stat').text();
+        const cpuLine = cpuData.split('\n').at(0)?.split(/\s+/);
+        if (!cpuLine) return undefined;
 
-      const idle = parseInt(cpuLine[4], 10);
-      const total = cpuLine.slice(1, 8).reduce((acc, val) => acc + parseInt(val, 10), 0);
+        const idle = parseInt(cpuLine[4], 10);
+        const total = cpuLine.slice(1, 8).reduce((acc, val) => acc + parseInt(val, 10), 0);
 
-      return {
-        usage: ((total - idle) / total) * 100,
-        idle: (idle / total) * 100,
-      } satisfies CPUInfo;
-    })();
+        return {
+          usage: ((total - idle) / total) * 100,
+          idle: (idle / total) * 100,
+        } satisfies CPUInfo;
+      })();
 
-    const memInfo = await (async () => {
-      const memData = await Bun.file('/host/proc/meminfo').text();
-      const lines = memData.split('\n');
+      const memInfo = await (async () => {
+        const memData = await Bun.file('/host/proc/meminfo').text();
+        const lines = memData.split('\n');
 
-      const memTotal = parseInt(
-        lines.find(line => line.startsWith('MemTotal:'))?.split(/\s+/)[1] || '0',
-        10,
-      );
-      const memFree = parseInt(
-        lines.find(line => line.startsWith('MemFree:'))?.split(/\s+/)[1] || '0',
-        10,
-      );
-      const memAvailable = parseInt(
-        lines.find(line => line.startsWith('MemAvailable:'))?.split(/\s+/)[1] || '0',
-        10,
-      );
+        const memTotal = parseInt(
+          lines.find(line => line.startsWith('MemTotal:'))?.split(/\s+/)[1] || '0',
+          10,
+        );
+        const memFree = parseInt(
+          lines.find(line => line.startsWith('MemFree:'))?.split(/\s+/)[1] || '0',
+          10,
+        );
+        const memAvailable = parseInt(
+          lines.find(line => line.startsWith('MemAvailable:'))?.split(/\s+/)[1] || '0',
+          10,
+        );
 
-      return {
-        total: memTotal * 1024,
-        available: memAvailable * 1024,
-        used: (memTotal - memAvailable) * 1024,
-        free: memFree * 1024,
-        percentage: ((memTotal - memAvailable) / memTotal) * 100,
-      } satisfies MemoryInfo;
-    })();
+        return {
+          total: memTotal * 1024,
+          available: memAvailable * 1024,
+          used: (memTotal - memAvailable) * 1024,
+          free: memFree * 1024,
+          percentage: ((memTotal - memAvailable) / memTotal) * 100,
+        } satisfies MemoryInfo;
+      })();
 
-    if (cpuInfo && memInfo) {
-      this.replay.push({ cpuInfo, memInfo });
-      if (this.replay.length > 60) {
-        this.replay.shift();
+      if (cpuInfo && memInfo) {
+        this.replay.push({ cpuInfo, memInfo });
+        if (this.replay.length > 60) {
+          this.replay.shift();
+        }
       }
-    }
 
-    setTimeout(() => {
-      this.#update();
-    }, 1000);
+      setTimeout(() => {
+        this.#update();
+      }, 1000);
+    } catch (error) {
+      warn(`Failed to update host monitor data: ${error}`);
+    }
   }
 
   constructor() {
