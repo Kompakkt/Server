@@ -23,14 +23,14 @@ import type { ServerDocument } from './util/document-with-objectid-type';
 import { type IPublicProfile } from './common/interfaces';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
-const url = ClientURL ?? `mongodb://${Hostname}:${Port}`;
-
-export const mongoClient = new MongoClient(url, {
-  auth: {
-    username: 'admin',
-    password: 'password',
-  },
-});
+export const mongoClient = ClientURL
+  ? new MongoClient(ClientURL)
+  : new MongoClient(`mongodb://${Hostname}:${Port}`, {
+      auth: {
+        username: 'admin',
+        password: 'password',
+      },
+    });
 await mongoClient.connect();
 info('Connected to MongoDB');
 
