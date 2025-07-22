@@ -21,10 +21,11 @@ import { HookManager } from './routers/modules/api.v1/hooks';
 import { findParentCompilations, findParentEntities } from './util/cascade-helpers';
 import { resolveCompilation, resolveEntity } from './routers/modules/api.v1/resolving-strategies';
 import { setImmediate } from 'node:timers';
+import { Configuration } from './configuration';
 
 const options: Options = {
-  host: 'sonic',
-  port: 1491,
+  host: Configuration.Sonic.Hostname,
+  port: Configuration.Sonic.Port,
   auth: undefined,
 };
 

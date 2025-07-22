@@ -66,6 +66,11 @@ interface IKompressorConfiguration {
   Port: number;
 }
 
+interface ISonicConfiguration {
+  Hostname: string;
+  Port: number;
+}
+
 export interface IConfiguration<T = Record<string, Record<string, string>>> {
   Mongo: IMongoConfiguration;
   Redis: IRedisConfiguration;
@@ -78,6 +83,7 @@ export interface IConfiguration<T = Record<string, Record<string, string>>> {
     };
   };
   Kompressor: IKompressorConfiguration;
+  Sonic: ISonicConfiguration;
   Mailer?: IMailerConfiguration;
   Extensions?: T;
 }
@@ -121,6 +127,10 @@ const LoadConfig = async () => {
       Enabled: getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') === 'true' || true,
       Hostname: getEnv('CONFIGURATION_KOMPRESSOR_HOSTNAME') || 'kompressor',
       Port: parseInt(getEnv('CONFIGURATION_KOMPRESSOR_PORT') || '7999', 10),
+    },
+    Sonic: {
+      Hostname: getEnv('CONFIGURATION_SONIC_HOSTNAME') || 'sonic',
+      Port: parseInt(getEnv('CONFIGURATION_SONIC_PORT') || '1491', 10),
     },
     Mailer: {
       Host: getEnv('CONFIGURATION_MAILER_HOST') || 'localhost',
