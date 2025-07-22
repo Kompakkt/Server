@@ -2,7 +2,7 @@ import { WikibaseConfiguration } from './config';
 import { WBAnnotationPredicates, WBClasses, WBPredicates } from './parsed-model';
 
 const standardPrefixes = () =>
-  WikibaseConfiguration?.Domain
+  false // WikibaseConfiguration?.Domain
     ? `
 PREFIX tib: <${WikibaseConfiguration?.Domain}/entity/>
 PREFIX tibt: <${WikibaseConfiguration?.Domain}/prop/direct/>
