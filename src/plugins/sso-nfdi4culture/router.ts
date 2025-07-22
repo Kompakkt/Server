@@ -6,6 +6,9 @@ import { log } from 'src/logger';
 
 const ssoNFDI4CultureRouter = new Elysia()
   .use(configServer)
+  .get('/auth/saml/health', () => {
+    return { status: 'OK', message: 'SAML authentication service is running' };
+  })
   .get('/auth/saml', async ({ redirect }) => {
     const samlService = new SAML(await getSAMLConfig());
     const authUrl = await samlService.getAuthorizeUrlAsync('', '', {});
