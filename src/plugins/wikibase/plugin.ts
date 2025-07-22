@@ -43,7 +43,8 @@ class WikibasePlugin extends Plugin {
           throw new Error('Failed to update wikibase digital entity');
         }
         doc.extensions!.wikibase!.id = result.itemId;
-        doc.extensions!.wikibase!.address = WikibaseConfiguration?.Domain;
+        doc.extensions!.wikibase!.address =
+          WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain;
         // log('After Wikibase transform', Bun.inspect(doc));
         return doc;
       },
@@ -68,7 +69,8 @@ class WikibasePlugin extends Plugin {
           throw new Error('Failed to update wikibase annotation');
         }
         doc.extensions!.wikibase!.id = result.itemId;
-        doc.extensions!.wikibase!.address = WikibaseConfiguration?.Domain;
+        doc.extensions!.wikibase!.address =
+          WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain;
         // log('After Wikibase transform', Bun.inspect(doc));
         return doc;
       },

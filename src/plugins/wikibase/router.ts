@@ -48,7 +48,7 @@ const wikibaseRouter = new Elysia()
   )
   .get('/wikibase/instance/info', async () => {
     return {
-      instance: WikibaseConfiguration?.Domain,
+      instance: WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain,
     };
   })
   .post(

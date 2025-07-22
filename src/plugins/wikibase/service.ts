@@ -760,7 +760,7 @@ export class WikibaseService {
     if (!id.startsWith('Q')) {
       return undefined;
     }
-    return `${WikibaseConfiguration?.Domain}/wiki/Special:Filepath/Preview${id}.png`;
+    return `${WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain}/wiki/Special:Filepath/Preview${id}.png`;
   }
 
   public async fetchWikibaseMetadata(
