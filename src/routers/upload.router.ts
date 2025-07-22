@@ -8,7 +8,7 @@ import slugify from 'slugify';
 import type { IFile } from 'src/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
-import { err, info, log } from 'src/logger';
+import { err, info, log, warn } from 'src/logger';
 import { entityCollection } from 'src/mongo';
 import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
@@ -397,16 +397,32 @@ const uploadRouter = new Elysia()
             };
           }
 
-          const queueResponse = await fetch(
-            `http://${Hostname}:${Port}/process/${type}/${ids.at(0)!}`,
-          ).then(response => response.json() as Promise<KompressorQueueResponse>);
+          try {
+            const queueResponse = await fetch(
+              `http://${Hostname}:${Port}/process/${type}/${ids.at(0)!}`,
+            ).then(response => response.json() as Promise<KompressorQueueResponse>);
 
-          return {
-            status: queueResponse.status,
-            uuid,
-            type,
-            requiresProcessing: true,
-          };
+            return {
+              status: queueResponse.status,
+              uuid,
+              type,
+              requiresProcessing: true,
+            };
+          } catch (error) {
+            err(`Failed processing with kompressor: ${error}`);
+            info(
+              Bun.inspect({
+                hasLasFiles,
+                hasObjFiles,
+                files,
+                ids,
+                type,
+                config: Configuration.Kompressor,
+              }),
+            );
+
+            return status(500, 'Failed to start processing with kompressor');
+          }
         },
         {
           body: t.Object({
