@@ -221,4 +221,9 @@ if (Configuration.Server.PublicURL.includes('localhost')) {
   );
 }
 
+if (!Configuration.Server.PublicURL.startsWith('http')) {
+  err('Configured public URL does not start with http(s)');
+  process.exit(1);
+}
+
 export { Configuration };

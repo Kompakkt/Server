@@ -331,19 +331,18 @@ export class WikibaseConnector implements TokenManager {
         }
 
         // Check if error exists and has a code property
-        if (response.error?.code) {
+        if ('error' in response && !!response.error?.info) {
           const info = response.error.info;
-          if (info && typeof info === 'string') {
-            const start = info.indexOf('[[:File:') + 8;
-            const end = info.indexOf(']]');
-            if (start > -1 && end > -1 && end > start) {
-              const filename = info.substring(start, end);
-              return filename;
-            }
+          const filename = response.error.info?.match(/\[\[\:\w+\:(\w+\.\w+)\]\]/)?.at(1);
+          if (filename) {
+            warn(`Using duplicate file: ${info}. Filename: ${filename}`);
+            return filename;
+          } else {
+            warn(`Error uploading image: ${info}`);
           }
         }
         // Check if upload result is "Success"
-        else if (response.upload?.filename) {
+        else if ('upload' in response && !!response.upload?.filename) {
           return response.upload.filename;
         }
 
