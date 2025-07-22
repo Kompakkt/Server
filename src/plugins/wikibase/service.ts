@@ -569,7 +569,8 @@ export class WikibaseService {
       log(
         `Fetched ${result.persons.length} persons, ${result.techniques.length} techniques, ${result.software.length} software, ${result.bibliographic_refs.length} bibliographic references, and ${result.physical_objs.length} physical objects from Wikibase`,
       );
-      pluginCache.set('wikibase::fetchMetadataChoices', result, 60);
+      const combinedLength = Object.values(result).reduce((acc, arr) => acc + arr.length, 0);
+      if (combinedLength > 0) pluginCache.set('wikibase::fetchMetadataChoices', result, 60);
       return result;
     } catch (error) {
       err('Error fetching metadata choices from Wikibase', error);
@@ -601,7 +602,8 @@ export class WikibaseService {
       log(
         `Fetched ${result.relatedAgents.length} related agents, ${result.relatedMedia.length} related media, ${result.relatedConcepts.length} related concepts, and ${result.licenses.length} licenses from Wikibase`,
       );
-      pluginCache.set('wikibase::fetchAnnotationLinkChoices', result, 60);
+      const combinedLength = Object.values(result).reduce((acc, arr) => acc + arr.length, 0);
+      if (combinedLength > 0) pluginCache.set('wikibase::fetchAnnotationLinkChoices', result, 60);
       return result;
     } catch (error) {
       err('Error fetching annotation link choices from Wikibase', error);
