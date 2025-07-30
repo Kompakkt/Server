@@ -19,7 +19,7 @@ import { resolveEntity, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-st
 import type { IPublicProfile } from 'src/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
-import { warn } from 'src/logger';
+import { info, warn } from 'src/logger';
 import { updatePreviewImage } from 'src/util/image-helpers';
 import { RouterTags } from './tags';
 
@@ -480,11 +480,6 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           : undefined;
         const existingProfileId = profile ? profile._id.toString() : undefined;
         const _id = existingProfileId ? new ObjectId(existingProfileId) : new ObjectId();
-        info(`Updating profile for ${userdata.fullname}`, {
-          existingProfileId,
-          _id,
-          imageUrl: body.imageUrl,
-        });
 
         // Save image if necessary
         body.imageUrl = await (async () => {
@@ -501,9 +496,8 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           { $set: { ...body } },
           { upsert: true },
         );
-        info(`Profile update result for ${userdata.fullname}`, updateResult);
 
-        if (updateResult.modifiedCount + updateResult.upsertedCount <= 0) {
+        if (!updateResult.acknowledged) {
           return status(500, 'Profile update failed');
         }
 
