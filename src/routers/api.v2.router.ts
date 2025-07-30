@@ -480,6 +480,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           : undefined;
         const existingProfileId = profile ? profile._id.toString() : undefined;
         const _id = existingProfileId ? new ObjectId(existingProfileId) : new ObjectId();
+        info(`Updating profile for ${userdata.fullname}`, {
+          existingProfileId,
+          _id,
+          imageUrl: body.imageUrl,
+        });
 
         // Save image if necessary
         body.imageUrl = await (async () => {
@@ -496,6 +501,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           { $set: { ...body } },
           { upsert: true },
         );
+        info(`Profile update result for ${userdata.fullname}`, updateResult);
 
         if (updateResult.modifiedCount + updateResult.upsertedCount <= 0) {
           return status(500, 'Profile update failed');
