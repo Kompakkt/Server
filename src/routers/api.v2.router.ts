@@ -20,7 +20,7 @@ import type { IPublicProfile } from 'src/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
-import { updatePreviewImage } from 'src/util/image-helpers';
+import { MAX_PROFILE_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
 import { RouterTags } from './tags';
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
@@ -379,7 +379,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         body.imageUrl = await (async () => {
           if (!body.imageUrl) return undefined;
           if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(body.imageUrl, 'profile-pictures', _id.toString());
+          return await updatePreviewImage(
+            body.imageUrl,
+            'profile-pictures',
+            _id.toString(),
+            MAX_PROFILE_IMAGE_RESOLUTION,
+          );
         })();
 
         const insertResult = await profileCollection.insertOne({ ...body, _id });
@@ -430,7 +435,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         body.imageUrl = await (async () => {
           if (!body.imageUrl) return undefined;
           if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(body.imageUrl, 'profile-pictures', institutionId);
+          return await updatePreviewImage(
+            body.imageUrl,
+            'profile-pictures',
+            institutionId,
+            MAX_PROFILE_IMAGE_RESOLUTION,
+          );
         })();
 
         // Ensure we don't overwrite the _id field
@@ -485,7 +495,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         body.imageUrl = await (async () => {
           if (!body.imageUrl) return undefined;
           if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(body.imageUrl, 'profile-pictures', _id.toString());
+          return await updatePreviewImage(
+            body.imageUrl,
+            'profile-pictures',
+            _id.toString(),
+            MAX_PROFILE_IMAGE_RESOLUTION,
+          );
         })();
 
         // TODO: think if we need to merge?

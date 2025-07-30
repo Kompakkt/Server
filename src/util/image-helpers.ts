@@ -5,19 +5,18 @@ import { RootDirectory } from 'src/environment';
 import { err } from 'src/logger';
 import { ensure } from './file-related-helpers';
 
+export const MAX_PROFILE_IMAGE_RESOLUTION = 256;
+export const MAX_PREVIEW_IMAGE_RESOLUTION = 360;
+
 /**
  * Takes a base64 PNG image string, saves it to disk, and returns the URL of the file.
  * If the input string is already a URL, it returns the existing URL.
- * @param {string} base64OrUrl - The base64 string or URL of the image.
- * @param {string} subfolder - The subfolder where the image will be saved.
- * @param {string | ObjectId} identifier - The identifier for the image file.
- * @returns {Promise<string>} - The URL of the saved image.
  */
 export const updatePreviewImage = async (
   base64OrUrl: string,
   subfolder: string,
   identifier: string | ObjectId,
-  maxResolution: number = 1024,
+  maxResolution: number,
 ) => {
   const convertBase64ToBuffer = (input: string) => {
     const replaced = input.replace(/^data:image\/\w+;base64,/, '');
@@ -26,8 +25,7 @@ export const updatePreviewImage = async (
 
   const minifyBuffer = (buffer: Buffer) =>
     sharp(buffer)
-      // TODO: should we resize the image to fit within maxResolution?
-      // .resize({ fit: 'inside', width: maxResolution, height: maxResolution })
+      .resize({ fit: 'inside', width: maxResolution, height: maxResolution })
       .webp({ quality: 80 })
       .toBuffer();
 

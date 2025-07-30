@@ -12,7 +12,7 @@ import { err, info, log, warn } from 'src/logger';
 import { collectionMap, entityCollection, groupCollection, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { updatePreviewImage } from 'src/util/image-helpers';
+import { MAX_PREVIEW_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
 import { authService, signInBody } from './handlers/auth.service';
 import {
   ExploreRequest,
@@ -284,6 +284,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               preview,
               'entity',
               existingEntity._id.toString(),
+              MAX_PREVIEW_IMAGE_RESOLUTION,
             );
 
             // Overwrite old settings

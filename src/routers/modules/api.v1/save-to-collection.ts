@@ -34,7 +34,7 @@ import {
 } from 'src/mongo';
 import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { updatePreviewImage } from 'src/util/image-helpers';
+import { MAX_PREVIEW_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
 import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
@@ -93,6 +93,7 @@ const transformAnnotation: TransformFn<IAnnotation> = async (body, user) => {
       asAnnotation!.body!.content!.relatedPerspective!.preview,
       'annotation',
       asAnnotation._id!,
+      MAX_PREVIEW_IMAGE_RESOLUTION,
     );
   } catch (error) {
     err('Error updating preview image:', error);
@@ -125,7 +126,12 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
       ...asEntity.settings!,
       preview:
         asEntity.settings?.preview && asEntity._id
-          ? await updatePreviewImage(asEntity.settings?.preview, 'entity', asEntity._id)
+          ? await updatePreviewImage(
+              asEntity.settings?.preview,
+              'entity',
+              asEntity._id,
+              MAX_PREVIEW_IMAGE_RESOLUTION,
+            )
           : asEntity.settings?.preview!,
     },
     whitelist: asEntity.whitelist,
