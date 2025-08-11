@@ -1,6 +1,7 @@
 import { type Collection as DbCollection, ObjectId } from 'mongodb';
 import {
   Collection,
+  EntityAccessRole,
   type IAnnotation,
   type ICompilation,
   type IDigitalEntity,
@@ -38,6 +39,7 @@ import { MAX_PREVIEW_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image
 import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
+import { saveMetadataFiles } from 'src/util/save-metadata-files';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,
@@ -138,8 +140,11 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
     access: asEntity.access ?? {
       [strippedUser._id]: {
         ...strippedUser,
-        role: 'owner',
+        role: EntityAccessRole.owner,
       },
+    },
+    options: asEntity.options ?? {
+      allowDownload: false,
     },
   };
 };
@@ -157,7 +162,10 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
     externalLink: asDigitalEntity.externalLink ?? [],
     files: asDigitalEntity.files ?? [],
     licence: asDigitalEntity.licence ?? '',
-    metadata_files: asDigitalEntity.metadata_files ?? [],
+    metadata_files: await saveMetadataFiles(
+      asDigitalEntity._id!,
+      asDigitalEntity.metadata_files ?? [],
+    ),
     objecttype: asDigitalEntity.objecttype ?? '',
     other: asDigitalEntity.other ?? [],
     statement: asDigitalEntity.statement ?? '',
@@ -255,7 +263,10 @@ const transformPhysicalEntity: TransformFn<IPhysicalEntity> = async body => {
     description: asPhysicalEntity.description ?? '',
     externalId: asPhysicalEntity.externalId ?? [],
     externalLink: asPhysicalEntity.externalLink ?? [],
-    metadata_files: asPhysicalEntity.metadata_files ?? [],
+    metadata_files: await saveMetadataFiles(
+      asPhysicalEntity._id!,
+      asPhysicalEntity.metadata_files ?? [],
+    ),
     other: asPhysicalEntity.other ?? [],
     title: asPhysicalEntity.title ?? '',
     collection: asPhysicalEntity.collection ?? '',

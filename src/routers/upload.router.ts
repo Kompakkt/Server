@@ -5,12 +5,11 @@ import type { Dirent } from 'node:fs';
 import { readdir, realpath, rmdir, stat, symlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
-import type { IFile } from 'src/common';
+import type { IEntity, IFile } from 'src/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { err, info, log, warn } from 'src/logger';
 import { entityCollection } from 'src/mongo';
-import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
 import { unique } from 'src/util/array-helpers';
 import { compressFile, COMPRESSION_ENCODINGS } from 'src/util/compress-file';
@@ -18,6 +17,7 @@ import { ensure } from 'src/util/file-related-helpers';
 import { typedObjectEntries } from 'src/util/typed-object-entries';
 import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
 import { authService } from './handlers/auth.service';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
@@ -151,7 +151,7 @@ const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait 
 
   for (const path of paths) {
     if (mediaType === 'cloud') {
-      const eptJsonPath = `${path}/out/ept.json`;
+      const eptJsonPath = `${path}/out/ept.json`.replace('/out/out', '/out');
       const eptJsonExists = await waitUntilFileExists(eptJsonPath, shouldWait ? 10_000 : 0);
 
       log({ eptJsonPath, eptJsonExists });
@@ -168,12 +168,112 @@ const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait 
         processedFiles.add(file);
       }
     }
+
+    if (mediaType === 'splat') {
+      const spzGlob = new Bun.Glob(`*.spz`);
+      const globResult = await Array.fromAsync(spzGlob.scan({ cwd: path }));
+      for (const file of globResult) {
+        processedFiles.add(file);
+      }
+    }
   }
 
   return Array.from(processedFiles);
 };
 
-const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip', '.splat'];
+enum DownloadType {
+  'raw' = 'raw',
+  'processed' = 'processed',
+}
+const getDownloadOptions = async (entity: ServerDocument<IEntity>) => {
+  const dirnames = Array.from(new Set(entity.files.map(file => dirname(file.file_link))));
+  const uniquePaths = new Set<string>();
+  const rawFiles = new Set<string>();
+
+  if (dirnames.every(d => d.includes('/out'))) {
+    const dirnamesWithoutOut = Array.from(new Set(dirnames.map(d => d.split('/out').at(0)!)));
+    dirnames.push(...dirnamesWithoutOut);
+  }
+
+  for (const dir of dirnames) {
+    const entries = await readdir(join(RootDirectory, dir), {
+      recursive: true,
+      withFileTypes: true,
+    });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        continue;
+      }
+      const path = entry.isSymbolicLink()
+        ? await realpath(join(entry.parentPath, entry.name))
+        : join(entry.parentPath, entry.name);
+
+      uniquePaths.add(dirname(path));
+
+      if (
+        path.endsWith('.compressed.glb') ||
+        path.endsWith('_processed.zip') ||
+        path.endsWith('_raw.zip') ||
+        path.endsWith('_log.txt') ||
+        path.includes('/out')
+      ) {
+        continue;
+      }
+
+      rawFiles.add(path);
+    }
+  }
+
+  const processedFiles = await Promise.all(
+    Array.from(uniquePaths).map(async path => {
+      const processed = await getProcessedFiles([path], entity.mediaType, false);
+      return processed.map(file => join(path, file));
+    }),
+  ).then(arrs => arrs.flat());
+
+  const rawFilesArr = Array.from(rawFiles).map(file => file.replace(RootDirectory, ''));
+  const processedFilesArr = processedFiles.map(file => file.replace(RootDirectory, ''));
+
+  // Find the most likely working directory for zipping.
+  // There should not be more than one directory anyways, so maybe this is not needed.
+  const getCwd = (arr: string[]) => {
+    const possibleCwds = arr
+      .map(file => join(RootDirectory, file))
+      .map(file => {
+        const index = file.split('/').findIndex(p => ObjectId.isValid(p));
+        return file
+          .split('/')
+          .slice(0, index + 1)
+          .join('/');
+      });
+    const counts = possibleCwds.reduce(
+      (acc, cwd) => {
+        acc[cwd] = (acc[cwd] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    const maxCount = Math.max(...Object.values(counts));
+    return Object.keys(counts).find(cwd => counts[cwd] === maxCount);
+  };
+
+  const rawCwd = getCwd(rawFilesArr);
+  const processedCwd = getCwd(processedFilesArr);
+
+  return {
+    mediaType: entity.mediaType,
+    rawFiles: rawFilesArr,
+    uniquePaths: Array.from(uniquePaths).map(path => path.replace(RootDirectory, '')),
+    processedFiles: processedFilesArr,
+    hasCompressedFiles: processedFiles.length > 0,
+    cwds: {
+      raw: rawCwd,
+      processed: processedCwd,
+    } as Record<DownloadType, string>,
+  };
+};
+
+const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip', '.splat', '.spz'];
 
 // Prepare folder structure
 const { UploadDirectory } = Configuration.Uploads;
@@ -243,53 +343,73 @@ const uploadRouter = new Elysia()
     },
   )
   .get(
-    '/download/:entityId',
-    async function* ({ status, params: { entityId } }) {
+    '/download/options/:entityId',
+    async ({ status, params: { entityId } }) => {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
       if (!entity) return status(404, 'Entity not found');
-      const dirnames = Array.from(new Set(entity.files.map(file => dirname(file.file_link))));
-      const uniqueFiles = new Set<string>();
-      for (const dirname of dirnames) {
-        const entries = await readdir(join(RootDirectory, dirname), {
-          recursive: true,
-          withFileTypes: true,
-        });
-        const filesPromises = entries
-          .filter(entry => entry.isFile())
-          .filter(entry => !entry.parentPath.includes('out/ept'))
-          .map(entry =>
-            entry.isSymbolicLink()
-              ? realpath(join(entry.parentPath, entry.name))
-              : Promise.resolve(join(entry.parentPath, entry.name)),
-          );
-        const files = await Promise.all(filesPromises);
-        files.forEach(file => uniqueFiles.add(file));
-      }
+      if (!entity.options?.allowDownload)
+        return status(403, 'Download not allowed for this entity');
 
-      const fileList = Array.from(uniqueFiles);
-      const cwd = join(RootDirectory, dirnames[0]!);
+      const { cwds, rawFiles, processedFiles, hasCompressedFiles } =
+        await getDownloadOptions(entity);
+      const rawZipName = `${entityId}_${DownloadType.raw}.zip`;
+      const processedZipName = `${entityId}_${DownloadType.processed}.zip`;
 
-      const existingZipArchive = fileList.find(file => file.endsWith(`${entityId}.zip`));
-      if (existingZipArchive) {
-        return {
-          progress: 1,
-          url: existingZipArchive.replace(RootDirectory, ''),
+      const zipStats = await (async () => {
+        const stats: Record<DownloadType, number> = {
+          [DownloadType.raw]: 0,
+          [DownloadType.processed]: 0,
         };
-      }
-
-      try {
-        for (let i = 0; i < fileList.length; i++) {
-          const file = fileList[i];
-          await Bun.$`7zz a "${entityId}.zip" "${file}"`.cwd(cwd).quiet();
-          yield { progress: (i + 1) / fileList.length };
+        if (cwds.raw) {
+          const file = Bun.file(join(cwds.raw, rawZipName));
+          if (await file.exists()) {
+            stats[DownloadType.raw] = file.size;
+          }
         }
-      } catch (error) {
-        err('Error creating zip file:', error);
+        if (cwds.processed) {
+          const file = Bun.file(join(cwds.processed, processedZipName));
+          if (await file.exists()) {
+            stats[DownloadType.processed] = file.size;
+          }
+        }
+        return stats;
+      })();
+
+      const rawSize = rawFiles.reduce((acc, file) => {
+        const filePath = join(RootDirectory, file);
+        return acc + (Bun.file(filePath).size || 0);
+      }, 0);
+
+      let processedSize = processedFiles.reduce((acc, file) => {
+        const filePath = join(RootDirectory, file);
+        return acc + (Bun.file(filePath).size || 0);
+      }, 0);
+
+      const rawFileTypes = Array.from(new Set(rawFiles.map(file => extname(file).toLowerCase())));
+      const processedFileTypes = Array.from(
+        new Set(processedFiles.map(file => extname(file).toLowerCase())),
+      );
+
+      if (entity.mediaType === 'cloud') {
+        processedFileTypes.splice(0, processedFileTypes.length);
+        processedFileTypes.push('ept.json', '.laz');
+
+        const duOutput = await Bun.$`du -bs .`.cwd(join(cwds.processed, 'out')).text();
+        const sizeMatch = duOutput.match(/^(\d+)\s/);
+        if (sizeMatch) {
+          processedSize = parseInt(sizeMatch[1], 10);
+        } else {
+          warn(`Failed to parse du output: ${duOutput}`);
+        }
       }
 
       return {
-        progress: 1,
-        url: join(cwd, `${entityId}.zip`).replace(RootDirectory, ''),
+        zipStats,
+        rawSize,
+        processedSize,
+        hasCompressedFiles,
+        rawFileTypes,
+        processedFileTypes,
       };
     },
     {
@@ -298,19 +418,168 @@ const uploadRouter = new Elysia()
       }),
     },
   )
+  .get(
+    '/download/prepare/:entityId/:type',
+    async function* ({ status, params: { entityId, type }, set }) {
+      const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+      if (!entity) return status(404, 'Entity not found');
+      if (!entity.options?.allowDownload)
+        return status(403, 'Download not allowed for this entity');
+
+      const { rawFiles, processedFiles, cwds } = await getDownloadOptions(entity);
+
+      const fileArr = type === DownloadType.raw ? rawFiles : processedFiles;
+      const cwd = cwds[type];
+      if (!cwd) {
+        warn(`No valid working directory found for entity ${entityId} of type ${type}`);
+        return status(404, 'No valid working directory found');
+      }
+
+      const zipName = `${entityId}_${type}.zip`;
+      if (await Bun.file(join(cwd, zipName)).exists()) {
+        yield '1\n';
+        return;
+      }
+
+      if (entity.mediaType === 'cloud' && type === 'processed') {
+        // Special case, we zip the whole /out directory
+        let isInFileList = false;
+        let counter = 0;
+        let totalFiles = -1;
+        let lastSentProgress = 0;
+        let lastSentTime = 0;
+        const progressThreshold = 0.1; // 10% progress threshold
+        const timeThreshold = 200; // 100 milliseconds time threshold
+        for await (const line of Bun.$`7zz a -bb3 -mx5 "../${zipName}" "./"`
+          .cwd(join(cwd, 'out'))
+          .lines()) {
+          if (!isInFileList) {
+            isInFileList = line.includes('Add new data to archive');
+            if (isInFileList) {
+              const match = line.match(/(\d+) files/);
+              if (match) {
+                totalFiles = parseInt(match[1], 10);
+              }
+            }
+            continue;
+          }
+          if (line.startsWith('+') || line.startsWith('U')) {
+            counter++;
+            const currentProgress = counter / totalFiles;
+            const now = Date.now();
+
+            const progressChanged = currentProgress - lastSentProgress >= progressThreshold;
+            const timeElapsed = now - lastSentTime >= timeThreshold;
+            const isComplete = counter === totalFiles;
+
+            if (progressChanged || timeElapsed || isComplete) {
+              lastSentProgress = currentProgress;
+              lastSentTime = now;
+              yield `${currentProgress}\n`;
+            }
+          }
+        }
+        yield '1\n';
+        return;
+      } else {
+        const fileList = fileArr.map(file => {
+          const path = join(RootDirectory, file);
+          const relativePath = path.replace(cwd + '/', '');
+          return relativePath;
+          // return `"${relativePath}"`;
+        });
+
+        if (await Bun.file(join(cwd, '7z_log.txt')).exists()) {
+          await Bun.file(join(cwd, '7z_log.txt')).unlink();
+        }
+
+        const process =
+          Bun.$`sh -c "stdbuf -oL 7zz a -bb3 -bsp1 -mx5 "${zipName}" ${fileList} >> 7z_log.txt"`.cwd(
+            cwd,
+          );
+
+        let resolved = false;
+        process.then(() => {
+          resolved = true;
+        });
+
+        while (true) {
+          try {
+            const logFile = Bun.file(join(cwd, '7z_log.txt'));
+            let logText = await logFile.text();
+            const progressLine = logText
+              .split('\n')
+              .filter(line => line.includes('%'))
+              .at(-1)!;
+            const matches = progressLine.matchAll(/(\d+(\.\d+)?)%/g);
+            if (matches) {
+              const lastMatch = Array.from(matches).pop();
+              if (lastMatch && lastMatch[1]) {
+                const progress = parseFloat(lastMatch[1]) / 100;
+                yield `${progress}\n`;
+              } else {
+                warn(`No valid progress found in line: ${progressLine}`);
+              }
+            }
+
+            logText = await logFile.text();
+          } catch (error) {
+            warn(`Could not read progress from logfile: ${error}`);
+          }
+          if (resolved) {
+            break;
+          }
+        }
+        yield '1\n';
+        return;
+      }
+    },
+    {
+      params: t.Object({
+        entityId: t.String(),
+        type: t.Enum(DownloadType),
+      }),
+    },
+  )
+  .get(
+    '/download/:entityId/:type',
+    async ({ status, params: { entityId, type }, set }) => {
+      const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+      if (!entity) return status(404, 'Entity not found');
+      if (!entity.options?.allowDownload)
+        return status(403, 'Download not allowed for this entity');
+
+      const { cwds } = await getDownloadOptions(entity);
+
+      const cwd = cwds[type];
+      if (!cwd) {
+        warn(`No valid working directory found for entity ${entityId} of type ${type}`);
+        return status(404, 'No valid working directory found');
+      }
+
+      const zipName = `${entityId}_${type}.zip`;
+      return Bun.file(join(cwd, zipName));
+    },
+    {
+      params: t.Object({
+        entityId: t.String(),
+        type: t.Enum(DownloadType),
+      }),
+    },
+  )
+
   .group('/upload', { isLoggedIn: true }, group =>
     group
       .post(
         '/file',
         async ({ status, body: { file, checksum, token, type, relativePath } }) => {
           const serverChecksum = await calculateMD5(file.stream());
-          const destPath = join(
-            uploadDir,
-            `${type}`,
-            `${token}/`,
-            `${slug(relativePath)}`,
-            file.name,
-          );
+          const basePath = join(uploadDir, type, token);
+          const sluggedRelativePath = slug(relativePath).trim();
+          const destPath =
+            sluggedRelativePath.length > 0
+              ? join(basePath, slug(relativePath))
+              : join(basePath, file.name);
 
           // TODO: Improve linking logic or do this outside of upload
           /*symlinkToExisting: {
@@ -383,12 +652,17 @@ const uploadRouter = new Elysia()
             type,
           ).then(result => result.length > 0);
 
-          const hasObjFiles = files.some(file => file.toLowerCase().endsWith('.obj'));
-          const hasLasFiles = files.some(
-            file => file.toLowerCase().endsWith('.las') || file.toLowerCase().endsWith('.laz'),
+          const unprocessedFileTypes: Record<string, string[]> = {
+            model: ['.obj'],
+            cloud: ['.las', '.laz'],
+            splat: ['.splat', '.spx', '.ply'],
+          };
+
+          const hasUnprocessedFiles = files.some(file =>
+            unprocessedFileTypes[type]?.some(ext => file.toLowerCase().endsWith(ext)),
           );
 
-          if ((!hasObjFiles && !hasLasFiles) || hasBeenProcessed) {
+          if (!hasUnprocessedFiles || hasBeenProcessed) {
             return {
               status: 'OK',
               uuid,
@@ -412,8 +686,7 @@ const uploadRouter = new Elysia()
             err(`Failed processing with kompressor: ${error}`);
             info(
               Bun.inspect({
-                hasLasFiles,
-                hasObjFiles,
+                hasUnprocessedFiles,
                 files,
                 ids,
                 type,
