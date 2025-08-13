@@ -4,7 +4,7 @@ import { Collection, isAnnotation, isEntity } from 'src/common';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { resolveCompilation, resolveEntity } from './resolving-strategies';
+import { RESOLVE_FULL_DEPTH, resolveCompilation, resolveEntity } from './resolving-strategies';
 import { buildSearchableText, searchService } from 'src/sonic';
 
 enum SortOrder {
@@ -181,7 +181,7 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
           `explore::entities::metadata::${_entity._id}`,
         );
         if (cached) return cached;
-        const resolved = await resolveEntity(_entity);
+        const resolved = await resolveEntity(_entity, RESOLVE_FULL_DEPTH);
         const json = JSON.stringify(resolved).toLowerCase();
         exploreCache.set(`explore::entities::metadata::${_entity._id}`, json);
         return json;
@@ -214,7 +214,7 @@ const exploreCompilations = async (body: ExploreRequest & IPossibleUserdata) => 
   for (let i = offset; i < sortedComps.length && finalComps.length < limit; i++) {
     const _comp = sortedComps[i];
     if (!_comp) continue;
-    const resolved = await resolveCompilation(_comp);
+    const resolved = await resolveCompilation(_comp, 1);
 
     if (!resolved || !resolved._id) continue;
     if (Object.keys(resolved.entities).length === 0) continue;
