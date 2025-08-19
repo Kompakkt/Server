@@ -138,9 +138,13 @@ const exploreEntities = async (body: ExploreRequest & IPossibleUserdata) => {
       )
       .toArray();
 
+    const filteredEntities = entities.filter(
+      e => isEntity(e) && e.name && typeof e.name === 'string',
+    );
+
     console.timeEnd('exploreEntities resolve');
     console.time('exploreEntities sort');
-    const sortedEntities = await sortEntities(entities, sortBy ?? SortOrder.popularity);
+    const sortedEntities = await sortEntities(filteredEntities, sortBy ?? SortOrder.popularity);
     console.timeEnd('exploreEntities sort');
     return sortedEntities;
   })();

@@ -75,7 +75,12 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
       '/post/explore',
       async ({ body, userdata, status }) => {
         const combined = { ...body, userData: userdata ?? undefined };
-        return body.searchEntity ? exploreEntities(combined) : exploreCompilations(combined);
+        return (
+          body.searchEntity ? exploreEntities(combined) : exploreCompilations(combined)
+        ).catch(error => {
+          err(`Error during explore request ${error}`);
+          return status(500, 'Internal Server Error');
+        });
       },
       {
         body: ExploreRequest,
