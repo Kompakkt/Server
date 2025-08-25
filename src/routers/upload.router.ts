@@ -122,7 +122,7 @@ const getUploadedFiles = async ({
       case 'model':
         return ['.obj', '.babylon', '.gltf', '.glb', '.stl'];
       case 'splat':
-        return ['.splat', '.spz', '.ply'];
+        return ['.splat', '.spz', '.spx', '.ply'];
       case 'cloud':
         return ['.las', '.laz', '.json'];
       default:
