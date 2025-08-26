@@ -9,9 +9,21 @@ import { ObjectId } from 'mongodb';
 
 const ssoNFDI4CultureRouter = new Elysia()
   .use(configServer)
-  .post('/user-management/auth/saml/callback', ({ redirect }) => {
-    return redirect('/sso-nfdi4culture/saml/callback');
-  })
+  .post(
+    '/user-management/auth/saml/callback',
+    ({ body, headers }) => {
+      return Bun.fetch('http://localhost:3030/server/sso-nfdi4culture/saml/callback', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: JSON.parse(JSON.stringify(headers)),
+      });
+    },
+    {
+      body: t.Object({
+        SAMLResponse: t.String(),
+      }),
+    },
+  )
   .get('/sso-nfdi4culture/saml/health', () => {
     return { status: 'OK', message: 'SAML authentication service is running' };
   })
