@@ -683,7 +683,31 @@ export class WikibaseService {
       return undefined;
     }
 
-    const annotation = processedMetadata as any;
+    const annotation = processedMetadata as unknown as {
+      desc: { value: string; agent?: string; agentLabel?: string }[];
+      concept?: ValueLabelItem[];
+      media?: ValueLabelItem[];
+      label: string[];
+      val: string[];
+      rank: number[];
+      motiv: string[];
+      camType: string[];
+      cx: number[];
+      cy: number[];
+      cz: number[];
+      ctx: number[];
+      cty: number[];
+      ctz: number[];
+      sx: number[];
+      sy: number[];
+      sz: number[];
+      snx: number[];
+      sny: number[];
+      snz: number[];
+      target: string[];
+      relMediaThumb?: string[];
+      fileView?: string[];
+    };
 
     const descriptionAuthors: IWikibaseItem[] = [];
     const descriptionLicenses: IWikibaseItem[] = [];
@@ -691,14 +715,12 @@ export class WikibaseService {
 
     //because SPARQL is weird, we have to concat the media related stuff here (and with the annotation)
     for (let i = 0; i < relatedMedia.length; i++) {
-      relatedMedia[i].media = this.getPreviewImage(relatedMedia[i].id);
+      //relatedMedia[i].media = this.getPreviewImage(relatedMedia[i].id);
       // TODO: fist check if annotation.filView is array or just string
-      relatedMedia[i].internalID = Array.isArray(annotation.fileView)
-        ? annotation.fileView
-        : annotation.fileView[i];
+      //relatedMedia[i].internalID = annotation.fileView;
     }
 
-    if (annotation.desc.agent) {
+    /*if (annotation.desc.agent) {
       const agentId = getPQNumberFromID(annotation.desc.agent);
       if (agentId)
         descriptionAuthors.push({
@@ -713,44 +735,46 @@ export class WikibaseService {
           id: licenseId.toString(),
           label: { en: annotation.desc.licenseLabel },
         });
-    }
+    }*/
 
     const annotationData = {
       id: wikibase_id,
-      label: { en: annotation.label },
-      description: annotation.desc.value,
-      created: annotation.dateCreated,
-      lastModificationDate: annotation.dateModified,
-      validated: annotation.val,
-      ranking: annotation.rank,
-      motivation: annotation.motiv,
-      cameraType: annotation.camType,
-      cameraPosition: {
+      label: { en: annotation.label.at(0) ?? '' },
+      description: { en: annotation.desc.at(0)?.value ?? '' },
+      // created: annotation.dateCreated,
+      // lastModificationDate: annotation.dateModified,
+      // validated: annotation.val.at(0) === WBValues.true,
+      // ranking: annotation.rank.at(0) ?? -1,
+      // motivation: annotation.motiv,
+      // cameraType: annotation.camType,
+      /*cameraPosition: {
         x: Number.parseFloat(annotation.cx),
         y: Number.parseFloat(annotation.cy),
         z: Number.parseFloat(annotation.cz),
-      },
-      cameraTarget: {
+      },*/
+      /*cameraTarget: {
         x: Number.parseFloat(annotation.ctx),
         y: Number.parseFloat(annotation.cty),
         z: Number.parseFloat(annotation.ctz),
-      },
-      selectorNormal: {
+      },*/
+      /*selectorNormal: {
         x: Number.parseFloat(annotation.sx),
         y: Number.parseFloat(annotation.sy),
         z: Number.parseFloat(annotation.sz),
-      },
-      targetMetadata: annotation.target,
-      descriptionAuthors: descriptionAuthors,
-      descriptionLicenses: descriptionLicenses,
-      relatedMedia: relatedMedia,
-      selectorPoint: {
+      },*/
+      // targetMetadata: annotation.target,
+      authors: [],
+      licenses: [],
+      // descriptionAuthors: descriptionAuthors,
+      // descriptionLicenses: descriptionLicenses,
+      // relatedMedia: relatedMedia,
+      /*selectorPoint: {
         x: Number.parseFloat(annotation.snx),
         y: Number.parseFloat(annotation.sny),
         z: Number.parseFloat(annotation.snz),
-      },
-      relatedEntities: this.processWikibaseItems(processedMetadata, 'concept') as IWikibaseItem[],
-      relatedMediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL') as string[],
+      },*/
+      entities: this.processWikibaseItems(processedMetadata, 'concept') as IWikibaseItem[],
+      mediaUrls: this.processWikibaseItems(processedMetadata, 'mediaURL') as string[],
     } satisfies IWikibaseAnnotationExtensionData;
     return annotationData;
   }

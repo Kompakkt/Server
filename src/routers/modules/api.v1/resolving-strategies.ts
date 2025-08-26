@@ -267,7 +267,7 @@ const createResolver = <T extends ServerDocument<T>>(
       });
     }
 
-    return entity;
+    return transformed;
   };
 };
 
