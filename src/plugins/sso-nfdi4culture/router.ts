@@ -74,8 +74,8 @@ const ssoNFDI4CultureRouter = new Elysia()
   .post('/user-management/auth/saml/callback', async context => await handleSAMLCallback(context), {
     body: t.Object({ SAMLResponse: t.String() }),
   })
-  .get('/sso-nfdi4culture/saml/health', ({ status }) => {
-    return status(200, 'SAML authentication service is running');
+  .get('/sso-nfdi4culture/saml/health', () => {
+    return { status: 'OK', message: 'SAML authentication service is running' };
   })
   .get('/sso-nfdi4culture/saml', async ({ redirect }) => {
     const samlService = new SAML(await getSAMLConfig());
