@@ -11,6 +11,8 @@ import {
 } from './ensure-extension-data';
 import wikibaseRouter from './router';
 import { WikibaseService } from './service';
+import { pluginCache } from 'src/redis';
+import type { IWikibaseDigitalEntityExtensionData } from './common';
 
 class WikibasePlugin extends Plugin {
   routers = [wikibaseRouter];
@@ -76,7 +78,7 @@ class WikibasePlugin extends Plugin {
       },
     });
 
-    /*HookManager.addHook<ServerDocument<IDigitalEntity>>({
+    HookManager.addHook<ServerDocument<IDigitalEntity>>({
       collection: Collection.digitalentity,
       type: 'onResolve',
       callback: async digitalEntity => {
@@ -89,13 +91,29 @@ class WikibasePlugin extends Plugin {
           log(`Resolving wikibase digital entity ${digitalEntity._id}`);
 
           const doc = ensureDigitalEntityExtensionData(digitalEntity);
-          await service.fetchWikibaseMetadata(doc.extensions!.wikibase!.id!);
+          const wikibaseId = doc.extensions?.wikibase?.id;
+          if (!wikibaseId) {
+            log(`Wikibase ID not found for digital entity ${digitalEntity._id}`);
+            return digitalEntity;
+          }
+
+          const extensionData = await (async () => {
+            const key = `wikibase::fetchWikibaseMetadata::${wikibaseId}`;
+            const cached = await pluginCache.get<IWikibaseDigitalEntityExtensionData>(key);
+            if (cached) return cached;
+            const fresh = await service.fetchWikibaseMetadata(wikibaseId);
+            if (!fresh) return undefined;
+            await pluginCache.set(key, fresh, 3600);
+            return fresh;
+          })();
+
+          if (extensionData) doc.extensions!.wikibase = extensionData;
         } catch (error) {
           log(`Error resolving wikibase digital entity: ${error}`);
         }
         return digitalEntity;
       },
-    });*/
+    });
 
     return true;
   }

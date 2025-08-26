@@ -6,7 +6,7 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 export const hasWikibaseExtension = (
   entity: ServerDocument<IDigitalEntity | IAnnotation>,
 ): entity is ServerDocument<WikibaseDigitalEntity | WikibaseAnnotation> => {
-  return entity.extensions?.wikibase !== undefined;
+  return entity.extensions?.wikibase !== undefined || 'wikibase_id' in entity;
 };
 
 export const ensureDigitalEntityExtensionData = (
@@ -19,6 +19,11 @@ export const ensureDigitalEntityExtensionData = (
 
   digitalEntity.extensions.wikibase.label.en ??= digitalEntity.title;
   digitalEntity.extensions.wikibase.description.en ??= digitalEntity.description;
+
+  if ('wikibase_id' in digitalEntity && typeof digitalEntity.wikibase_id === 'string') {
+    digitalEntity.extensions.wikibase.id ??= digitalEntity.wikibase_id;
+  }
+
   return digitalEntity;
 };
 
@@ -32,5 +37,10 @@ export const ensureAnnotationExtensionData = (
 
   annotation.extensions.wikibase.label.en ??= annotation.body.content.title;
   annotation.extensions.wikibase.description.en ??= annotation.body.content.description;
+
+  if ('wikibase_id' in annotation && typeof annotation.wikibase_id === 'string') {
+    annotation.extensions.wikibase.id ??= annotation.wikibase_id;
+  }
+
   return annotation;
 };

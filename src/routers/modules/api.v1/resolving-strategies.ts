@@ -43,6 +43,7 @@ import {
 } from 'src/mongo';
 import { entitiesCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { HookManager } from './hooks';
 
 type Resolvable<T> = ServerDocument<IDocument | T> | string | ObjectId;
 type ResolveFn<T> = (obj: Resolvable<T>, depth: number) => Promise<ServerDocument<T> | undefined>;
@@ -250,8 +251,17 @@ const createResolver = <T extends ServerDocument<T>>(
       return undefined;
     });
 
+    // log(`Running onResolve hooks ${collection.collectionName} ${entity._id}`);
+    const transformed = await HookManager.runHooks(
+      collection.collectionName as Collection,
+      'onResolve',
+      entity,
+    );
+    transformed._id = entity._id; // Ensure _id remains of type ObjectId
+    // log(`Finished onResolve hooks ${collection.collectionName} ${entity._id}`);
+
     if (additionalProcessing && depth > 0) {
-      return await additionalProcessing(entity, depth - 1).catch(error => {
+      return await additionalProcessing(transformed, depth - 1).catch(error => {
         err(`Failed running additional processing on entity: ${error.toString()}`);
         return undefined;
       });
