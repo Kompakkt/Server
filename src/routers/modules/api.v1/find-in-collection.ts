@@ -3,7 +3,12 @@ import { Collection, type IUserData } from 'src/common';
 import type { IDocument } from 'src/common/interfaces';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { resolveAny, resolveCompilation, resolveEntity } from './resolving-strategies';
+import {
+  RESOLVE_FULL_DEPTH,
+  resolveAny,
+  resolveCompilation,
+  resolveEntity,
+} from './resolving-strategies';
 import { checkIsOwner } from '../user-management/users';
 
 export const findSingleHandler = async (
@@ -20,7 +25,7 @@ export const findSingleHandler = async (
 ) => {
   switch (collection) {
     case Collection.entity: {
-      const entity = await resolveEntity({ _id: identifier });
+      const entity = await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH);
       if (!entity) return undefined;
       // Check if user has access to the entity
       // TODO: Remove whitelist after migration to new access system
@@ -37,7 +42,7 @@ export const findSingleHandler = async (
         .concat(entity.whitelist.groups.flatMap(g => g.members))
         .some(p => p._id === userdata?._id.toString());
 
-      const userHasAccess = entityExistsInUserdata || isUserWhitelisted || userInAccess;
+      const userHasAccess = entityExistsInUserdata || isUserWhitelisted || !!userInAccess;
 
       if (entity.online && isWhitelistEnabled) {
         return userHasAccess ? entity : undefined;
@@ -49,7 +54,7 @@ export const findSingleHandler = async (
       return undefined;
     }
     case Collection.compilation: {
-      const compilation = await resolveCompilation({ _id: identifier });
+      const compilation = await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
       if (!compilation) return undefined;
       const _pw = compilation.password;
       const isPasswordProtected = _pw !== '';

@@ -4,3 +4,4 @@ export * from './welcome-new-account.template';
 export * from './forgot-username.template';
 export * from './userrole-updated.template';
 export * from './admin-health.template';
+export * from './admin-digest.template';

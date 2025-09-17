@@ -27,6 +27,10 @@ export const AuthController = new (class {
     }
   }
 
+  get availableStrategies(): string[] {
+    return Object.keys(this.strategies).filter(strategy => !this.#disabledStrategies.has(strategy));
+  }
+
   async authenticate<T extends keyof typeof this.strategies>(
     strategy: T,
     authObj: Parameters<(typeof this.strategies)[T]['authenticate']>[0],

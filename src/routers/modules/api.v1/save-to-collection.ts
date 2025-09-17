@@ -110,6 +110,10 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
   const strippedUser = stripUser(user);
 
   return {
+    __hits: asEntity.__hits ?? 0,
+    __createdAt: asEntity.__createdAt ?? new ObjectId(asEntity._id).getTimestamp().getTime(),
+    __normalizedName: asEntity.name?.trim().toLowerCase() ?? '',
+    __annotationCount: Object.keys(asEntity.annotations || {}).length,
     _id: asEntity._id,
     annotations: flattenRecord(asEntity.annotations),
     creator: asEntity.creator ?? strippedUser,
@@ -182,6 +186,11 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
 const transformCompilation: TransformFn<ICompilation> = async body => {
   const asCompilation = body as unknown as Partial<ICompilation>;
   return {
+    __hits: asCompilation.__hits ?? 0,
+    __createdAt:
+      asCompilation.__createdAt ?? new ObjectId(asCompilation._id).getTimestamp().getTime(),
+    __normalizedName: asCompilation.name?.trim().toLowerCase() ?? '',
+    __annotationCount: Object.keys(asCompilation.annotations || {}).length,
     _id: asCompilation._id,
     annotations: flattenRecord(asCompilation.annotations),
     creator: asCompilation.creator,

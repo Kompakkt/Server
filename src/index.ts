@@ -1,18 +1,26 @@
 import './util/patch-structured-clone';
-import Elysia, { t } from 'elysia';
-import { ensureUploadStructure } from './jobs/ensure-upload-structure';
-import { ensureSearchIndex } from './jobs/ensure-search-index';
+import Elysia from 'elysia';
+
 import { err, info, log } from './logger';
 import { initializePlugins } from './plugins';
 import finalServer from './server.final';
 import { swagger } from '@elysiajs/swagger';
-import { cleanupPersons } from './jobs/cleanup-persons';
 import { openApiUI } from './templates/openapi-ui';
+
+import { cleanupPersons } from './jobs/cleanup-persons';
+import { ensureUploadStructure } from './jobs/ensure-upload-structure';
+import { ensureSearchIndex } from './jobs/ensure-search-index';
+import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
+import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
+import { decreatePopularityTimer } from './jobs/decrease-popularity-timer';
 
 const jobs = {
   ensureUploadStructure,
   ensureSearchIndex,
+  ensureGaplessLicenses,
+  ensureSortableProperties,
   cleanupPersons,
+  decreatePopularityTimer,
 } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);

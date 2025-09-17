@@ -1,12 +1,11 @@
 import hash from 'object-hash';
 import { Configuration } from './configuration';
 import { log } from './logger';
-import { Redis } from 'ioredis';
 
 const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
 export class CacheClient {
-  private redis: Redis;
+  private redis: Bun.RedisClient;
   private db: number;
   private defaultSeconds: number;
   public hash = hash;
@@ -19,17 +18,7 @@ export class CacheClient {
     }
     CacheClient.takenDbs.add(db);
     this.db = db;
-    const client = new Redis(`redis://${host}:${port}/${db}`);
-    // TODO: Switch to Bun.RedisClient when its stable
-    // TODO: Manually switch DB number until the following issue is fixed: https://github.com/oven-sh/bun/issues/19041
-    /*client
-      .send('select', [db.toString()])
-      .then(() => {
-        log(`Initialized Redis using DB ${db}`);
-      })
-      .catch(() => {
-        log(`Failed to initialized DB ${db}`);
-        });*/
+    const client = new Bun.RedisClient(`redis://${host}:${port}/${db}`);
     this.redis = client;
     this.defaultSeconds = defaultSeconds;
   }
@@ -39,11 +28,10 @@ export class CacheClient {
   }
 
   public async flush() {
-    return this.redis.flushdb().then(() => log(`Flushed Redis DB ${this.db}`));
-    /* For Bun.RedisClient return this.redis
+    return this.redis
       .send('FLUSHDB', [])
       .then(() => log(`Flushed Redis DB ${this.db}`))
-      .catch(err => err('Failed to flush Redis DB', err));*/
+      .catch(err => err('Failed to flush Redis DB', err));
   }
 
   public async del(key: string) {

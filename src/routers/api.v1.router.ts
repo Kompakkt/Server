@@ -31,13 +31,32 @@ import { checkIsOwner, makeUserOwnerOf, undoUserOwnerOf } from './modules/user-m
 import { deleteAny } from './modules/api.v1/deletion-strategies';
 import { exploreCache } from 'src/redis';
 import { RouterTags } from './tags';
+import { increasePopularity } from './modules/api.v2/increase-popularity';
 
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
     .use(authService)
     .get(
       '/get/find/:collection/:identifier',
-      ({ params, userdata }) => findSingleHandler(params, userdata),
+      async ({ params, userdata, request, server }) => {
+        const result = await findSingleHandler(params, userdata).catch(error => {
+          err(
+            `Error finding single handler for ${params.collection} ${params.identifier}: ${error}`,
+          );
+          return undefined;
+        });
+
+        if (result && [Collection.entity, Collection.compilation].includes(params.collection)) {
+          try {
+            increasePopularity(result, params.collection, request, server);
+          } catch (error) {
+            warn(
+              `Failed increasing popularity for ${params.collection} ${params.identifier}: ${error}`,
+            );
+          }
+        }
+        return result;
+      },
       {
         params: findSingleParams,
         detail: {

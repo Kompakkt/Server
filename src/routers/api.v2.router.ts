@@ -22,6 +22,8 @@ import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
 import { MAX_PROFILE_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
 import { RouterTags } from './tags';
+import { exploreHandler } from './modules/api.v2/explore';
+import { ExploreRequest } from './modules/api.v2/types';
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
   app
@@ -95,7 +97,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           })
           .toArray();
 
-        const resolved = await Promise.all(entities.map(entity => resolveEntity(entity))).then(
+        const resolved = await Promise.all(entities.map(entity => resolveEntity(entity, 1))).then(
           arr => arr.filter(isEntity),
         );
 
@@ -103,7 +105,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         if (role === EntityAccessRole.owner && userdata.data.entity) {
           const userEntities = userdata.data.entity
             .filter((docId): docId is string | IDocument => !!docId)
-            .map(docId => resolveEntity({ _id: typeof docId === 'string' ? docId : docId._id }));
+            .map(docId => resolveEntity({ _id: typeof docId === 'string' ? docId : docId._id }, 1));
           const userResolved = await Promise.all(userEntities);
           resolved.push(...userResolved.filter(isEntity));
         }
@@ -620,6 +622,27 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             'Retrieves entities that match the specified file formats, filtering by processed raw paths.',
           tags: [RouterTags.API, RouterTags['API V2']],
         },
+      },
+    )
+    .post(
+      '/explore',
+      async ({ body, status, userdata }) => {
+        const result = await exploreHandler(body, userdata).catch(err => {
+          warn(`Error in exploreHandler: ${err}`);
+          return undefined;
+        });
+        if (!result) {
+          return status(500, 'Internal server error');
+        }
+        return result;
+      },
+      {
+        detail: {
+          description:
+            'Explore entities (objects) and compilations (collections) on various filters.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
+        body: ExploreRequest,
       },
     ),
 );

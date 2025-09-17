@@ -74,7 +74,7 @@ export const sendMail = async (mail: SendMailOptions): Promise<boolean> =>
       : reject('No transporter'),
   )
     .then(mailInfo => {
-      info('Mail sent', mailInfo);
+      info('Mail sent', JSON.stringify(mailInfo));
       return true;
     })
     .catch(error => {
@@ -93,7 +93,7 @@ export const sendJSXMail = async ({
   to: string;
   subject: string;
 }): Promise<boolean> => {
-  log('Preparing JSX mail', jsx, wrapInMailBody({ jsx, subject }));
+  // log('Preparing JSX mail', jsx, wrapInMailBody({ jsx, subject }));
   return sendMail({
     from,
     to,
