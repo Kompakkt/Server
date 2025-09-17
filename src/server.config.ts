@@ -3,10 +3,9 @@ import { type JWTOption, jwt } from '@elysiajs/jwt';
 import timingPlugin from '@elysiajs/server-timing';
 import { Elysia } from 'elysia';
 import { helmet } from 'elysia-helmet';
-import { Logestic } from 'logestic';
 import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
-import { err } from './logger';
+import { err, log } from './logger';
 
 export const jwtOptions: JWTOption = {
   secret: Bun.env.JWT_SECRET ?? 'secret',
@@ -25,6 +24,11 @@ const configServer = new Elysia({
     secure: false,
   },
 })
+  .onRequest(({ request }) => {
+    const url = request.url.slice(request.url.indexOf('/server/') + 7);
+    if (url.indexOf('/previews') !== -1) return;
+    log(`${request.method}  ${url}`);
+  })
   .onError(({ error, code }) => {
     if (code === 'NOT_FOUND') {
       return;
@@ -32,8 +36,6 @@ const configServer = new Elysia({
     err(error);
   })
   // These are as any because type inference in other routers is bugged otherwise
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  .use(Logestic.preset('fancy') as any)
   .use(
     helmet({
       contentSecurityPolicy: {
@@ -57,8 +59,14 @@ const configServer = new Elysia({
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
   .use(timingPlugin({}))
-  .get('/previews/*', ({ params }) =>
-    Bun.file(`${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`),
-  );
+  .get('/previews/*', async ({ params, redirect }) => {
+    const file = Bun.file(
+      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`,
+    );
+    if (await file.exists()) {
+      return file;
+    }
+    return redirect(`https://kompakkt.de/server/previews/${params['*']}`);
+  });
 
 export default configServer;
