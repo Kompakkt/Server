@@ -56,11 +56,7 @@ export const checkIsOwner = async (obj: {
       if (isDocument(doc)) return doc._id.toString();
       return undefined;
     }) ?? [];
-  log(`checkIsOwner`, {
-    collection: obj.collection,
-    data: normalizedData,
-    id: docId,
-  });
+  // log(`checkIsOwner`, { collection: obj.collection, data: normalizedData, id: docId });
   return normalizedData.includes(docId) ?? false;
 };
 

@@ -2,36 +2,68 @@ import jwt from '@elysiajs/jwt';
 import Elysia, { t, type Static } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
-import { UserRank } from 'src/common';
+import { UserRank, type IUserData } from 'src/common';
 import { log } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import configServer, { jwtOptions } from 'src/server.config';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export const signInBody = t.Object({
   username: t.String(),
   password: t.String(),
 });
-type SignInBody = Static<typeof signInBody>;
+export type SignInBody = Static<typeof signInBody>;
+export const isSignInBody = (data: unknown): data is SignInBody => {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'username' in data &&
+    'password' in data &&
+    typeof data.username === 'string' &&
+    typeof data.password === 'string'
+  );
+};
 
-export const strategyParams = t.Object({
-  strategy: t.Optional(t.String()),
-});
+export const strategyParams = t.Optional(
+  t.Object({
+    strategy: t.String(),
+  }),
+);
+export type StrategyParams = Static<typeof strategyParams>;
+export const isStrategyParams = (data: unknown): data is StrategyParams => {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'strategy' in data &&
+    (typeof data.strategy === 'string' || data.strategy === undefined)
+  );
+};
 
-export const authService = new Elysia({ name: 'Service.Auth' })
+export const authService = new Elysia({ name: 'authService' })
   .use(configServer)
   .use(jwt(jwtOptions))
-  .resolve({ as: 'global' }, async ({ jwt, cookie }) => {
-    const result = await jwt.verify(cookie.auth.value);
-    if (!result) {
-      return { userdata: undefined, isLoggedIn: false, isAdmin: false };
-    }
-    const { username, _id } = result as { username: string; _id: string };
-    const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
-    if (!user) {
-      return { userdata: undefined, isLoggedIn: false, isAdmin: false };
-    }
-    return { userdata: user, isLoggedIn: true, isAdmin: user.role === UserRank.admin };
-  })
+  .resolve(
+    { as: 'global' },
+    async ({
+      jwt,
+      cookie,
+    }): Promise<{
+      userdata: ServerDocument<IUserData> | undefined;
+      isLoggedIn: boolean;
+      isAdmin: boolean;
+    }> => {
+      const result = await jwt.verify(cookie.auth.value as any);
+      if (!result) {
+        return { userdata: undefined, isLoggedIn: false, isAdmin: false };
+      }
+      const { username, _id } = result as { username: string; _id: string };
+      const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
+      if (!user) {
+        return { userdata: undefined, isLoggedIn: false, isAdmin: false };
+      }
+      return { userdata: user, isLoggedIn: true, isAdmin: user.role === UserRank.admin };
+    },
+  )
   .decorate('useAuthController', async (body: SignInBody, strategy?: string) => {
     const wrappedUserdata = await (async () => {
       switch (strategy) {
@@ -44,34 +76,35 @@ export const authService = new Elysia({ name: 'Service.Auth' })
     })();
     return wrappedUserdata;
   })
-  .macro(({ onBeforeHandle }) => ({
-    isLoggedIn(needed?: boolean) {
-      if (!needed) return;
-      onBeforeHandle(({ status, userdata }) => {
+  .macro({
+    isLoggedIn: {
+      resolve: ({ status, userdata }) => {
         if (!userdata) return status('Forbidden');
         return;
-      });
+      },
     },
-    isAdmin(needed?: boolean) {
-      if (!needed) return;
-      onBeforeHandle(({ status, userdata }) => {
+    isAdmin: {
+      resolve: ({ status, userdata }) => {
         if (userdata?.role !== UserRank.admin) return status('Forbidden');
         return;
-      });
+      },
     },
-    verifyLoginData(needed?: boolean) {
-      if (!needed) return;
-      onBeforeHandle(async ({ status, body, params, useAuthController }) => {
-        const loginBody = body as SignInBody;
-        if (!loginBody?.username || !loginBody?.password) return status('Forbidden');
+    verifyLoginData: {
+      // TODO: These are bugged due to: https://github.com/elysiajs/elysia/issues/1282
+      // body: signInBody,
+      // params: strategyParams,
+      resolve: async ({ status, body, params, useAuthController }) => {
+        if (!isSignInBody(body)) return status('Forbidden');
+        if (!body?.username || !body?.password) return status('Forbidden');
+        const strategy =
+          'strategy' in params && typeof params.strategy === 'string' ? params.strategy : undefined;
 
-        // TODO: maybe params can be typed as part of onBeforeHandle
-        const typedParams = params as Static<typeof strategyParams>;
-        const strategy = typedParams.strategy;
-
-        const authResult = await useAuthController(loginBody, strategy);
-        if (authResult instanceof Error) return status('Forbidden');
+        const authResult = await useAuthController(body, strategy);
+        if (authResult instanceof Error) {
+          log(`Failed login attempt for user ${body.username} using strategy ${strategy}`);
+          return status('Forbidden');
+        }
         return;
-      });
+      },
     },
-  }));
+  });

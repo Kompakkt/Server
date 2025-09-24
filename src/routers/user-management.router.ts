@@ -156,6 +156,9 @@ const userManagementRouter = new Elysia()
           return userWithData;
         },
         {
+          cookie: t.Cookie({
+            auth: t.String(),
+          }),
           query: t.Optional(
             t.Object({
               data: t.String(),

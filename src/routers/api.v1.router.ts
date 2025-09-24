@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import {
   Collection,
+  EntityAccessRole,
   type IStrippedUserData,
   isAnnotation,
   isInstitution,
@@ -10,10 +11,13 @@ import {
 import { isEntitySettings } from 'src/common/typeguards';
 import { err, info, log, warn } from 'src/logger';
 import { collectionMap, entityCollection, groupCollection, userCollection } from 'src/mongo';
+import { exploreCache } from 'src/redis';
 import configServer from 'src/server.config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { MAX_PREVIEW_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
 import { authService, signInBody } from './handlers/auth.service';
+import { PermissionHelper, permissionService } from './handlers/permission.service';
+import { deleteAny } from './modules/api.v1/deletion-strategies';
 import {
   ExploreRequest,
   exploreCompilations,
@@ -27,15 +31,28 @@ import {
 } from './modules/api.v1/find-in-collection';
 import { resolveAny } from './modules/api.v1/resolving-strategies';
 import { saveHandler } from './modules/api.v1/save-to-collection';
-import { checkIsOwner, makeUserOwnerOf, undoUserOwnerOf } from './modules/user-management/users';
-import { deleteAny } from './modules/api.v1/deletion-strategies';
-import { exploreCache } from 'src/redis';
-import { RouterTags } from './tags';
 import { increasePopularity } from './modules/api.v2/increase-popularity';
+import { checkIsOwner, makeUserOwnerOf } from './modules/user-management/users';
+import { RouterTags } from './tags';
+
+/**
+ * If the entity already exists we need to check for owner status
+ * We skip this for annotations, since annotation ranking can be changed by owner
+ * We check this in the saving strategy instead
+ * We also skip this for persons and institutions since their nested content
+ * (addresses, contact_references, etc.) can also be updated
+ */
+const isEditableType = (_e: unknown) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
+
+/**
+ * List of collections that allows editing by users with EntityAccessRole.editor.
+ */
+const editorCollections = [Collection.entity, Collection.annotation, Collection.compilation];
 
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
     .use(authService)
+    .use(permissionService)
     .get(
       '/get/find/:collection/:identifier',
       async ({ params, userdata, request, server }) => {
@@ -133,23 +150,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           );
         }
 
-        // Flatten account.data so its an array of ObjectId.toString()
-        const userEntities = Object.values(user.data)
-          .flat()
-          .map(e => e?.toString())
-          .filter((e): e is string => !!e);
-
-        if (!userEntities.includes(_id)) {
-          const message = 'Entity removal failed because Entity does not belong to user';
-          err(message);
-          return status(401, message);
-        }
-
-        const success = await deleteAny({
-          _id,
-          collection,
-          userdata,
-        });
+        const success = await deleteAny({ _id, collection, userdata });
         if (!success) {
           const message = 'Entity removal failed';
           err(message);
@@ -169,6 +170,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         }),
         body: signInBody,
         verifyLoginData: true,
+        hasRole: EntityAccessRole.owner,
         detail: {
           description: 'Remove an entity from a collection',
           tags: [RouterTags.API, RouterTags['API V1']],
@@ -208,7 +210,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         })
         .post(
           '/post/push/:collection',
-          async ({ status, params: { collection }, body, userdata }) => {
+          async ({ status, params: { collection }, body, userdata, userRole }) => {
             if (!body || typeof body !== 'object') return status(400);
             if (!userdata) return status(401);
             const isDocument = (obj: unknown): obj is { _id: string } => {
@@ -225,26 +227,41 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               return !!result;
             })();
 
-            /**
-             * If the entity already exists we need to check for owner status
-             * We skip this for annotations, since annotation ranking can be changed by owner
-             * We check this in the saving strategy instead
-             * We also skip this for persons and institutions since their nested content
-             * (addresses, contact_references, etc.) can also be updated
-             */
-            const isEditableType = (_e: unknown) =>
-              isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
+            const canProceed = await (async (): Promise<boolean> => {
+              // Creation always allowed here
+              if (!doesEntityExist) return true;
+              // Editable types can be edited by anyone
+              if (isEditableType(body)) return true;
+              const isLegacyOwner = PermissionHelper.isUserLegacyOwner(body, userdata);
+              log(
+                `Checking if user is owner of ${body._id} to ${collection}: { role: ${userRole}, isLegacyOwner: ${isLegacyOwner} }`,
+              );
+              // Owner can always edit
+              if (isLegacyOwner) return true;
+              if (userRole === EntityAccessRole.owner) return true;
+              // Editors can edit certain collections
+              if (editorCollections.includes(collection) && userRole === EntityAccessRole.editor)
+                return true;
 
-            const needOwnerCheck = isValidObjectId && doesEntityExist && !isEditableType(body);
-            if (needOwnerCheck) {
-              const isOwner = await checkIsOwner({
-                doc: body,
-                collection,
-                userdata,
-              });
-              log(`Checking if user is owner of ${body._id} to ${collection}: ${isOwner}`);
-              if (!isOwner) return status(403);
-            }
+              if (collection === Collection.digitalentity) {
+                // For digital entities, we allow editing if the user is an editor of the parent entity
+                const parentEntity = await entityCollection.findOne({
+                  'relatedDigitalEntity._id': { $in: [_id.toString(), new ObjectId(_id)] },
+                });
+                const hasParentPermission = PermissionHelper.isUserMinimumRole(
+                  parentEntity,
+                  userdata,
+                  EntityAccessRole.editor,
+                );
+                log(
+                  `User has parent entity editor permission: ${hasParentPermission}, { parentEntity: ${parentEntity?._id} }`,
+                );
+                if (hasParentPermission) return true;
+              }
+
+              return false;
+            })();
+            if (!canProceed) return status('Forbidden');
 
             const saveResult = await saveHandler({
               collection,

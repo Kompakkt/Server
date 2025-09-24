@@ -26,9 +26,9 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
     )
     .guard(
       {
-        async beforeHandle(context) {
-          if (!context.isLoggedIn) {
-            return context.error('Forbidden');
+        async beforeHandle({ isLoggedIn, status }) {
+          if (!isLoggedIn) {
+            return status('Forbidden');
           }
           return;
         },
