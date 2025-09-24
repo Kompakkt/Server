@@ -31,6 +31,11 @@ const isAccessObject = (obj: unknown): obj is Record<string, { role: EntityAcces
   );
 };
 
+/**
+ * List of collections that allows editing by users with EntityAccessRole.editor.
+ */
+const editorCollections = [Collection.entity, Collection.annotation, Collection.compilation];
+
 export const PermissionHelper = new (class {
   /**
    * Get the user's role in the document's access field.
@@ -72,6 +77,13 @@ export const PermissionHelper = new (class {
       case EntityAccessRole.owner:
         return accessRole === EntityAccessRole.owner;
     }
+  }
+
+  /**
+   * Check if the collection regulates permission via access field and EntityAccessRole.
+   */
+  isEditorCollection(collection: string | Collection) {
+    return editorCollections.includes(collection as Collection);
   }
 })();
 

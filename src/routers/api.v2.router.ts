@@ -1,5 +1,11 @@
 import { Elysia, t } from 'elysia';
-import { entityCollection, profileCollection, userCollection } from 'src/mongo';
+import {
+  collectionMap,
+  entityCollection,
+  groupCollection,
+  profileCollection,
+  userCollection,
+} from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
@@ -24,10 +30,12 @@ import { MAX_PROFILE_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image
 import { RouterTags } from './tags';
 import { exploreHandler } from './modules/api.v2/explore';
 import { ExploreRequest } from './modules/api.v2/types';
+import { PermissionHelper, permissionService } from './handlers/permission.service';
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
   app
     .use(authService)
+    .use(permissionService)
     .get(
       '/user-data/:collection',
       async ({ userdata, status, params: { collection }, query: { full, depth } }) => {
@@ -643,6 +651,87 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           tags: [RouterTags.API, RouterTags['API V2']],
         },
         body: ExploreRequest,
+      },
+    )
+    .post(
+      '/remove-self-from-access/:collection/:identifier',
+      async ({ params: { collection, identifier }, userdata, userRole, status }) => {
+        if (!userdata) return status('Forbidden', 'Must be logged in to remove self from access');
+        if (userRole === EntityAccessRole.owner)
+          return status('Forbidden', 'Owner cannot remove themselves');
+        if (!PermissionHelper.isEditorCollection(collection))
+          return status(
+            'Bad Request',
+            `Collection "${collection}" has no access field or does not allow modification of access field.`,
+          );
+
+        const document = await collectionMap[collection].findOne({ _id: new ObjectId(identifier) });
+        if (!document) return status('Not Found', 'Document not found');
+        if (!('access' in document)) return status('Bad Request', 'Document has no access field');
+
+        const updateResult = await collectionMap[collection].updateOne(
+          { _id: new ObjectId(identifier) },
+          { $unset: { [`access.${userdata._id.toString()}`]: '' } },
+        );
+        info(
+          `User ${userdata.username} (${userdata._id.toString()}) removed themselves from access of ${collection} ${identifier}`,
+          updateResult,
+        );
+
+        return { status: 'OK', message: `You've removed your access to the specified object` };
+      },
+      {
+        params: t.Object({
+          collection: t.Enum(Collection, {
+            description: 'The collection of the document to remove self from.',
+          }),
+          identifier: t.String({
+            description: 'The identifier of the document to remove self from.',
+          }),
+        }),
+        hasRole: EntityAccessRole.viewer,
+        isLoggedIn: true,
+        detail: {
+          description:
+            'Removes the logged-in user from editor or viewer to no special access on the specified document. The user must be either editor or viewer to use this endpoint.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
+      },
+    )
+    .post(
+      '/leave-group/:identifier',
+      async ({ params: { identifier }, status, userdata }) => {
+        if (!userdata) return status('Bad Request', 'Must be logged in to leave a group');
+        const group = await groupCollection.findOne({ _id: new ObjectId(identifier) });
+        if (!group) return status('Not Found', 'Group not found');
+        const isMember = group.members?.find(
+          member => member._id.toString() === userdata._id.toString(),
+        );
+        if (!isMember) return status('Bad Request', 'You are not a member of this group');
+
+        group.members = group.members?.filter(
+          member => member._id.toString() !== userdata._id.toString(),
+        );
+        const updateResult = await groupCollection.updateOne(
+          { _id: new ObjectId(identifier) },
+          { $set: { members: group.members } },
+        );
+        if (updateResult.modifiedCount === 0) {
+          return status('Internal Server Error', 'Failed to leave group');
+        }
+        return { status: 'OK', message: `You've left the group ${group.name}` };
+      },
+      {
+        params: t.Object({
+          identifier: t.String({
+            description: 'The identifier of the group to leave.',
+          }),
+        }),
+        isLoggedIn: true,
+        detail: {
+          description: 'Allows the logged-in user to leave a group they are a member of.',
+          tags: [RouterTags.API, RouterTags['API V2']],
+        },
       },
     ),
 );

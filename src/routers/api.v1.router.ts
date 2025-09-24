@@ -44,11 +44,6 @@ import { RouterTags } from './tags';
  */
 const isEditableType = (_e: unknown) => isAnnotation(_e) || isPerson(_e) || isInstitution(_e);
 
-/**
- * List of collections that allows editing by users with EntityAccessRole.editor.
- */
-const editorCollections = [Collection.entity, Collection.annotation, Collection.compilation];
-
 const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
   app
     .use(authService)
@@ -240,7 +235,10 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               if (isLegacyOwner) return true;
               if (userRole === EntityAccessRole.owner) return true;
               // Editors can edit certain collections
-              if (editorCollections.includes(collection) && userRole === EntityAccessRole.editor)
+              if (
+                PermissionHelper.isEditorCollection(collection) &&
+                userRole === EntityAccessRole.editor
+              )
                 return true;
 
               if (collection === Collection.digitalentity) {
