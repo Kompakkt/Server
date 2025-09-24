@@ -14,6 +14,7 @@ import { WikibaseService } from './service';
 import { pluginCache } from 'src/redis';
 import type { IWikibaseDigitalEntityExtensionData } from './common';
 import { restoreOriginalAnnotation } from './restore-original-data-model';
+import { get } from 'src/util/requests';
 
 class WikibasePlugin extends Plugin {
   routers = [wikibaseRouter];
@@ -21,6 +22,20 @@ class WikibasePlugin extends Plugin {
   async load(pluginArgs?: unknown): Promise<boolean> {
     if (!WikibaseConfiguration || !isWikibaseConfiguration(WikibaseConfiguration)) {
       log('Wikibase configuration not found');
+      return false;
+    }
+
+    // Check if we can reach the Wikibase instance
+    let domain = WikibaseConfiguration.Domain;
+    if (!domain.startsWith('http')) {
+      domain = `http://${domain}`;
+    }
+    const paramInfo = await get(
+      new URL('api.php?action=paraminfo&modules=&format=json', domain).toString(),
+      { responseFormat: 'json' },
+    ).catch(() => undefined);
+    if (!paramInfo) {
+      log('Wikibase instance not reachable');
       return false;
     }
 
