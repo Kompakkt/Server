@@ -98,6 +98,8 @@ export const physicalEntityCollection =
   entitiesDb.collection<ServerDocument<IPhysicalEntity>>('physicalentity');
 export const tagCollection = entitiesDb.collection<ServerDocument<ITag>>('tag');
 
+entityCollection.createIndex({ 'relatedDigitalEntity._id': 1 });
+
 export const collectionMap = {
   [Collection.entity]: entityCollection,
   [Collection.group]: groupCollection,

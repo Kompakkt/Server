@@ -16,12 +16,17 @@ import {
 } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import {
+  RESOLVE_FULL_DEPTH,
   resolveAnnotation,
   resolveCompilation,
   resolveEntity,
+  resolveGroup,
 } from '../api.v1/resolving-strategies';
 import { makeUserOwnerOf, undoUserOwnerOf } from '../user-management/users';
 import { log } from 'src/logger';
+
+const asIdQueryArray = (id: string | ObjectId) =>
+  [id.toString(), new ObjectId(id)] as [string, ObjectId];
 
 // Query helpers
 // TODO: This can be cached without trouble
@@ -33,12 +38,16 @@ const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
   const query: Filter<ServerDocument<ICompilation>> = {
     'whitelist.enabled': { $eq: true },
     '$or': [
-      { 'whitelist.persons': { $elemMatch: { _id: { $in: [user._id, new ObjectId(user._id)] } } } },
+      {
+        'whitelist.persons': {
+          $elemMatch: { _id: { $in: asIdQueryArray(user._id) } },
+        },
+      },
     ],
   };
   if (groups && groups.length > 0) {
     const groupQuery = {
-      $elemMatch: { _id: { $in: groups.flatMap(g => [g._id, new ObjectId(g._id)]) } },
+      $elemMatch: { _id: { $in: groups.flatMap(g => asIdQueryArray(g._id)) } },
     };
     query.$or?.push({ 'whitelist.groups': groupQuery });
   }
@@ -47,7 +56,7 @@ const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
 };
 
 const userInGroupQuery = (userdata: ServerDocument<IUserData>) => {
-  const _idQuery = [userdata._id, new ObjectId(userdata._id)];
+  const _idQuery = asIdQueryArray(userdata._id);
   return {
     $or: [
       { 'creator._id': { $in: _idQuery } },
@@ -61,7 +70,7 @@ export const findEntityOwnersQuery = async (
   _id: string | ObjectId,
 ): Promise<ServerDocument<IStrippedUserData>[]> => {
   const accounts = await userCollection
-    .find({ 'data.entity': { $in: [_id, new ObjectId(_id)] } })
+    .find({ 'data.entity': { $in: asIdQueryArray(_id) } })
     .toArray();
   return accounts.map(({ _id, username, fullname }) => ({
     _id,
@@ -78,7 +87,9 @@ export const countEntityUses = async (
   // (Not password protected || user is creator || user is whitelisted) && has entity
   const filter: Filter<ServerDocument<ICompilation>> = { $or: [{ password: { $eq: '' } }] };
   if (userdata) {
-    filter.$or?.push({ 'creator._id': { $in: [userdata._id, new ObjectId(userdata._id)] } });
+    filter.$or?.push({
+      'creator._id': { $in: asIdQueryArray(userdata._id) },
+    });
     filter.$or?.push(await userInWhitelistQuery(userdata));
   }
   filter[`entities.${identifier.toString()}`] = { $exists: true };
@@ -103,12 +114,12 @@ export const addAnnotationsToAnnotationList = async ({
   userdata: ServerDocument<IUserData>;
 }) => {
   const compilation = await compilationCollection.findOne({
-    _id: { $in: [identifier, new ObjectId(identifier)] },
+    _id: { $in: asIdQueryArray(identifier) },
   });
   if (!compilation) throw new Error('Compilation not found');
 
   const resolvedList = await Promise.all(
-    annotationList.map(aId => resolveAnnotation({ _id: aId })),
+    annotationList.map(aId => resolveAnnotation({ _id: aId }, RESOLVE_FULL_DEPTH)),
   );
   const filteredList = resolvedList.filter((a): a is ServerDocument<IAnnotation> => !!a);
   const correctedList = filteredList.map(ann => {
@@ -128,12 +139,8 @@ export const addAnnotationsToAnnotationList = async ({
   }
 
   const updateResult = await compilationCollection.updateOne(
-    {
-      _id: { $in: [identifier, new ObjectId(identifier)] },
-    },
-    {
-      $set: { annotations: compilation.annotations },
-    },
+    { _id: { $in: asIdQueryArray(identifier) } },
+    { $set: { annotations: compilation.annotations } },
   );
   if (!updateResult || updateResult.modifiedCount !== 1)
     throw new Error('Failed updating Compilation');
@@ -144,7 +151,7 @@ export const addAnnotationsToAnnotationList = async ({
     collection: Collection.annotation,
     userdata: userdata,
   });
-  return resolveCompilation({ _id: identifier });
+  return resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
 };
 
 export enum Command {
@@ -205,7 +212,7 @@ export const applyActionToEntityOwner = async ({
 
 export const findUserInGroups = async (userdata: ServerDocument<IUserData>) => {
   const groups = await groupCollection.find(userInGroupQuery(userdata)).toArray();
-  return groups;
+  return await Promise.all(groups.map(g => resolveGroup(g, RESOLVE_FULL_DEPTH)));
 };
 
 export const findUserInCompilations = async (userdata: ServerDocument<IUserData>) => {
@@ -215,7 +222,7 @@ export const findUserInCompilations = async (userdata: ServerDocument<IUserData>
   if (!compilations) return [];
 
   const resolved = await Promise.all(
-    compilations.map(comp => resolveCompilation({ _id: new ObjectId(comp._id) })),
+    compilations.map(comp => resolveCompilation({ _id: new ObjectId(comp._id) }, 1)),
   );
   const filtered = resolved.filter(_ => _) as ServerDocument<ICompilation>[];
 
@@ -229,7 +236,9 @@ export const findUserInMetadata = async (userdata: ServerDocument<IUserData>) =>
   const entities = await entityCollection.find({}).toArray();
 
   const resolvedEntities = (
-    await Promise.all(entities.map(e => resolveEntity({ _id: new ObjectId(e._id) })))
+    await Promise.all(
+      entities.map(e => resolveEntity({ _id: new ObjectId(e._id) }, RESOLVE_FULL_DEPTH)),
+    )
   ).filter(entity => {
     if (!entity) return false;
     const stringified = JSON.stringify(entity.relatedDigitalEntity);

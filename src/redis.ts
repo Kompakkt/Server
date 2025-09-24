@@ -49,9 +49,22 @@ export class CacheClient {
     });
   }
 
+  public async scan<T>(key: string, callback: (key: string) => Promise<T>) {
+    const matches: Promise<T>[] = [];
+    let cursor = '0';
+
+    do {
+      const result = await this.redis.send('SCAN', [cursor, 'MATCH', key, 'COUNT', '100']);
+      cursor = result[0];
+      matches.push(...result[1].map((k: string) => callback(k)));
+    } while (cursor !== '0');
+
+    return await Promise.all(matches);
+  }
+
   public async getAll<T>(key: string) {
-    const matches = await this.redis.keys(key);
-    return Promise.all(matches.map(m => this.get<T>(m)));
+    const matches = await this.scan(key, async (key: string) => this.get<T>(key));
+    return await Promise.all(matches);
   }
 
   public async set(key: string, value: unknown, seconds = this.defaultSeconds) {
@@ -76,8 +89,8 @@ export const entitiesCache = new CacheClient(offset + 1, 1);
 export const usersCache = new CacheClient(offset + 2, 1);
 // User/Account Session Cache
 export const sessionCache = new CacheClient(offset + 3, 60);
-// Cache information about who uploaded files
-export const uploadCache = new CacheClient(offset + 4, 3.6e4);
+// Cache additional information when resolving objects
+export const resolveCache = new CacheClient(offset + 4, 60);
 // Cache explore requests
 export const exploreCache = new CacheClient(offset + 5, 60);
 

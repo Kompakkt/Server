@@ -1,3 +1,5 @@
+import { generateTailwindCSS } from 'src/util/generate-tailwindcss';
+
 type OpenAPISpecMethodProperties = {
   summary?: string;
   description?: string;
@@ -325,7 +327,7 @@ export const openApiUI = async () => {
   const json = await Bun.fetch('http://localhost:3030/server/swagger/json').then(res => res.json());
   const OpenAPI = json as OpenAPISpec;
 
-  return (
+  const htmlContent =
     '<!DOCTYPE html>' +
     (
       <html lang="en">
@@ -333,7 +335,7 @@ export const openApiUI = async () => {
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <title safe>{OpenAPI.info.title} - API Documentation</title>
-          <script src="https://cdn.tailwindcss.com"></script>
+          <style>#TAILWIND_CSS</style>
           <style>
             {`
               html {
@@ -386,6 +388,8 @@ export const openApiUI = async () => {
           </div>
         </body>
       </html>
-    )
-  );
+    );
+
+  const patched = await generateTailwindCSS(htmlContent, 'openapi-ui.css');
+  return htmlContent.replace('#TAILWIND_CSS', patched);
 };
