@@ -19,7 +19,31 @@ logger.attachTransport(obj => {
   stream.write(JSON.stringify(obj) + '\n');
 });
 
-export const log = (...args: unknown[]) => logger.silly(...args);
-export const info = (...args: unknown[]) => logger.info(...args);
-export const warn = (...args: unknown[]) => logger.warn(...args);
-export const err = (...args: unknown[]) => logger.error(...args);
+const mapLogObjects = (arg: unknown) => {
+  const message = (() => {
+    try {
+      if (typeof arg === 'function') {
+        return arg.toString();
+      }
+      if (typeof arg === 'object') {
+        if (arg instanceof Error) {
+          return (arg.stack ?? arg.message).replaceAll('\n', ' ');
+        }
+        try {
+          return JSON.stringify(arg, null, 2);
+        } catch {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    } catch {
+      return '[unserializable]' + new Error().stack?.replaceAll('\n', ' ');
+    }
+  })();
+  return message.replaceAll(/\s+/g, ' ').replaceAll(__dirname, '').trim();
+};
+
+export const log = (...args: unknown[]) => logger.silly(...args.map(mapLogObjects));
+export const info = (...args: unknown[]) => logger.info(...args.map(mapLogObjects));
+export const warn = (...args: unknown[]) => logger.warn(...args.map(mapLogObjects));
+export const err = (...args: unknown[]) => logger.error(...args.map(mapLogObjects));
