@@ -13,8 +13,10 @@ import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
 import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
 import { decreatePopularityTimer } from './jobs/decrease-popularity-timer';
+import { adminDigestMail } from './jobs/admin-digest-mail';
 
 const jobs = {
+  adminDigestMail,
   ensureUploadStructure,
   ensureSearchIndex,
   ensureGaplessLicenses,

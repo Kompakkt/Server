@@ -1,4 +1,14 @@
-export const wrapInMailBody = ({ jsx, subject }: { jsx: JSX.Element; subject: string }) => {
+export const wrapInMailBody = ({
+  jsx,
+  subject,
+  maxWidth,
+}: {
+  jsx: JSX.Element;
+  subject: string;
+  maxWidth?: number;
+}) => {
+  maxWidth = maxWidth ?? 600;
+
   const head = (
     <head>
       <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -17,7 +27,7 @@ export const wrapInMailBody = ({ jsx, subject }: { jsx: JSX.Element; subject: st
               border={0}
               cellpadding="0"
               cellspacing="0"
-              width="600"
+              width={maxWidth}
               style="border-collapse: collapse;"
             >
               <tr>
@@ -25,7 +35,7 @@ export const wrapInMailBody = ({ jsx, subject }: { jsx: JSX.Element; subject: st
                   <img
                     src="https://raw.githubusercontent.com/Kompakkt/Repo/master/src/assets/kompakkt-logo.png"
                     alt="Kompakkt Logo"
-                    width="600"
+                    width={Math.min(maxWidth, 600)}
                   />
                 </td>
               </tr>

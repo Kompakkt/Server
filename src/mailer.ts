@@ -87,18 +87,20 @@ export const sendJSXMail = async ({
   to,
   subject,
   jsx,
+  maxWidth,
 }: {
   jsx: JSX.Element;
   from: string;
   to: string;
   subject: string;
+  maxWidth?: number;
 }): Promise<boolean> => {
   // log('Preparing JSX mail', jsx, wrapInMailBody({ jsx, subject }));
   return sendMail({
     from,
     to,
     subject,
-    html: wrapInMailBody({ jsx, subject }),
+    html: wrapInMailBody({ jsx, subject, maxWidth }),
   });
 };
 
