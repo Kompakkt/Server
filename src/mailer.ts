@@ -91,7 +91,7 @@ export const sendJSXMail = async ({
 }: {
   jsx: JSX.Element;
   from: string;
-  to: string;
+  to: string | string[];
   subject: string;
   maxWidth?: number;
 }): Promise<boolean> => {

@@ -1,25 +1,20 @@
+import { UserRank } from 'src/common';
 import { Configuration } from 'src/configuration';
-import { warn } from 'src/logger';
 import { adminDigest } from 'src/mail-templates';
 import { sendJSXMail } from 'src/mailer';
+import { userCollection } from 'src/mongo';
 
 export const adminDigestMail = async () => {
-  const contact = Configuration.Mailer?.Target.contact;
-  if (!contact) {
-    warn('No contact mail configured, skipping admin digest mail job');
-    return;
-  }
+  let senderDomain = new URL(Configuration.Server.PublicURL).host;
+  if (senderDomain.includes('localhost')) senderDomain = 'kompakkt.de';
 
-  const senderDomain = contact.split('@').at(1);
-  if (!senderDomain) {
-    warn('No valid contact mail configured, skipping admin digest mail job');
-    return;
-  }
+  const admins = await userCollection.find({ role: UserRank.admin }).toArray();
+  const mails = admins.map(a => a.mail.trim()).filter(mail => !!mail);
 
   sendJSXMail({
     jsx: await adminDigest('Server has been restarted'),
     from: `noreply@${senderDomain}`,
-    to: contact,
+    to: mails,
     subject: 'Kompakkt Admin Digest [Server Restart]',
     maxWidth: 1280,
   });
@@ -38,7 +33,7 @@ export const adminDigestMail = async () => {
         sendJSXMail({
           jsx: adminDigest(),
           from: `noreply@${senderDomain}`,
-          to: contact,
+          to: mails,
           subject: 'Kompakkt Admin Digest [Weekly]',
           maxWidth: 1280,
         });
