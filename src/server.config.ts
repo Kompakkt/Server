@@ -2,10 +2,11 @@ import corsPlugin from '@elysiajs/cors';
 import { type JWTOption, jwt } from '@elysiajs/jwt';
 import timingPlugin from '@elysiajs/server-timing';
 import { Elysia } from 'elysia';
-import { helmet } from 'elysia-helmet';
 import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
 import { err, log } from './logger';
+import objectHash from 'object-hash';
+import { decodeJwt } from 'jose';
 
 export const jwtOptions: JWTOption = {
   secret: Bun.env.JWT_SECRET ?? 'secret',
@@ -23,11 +24,20 @@ const configServer = new Elysia({
     sameSite: 'lax',
     secure: false,
   },
+  name: 'configServer',
 })
-  .onRequest(({ request }) => {
-    const url = request.url.slice(request.url.indexOf('/server/') + 7);
-    if (url.indexOf('/previews') !== -1) return;
-    log(`${request.method}  ${url}`);
+  .onRequest(({ request: { url, method, headers } }) => {
+    url = url.slice(url.indexOf('/server/') + 7);
+    if (url.indexOf('/previews') === -1) {
+      queueMicrotask(() => {
+        const date = new Date().toISOString().replaceAll(/[TZ]/g, ' ').trim();
+        const user = Bun.hash(headers.get('cookie') ?? '');
+        // eslint-disable-next-line no-console
+        console.log(
+          `\x1B[2m${date} \x1B[1m${method.padEnd(7, ' ')}\x1B[22m \x1B[2m${user}:${url}\x1B[22m`,
+        );
+      });
+    }
   })
   .onError(({ error, code }) => {
     if (code === 'NOT_FOUND') {
@@ -35,25 +45,9 @@ const configServer = new Elysia({
     }
     err(error);
   })
-  // These are as any because type inference in other routers is bugged otherwise
-  .use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:', 'https:'],
-        },
-      },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any,
-  )
   .get('/health', ({ set }) => {
     set.status = 200;
-    return {
-      status: 'OK',
-    };
+    return { status: 'OK' };
   })
   .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
