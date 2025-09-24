@@ -6,22 +6,22 @@ import { isRouteOfApiKey, validateApiKey } from 'src/util/api-key-helpers';
 
 const cologenCaveRouter = new Elysia().use(configServer).get(
   '/cologne-cave-api/all-entities',
-  async ({ query: { key, limit, offset }, route, error }) => {
+  async ({ query: { key, limit, offset }, route, status }) => {
     const keyDocument = await apiKeyCollection.findOne({ key });
 
     const { valid, expired } = await validateApiKey(keyDocument);
     log('Cave request', { keyDocument, valid, expired, route });
 
     if (!valid) {
-      return error(401, 'Invalid API key');
+      return status(401, 'Invalid API key');
     }
     if (expired) {
-      return error(403, 'API key has expired');
+      return status(403, 'API key has expired');
     }
 
     const correctRoute = isRouteOfApiKey(route, keyDocument);
     if (!correctRoute) {
-      return error(403, 'API key does not have access to this route');
+      return status(403, 'API key does not have access to this route');
     }
 
     const entities = await entityCollection

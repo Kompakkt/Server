@@ -19,7 +19,7 @@ const handleSAMLCallback = async ({
   body: { SAMLResponse: string };
   status: (code: number, message?: string) => any;
   request: Request;
-  cookie: Record<string, Cookie<string | undefined>>;
+  cookie: Record<string, Cookie<unknown>>;
   jwt: { sign: (payload: any) => any };
 }) => {
   const samlService = new SAML(await getSAMLConfig());

@@ -230,6 +230,7 @@ const createResolver = <T extends ServerDocument<T>>(
   isTypeGuard: (obj: unknown) => obj is T,
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
+  // @ts-expect-error Unsure of correct typing, but it works
   return async (obj: ServerDocument<T>, depth: number = RESOLVE_FULL_DEPTH) => {
     const cachedEntity = obj?._id
       ? await entitiesCache

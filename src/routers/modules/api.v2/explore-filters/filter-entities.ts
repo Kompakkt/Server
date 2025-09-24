@@ -14,11 +14,12 @@ export const filterEntities = async (
   for (const document of documents) {
     if (resultDocuments.length >= limit) break;
     const resolved = (await resolveEntity(document, 1)) as
-      | ServerDocument<IEntity<unknown, 1>>
+      | ServerDocument<IEntity<unknown, false>>
       | undefined;
     if (!resolved) continue;
 
     if (licences.length > 0) {
+      if (!('licence' in resolved.relatedDigitalEntity)) continue;
       const licence = resolved.relatedDigitalEntity.licence.replaceAll('-', '');
       if (!licences.includes(licence)) continue;
     }

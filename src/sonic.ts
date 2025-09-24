@@ -19,7 +19,11 @@ import {
 } from './common';
 import { HookManager } from './routers/modules/api.v1/hooks';
 import { findParentCompilations, findParentEntities } from './util/cascade-helpers';
-import { resolveCompilation, resolveEntity } from './routers/modules/api.v1/resolving-strategies';
+import {
+  RESOLVE_FULL_DEPTH,
+  resolveCompilation,
+  resolveEntity,
+} from './routers/modules/api.v1/resolving-strategies';
 import { setImmediate } from 'node:timers';
 import { Configuration } from './configuration';
 
@@ -340,7 +344,9 @@ HookManager.addHook({
       findParentCompilations(entity)
         .then(parentCompilations => {
           return Promise.all(
-            parentCompilations.map(compilation => resolveCompilation(compilation)),
+            parentCompilations.map(compilation =>
+              resolveCompilation(compilation, RESOLVE_FULL_DEPTH),
+            ),
           );
         })
         .then(resolvedCompilations => {
@@ -399,7 +405,9 @@ HookManager.addHook({
       log(`Re-indexing digital entity ${digitalEntity._id} using afterSave hook`);
       findParentEntities(digitalEntity)
         .then(parentEntities => {
-          return Promise.all(parentEntities.map(parentEntity => resolveEntity(parentEntity)));
+          return Promise.all(
+            parentEntities.map(parentEntity => resolveEntity(parentEntity, RESOLVE_FULL_DEPTH)),
+          );
         })
         .then(resolvedEntities => {
           for (const resolvedEntity of resolvedEntities) {

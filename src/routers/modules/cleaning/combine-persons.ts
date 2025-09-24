@@ -1,14 +1,14 @@
 import type { IPerson } from 'src/common';
 import { personCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { resolvePerson } from '../api.v1/resolving-strategies';
+import { RESOLVE_FULL_DEPTH, resolvePerson } from '../api.v1/resolving-strategies';
 import { log } from 'src/logger';
 
 export const combinePersons = async () => {
   const persons = await personCollection
     .find({})
     .toArray()
-    .then(documents => Promise.all(documents.map(doc => resolvePerson(doc))))
+    .then(documents => Promise.all(documents.map(doc => resolvePerson(doc, RESOLVE_FULL_DEPTH))))
     .then(persons => persons.filter((v): v is ServerDocument<IPerson<true>> => !!v));
 
   const groupedByContactRef: Record<string, ServerDocument<IPerson<true>>[]> = {};

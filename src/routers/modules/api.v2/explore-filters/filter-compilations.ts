@@ -1,4 +1,4 @@
-import type { ICompilation, IUserData } from 'src/common';
+import { isEntity, type ICompilation, type IUserData } from 'src/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveCompilation } from '../../api.v1/resolving-strategies';
 import { AnnotationFilter, MiscFilter, type ExploreRequest } from '../types';
@@ -14,38 +14,47 @@ export const filterCompilations = async (
   for (const document of documents) {
     if (resultDocuments.length >= limit) break;
     const resolved = (await resolveCompilation(document, 2)) as
-      | ServerDocument<ICompilation<2>>
+      | ServerDocument<ICompilation<false>>
       | undefined;
     if (!resolved) continue;
     const entities = Object.values(resolved.entities);
 
     if (licences.length > 0) {
-      const anyEntityHasLicence = entities.some(e =>
-        licences.includes(e.relatedDigitalEntity.licence.replaceAll('-', '')),
+      const anyEntityHasLicence = entities.some(
+        e =>
+          isEntity(e) &&
+          'licence' in e.relatedDigitalEntity &&
+          licences.includes(e.relatedDigitalEntity.licence.replaceAll('-', '')),
       );
       if (!anyEntityHasLicence) continue;
     }
 
     if (misc.length > 0) {
       if (misc.includes(MiscFilter.downloadable)) {
-        const anyEntityIsDownloadable = entities.some(e => e.options?.allowDownload);
+        const anyEntityIsDownloadable = entities.some(
+          e => 'options' in e && e.options?.allowDownload,
+        );
         if (!anyEntityIsDownloadable) continue;
       }
       // TODO: Animated filter
     }
 
     if (mediaTypes.length > 0) {
-      const anyEntityHasMediaType = entities.some(e => mediaTypes.includes(e.mediaType));
+      const anyEntityHasMediaType = entities.some(
+        e => 'mediaType' in e && mediaTypes.includes(e.mediaType),
+      );
       if (!anyEntityHasMediaType) continue;
     }
 
     if (annotations !== AnnotationFilter.all) {
       if (annotations === AnnotationFilter.withAnnotations) {
-        const anyEntityHasAnnotations = entities.some(e => Object.keys(e.annotations).length > 0);
+        const anyEntityHasAnnotations = entities.some(
+          e => 'annotations' in e && Object.keys(e.annotations).length > 0,
+        );
         if (!anyEntityHasAnnotations) continue;
       } else if (annotations === AnnotationFilter.withoutAnnotations) {
         const allEntitiesHaveNoAnnotations = entities.every(
-          e => Object.keys(e.annotations).length === 0,
+          e => 'annotations' in e && Object.keys(e.annotations).length === 0,
         );
         if (!allEntitiesHaveNoAnnotations) continue;
       }

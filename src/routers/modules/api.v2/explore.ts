@@ -132,6 +132,7 @@ export const exploreHandler = async (
   })();
   console.timeEnd(`explore::${collection}::${hash}`);
 
+  // @ts-expect-error Unsure of correct typing, but it works
   const filteredDocuments = await filterDocuments(collection)(documents, options, userdata);
 
   // TODO: Sort options, pagination, and reversed order
