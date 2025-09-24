@@ -1,3 +1,4 @@
+import { generateTailwindCSS } from 'src/util/generate-tailwindcss';
 import { hostMonitor, type CPUInfo, type MemoryInfo } from '../util/host-monitor';
 
 type DataPoint = {
@@ -118,14 +119,14 @@ const LineChart = ({
   );
 };
 
-export const hostMonitorUI = () => {
+export const hostMonitorUI = async () => {
   // Convert replay data to include timestamps
   const dataPoints: DataPoint[] = hostMonitor.replay.map((point, index) => ({
     timestamp: Date.now() - (hostMonitor.replay.length - index - 1) * 1000,
     ...point,
   }));
 
-  return (
+  const htmlContent =
     '<!DOCTYPE html>' +
     (
       <html>
@@ -133,7 +134,7 @@ export const hostMonitorUI = () => {
           <title>Host Monitor</title>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <script src="https://cdn.tailwindcss.com"></script>
+          <style>#TAILWIND_CSS</style>
           <style>
             {`
             .metric-card {
@@ -280,6 +281,8 @@ export const hostMonitorUI = () => {
           </div>
         </body>
       </html>
-    )
-  );
+    );
+
+  const patched = await generateTailwindCSS(htmlContent, 'host-monitor.css');
+  return htmlContent.replace('#TAILWIND_CSS', patched);
 };

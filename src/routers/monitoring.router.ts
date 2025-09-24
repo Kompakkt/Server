@@ -21,7 +21,7 @@ const monitoringRouter = new Elysia()
           set.headers['Content-Type'] = 'text/html';
           set.headers['Content-Security-Policy'] =
             `style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com`;
-          return hostMonitorUI();
+          return await hostMonitorUI();
         },
         {
           query: t.Object({
