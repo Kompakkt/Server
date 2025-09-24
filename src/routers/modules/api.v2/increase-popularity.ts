@@ -9,7 +9,7 @@ const lastRequestFromAddress = new Map<string, number>();
 const popularityIncreaseInterval = 60 * 1000 * 60; // 60 minutes
 
 export const increasePopularity = async (
-  document: ServerDocument<ISortable>,
+  document: ServerDocument<Partial<ISortable>>,
   collection: Collection,
   request: Request,
   server: Bun.Server | null,

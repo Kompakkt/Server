@@ -14,7 +14,7 @@ import {
 } from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService, signInBody } from './handlers/auth.service';
-import { resolveEntity } from './modules/api.v1/resolving-strategies';
+import { RESOLVE_FULL_DEPTH, resolveEntity } from './modules/api.v1/resolving-strategies';
 import { resolveUsersDataObject } from './modules/user-management/users';
 import { exploreCache } from 'src/redis';
 import { RouterTags } from './tags';
@@ -178,7 +178,7 @@ const adminRouter = new Elysia()
 
           exploreCache.flush();
 
-          return resolveEntity({ _id });
+          return resolveEntity({ _id }, RESOLVE_FULL_DEPTH);
         },
         {
           body: t.Object({
