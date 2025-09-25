@@ -1,5 +1,5 @@
 import { t } from 'elysia';
-import { Collection, type IUserData } from 'src/common';
+import { Collection, UserRank, type IUserData } from 'src/common';
 import type { IDocument } from 'src/common/interfaces';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -10,6 +10,7 @@ import {
   resolveEntity,
 } from './resolving-strategies';
 import { checkIsOwner } from '../user-management/users';
+import { log } from 'src/logger';
 
 export const findSingleHandler = async (
   {
@@ -41,15 +42,19 @@ export const findSingleHandler = async (
       const isUserWhitelisted = entity.whitelist.persons
         .concat(entity.whitelist.groups.flatMap(g => g.members))
         .some(p => p._id === userdata?._id.toString());
+      const isAdmin = userdata?.role === UserRank.admin;
 
-      const userHasAccess = entityExistsInUserdata || isUserWhitelisted || !!userInAccess;
+      const userHasAccess =
+        isAdmin || entityExistsInUserdata || isUserWhitelisted || !!userInAccess;
+      if (isAdmin && (isWhitelistEnabled || !entity.online))
+        log(`Admin ${userdata.username} requested access to ${entity._id.toString()}`);
 
       if (entity.online && isWhitelistEnabled) {
         return userHasAccess ? entity : undefined;
       } else if (entity.online && !isWhitelistEnabled) {
         return entity;
       } else if (!entity.online) {
-        return userInAccess || entityExistsInUserdata ? entity : undefined;
+        return !!userInAccess || entityExistsInUserdata || isAdmin ? entity : undefined;
       }
       return undefined;
     }
