@@ -60,6 +60,31 @@ const adminRouter = new Elysia()
   .group('/admin', { body: signInBody, isAdmin: true }, group =>
     group
       .post(
+        '/digest',
+        async ({ query: { from, to, finished, restricted }, status }) => {
+          // Check if timespan is larger than 31 days
+          if (to - from > 31 * 24 * 60 * 60 * 1000) return status('Bad Request', 'Range too large');
+
+          const entities = await entityCollection
+            .find({
+              __createdAt: { $gte: from, $lte: to },
+              ...(finished !== undefined ? { finished: true } : {}),
+              ...(restricted !== undefined ? { online: false } : {}),
+            })
+            .toArray();
+          const resolvedEntities = await Promise.all(entities.map(e => resolveEntity(e, 0)));
+          return resolvedEntities;
+        },
+        {
+          query: t.Object({
+            from: t.Number(),
+            to: t.Number(),
+            finished: t.Optional(t.Boolean()),
+            restricted: t.Optional(t.Boolean()),
+          }),
+        },
+      )
+      .post(
         '/stats',
         async () => {
           const entities = await gatherDbCollectionStats(entityCollection);
