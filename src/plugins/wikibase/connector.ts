@@ -135,14 +135,20 @@ export class WikibaseConnector implements TokenManager {
       format: 'json',
     };
 
-    const response: ClientLoginResponse | undefined = await this.client.post('/api.php', {
-      options: {
-        body: new URLSearchParams(params).toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+    const response: ClientLoginResponse | undefined = await this.client
+      .post('/api.php', {
+        options: {
+          body: new URLSearchParams(params).toString(),
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
         },
-      },
-    });
+      })
+      .catch(error => {
+        err('Login request failed', error);
+        return undefined;
+      });
+    if (!response) return undefined;
 
     if (response?.clientlogin.status !== 'PASS') {
       err('! login failed', response);
@@ -152,33 +158,6 @@ export class WikibaseConnector implements TokenManager {
     const token = await this.requestCsrfToken();
     if (!token) return undefined;
     this.csrfToken = token;
-  }
-
-  public async createAccount(username: string, password: string): Promise<unknown> {
-    const csrfToken = await this.getCreateAccountToken();
-    const params = {
-      action: 'createaccount',
-      createtoken: csrfToken,
-      username: username,
-      password: password,
-      retype: password,
-      createreturnurl: 'http://test',
-      format: 'json',
-    };
-    const response = await this.client.post('/api.php', { params });
-    return response;
-  }
-
-  private async getCreateAccountToken() {
-    const params = {
-      action: 'query',
-      meta: 'tokens',
-      type: 'createaccount',
-      format: 'json',
-    };
-
-    const data = await this.client.get('/api.php', { params });
-    return data.query.tokens.createaccounttoken;
   }
 
   // Token management methods
@@ -202,14 +181,19 @@ export class WikibaseConnector implements TokenManager {
   }
 
   private async requestCsrfToken(): Promise<string | undefined> {
-    const csfrTokenResponse: CSRFTokenResponse | undefined = await this.client.get('/api.php', {
-      params: {
-        action: 'query',
-        meta: 'tokens',
-        type: 'csrf',
-        format: 'json',
-      },
-    });
+    const csfrTokenResponse: CSRFTokenResponse | undefined = await this.client
+      .get('/api.php', {
+        params: {
+          action: 'query',
+          meta: 'tokens',
+          type: 'csrf',
+          format: 'json',
+        },
+      })
+      .catch(error => {
+        warn(`Failed getting wikibase CSRF token: ${error}`);
+        return undefined;
+      });
 
     if (!csfrTokenResponse) {
       return undefined;
@@ -293,6 +277,10 @@ export class WikibaseConnector implements TokenManager {
         }
         warn(`Unknown response type ${response}`);
         throw new Error('Failed to write annotation');
+      })
+      .catch(error => {
+        err('writeAnnotation', error);
+        return false;
       });
   }
 
@@ -352,18 +340,5 @@ export class WikibaseConnector implements TokenManager {
         log(error);
         return undefined;
       });
-  }
-
-  // SDK query methods
-
-  public async requestSDKquery(query: string): Promise<unknown> {
-    const params = {
-      action: 'wbgetentities',
-      ids: query,
-      format: 'json',
-    };
-
-    const data = await this.client.get('/api.php', { params });
-    return data;
   }
 }

@@ -661,11 +661,6 @@ export class WikibaseService {
     });
   }
 
-  // createAccount
-  public async createAccount(username: string, password: string) {
-    await this.wbConnect.createAccount(username, password);
-  }
-
   public async fetchAnnotation(
     wikibase_id: string,
   ): Promise<IWikibaseAnnotationExtensionData | undefined> {
