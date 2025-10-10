@@ -46,13 +46,18 @@ export const authService = new Elysia({ name: 'authService' })
     { as: 'global' },
     async ({
       jwt,
-      cookie,
+      cookie: { auth },
+      headers: { authorization },
     }): Promise<{
       userdata: ServerDocument<IUserData> | undefined;
       isLoggedIn: boolean;
       isAdmin: boolean;
     }> => {
-      const result = await jwt.verify(cookie.auth.value as any);
+      const result = await (async () => {
+        const token = authorization?.replace('Bearer ', '')?.trim();
+        if (token) return await jwt.verify(token);
+        return await jwt.verify(auth.value as any);
+      })();
       if (!result) {
         return { userdata: undefined, isLoggedIn: false, isAdmin: false };
       }

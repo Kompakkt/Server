@@ -27,6 +27,7 @@ const userManagementRouter = new Elysia()
           jwt,
           useAuthController,
           request,
+          set: { headers },
         }) => {
           const userdata = await useAuthController(body, strategy);
           if (userdata instanceof Error) {
@@ -36,13 +37,18 @@ const userManagementRouter = new Elysia()
           const origin = request.headers.get('origin') ?? '';
           const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
 
+          const token = await jwt.sign({
+            username: userdata.username,
+            _id: userdata._id.toString(),
+          });
           auth.set({
-            value: await jwt.sign({ username: userdata.username, _id: userdata._id.toString() }),
+            value: token,
             path: '/',
             httpOnly: true,
             sameSite: isLocalhost ? 'none' : 'lax',
             secure: isLocalhost ? true : undefined,
           });
+          headers['X-JWT'] = token;
 
           return userdata;
         },
@@ -128,7 +134,7 @@ const userManagementRouter = new Elysia()
       )
       .get(
         '/auth',
-        async ({ cookie: { auth }, status, jwt, query: { data } }) => {
+        async ({ cookie: { auth }, status, jwt, query: { data }, set: { headers } }) => {
           if (!auth.value) {
             return status(401, 'No session');
           }
@@ -136,6 +142,7 @@ const userManagementRouter = new Elysia()
           if (!result) {
             return status(401, 'Invalid session');
           }
+
           const { username, _id } = result;
           if (!username || typeof username !== 'string' || !_id || typeof _id !== 'string') {
             return status(401, 'Invalid session');
@@ -153,17 +160,17 @@ const userManagementRouter = new Elysia()
 
           // TODO: set resolve depth to 0 after colleagues stop working on old branch
           const userWithData = resolveUsersDataObject(user, dataTypes);
+
+          headers['X-JWT'] = auth.value;
           return userWithData;
         },
         {
           cookie: t.Cookie({
             auth: t.String(),
           }),
-          query: t.Optional(
-            t.Object({
-              data: t.String(),
-            }),
-          ),
+          query: t.Object({
+            data: t.Optional(t.String()),
+          }),
         },
       )
       .post(
