@@ -1,12 +1,11 @@
 import corsPlugin from '@elysiajs/cors';
 import { type JWTOption, jwt } from '@elysiajs/jwt';
 import timingPlugin from '@elysiajs/server-timing';
-import { Elysia } from 'elysia';
+import prometheusPlugin from 'elysia-prometheus';
+import { Elysia, t } from 'elysia';
 import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
-import { err, log } from './logger';
-import objectHash from 'object-hash';
-import { decodeJwt } from 'jose';
+import { err, log, warn } from './logger';
 
 export const jwtOptions: JWTOption = {
   secret: Bun.env.JWT_SECRET ?? 'secret',
@@ -26,7 +25,7 @@ const configServer = new Elysia({
   },
   name: 'configServer',
 })
-  .onRequest(({ request: { url, method, headers } }) => {
+  .onRequest(({ request: { url, method, headers }, status }) => {
     url = url.slice(url.indexOf('/server/') + 7);
     if (url.indexOf('/previews') === -1) {
       queueMicrotask(() => {
@@ -38,6 +37,12 @@ const configServer = new Elysia({
         );
       });
     }
+    if (url.indexOf('/metrics') >= 0) {
+      const key = new URL(`http://example.com${url}`).searchParams.get('key');
+      if (!key) return status('Unauthorized', 'Incorrect API key');
+      if (key !== Configuration.Server.MonitoringToken)
+        return status('Unauthorized', 'Incorrect API key');
+    }
   })
   .onError(({ error, code }) => {
     if (code === 'NOT_FOUND') {
@@ -45,6 +50,15 @@ const configServer = new Elysia({
     }
     err(error);
   })
+  .use(
+    prometheusPlugin({
+      metricsPath: '/metrics',
+      staticLabels: { service: 'kompakkt-server' },
+      dynamicLabels: {
+        userAgent: ctx => ctx.request.headers.get('user-agent') ?? 'unknown',
+      },
+    }),
+  )
   .get('/health', ({ set }) => {
     set.status = 200;
     return { status: 'OK' };
@@ -53,14 +67,12 @@ const configServer = new Elysia({
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
   .use(timingPlugin({}))
-  .get('/previews/*', async ({ params, redirect }) => {
+  .get('/previews/*', async ({ params, status }) => {
     const file = Bun.file(
       `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`,
     );
-    if (await file.exists()) {
-      return file;
-    }
-    return redirect(`https://kompakkt.de/server/previews/${params['*']}`);
+    if (await file.exists()) return file;
+    return status(404, 'Preview not found');
   });
 
 export default configServer;

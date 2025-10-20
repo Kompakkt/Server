@@ -106,6 +106,7 @@ const WBClassesArr = [
   'human',
   'humanMadeObject',
   'conceptualObject',
+  'digitalObject',
   'mediaItem',
   'software',
   'bibliographicWork',

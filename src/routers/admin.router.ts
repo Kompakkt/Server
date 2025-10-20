@@ -3,8 +3,8 @@ import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import { UserRank } from 'src/common';
 import { Configuration } from 'src/configuration';
-import { passwordResetRequest, updatedUserRole } from 'src/mail-templates';
-import { sendJSXMail } from 'src/mailer';
+import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
+import { sendReactMail } from 'src/mailer';
 import {
   annotationCollection,
   compilationCollection,
@@ -160,11 +160,11 @@ const adminRouter = new Elysia()
           if (!updateResult) return status('Internal Server Error');
 
           if (Configuration.Mailer?.Target) {
-            sendJSXMail({
+            sendReactMail({
               from: Configuration.Mailer.Target.contact,
               to: user.mail,
               subject: 'Your Kompakkt status has been updated',
-              jsx: updatedUserRole({
+              jsx: userroleUpdatedTemplate({
                 prename: user.prename,
                 prevRole: user.role,
                 newRole: role,
@@ -231,11 +231,11 @@ const adminRouter = new Elysia()
           );
           if (!updateResult) return status('Internal Server Error');
 
-          const success = await sendJSXMail({
+          const success = await sendReactMail({
             from: Configuration.Mailer?.Target?.contact ?? 'noreply@kompakkt.de',
             to: user.mail,
             subject: 'Kompakkt password reset request',
-            jsx: passwordResetRequest({
+            jsx: passwordResetRequestTemplate({
               prename: user.prename,
               resetToken,
               requestedByAdministrator: true,

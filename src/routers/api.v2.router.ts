@@ -74,7 +74,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Retrieves user data from the specified collection, resolving document IDs to full documents if requested.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -132,7 +132,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }),
         detail: {
           description: 'Retrieves entities the user has access to based on the specified role.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -219,7 +219,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Updates the access permissions for an entity, ensuring at least one owner remains.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -295,7 +295,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Transfers ownership of an entity to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -318,7 +318,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }),
         detail: {
           description: 'Retrieves a user profile by its ID or display name.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
         isLoggedIn: false,
       },
@@ -371,7 +371,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: "Retrieves the logged-in user's profile.",
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -424,7 +424,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: 'Creates a new institutional profile.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -474,7 +474,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: 'Updates an existing institutional profile.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
         params: t.Object({
           id: t.String({
@@ -545,7 +545,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: "Updates the logged-in user's profile with the provided data.",
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -572,7 +572,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       {
         detail: {
           description: 'Lists all unique file formats of processed entities.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -628,7 +628,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Retrieves entities that match the specified file formats, filtering by processed raw paths.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -648,7 +648,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Explore entities (objects) and compilations (collections) on various filters.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
         body: ExploreRequest,
       },
@@ -694,7 +694,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Removes the logged-in user from editor or viewer to no special access on the specified document. The user must be either editor or viewer to use this endpoint.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     )
@@ -730,7 +730,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         detail: {
           description: 'Allows the logged-in user to leave a group they are a member of.',
-          tags: [RouterTags.API, RouterTags['API V2']],
+          tags: [RouterTags['API V2']],
         },
       },
     ),

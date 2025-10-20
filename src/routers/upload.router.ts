@@ -18,6 +18,7 @@ import { typedObjectEntries } from 'src/util/typed-object-entries';
 import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
 import { authService } from './handlers/auth.service';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { RouterTags } from './tags';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
@@ -338,8 +339,17 @@ const uploadRouter = new Elysia()
     },
     {
       params: t.Object({
-        '*': t.String(),
+        '*': t.String({
+          description: 'Path to the requested file within the uploads directory',
+        }),
       }),
+      detail: {
+        description: 'Serve uploaded files with on-the-fly compression',
+        tags: [RouterTags.Upload],
+      },
+      response: {
+        200: t.File({ description: 'The requested file' }),
+      },
     },
   )
   .get(

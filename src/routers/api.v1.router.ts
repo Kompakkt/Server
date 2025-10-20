@@ -73,7 +73,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         params: findSingleParams,
         detail: {
           description: 'Find a single entity in a collection by its identifier',
-          tags: [RouterTags.API, RouterTags['API V1']],
+          tags: [RouterTags['API V1']],
         },
       },
     )
@@ -85,7 +85,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         detail: {
           description:
             'Find a single entity in a collection, and decode it with the provided password',
-          tags: [RouterTags.API, RouterTags['API V1']],
+          tags: [RouterTags['API V1']],
         },
       },
     )
@@ -93,13 +93,13 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
       params: findAllParams,
       detail: {
         description: 'Find all entities in a collection',
-        tags: [RouterTags.API, RouterTags['API V1']],
+        tags: [RouterTags['API V1']],
       },
     })
     .get('/get/id', () => new ObjectId(), {
       detail: {
         description: 'Get a new ObjectId',
-        tags: [RouterTags.API, RouterTags['API V1']],
+        tags: [RouterTags['API V1']],
       },
     })
     .post(
@@ -117,7 +117,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         body: ExploreRequest,
         detail: {
           description: 'Explore entities or compilations based on search criteria',
-          tags: [RouterTags.API, RouterTags['API V1']],
+          tags: [RouterTags['API V1']],
         },
       },
     )
@@ -168,7 +168,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         hasRole: EntityAccessRole.owner,
         detail: {
           description: 'Remove an entity from a collection',
-          tags: [RouterTags.API, RouterTags['API V1']],
+          tags: [RouterTags['API V1']],
         },
       },
     )
@@ -193,14 +193,14 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           {
             detail: {
               description: 'Get all users with stripped data',
-              tags: [RouterTags.API, RouterTags['API V1']],
+              tags: [RouterTags['API V1']],
             },
           },
         )
         .get('/get/groups', () => groupCollection.find({}).toArray(), {
           detail: {
             description: 'Get all groups',
-            tags: [RouterTags.API, RouterTags['API V1']],
+            tags: [RouterTags['API V1']],
           },
         })
         .post(
@@ -297,7 +297,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             body: t.Unknown(),
             detail: {
               description: 'Push an entity to a collection',
-              tags: [RouterTags.API, RouterTags['API V1']],
+              tags: [RouterTags['API V1']],
             },
           },
         )
@@ -330,7 +330,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             const settings = { ...body, preview: finalImagePath };
             const result = await entityCollection.updateOne(
               { _id: new ObjectId(existingEntity._id.toString()) },
-              { $set: { settings } },
+              { $set: { settings: { ...existingEntity.settings, ...settings } } },
             );
 
             if (!result || result.modifiedCount !== 1) return status('Internal Server Error');
@@ -344,7 +344,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             body: t.Unknown(),
             detail: {
               description: 'Update settings of an entity',
-              tags: [RouterTags.API, RouterTags['API V1']],
+              tags: [RouterTags['API V1']],
             },
             isLoggedIn: true,
           },

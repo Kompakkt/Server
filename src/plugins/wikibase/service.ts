@@ -562,7 +562,11 @@ export class WikibaseService {
     }
     try {
       const result = {
-        persons: await this.wikibaseClassInstances([WBClasses.human, WBClasses.organization]),
+        persons: await this.wikibaseClassInstances([
+          WBClasses.human,
+          WBClasses.group,
+          WBClasses.organization,
+        ]),
         techniques: await this.wikibaseClassInstances([WBClasses.technique]),
         software: await this.wikibaseClassInstances([WBClasses.software]),
         bibliographic_refs: await this.wikibaseClassInstances([WBClasses.bibliographicWork]),

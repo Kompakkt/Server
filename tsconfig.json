@@ -16,9 +16,8 @@
     "noImplicitAny": true,
     "verbatimModuleSyntax": true,
     "lib": ["ESNext", "dom"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "@kitajs/html",
-    "plugins": [{ "name": "@kitajs/ts-html-plugin" }],
+    "jsx": "react",
+    // "plugins": [{ "name": "@kitajs/ts-html-plugin" }],
     "paths": {
       "*": ["./*"]
     }

@@ -1,15 +1,9 @@
+import type { KyInstance } from 'ky';
 import { join } from 'node:path';
-import { t } from 'elysia';
 import { Configuration } from 'src/configuration';
-import { err, info, log, warn } from 'src/logger';
-import { RequestClient } from 'src/util/requests';
+import { err, log, warn } from 'src/logger';
+import { createKyClient } from 'src/util/create-ky-client';
 import { RootDirectory } from '../../environment';
-import { CacheClient } from 'src/redis';
-
-interface TokenManager {
-  loginToken: string | null;
-  csrfToken: string | null;
-}
 
 type QueryTokenResponse<K extends 'logintoken' | 'csrftoken'> = {
   batchcomplete: string;
@@ -22,14 +16,6 @@ type QueryTokenResponse<K extends 'logintoken' | 'csrftoken'> = {
 
 type LoginTokenResponse = QueryTokenResponse<'logintoken'>;
 type CSRFTokenResponse = QueryTokenResponse<'csrftoken'>;
-
-type LoginResponse = {
-  login: {
-    result: string;
-    lguserid: number;
-    lgusername: string;
-  };
-};
 
 type ClientLoginResponse = {
   clientlogin:
@@ -95,19 +81,22 @@ const isWikibaseImageResponse = (response: unknown): response is WikibaseImageRe
   return false;
 };
 
-const { DBOffset: offset } = Configuration.Redis;
-
-export class WikibaseConnector implements TokenManager {
+export class WikibaseConnector {
   private wikibaseUrl: string;
   private login: string;
   private password: string;
-  private client: RequestClient;
+  private client: KyInstance;
   private requestAttempts = 0;
 
   loginToken: string | null;
   csrfToken: string | null;
 
   constructor(instance: string, credentials: { username: string; password: string }) {
+    if (!instance.endsWith('api.php')) {
+      if (!instance.endsWith('/')) instance += '/';
+      instance += 'api.php';
+    }
+
     this.wikibaseUrl = instance;
     this.login = credentials.username;
     this.password = credentials.password;
@@ -115,7 +104,7 @@ export class WikibaseConnector implements TokenManager {
     this.loginToken = null;
     this.csrfToken = null;
 
-    this.client = new RequestClient(this.wikibaseUrl);
+    this.client = createKyClient();
 
     this.loginRequest();
   }
@@ -126,24 +115,21 @@ export class WikibaseConnector implements TokenManager {
     const loginToken = await this.getLoginToken();
     if (!loginToken) return undefined;
 
-    const params = {
-      action: 'clientlogin',
-      username: this.login,
-      password: this.password,
-      logintoken: loginToken,
-      loginreturnurl: 'http://test',
-      format: 'json',
-    };
+    const url = new URL(this.wikibaseUrl);
+    const params = new URLSearchParams();
+    params.set('action', 'clientlogin');
+    params.set('username', this.login);
+    params.set('password', this.password);
+    params.set('logintoken', loginToken);
+    params.set('loginreturnurl', 'http://test');
+    params.set('format', 'json');
 
-    const response: ClientLoginResponse | undefined = await this.client
-      .post('/api.php', {
-        options: {
-          body: new URLSearchParams(params).toString(),
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        },
+    const response = await this.client
+      .post<ClientLoginResponse>(url, {
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       })
+      .then(response => response.json())
       .catch(error => {
         err('Login request failed', error);
         return undefined;
@@ -163,15 +149,15 @@ export class WikibaseConnector implements TokenManager {
   // Token management methods
 
   private async requestLoginToken() {
-    const queryLoginTokenResponse: LoginTokenResponse | undefined = await this.client
-      .get('/api.php', {
-        params: {
-          action: 'query',
-          meta: 'tokens',
-          type: 'login',
-          format: 'json',
-        },
-      })
+    const url = new URL(this.wikibaseUrl);
+    url.searchParams.set('action', 'query');
+    url.searchParams.set('meta', 'tokens');
+    url.searchParams.set('type', 'login');
+    url.searchParams.set('format', 'json');
+
+    const queryLoginTokenResponse = await this.client
+      .get<LoginTokenResponse>(url)
+      .then(response => response.json())
       .catch(error => {
         warn(`Failed getting wikibase login token: ${error}`);
         return undefined;
@@ -181,15 +167,14 @@ export class WikibaseConnector implements TokenManager {
   }
 
   private async requestCsrfToken(): Promise<string | undefined> {
-    const csfrTokenResponse: CSRFTokenResponse | undefined = await this.client
-      .get('/api.php', {
-        params: {
-          action: 'query',
-          meta: 'tokens',
-          type: 'csrf',
-          format: 'json',
-        },
-      })
+    const url = new URL(this.wikibaseUrl);
+    url.searchParams.set('action', 'query');
+    url.searchParams.set('meta', 'tokens');
+    url.searchParams.set('type', 'csrf');
+    url.searchParams.set('format', 'json');
+    const csfrTokenResponse = await this.client
+      .get<CSRFTokenResponse>(url)
+      .then(response => response.json())
       .catch(error => {
         warn(`Failed getting wikibase CSRF token: ${error}`);
         return undefined;
@@ -254,6 +239,7 @@ export class WikibaseConnector implements TokenManager {
       throw new Error('Failed to get CSRF token');
     }
 
+    const url = new URL(this.wikibaseUrl);
     const formData = new FormData();
     formData.append('ignorewarnings', '1');
     formData.append('title', `Annotation:${id}`);
@@ -263,11 +249,8 @@ export class WikibaseConnector implements TokenManager {
     formData.append('format', 'json');
 
     return await this.client
-      .post('/api.php', {
-        options: {
-          body: formData,
-        },
-      })
+      .post(url, { body: formData })
+      .then(response => response.json())
       .then(response => {
         if (isLinkbackResponse(response) && response.success === 1) {
           return true;
@@ -296,6 +279,7 @@ export class WikibaseConnector implements TokenManager {
     const extension = path.split('.').pop();
     const filename = `Preview${id}.${extension}`;
 
+    const url = new URL(this.wikibaseUrl);
     const formData = new FormData();
     const blob = await Bun.readableStreamToBlob(file.stream());
     formData.append('file', blob, filename);
@@ -306,11 +290,8 @@ export class WikibaseConnector implements TokenManager {
     formData.append('format', 'json');
 
     return this.client
-      .post('/api.php', {
-        options: {
-          body: formData,
-        },
-      })
+      .post(url, { body: formData })
+      .then(response => response.json())
       .then(response => {
         log('writeImage', response);
         if (!isWikibaseImageResponse(response)) {

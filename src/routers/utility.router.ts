@@ -11,6 +11,14 @@ import {
   findUserInCompilations,
   findUserInGroups,
 } from './modules/utility/utility';
+import { copyFile, mkdir, mkdtemp } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { entityCollection } from 'src/mongo';
+import { ObjectId } from 'mongodb';
+import { RootDirectory } from 'src/environment';
+import { Configuration } from 'src/configuration';
+import sharp from 'sharp';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -21,6 +29,54 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
       {
         params: t.Object({
           id: t.String(),
+        }),
+      },
+    )
+    .post(
+      '/generate-entity-video-preview',
+      async ({ body: { entityId, screenshots }, status }) => {
+        const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        if (!entity) return status('Not Found', 'Entity not found');
+
+        const mediaType =
+          {
+            model: 'entity',
+            cloud: 'entity',
+            splat: 'entity',
+          }[entity.mediaType] ?? entity.mediaType;
+
+        const tmpDir = await mkdtemp(join(tmpdir(), 'bun-'));
+
+        await Promise.all(
+          screenshots.map((screenshot, index) => {
+            const buffer = Buffer.from(
+              screenshot.replace(/^data:image\/\w+;base64,/, ''),
+              'base64',
+            );
+            return sharp(buffer)
+              .png()
+              .toFile(`${tmpDir}/frame_${String(index).padStart(4, '0')}.png`);
+          }),
+        );
+
+        await Bun.$`ffmpeg -y -framerate ${screenshots.length} -i ${tmpDir}/frame_%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p -colorspace bt709 -color_primaries bt709 -color_trc bt709 -deadline best -crf 30 -b:v 200k -g 1 ${tmpDir}/${entityId}.webm`.quiet();
+
+        const previewPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${mediaType}/`;
+        await mkdir(previewPath, { recursive: true });
+        await copyFile(`${tmpDir}/${entityId}.webm`, `${previewPath}${entityId}.webm`);
+
+        const finalPath = `/server/previews/${mediaType}/${entityId}.webm`;
+        await entityCollection.updateOne(
+          { _id: new ObjectId(entityId) },
+          { $set: { 'settings.previewVideo': finalPath } },
+        );
+
+        return { status: 'OK', videoUrl: finalPath };
+      },
+      {
+        body: t.Object({
+          screenshots: t.Array(t.String()),
+          entityId: t.String(),
         }),
       },
     )

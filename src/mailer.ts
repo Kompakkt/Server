@@ -3,10 +3,11 @@ import { type SendMailOptions, createTransport } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { type IUserData, UserRank } from './common';
 import { Configuration, isMailConfiguration } from './configuration';
-import { err, info, log } from './logger';
-import { wrapInMailBody } from './mail-templates/mail-body.template';
+import { err, info } from './logger';
 import { mailCollection, userCollection } from './mongo';
 import type { ServerDocument } from './util/document-with-objectid-type';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 export enum ETarget {
   contact = 'contact',
@@ -82,25 +83,22 @@ export const sendMail = async (mail: SendMailOptions): Promise<boolean> =>
       return true;
     });
 
-export const sendJSXMail = async ({
+export const sendReactMail = async ({
   from,
   to,
   subject,
   jsx,
-  maxWidth,
 }: {
-  jsx: JSX.Element;
+  jsx: React.ReactNode;
   from: string;
   to: string | string[];
   subject: string;
-  maxWidth?: number;
 }): Promise<boolean> => {
-  // log('Preparing JSX mail', jsx, wrapInMailBody({ jsx, subject }));
   return sendMail({
     from,
     to,
     subject,
-    html: wrapInMailBody({ jsx, subject, maxWidth }),
+    html: renderToStaticMarkup(jsx),
   });
 };
 

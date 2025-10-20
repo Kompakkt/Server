@@ -2,12 +2,16 @@ import { randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { Collection, type IUserData, UserRank } from 'src/common';
-import { sendJSXMail } from 'src/mailer';
+import { sendReactMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { updateUserPassword } from 'src/util/authentication-helpers';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { forgotUsername, passwordResetRequest, welcomeNewAccount } from '../mail-templates';
+import {
+  forgotUsernameTemplate,
+  passwordResetRequestTemplate,
+  welcomeNewAccountTemplate,
+} from '../emails';
 import { authService, signInBody } from './handlers/auth.service';
 import { resolveUsersDataObject } from './modules/user-management/users';
 import { info } from 'src/logger';
@@ -97,11 +101,11 @@ const userManagementRouter = new Elysia()
           }
 
           info('Sending welcome mail');
-          const success = await sendJSXMail({
+          const success = await sendReactMail({
             from: 'noreply@kompakkt.de',
             to: mail,
             subject: 'Welcome to Kompakkt!',
-            jsx: welcomeNewAccount(adjustedUser),
+            jsx: welcomeNewAccountTemplate(adjustedUser),
           });
           if (!success) return status(500, 'Failed sending welcome mail');
 
@@ -191,11 +195,11 @@ const userManagementRouter = new Elysia()
           );
           if (!updateResult) return status('Internal Server Error');
 
-          const success = await sendJSXMail({
+          const success = await sendReactMail({
             from: 'noreply@kompakkt.de',
             to: user.mail,
             subject: 'Kompakkt password reset request',
-            jsx: passwordResetRequest({ prename: user.prename, resetToken }),
+            jsx: passwordResetRequestTemplate({ prename: user.prename, resetToken }),
           });
           if (!success) return status('Internal Server Error');
 
@@ -254,11 +258,11 @@ const userManagementRouter = new Elysia()
           const user = await userCollection.findOne({ mail });
           if (!user) return status(400);
 
-          const success = await sendJSXMail({
+          const success = await sendReactMail({
             from: 'noreply@kompakkt.de',
             to: user.mail,
             subject: 'Your Kompakkt username',
-            jsx: forgotUsername(user),
+            jsx: forgotUsernameTemplate(user),
           });
           if (!success) return status(500);
 

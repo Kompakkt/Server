@@ -1,22 +1,22 @@
-import './util/patch-structured-clone';
+import { openapi } from '@elysiajs/openapi';
 import Elysia from 'elysia';
+import './util/patch-structured-clone';
 
 import { err, info, log } from './logger';
 import { initializePlugins } from './plugins';
 import finalServer from './server.final';
-import { swagger } from '@elysiajs/swagger';
-import { openApiUI } from './templates/openapi-ui';
 
 import { cleanupPersons } from './jobs/cleanup-persons';
-import { ensureUploadStructure } from './jobs/ensure-upload-structure';
-import { ensureSearchIndex } from './jobs/ensure-search-index';
-import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
-import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
 import { decreatePopularityTimer } from './jobs/decrease-popularity-timer';
-import { adminDigestMail } from './jobs/admin-digest-mail';
+import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
+import { ensureSearchIndex } from './jobs/ensure-search-index';
+import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
+import { ensureUploadStructure } from './jobs/ensure-upload-structure';
+import { sendTestMails } from './jobs/send-test-mails';
+import { RouterTagsAsTagObjects } from './routers/tags';
 
 const jobs = {
-  adminDigestMail,
+  sendTestMails,
   ensureUploadStructure,
   ensureSearchIndex,
   ensureGaplessLicenses,
@@ -46,42 +46,22 @@ new Elysia({
     idleTimeout: 255,
   },
 })
+  .use(app)
+  .use(finalServer)
   .use(
-    swagger({
-      provider: 'scalar',
+    openapi({
       documentation: {
         info: {
-          title: 'Kompakkt Server Documentation',
-          description: 'The Kompakkt Server API Documentation',
-          version: '1.0.0',
+          title: 'Kompakkt API Documentation',
+          version: '2.0.0',
         },
+        tags: RouterTagsAsTagObjects,
       },
     }),
   )
-  .use(app)
-  .use(finalServer)
-  .get(
-    '/documentation',
-    async ({ set }) => {
-      set.headers['Content-Type'] = 'text/html';
-      set.headers['Content-Security-Policy'] =
-        `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`;
-      return await openApiUI();
-    },
-    {
-      detail: {
-        summary: 'OpenAPI Documentation',
-        description: 'Provides the OpenAPI documentation in a user-friendly HTML format.',
-        responses: {
-          200: {
-            description: 'OpenAPI documentation in HTML format',
-          },
-        },
-      },
-    },
-  )
-
-  // .get('/swagger/swagger/json', ({ redirect }) => redirect('/swagger/json'))
+  .post('/csp-report', ({ status }) => {
+    return status(200);
+  })
   .listen(3030, () => {
     info('Listening on port 3030');
   });
