@@ -12,11 +12,9 @@ import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
 import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
-import { sendTestMails } from './jobs/send-test-mails';
 import { RouterTagsAsTagObjects } from './routers/tags';
 
 const jobs = {
-  sendTestMails,
   ensureUploadStructure,
   ensureSearchIndex,
   ensureGaplessLicenses,
