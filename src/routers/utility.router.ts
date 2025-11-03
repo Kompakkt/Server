@@ -113,19 +113,13 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           .post(
             '/checksumexists',
             async ({ body: { checksum } }) => {
-              const existing = await md5Cache.get<string>(checksum);
+              const existing = await md5Cache.get<string>(checksum).catch(() => undefined);
               return { checksum, existing };
             },
-            {
-              body: t.Object({
-                checksum: t.String(),
-              }),
-            },
+            { body: t.Object({ checksum: t.String() }) },
           )
           .get('/findentityowners/:id', ({ params: { id } }) => findEntityOwnersQuery(id), {
-            params: t.Object({
-              id: t.String(),
-            }),
+            params: t.Object({ id: t.String() }),
           })
           .post(
             '/moveannotations/:id',
@@ -138,12 +132,8 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
                   })
                 : status('Forbidden'),
             {
-              params: t.Object({
-                id: t.String(),
-              }),
-              body: t.Object({
-                annotationList: t.Array(t.String()),
-              }),
+              params: t.Object({ id: t.String() }),
+              body: t.Object({ annotationList: t.Array(t.String()) }),
             },
           )
           .get('/finduseringroups', ({ status, userdata }) =>

@@ -19,7 +19,9 @@ import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
 import { authService } from './handlers/auth.service';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RouterTags } from './tags';
+import { parseHttpRangeHeaders } from 'src/util/parse-http-range-headers';
 
+// TODO: Do we still need this polyfill in Bun?
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
   interface ReadableStream<R = any> {
@@ -146,37 +148,35 @@ const getUploadedFiles = async ({
   return { files: filteredFiles, ids: unique(ids) };
 };
 
-const getProcessedFiles = async (paths: string[], mediaType: string, shouldWait = false) => {
+/**
+ * Kompressor will either store the processed file in the same directory, or in an "out" subdirectory.
+ * This function scans both locations and returns a combined list.
+ */
+const globKompressorResults = async (glob: Bun.Glob, path: string) => {
+  const globResult = await Array.fromAsync(glob.scan({ cwd: path })).catch(() => []);
+  const globResultWithOutDir = await Array.fromAsync(glob.scan({ cwd: join(path, 'out') }))
+    .catch(() => [])
+    .then(arr => arr.map(file => join('out', file)));
+  return [...globResult, ...globResultWithOutDir];
+};
+
+const GLOBS_BY_MEDIA_TYPE: Record<string, Bun.Glob | undefined> = {
+  cloud: new Bun.Glob('*.copc.laz'),
+  model: new Bun.Glob('*.compressed.glb'),
+  splat: new Bun.Glob('*.spz'),
+};
+
+const getProcessedFiles = async (paths: string[], mediaType: string) => {
   log('getProcessedFiles', { paths, mediaType });
   const processedFiles = new Set<string>();
 
+  if (mediaType === 'entity') mediaType = 'model';
+  const glob = GLOBS_BY_MEDIA_TYPE[mediaType];
+  if (!glob) return [];
+
   for (const path of paths) {
-    if (mediaType === 'cloud') {
-      const eptJsonPath = `${path}/out/ept.json`.replace('/out/out', '/out');
-      const eptJsonExists = await waitUntilFileExists(eptJsonPath, shouldWait ? 10_000 : 0);
-
-      log({ eptJsonPath, eptJsonExists });
-
-      if (eptJsonExists) {
-        processedFiles.add(eptJsonPath);
-      }
-    }
-
-    if (mediaType === 'model' || mediaType === 'entity') {
-      const glbGlob = new Bun.Glob(`*.compressed.glb`);
-      const globResult = await Array.fromAsync(glbGlob.scan({ cwd: path }));
-      for (const file of globResult) {
-        processedFiles.add(file);
-      }
-    }
-
-    if (mediaType === 'splat') {
-      const spzGlob = new Bun.Glob(`*.spz`);
-      const globResult = await Array.fromAsync(spzGlob.scan({ cwd: path }));
-      for (const file of globResult) {
-        processedFiles.add(file);
-      }
-    }
+    const globResult = await globKompressorResults(glob, path);
+    for (const file of globResult) processedFiles.add(file);
   }
 
   return Array.from(processedFiles);
@@ -227,7 +227,7 @@ const getDownloadOptions = async (entity: ServerDocument<IEntity>) => {
 
   const processedFiles = await Promise.all(
     Array.from(uniquePaths).map(async path => {
-      const processed = await getProcessedFiles([path], entity.mediaType, false);
+      const processed = await getProcessedFiles([path], entity.mediaType);
       return processed.map(file => join(path, file));
     }),
   ).then(arrs => arrs.flat());
@@ -274,7 +274,18 @@ const getDownloadOptions = async (entity: ServerDocument<IEntity>) => {
   };
 };
 
-const PRECOMPRESSED_TYPES = ['.glb', '.laz', '.zip', '.splat', '.spz'];
+const PRECOMPRESSED_TYPES = [
+  '.glb',
+  '.laz',
+  '.zip',
+  '.splat',
+  '.spz',
+  '.webp',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.mtl',
+];
 
 // Prepare folder structure
 const { UploadDirectory } = Configuration.Uploads;
@@ -285,10 +296,10 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ params: { '*': path }, set, headers, status }) => {
+    async ({ request: { url }, set, headers, status }) => {
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
 
-      const requestedPath = path.split('/uploads').at(-1)!;
+      const requestedPath = url.split('/uploads').at(-1)!;
       const decodedPath = requestedPath
         .split('/')
         .map(part => decodeURIComponent(part))
@@ -307,6 +318,12 @@ const uploadRouter = new Elysia()
       const realPath = await realpath(filePath);
       const realFile = Bun.file(realPath);
 
+      const hasRangeHeader = !!headers['range'];
+      if (realPath.endsWith('.copc.laz') && !hasRangeHeader) {
+        // Force read headers for COPC files
+        headers['range'] = 'bytes=0-549';
+      }
+
       const isCompressed = PRECOMPRESSED_TYPES.some(type => realPath.toLowerCase().endsWith(type));
       info({
         isCompressed,
@@ -314,41 +331,58 @@ const uploadRouter = new Elysia()
         size: realFile.size,
         encodings: headers['accept-encoding'],
       });
-      if (realFile.size <= 65_536 || isCompressed) {
-        return realFile;
-      }
 
-      const supportedEncodings = headers['accept-encoding']?.split(',').map(e => e.trim()) ?? [];
+      const file = await (async () => {
+        // If the file is already compressed, serve it directly
+        if (isCompressed) return realFile;
 
-      for (const [encoding, extension] of typedObjectEntries(COMPRESSION_ENCODINGS)) {
-        if (!supportedEncodings.includes(encoding)) continue;
-        const compressedFile = () => Bun.file(`${realPath}${extension}`);
-        if (!(await compressedFile().exists())) {
-          const result = await compressFile(realPath, encoding).catch(error => {
-            err(`Failed compressing new file ${realPath}`, error);
-            return false;
-          });
-          if (!result) break;
+        // On-the-fly compression
+        const supportedEncodings = headers['accept-encoding']?.split(',').map(e => e.trim()) ?? [];
+        for (const [encoding, extension] of typedObjectEntries(COMPRESSION_ENCODINGS)) {
+          if (!supportedEncodings.includes(encoding)) continue;
+          const compressedFile = () => Bun.file(`${realPath}${extension}`);
+          if (!(await compressedFile().exists())) {
+            const result = await compressFile(realPath, encoding).catch(error => {
+              err(`Failed compressing new file ${realPath}`, error);
+              return false;
+            });
+            if (!result) break;
+          }
+          set.headers['content-encoding'] = encoding;
+          set.headers['content-type'] = realFile.type;
+          return compressedFile();
         }
-        set.headers['content-encoding'] = encoding;
-        set.headers['content-type'] = realFile.type;
-        return compressedFile();
+
+        // Fallback
+        return realFile;
+      })();
+
+      const ranges = parseHttpRangeHeaders(headers['range'] ?? '', file.size);
+      if (!ranges) return file;
+
+      if (ranges.length === 1) {
+        const range = ranges[0];
+        return file.slice(range.start, range.end + 1);
       }
 
-      return realFile;
+      return status(416, 'Range Not Satisfiable');
     },
     {
-      params: t.Object({
-        '*': t.String({
-          description: 'Path to the requested file within the uploads directory',
-        }),
+      headers: t.Object({
+        'range': t.Optional(
+          t.String({
+            description: 'The Range header for partial content requests, e.g., "bytes=0-1023"',
+          }),
+        ),
+        'accept-encoding': t.Optional(
+          t.String({
+            description: 'The Accept-Encoding header indicating supported compression methods',
+          }),
+        ),
       }),
       detail: {
         description: 'Serve uploaded files with on-the-fly compression',
         tags: [RouterTags.Upload],
-      },
-      response: {
-        200: t.File({ description: 'The requested file' }),
       },
     },
   )
@@ -582,7 +616,7 @@ const uploadRouter = new Elysia()
     group
       .post(
         '/file',
-        async ({ status, body: { file, checksum, token, type, relativePath } }) => {
+        async ({ status, body: { file, token, type, relativePath } }) => {
           const serverChecksum = await calculateMD5(file.stream());
           const basePath = join(uploadDir, type, token);
           const sluggedRelativePath = slug(relativePath).trim();
@@ -591,40 +625,8 @@ const uploadRouter = new Elysia()
               ? join(basePath, slug(relativePath))
               : join(basePath, file.name);
 
-          // TODO: Improve linking logic or do this outside of upload
-          /*symlinkToExisting: {
-            const existing = await md5Cache.get<string>(serverChecksum);
-            if (!existing) break symlinkToExisting;
-
-            const doesFileExist = await Bun.file(existing).exists();
-            if (!doesFileExist) break symlinkToExisting;
-
-            info(
-              `File already exists, creating symlink from ${join(uploadDir, existing)} to ${destPath}`,
-            );
-            await ensure(destPath);
-            await symlink(join(uploadDir, existing), destPath).catch(e => {
-              err(e);
-            });
-
-            return {
-              status: 'OK',
-              clientChecksum: checksum,
-              serverChecksum,
-              usingExisting: true,
-            };
-          }*/
-
           const success = await writeStreamToDisk(file.stream(), destPath);
-
-          return success
-            ? {
-                status: 'OK',
-                clientChecksum: checksum,
-                serverChecksum,
-                usingExisting: false,
-              }
-            : status('Internal Server Error');
+          return success ? { status: 'OK', serverChecksum } : status('Internal Server Error');
         },
         {
           body: t.Object({
@@ -634,7 +636,6 @@ const uploadRouter = new Elysia()
             relativePath: t.String(),
             token: t.String(),
             type: t.String(),
-            checksum: t.String(),
           }),
         },
       )
@@ -756,7 +757,6 @@ const uploadRouter = new Elysia()
           const processedFiles = await getProcessedFiles(
             ids.map(id => `${RootDirectory}/${UploadDirectory}/${type}/${id}`),
             type,
-            true,
           );
 
           log({ processedFiles, files });
