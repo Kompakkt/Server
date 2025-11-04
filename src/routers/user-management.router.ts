@@ -138,7 +138,7 @@ const userManagementRouter = new Elysia()
       )
       .get(
         '/auth',
-        async ({ cookie: { auth }, status, jwt, query: { data }, set: { headers } }) => {
+        async ({ cookie: { auth }, status, jwt, set: { headers } }) => {
           if (!auth.value) {
             return status(401, 'No session');
           }
@@ -156,25 +156,13 @@ const userManagementRouter = new Elysia()
             return status(401, 'User not found');
           }
 
-          const dataTypes = data
-            ?.toLowerCase()
-            .split(',')
-            .map(v => v.trim())
-            .filter((v): v is keyof typeof Collection => Object.keys(Collection).includes(v));
-
-          const userWithData = resolveUsersDataObject(user, dataTypes, 0);
-
           headers['X-JWT'] = auth.value;
-          return userWithData;
+
+          // As IUserDataWithoutData
+          delete (user as any).data;
+          return user;
         },
-        {
-          cookie: t.Cookie({
-            auth: t.String(),
-          }),
-          query: t.Object({
-            data: t.Optional(t.String()),
-          }),
-        },
+        { cookie: t.Cookie({ auth: t.String() }) },
       )
       .post(
         '/help/request-reset',
