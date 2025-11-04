@@ -119,10 +119,10 @@ export const exploreHandler = async (
 
   console.time(`explore::${collection}::${hash}`);
   const documents = await (async () => {
-    /*const cached = await exploreCache.get<ServerDocument<ExploreDocument>[]>(
+    const cached = await exploreCache.get<ServerDocument<ExploreDocument>[]>(
       `explore::${collection}::${hash}`,
     );
-    if (cached) return cached;*/
+    if (cached) return cached;
     const fresh = await getDocuments(collection, hasSearchText, foundIds, {
       order: options.sortBy,
       reversed: options.reversed,
