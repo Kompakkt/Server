@@ -162,8 +162,7 @@ const userManagementRouter = new Elysia()
             .map(v => v.trim())
             .filter((v): v is keyof typeof Collection => Object.keys(Collection).includes(v));
 
-          // TODO: set resolve depth to 0 after colleagues stop working on old branch
-          const userWithData = resolveUsersDataObject(user, dataTypes);
+          const userWithData = resolveUsersDataObject(user, dataTypes, 0);
 
           headers['X-JWT'] = auth.value;
           return userWithData;
