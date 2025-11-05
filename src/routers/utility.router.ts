@@ -1,5 +1,4 @@
 import { Elysia, t } from 'elysia';
-import { md5Cache } from 'src/redis';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
@@ -113,8 +112,9 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           .post(
             '/checksumexists',
             async ({ body: { checksum } }) => {
-              const existing = await md5Cache.get<string>(checksum).catch(() => undefined);
-              return { checksum, existing };
+              // TODO: Deprecate endpoint, keeping until removed from frontend
+              // const existing = await md5Cache.get<string>(checksum).catch(() => undefined);
+              return { checksum, existing: false };
             },
             { body: t.Object({ checksum: t.String() }) },
           )

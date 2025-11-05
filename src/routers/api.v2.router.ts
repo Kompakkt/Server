@@ -31,6 +31,7 @@ import { RouterTags } from './tags';
 import { exploreHandler } from './modules/api.v2/explore';
 import { ExploreRequest } from './modules/api.v2/types';
 import { PermissionHelper, permissionService } from './handlers/permission.service';
+import { searchCache } from 'src/redis';
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
   app
@@ -651,6 +652,48 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           tags: [RouterTags['API V2']],
         },
         body: ExploreRequest,
+      },
+    )
+    .get(
+      '/explore-popular-searches',
+      async ({ query: { collection, limit } }) => {
+        const key = `search-terms::${collection}`;
+        const topN = await searchCache.redis
+          .send('ZRANGE', [
+            key,
+            '1',
+            '+inf',
+            'BYSCORE',
+            'LIMIT',
+            '0',
+            (limit ?? 10).toString(),
+            'WITHSCORES',
+          ])
+          .then(result =>
+            result.filter((entry: any): entry is [string, number] => {
+              if (!Array.isArray(entry)) return false;
+              const [query, score] = entry;
+              return typeof query === 'string' && !isNaN(Number(score));
+            }),
+          )
+          .catch(err => {
+            warn(`Failed to retrieve popular searches for collection "${collection}": ${err}`);
+            return [];
+          });
+        return topN;
+      },
+      {
+        query: t.Object({
+          collection: t.Enum(Collection, {
+            description: 'The collection to retrieve popular searches from.',
+          }),
+          limit: t.Optional(
+            t.Number({
+              description: 'The maximum number of popular searches to retrieve.',
+              default: 10,
+            }),
+          ),
+        }),
       },
     )
     .post(

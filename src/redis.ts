@@ -5,7 +5,7 @@ import { log } from './logger';
 const { Hostname: host, Port: port, DBOffset: offset } = Configuration.Redis;
 
 export class CacheClient {
-  private redis: Bun.RedisClient;
+  public readonly redis: Bun.RedisClient;
   private db: number;
   private defaultSeconds: number;
   public hash = hash;
@@ -32,6 +32,10 @@ export class CacheClient {
       .send('FLUSHDB', [])
       .then(() => log(`Flushed Redis DB ${this.db}`))
       .catch(err => err('Failed to flush Redis DB', err));
+  }
+
+  public async keys(pattern: string) {
+    return this.redis.keys(pattern);
   }
 
   public async del(key: string) {
@@ -94,7 +98,7 @@ export const resolveCache = new CacheClient(offset + 4, 60);
 // Cache explore requests
 export const exploreCache = new CacheClient(offset + 5, 60);
 
-// MD5 Checksum cache for uploads
-export const md5Cache = new CacheClient(offset + 6, -1);
+// Search cache
+export const searchCache = new CacheClient(offset + 6, -1);
 
 export const pluginCache = new CacheClient(offset + 7, 60);

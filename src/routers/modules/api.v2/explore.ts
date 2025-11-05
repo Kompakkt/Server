@@ -15,7 +15,8 @@ import { filterEntities } from './explore-filters/filter-entities';
 import { filterByCollection, SortOrder, type ExploreRequest } from './types';
 import { filterCompilations } from './explore-filters/filter-compilations';
 import objectHash from 'object-hash';
-import { exploreCache } from 'src/redis';
+import { exploreCache, searchCache } from 'src/redis';
+import { warn } from 'src/logger';
 
 type SortOptions = {
   order: SortOrder;
@@ -112,6 +113,18 @@ export const exploreHandler = async (
   const suggestions = hasSearchText
     ? await searchService.suggest(collection, trimmedSearchText).catch(() => [])
     : [];
+
+  queueMicrotask(() => {
+    // Increment search term count for exact matches to suggest popular searches
+    const exactSuggestionMatch = suggestions.find(
+      s => s.toLowerCase() === trimmedSearchText.toLowerCase(),
+    );
+    if (!exactSuggestionMatch) return;
+    const key = `search-terms::${collection}`;
+    searchCache.redis.send('ZINCRBY', [key, '1', exactSuggestionMatch]).catch(err => {
+      warn(`Failed to increment search term count for explore suggestions`, err);
+    });
+  });
 
   const foundIds = hasSearchText ? await searchService.search(collection, trimmedSearchText) : [];
 
