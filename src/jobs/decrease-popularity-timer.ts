@@ -1,11 +1,16 @@
 import { err, log } from 'src/logger';
 import { compilationCollection, entityCollection, profileCollection } from 'src/mongo';
 
+// 10% decay per hour
+const DECAY_PERCENTAGE = 0.1;
+
 const callback = async () => {
   const collections = [entityCollection, compilationCollection, profileCollection];
   try {
     for (const collection of collections) {
-      await collection.updateMany({ __hits: { $gt: 0 } }, { $inc: { __hits: -1 } });
+      await collection.updateMany({ __hits: { $gt: 0 } }, [
+        { $set: { __hits: { $multiply: ['$__hits', 1 - DECAY_PERCENTAGE] } } },
+      ]);
     }
   } catch (error) {
     err(`Failed decreasing popularity: ${error}`);
