@@ -52,7 +52,12 @@ const userManagementRouter = new Elysia()
             sameSite: isLocalhost ? 'none' : 'lax',
             secure: isLocalhost ? true : undefined,
           });
-          headers['X-JWT'] = token;
+          headers['x-jwt'] = token;
+          if (headers['access-control-expose-headers'] === undefined) {
+            headers['access-control-expose-headers'] = 'x-jwt';
+          } else {
+            headers['access-control-expose-headers'] += ', x-jwt';
+          }
 
           return userdata;
         },
@@ -156,7 +161,12 @@ const userManagementRouter = new Elysia()
             return status(401, 'User not found');
           }
 
-          headers['X-JWT'] = auth.value;
+          headers['x-jwt'] = auth.value;
+          if (headers['access-control-expose-headers'] === undefined) {
+            headers['access-control-expose-headers'] = 'x-jwt';
+          } else {
+            headers['access-control-expose-headers'] += ', x-jwt';
+          }
 
           // As IUserDataWithoutData
           delete (user as any).data;
