@@ -52,21 +52,31 @@ export const authService = new Elysia({ name: 'authService' })
       userdata: ServerDocument<IUserData> | undefined;
       isLoggedIn: boolean;
       isAdmin: boolean;
+      extractedJwt: string | undefined;
     }> => {
-      const result = await (async () => {
+      const token = (() => {
         const token = authorization?.replace('Bearer ', '')?.trim();
-        if (token) return await jwt.verify(token);
-        return await jwt.verify(auth.value as any);
+        if (token) return token;
+        const authCookie = auth?.value;
+        if (!authCookie || typeof authCookie !== 'string') return undefined;
+        return authCookie;
       })();
+
+      const result = await jwt.verify(token);
       if (!result) {
-        return { userdata: undefined, isLoggedIn: false, isAdmin: false };
+        return { userdata: undefined, isLoggedIn: false, isAdmin: false, extractedJwt: undefined };
       }
       const { username, _id } = result as { username: string; _id: string };
       const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
       if (!user) {
-        return { userdata: undefined, isLoggedIn: false, isAdmin: false };
+        return { userdata: undefined, isLoggedIn: false, isAdmin: false, extractedJwt: undefined };
       }
-      return { userdata: user, isLoggedIn: true, isAdmin: user.role === UserRank.admin };
+      return {
+        userdata: user,
+        isLoggedIn: true,
+        isAdmin: user.role === UserRank.admin,
+        extractedJwt: token,
+      };
     },
   )
   .decorate('useAuthController', async (body: SignInBody, strategy?: string) => {

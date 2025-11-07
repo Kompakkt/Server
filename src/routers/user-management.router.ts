@@ -1,7 +1,8 @@
-import { randomBytes } from 'node:crypto';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { Collection, type IUserData, UserRank } from 'src/common';
+import { randomBytes } from 'node:crypto';
+import { type IUserData, UserRank } from 'src/common';
+import { info } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
@@ -13,8 +14,6 @@ import {
   welcomeNewAccountTemplate,
 } from '../emails';
 import { authService, signInBody } from './handlers/auth.service';
-import { resolveUsersDataObject } from './modules/user-management/users';
-import { info } from 'src/logger';
 
 const userManagementRouter = new Elysia()
   .use(configServer)
@@ -61,12 +60,7 @@ const userManagementRouter = new Elysia()
 
           return userdata;
         },
-        {
-          params: t.Object({
-            strategy: t.Optional(t.String()),
-          }),
-          body: signInBody,
-        },
+        { params: t.Object({ strategy: t.Optional(t.String()) }), body: signInBody },
       )
       .post(
         '/register',
@@ -137,43 +131,25 @@ const userManagementRouter = new Elysia()
           set.headers['Set-Cookie'] = 'auth=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
           return { status: 'OK' };
         },
-        {
-          isLoggedIn: true,
-        },
+        { isLoggedIn: true },
       )
-      .get(
-        '/auth',
-        async ({ cookie: { auth }, status, jwt, set: { headers } }) => {
-          if (!auth.value) {
-            return status(401, 'No session');
-          }
-          const result = await jwt.verify(auth.value);
-          if (!result) {
-            return status(401, 'Invalid session');
-          }
+      .get('/auth', async ({ userdata, status, extractedJwt, set: { headers } }) => {
+        if (!userdata || !extractedJwt) {
+          return status(401, 'User not found');
+        }
 
-          const { username, _id } = result;
-          if (!username || typeof username !== 'string' || !_id || typeof _id !== 'string') {
-            return status(401, 'Invalid session');
-          }
-          const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
-          if (!user) {
-            return status(401, 'User not found');
-          }
+        headers['x-jwt'] = extractedJwt;
+        if (headers['access-control-expose-headers'] === undefined) {
+          headers['access-control-expose-headers'] = 'x-jwt';
+        } else {
+          headers['access-control-expose-headers'] += ', x-jwt';
+        }
 
-          headers['x-jwt'] = auth.value;
-          if (headers['access-control-expose-headers'] === undefined) {
-            headers['access-control-expose-headers'] = 'x-jwt';
-          } else {
-            headers['access-control-expose-headers'] += ', x-jwt';
-          }
-
-          // As IUserDataWithoutData
-          delete (user as any).data;
-          return user;
-        },
-        { cookie: t.Cookie({ auth: t.String() }) },
-      )
+        // As IUserDataWithoutData
+        const user = { ...userdata };
+        delete (user as any).data;
+        return user;
+      })
       .post(
         '/help/request-reset',
         async ({ status, body: { username } }) => {
