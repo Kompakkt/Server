@@ -110,11 +110,23 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
 
   const strippedUser = stripUser(user);
 
+  const digitalEntity = asEntity.relatedDigitalEntity?._id
+    ? await digitalEntityCollection.findOne({
+        _id: new ObjectId(asEntity.relatedDigitalEntity._id),
+      })
+    : undefined;
+
   return {
     __hits: asEntity.__hits ?? 0,
     __createdAt: asEntity.__createdAt ?? new ObjectId(asEntity._id).getTimestamp().getTime(),
     __normalizedName: asEntity.name?.trim().toLowerCase() ?? '',
     __annotationCount: Object.keys(asEntity.annotations || {}).length,
+    __downloadable: asEntity.__downloadable ?? asEntity.options?.allowDownload ?? false,
+    __licenses:
+      digitalEntity && 'licence' in digitalEntity
+        ? [digitalEntity.licence]
+        : (asEntity.__licenses ?? []),
+    __mediaTypes: asEntity.__mediaTypes ?? (asEntity.mediaType ? [asEntity.mediaType] : []),
     _id: asEntity._id,
     annotations: flattenRecord(asEntity.annotations),
     creator: asEntity.creator ?? strippedUser,
@@ -126,9 +138,9 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
     name: asEntity.name,
     online: asEntity.online,
     processed: asEntity.processed,
-    relatedDigitalEntity: asEntity.relatedDigitalEntity
-      ? flattenDocument(asEntity.relatedDigitalEntity)
-      : flattenDocument({ _id: new ObjectId().toString() }),
+    relatedDigitalEntity: flattenDocument({
+      _id: digitalEntity?._id.toString() ?? new ObjectId().toString(),
+    }),
     settings: {
       ...asEntity.settings!,
       preview:
@@ -186,12 +198,21 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
 
 const transformCompilation: TransformFn<ICompilation> = async body => {
   const asCompilation = body as unknown as Partial<ICompilation>;
+
+  // NOTE: We update the filterable properties using hook running in the background after save
+  // This means that there might be a slight delay when filtering, but it should not be noticeable
+  // and it avoids slowing down the save operation significantly
+  // See: `src/jobs/ensure-filterable-properties.ts`
+
   return {
     __hits: asCompilation.__hits ?? 0,
     __createdAt:
       asCompilation.__createdAt ?? new ObjectId(asCompilation._id).getTimestamp().getTime(),
     __normalizedName: asCompilation.name?.trim().toLowerCase() ?? '',
     __annotationCount: Object.keys(asCompilation.annotations || {}).length,
+    __downloadable: asCompilation.__downloadable ?? false,
+    __licenses: asCompilation.__licenses ?? [],
+    __mediaTypes: asCompilation.__mediaTypes ?? [],
     _id: asCompilation._id,
     annotations: flattenRecord(asCompilation.annotations),
     creator: asCompilation.creator,
@@ -199,12 +220,8 @@ const transformCompilation: TransformFn<ICompilation> = async body => {
     entities: flattenRecord(asCompilation.entities),
     name: asCompilation.name ?? '',
     password: asCompilation.password ?? '',
-    // TODO: handle nested fields in whitelist
-    whitelist: asCompilation.whitelist ?? {
-      enabled: false,
-      groups: [],
-      persons: [],
-    },
+    whitelist: asCompilation.whitelist,
+    access: asCompilation.access,
   };
 };
 
@@ -366,6 +383,7 @@ const createSaver = <T extends ServerDocument<T>>(
       collection.collectionName as Collection,
       'onTransform',
       transformedPreHook as T,
+      userdata,
     )) as Partial<T>;
     log(`Finished onTransform hooks ${collection.collectionName} ${obj._id}`);
 
@@ -383,10 +401,12 @@ const createSaver = <T extends ServerDocument<T>>(
         return false;
       });
     log(`Running afterSave hooks ${collection.collectionName} ${obj._id}`);
-    await HookManager.runHooks(collection.collectionName as Collection, 'afterSave', {
-      ...transformed,
-      _id: obj._id,
-    } as T);
+    await HookManager.runHooks(
+      collection.collectionName as Collection,
+      'afterSave',
+      { ...transformed, _id: obj._id } as T,
+      userdata,
+    );
     log(`Finished afterSave hooks ${collection.collectionName} ${obj._id}`);
     return saved;
   };

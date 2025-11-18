@@ -306,31 +306,41 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           async ({ status, params: { identifier }, body, userdata }) => {
             if (!body || !isEntitySettings(body) || !userdata) return status('Bad Request');
             const preview = body.preview;
-            const existingEntity = await entityCollection.findOne({
+            const entity = await entityCollection.findOne({
               _id: new ObjectId(identifier),
             });
-            if (!existingEntity) return status(404, 'Entity not found');
+            if (!entity) return status(404, 'Entity not found');
 
-            const isOwner = await checkIsOwner({
-              doc: existingEntity,
-              collection: Collection.entity,
-              userdata,
-            });
-            if (!isOwner) return status(403);
+            const hasAccess = await (async () => {
+              const currentAccess = entity.access?.[userdata._id.toString()];
+              const isOwner = await checkIsOwner({
+                doc: entity,
+                collection: Collection.entity,
+                userdata,
+              });
+
+              return (
+                currentAccess?.role === EntityAccessRole.owner ||
+                currentAccess?.role === EntityAccessRole.editor ||
+                isOwner
+              );
+            })();
+
+            if (!hasAccess) return status(403);
 
             // Save preview to file, if not yet done
             const finalImagePath = await updatePreviewImage(
               preview,
               'entity',
-              existingEntity._id.toString(),
+              entity._id.toString(),
               MAX_PREVIEW_IMAGE_RESOLUTION,
             );
 
             // Overwrite old settings
             const settings = { ...body, preview: finalImagePath };
             const result = await entityCollection.updateOne(
-              { _id: new ObjectId(existingEntity._id.toString()) },
-              { $set: { settings: { ...existingEntity.settings, ...settings } } },
+              { _id: new ObjectId(entity._id.toString()) },
+              { $set: { settings: { ...entity.settings, ...settings } } },
             );
 
             if (!result || result.modifiedCount !== 1) return status('Internal Server Error');

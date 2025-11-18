@@ -12,11 +12,15 @@ import {
   type IPerson,
   type IPhysicalEntity,
   type ITag,
+  type IUserData,
 } from 'src/common';
 import { info } from 'src/logger';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
-export type HookFn<T extends ServerDocument<IDocument>> = (doc: T) => Promise<T>;
+export type HookFn<T extends ServerDocument<IDocument>> = (
+  doc: T,
+  userdata?: ServerDocument<IUserData>,
+) => Promise<T>;
 export type HookType = 'onTransform' | 'onResolve' | 'onDelete' | 'afterSave';
 
 const createHookGroup = <T extends ServerDocument<IDocument>>(): Record<
@@ -59,6 +63,7 @@ export const HookManager = new (class {
     collection: Collection,
     type: HookType,
     doc: T,
+    userdata?: ServerDocument<IUserData>,
   ): Promise<T> {
     const hooks = this.hooks[collection][type] as unknown as Array<HookFn<T>>;
 
@@ -66,7 +71,7 @@ export const HookManager = new (class {
 
     for (const hook of hooks) {
       try {
-        currentDoc = await hook(structuredClone(currentDoc));
+        currentDoc = await hook(structuredClone(currentDoc), userdata);
       } catch (error) {
         info('Failed to run hook', error);
       }

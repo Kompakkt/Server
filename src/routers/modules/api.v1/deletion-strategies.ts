@@ -88,7 +88,7 @@ export const deleteAny = async ({
     return { success: false, error: message };
   }
 
-  await HookManager.runHooks(collection, 'onDelete', document);
+  await HookManager.runHooks(collection, 'onDelete', document, userdata);
 
   switch (collection) {
     case Collection.entity: {

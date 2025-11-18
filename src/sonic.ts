@@ -41,10 +41,10 @@ const extractText = (value: unknown): string[] => {
   } else if (typeof value === 'number' || typeof value === 'boolean') {
     return [value.toString()];
   } else if (Array.isArray(value)) {
-    return value.flatMap(item => extractText(item));
+    return Array.from(new Set(value.flatMap(item => extractText(item))));
   } else if (typeof value === 'object') {
     if (Object.prototype.toString.call(value) === '[object Object]') {
-      return Object.values(value).flatMap(val => extractText(val));
+      return Array.from(new Set(Object.values(value).flatMap(val => extractText(val))));
     }
   }
   return [];

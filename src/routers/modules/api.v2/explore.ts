@@ -1,5 +1,5 @@
 import { t, type Static } from 'elysia';
-import type { FindOptions, ObjectId } from 'mongodb';
+import type { Filter, FindOptions, ObjectId } from 'mongodb';
 import {
   Collection,
   ProfileType,
@@ -12,11 +12,18 @@ import { compilationCollection, entityCollection, profileCollection } from 'src/
 import { searchService } from 'src/sonic';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { filterEntities } from './explore-filters/filter-entities';
-import { filterByCollection, SortOrder, type ExploreRequest } from './types';
+import {
+  AnnotationFilter,
+  filterByCollection,
+  MiscFilter,
+  SortOrder,
+  type ExploreRequest,
+} from './types';
 import { filterCompilations } from './explore-filters/filter-compilations';
 import objectHash from 'object-hash';
 import { exploreCache, searchCache } from 'src/redis';
 import { warn } from 'src/logger';
+import type { IDocument, IFilterable, ISortable } from 'src/common/interfaces';
 
 type SortOptions = {
   order: SortOrder;
@@ -103,6 +110,7 @@ export const exploreHandler = async (
   results: ServerDocument<ExploreDocument>[];
   suggestions: string[];
   requestTime: number;
+  count: number;
 }> => {
   const requestTime = Date.now();
 
@@ -127,28 +135,83 @@ export const exploreHandler = async (
   });
 
   const foundIds = hasSearchText ? await searchService.search(collection, trimmedSearchText) : [];
+  console.log(hasSearchText, trimmedSearchText, foundIds);
+  // TODO: Figure out caching with new filtering system, since userdata can affect results
 
   const hash = objectHash(options);
-
   console.time(`explore::${collection}::${hash}`);
-  const documents = await (async () => {
-    const cached = await exploreCache.get<ServerDocument<ExploreDocument>[]>(
-      `explore::${collection}::${hash}`,
-    );
-    if (cached) return cached;
-    const fresh = await getDocuments(collection, hasSearchText, foundIds, {
-      order: options.sortBy,
-      reversed: options.reversed,
-    });
-    exploreCache.set(`explore::${collection}::${hash}`, fresh);
-    return fresh;
+  const [documents, count] = await (async () => {
+    const sortOptions = getSortObject({ order: options.sortBy, reversed: options.reversed });
+
+    const baseFilter: Filter<ServerDocument<IEntity> | ServerDocument<ICompilation>> = {};
+    if (hasSearchText) {
+      baseFilter._id = { $in: foundIds };
+    }
+
+    // TODO: Figure out access, once its available in compilations
+    // Right now access data is only available in entities
+    if (collection === Collection.entity && options.access.length > 0) {
+      if (!userdata) return [[], 0];
+      baseFilter[`access.${userdata._id.toString()}.role`] = { $in: options.access };
+    }
+
+    if (options.annotations === AnnotationFilter.withAnnotations) {
+      baseFilter.__annotationCount = { $gt: 0 };
+    } else if (options.annotations === AnnotationFilter.withoutAnnotations) {
+      baseFilter.__annotationCount = { $eq: 0 };
+    }
+
+    if (options.mediaTypes.length > 0) {
+      baseFilter.__mediaTypes = { $in: options.mediaTypes };
+    }
+
+    if (options.licences.length > 0) {
+      baseFilter.__licenses = { $in: options.licences };
+    }
+
+    if (options.misc.length > 0) {
+      if (options.misc.includes(MiscFilter.downloadable)) {
+        baseFilter.__downloadable = true;
+      }
+    }
+
+    switch (collection) {
+      case Collection.entity: {
+        const filter: Filter<ServerDocument<IEntity>> = {
+          ...baseFilter,
+          finished: true,
+          online: true,
+        };
+
+        return await Promise.all([
+          entityCollection
+            .find(filter, { sort: sortOptions })
+            .skip(options.offset)
+            .limit(options.limit)
+            .toArray(),
+          entityCollection.countDocuments(filter),
+        ]);
+      }
+      case Collection.compilation: {
+        const filter: Filter<ServerDocument<ICompilation>> = {
+          ...baseFilter,
+          password: { $eq: '' },
+        };
+
+        return await Promise.all([
+          compilationCollection
+            .find(filter, { sort: sortOptions })
+            .skip(options.offset)
+            .limit(options.limit)
+            .toArray(),
+          compilationCollection.countDocuments(filter),
+        ]);
+      }
+      default: {
+        return [[], 0];
+      }
+    }
   })();
   console.timeEnd(`explore::${collection}::${hash}`);
-
-  // @ts-expect-error Unsure of correct typing, but it works
-  const filteredDocuments = await filterDocuments(collection)(documents, options, userdata);
-
-  // TODO: Sort options, pagination, and reversed order
-
-  return Promise.resolve({ suggestions, requestTime, results: filteredDocuments });
+  return { results: documents, suggestions, requestTime, count };
 };

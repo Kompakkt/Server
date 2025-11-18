@@ -12,6 +12,7 @@ import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
 import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
+import { ensureFilterableProperties } from './jobs/ensure-filterable-properties';
 import { RouterTagsAsTagObjects } from './routers/tags';
 
 const jobs = {
@@ -19,6 +20,7 @@ const jobs = {
   ensureSearchIndex,
   ensureGaplessLicenses,
   ensureSortableProperties,
+  ensureFilterableProperties,
   cleanupPersons,
   decreatePopularityTimer,
 } as const;
