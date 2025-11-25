@@ -1,17 +1,17 @@
-import { t, type Static } from 'elysia';
-import type { Filter, FindOptions, ObjectId } from 'mongodb';
+import type { Filter } from 'mongodb';
+import objectHash from 'object-hash';
 import {
   Collection,
-  ProfileType,
   type ICompilation,
   type IEntity,
   type IInstitution,
   type IUserData,
 } from 'src/common';
-import { compilationCollection, entityCollection, profileCollection } from 'src/mongo';
+import { warn } from 'src/logger';
+import { compilationCollection, entityCollection } from 'src/mongo';
+import { searchCache } from 'src/redis';
 import { searchService } from 'src/sonic';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { filterEntities } from './explore-filters/filter-entities';
 import {
   AnnotationFilter,
   filterByCollection,
@@ -19,11 +19,6 @@ import {
   SortOrder,
   type ExploreRequest,
 } from './types';
-import { filterCompilations } from './explore-filters/filter-compilations';
-import objectHash from 'object-hash';
-import { exploreCache, searchCache } from 'src/redis';
-import { warn } from 'src/logger';
-import type { IDocument, IFilterable, ISortable } from 'src/common/interfaces';
 
 type SortOptions = {
   order: SortOrder;
@@ -47,61 +42,7 @@ const getSortObject = (sortOptions: SortOptions) => {
   return sort;
 };
 
-const getDocuments = async <
-  C extends Collection.entity | Collection.compilation | Collection.institution,
->(
-  collection: C,
-  hasSearchText: boolean,
-  foundIds: ObjectId[],
-  sortOptions: SortOptions,
-) => {
-  if (collection === Collection.entity) {
-    return entityCollection
-      .find(
-        hasSearchText
-          ? { _id: { $in: foundIds }, finished: true, online: true }
-          : { finished: true, online: true },
-        { sort: getSortObject(sortOptions) },
-      )
-      .toArray();
-  } else if (collection === Collection.compilation) {
-    return compilationCollection
-      .find(
-        hasSearchText
-          ? { _id: { $in: foundIds }, password: { $eq: '' } }
-          : { password: { $eq: '' } },
-        { sort: getSortObject(sortOptions) },
-      )
-      .toArray();
-  } else if (collection === Collection.institution) {
-    return profileCollection
-      .find(
-        hasSearchText
-          ? { _id: { $in: foundIds }, type: ProfileType.institution }
-          : { type: ProfileType.institution },
-        { sort: getSortObject(sortOptions) },
-      )
-      .toArray();
-  } else {
-    return [];
-  }
-};
-
 type ExploreDocument = IEntity | ICompilation | IInstitution;
-
-const filterDocuments = (collection: Collection) => {
-  switch (collection) {
-    case Collection.entity:
-      return filterEntities;
-    case Collection.compilation:
-      return filterCompilations;
-    default:
-      return async (
-        documents: ServerDocument<ExploreDocument>[],
-        options: ExploreRequest,
-      ): Promise<ServerDocument<ExploreDocument>[]> => documents;
-  }
-};
 
 export const exploreHandler = async (
   options: ExploreRequest,
@@ -155,10 +96,18 @@ export const exploreHandler = async (
       baseFilter[`access.${userdata._id.toString()}.role`] = { $in: options.access };
     }
 
-    if (options.annotations === AnnotationFilter.withAnnotations) {
-      baseFilter.__annotationCount = { $gt: 0 };
-    } else if (options.annotations === AnnotationFilter.withoutAnnotations) {
-      baseFilter.__annotationCount = { $eq: 0 };
+    // Note: We went from exclusive options to inclusive options, so we need to adjust the logic here
+    // Reference: https://github.com/Kompakkt/Repo/issues/146
+    const availableAnnotationOptions = Object.keys(AnnotationFilter).length;
+    if (
+      options.annotations.length !== 0 &&
+      options.annotations.length !== availableAnnotationOptions
+    ) {
+      if (options.annotations.includes(AnnotationFilter.withAnnotations)) {
+        baseFilter.__annotationCount = { $gt: 0 };
+      } else if (options.annotations.includes(AnnotationFilter.withoutAnnotations)) {
+        baseFilter.__annotationCount = { $eq: 0 };
+      }
     }
 
     if (options.mediaTypes.length > 0) {

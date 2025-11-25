@@ -21,7 +21,6 @@ export enum SortOrder {
 }
 
 export enum AnnotationFilter {
-  all = 'all',
   withAnnotations = 'with-annotations',
   withoutAnnotations = 'without-annotations',
 }
@@ -35,7 +34,7 @@ export const ExploreRequest = t.Object({
   searchText: t.String(),
   filterBy: t.Enum(FilterByOptions),
   mediaTypes: t.Array(t.String()),
-  annotations: t.Enum(AnnotationFilter),
+  annotations: t.Array(t.Enum(AnnotationFilter)),
   access: t.Array(t.Enum(EntityAccessRole)),
   licences: t.Array(t.String()),
   misc: t.Array(t.Enum(MiscFilter)),
