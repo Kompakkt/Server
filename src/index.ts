@@ -3,7 +3,12 @@ import Elysia from 'elysia';
 import './util/patch-structured-clone';
 
 import { err, info, log } from './logger';
-import { initializePlugins } from './plugins';
+import {
+  initializePlugins,
+  Plugin,
+  PluginController,
+  type AnyElysia,
+} from './plugins/plugin-controller';
 import finalServer from './server.final';
 
 import { cleanupPersons } from './jobs/cleanup-persons';
@@ -30,38 +35,47 @@ for (const [name, job] of Object.entries(jobs)) {
   log(`Job ${name} completed`);
 }
 
-const app: Elysia = new Elysia();
-const pluginRoutes = await initializePlugins();
+let final: AnyElysia | undefined;
+await initializePlugins();
 
-for (const router of pluginRoutes) {
-  app.use(router);
-}
+PluginController.routers$.subscribe(async routers => {
+  let app: AnyElysia = new Elysia();
 
-new Elysia({
-  prefix: '/server',
-  serve: {
-    // 4096MB
-    maxRequestBodySize: 4096 * 1024 * 1024,
-    // Long timeout
-    idleTimeout: 255,
-  },
-})
-  .use(app)
-  .use(finalServer)
-  .use(
-    openapi({
-      documentation: {
-        info: {
-          title: 'Kompakkt API Documentation',
-          version: '2.0.0',
-        },
-        tags: RouterTagsAsTagObjects,
-      },
-    }),
-  )
-  .post('/csp-report', ({ status }) => {
-    return status(200);
+  for (const router of routers) {
+    app = app.use(router);
+  }
+
+  if (final) {
+    await final.stop(true);
+  }
+
+  final = new Elysia({
+    prefix: '/server',
+    serve: {
+      // 4096MB
+      maxRequestBodySize: 4096 * 1024 * 1024,
+      // Long timeout
+      idleTimeout: 255,
+    },
   })
-  .listen(3030, () => {
+    .use(app)
+    .use(finalServer)
+    .use(
+      openapi({
+        documentation: {
+          info: {
+            title: 'Kompakkt API Documentation',
+            version: '2.0.0',
+          },
+          tags: RouterTagsAsTagObjects,
+        },
+      }),
+    )
+    .post('/csp-report', ({ status }) => {
+      return status(200);
+    });
+
+  final?.listen(3030, () => {
     info('Listening on port 3030');
   });
+});

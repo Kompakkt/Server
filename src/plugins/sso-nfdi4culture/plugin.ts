@@ -1,4 +1,4 @@
-import { Plugin } from '../plugin-base';
+import { Plugin } from '../plugin-controller';
 import ssoNFDI4CultureRouter from './router';
 
 class SSONFDI4CulturePlugin extends Plugin {

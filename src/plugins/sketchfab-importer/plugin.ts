@@ -1,4 +1,4 @@
-import { Plugin } from '../plugin-base';
+import { Plugin } from '../plugin-controller';
 import sketchfabImportRouter from './router';
 
 class SketchfabImportPlugin extends Plugin {
