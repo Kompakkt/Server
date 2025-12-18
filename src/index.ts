@@ -18,6 +18,7 @@ import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
 import { ensureFilterableProperties } from './jobs/ensure-filterable-properties';
+import { ensureEntitySettingsScaleAsVector } from './jobs/ensure-entity-settings-scale-as-vector';
 import { RouterTagsAsTagObjects } from './routers/tags';
 
 const jobs = {
@@ -26,6 +27,7 @@ const jobs = {
   ensureGaplessLicenses,
   ensureSortableProperties,
   ensureFilterableProperties,
+  ensureEntitySettingsScaleAsVector,
   cleanupPersons,
   decreatePopularityTimer,
 } as const;

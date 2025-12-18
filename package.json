@@ -11,7 +11,6 @@
     "test": "bun test",
     "lint": "eslint src/",
     "prettier": "prettier --config .prettierrc.json 'src/**/*.{ts,html,scss}' --write",
-    "postprepare": "git submodule update --remote --merge",
     "email": "email dev --dir src/emails"
   },
   "repository": {
@@ -33,6 +32,8 @@
     "@react-email/components": "^0.5.5",
     "@react-email/preview-server": "^4.2.11",
     "@tailwindcss/cli": "^4.1.13",
+    "@types/archiver": "^7.0.0",
+    "archiver": "^7.0.1",
     "arktype": "^2.1.22",
     "blurhash": "^2.0.5",
     "deepmerge": "^4.3.1",
