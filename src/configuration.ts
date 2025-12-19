@@ -76,6 +76,9 @@ export interface IConfiguration<T = Record<string, Record<string, string>>> {
   Redis: IRedisConfiguration;
   Uploads: IUploadConfiguration;
   Server: IServerConfiguration;
+  LDAP: {
+    SearchService: string;
+  };
   Services?: {
     Europeana?: {
       apiKey: string;
@@ -122,6 +125,9 @@ const LoadConfig = async () => {
       PublicURL: getEnv('CONFIGURATION_SERVER_PUBLIC_URL') || 'http://localhost',
       MonitoringToken:
         getEnv('CONFIGURATION_SERVER_MONITORING_TOKEN') || randomBytes(32).toString('hex'),
+    },
+    LDAP: {
+      SearchService: getEnv('CONFIGURATION_LDAP_SEARCH_SERVICE') || 'openldap-search:3000',
     },
     Kompressor: {
       Enabled: (getEnv('CONFIGURATION_KOMPRESSOR_ENABLED') ?? 'true') === 'true',

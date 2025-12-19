@@ -7,6 +7,12 @@ import {
   type AuthWithUsernamePassword,
   AuthenticationStrategy,
 } from '../strategy';
+import { Configuration } from 'src/configuration';
+
+let SEARCH_URL = `${Configuration.LDAP.SearchService}/search`;
+if (SEARCH_URL.includes('//search')) {
+  SEARCH_URL = SEARCH_URL.replace('//search', '/search');
+}
 
 export type UniCologneLDAPResponse = {
   objectClass: string[];
@@ -26,7 +32,7 @@ const sendLDAPSearchRequest = async (
   username: string,
   password: string,
 ): Promise<UniCologneLDAPResponse | Error> => {
-  return Bun.fetch('openldap-search:3000/search', {
+  return Bun.fetch(SEARCH_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
