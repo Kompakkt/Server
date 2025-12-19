@@ -7,6 +7,9 @@ import { dirname } from 'node:path';
  * @returns
  */
 export const ensure = async (path: string) => {
-  if (await Bun.file(dirname(path)).exists()) return;
-  await mkdir(dirname(path), { recursive: true });
+  try {
+    await mkdir(dirname(path), { recursive: true });
+  } catch (err) {
+    // ignore
+  }
 };

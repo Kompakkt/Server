@@ -1,4 +1,9 @@
 import { Elysia, t } from 'elysia';
+import { ObjectId } from 'mongodb';
+import { mkdir } from 'node:fs/promises';
+import { Configuration } from 'src/configuration';
+import { RootDirectory } from 'src/environment';
+import { entityCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
@@ -10,14 +15,6 @@ import {
   findUserInCompilations,
   findUserInGroups,
 } from './modules/utility/utility';
-import { copyFile, mkdir, mkdtemp } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { entityCollection } from 'src/mongo';
-import { ObjectId } from 'mongodb';
-import { RootDirectory } from 'src/environment';
-import { Configuration } from 'src/configuration';
-import sharp from 'sharp';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -44,25 +41,18 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
             splat: 'entity',
           }[entity.mediaType] ?? entity.mediaType;
 
-        const tmpDir = await mkdtemp(join(tmpdir(), 'bun-'));
-
-        await Promise.all(
-          screenshots.map((screenshot, index) => {
-            const buffer = Buffer.from(
-              screenshot.replace(/^data:image\/\w+;base64,/, ''),
-              'base64',
-            );
-            return sharp(buffer)
-              .png()
-              .toFile(`${tmpDir}/frame_${String(index).padStart(4, '0')}.png`);
-          }),
-        );
-
-        await Bun.$`ffmpeg -y -framerate ${screenshots.length} -i ${tmpDir}/frame_%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p -colorspace bt709 -color_primaries bt709 -color_trc bt709 -deadline best -crf 30 -b:v 200k -g 1 ${tmpDir}/${entityId}.webm`.quiet();
+        const port = Bun.env.PREVIEW_GEN_PORT ? parseInt(Bun.env.PREVIEW_GEN_PORT) : 14841;
+        const webmBuffer = await Bun.fetch(`http://preview-gen:${port}/generate-preview-video`, {
+          method: 'POST',
+          body: JSON.stringify({ screenshots, entityId }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }).then(response => response.arrayBuffer());
 
         const previewPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${mediaType}/`;
         await mkdir(previewPath, { recursive: true });
-        await copyFile(`${tmpDir}/${entityId}.webm`, `${previewPath}${entityId}.webm`);
+        await Bun.write(`${previewPath}${entityId}.webm`, webmBuffer);
 
         const finalPath = `/server/previews/${mediaType}/${entityId}.webm`;
         await entityCollection.updateOne(

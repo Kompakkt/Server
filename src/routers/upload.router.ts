@@ -1,8 +1,10 @@
+import archiver from 'archiver';
 import { fetch } from 'bun';
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import type { Dirent } from 'node:fs';
-import { readdir, realpath, rmdir, stat, symlink } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { exists, readdir, realpath, rm, rmdir, stat, symlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
 import type { IEntity, IFile } from 'src/common';
@@ -12,7 +14,6 @@ import { err, info, log, warn } from 'src/logger';
 import { entityCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { unique } from 'src/util/array-helpers';
-import { compressFile, COMPRESSION_ENCODINGS } from 'src/util/compress-file';
 import { ensure } from 'src/util/file-related-helpers';
 import { typedObjectEntries } from 'src/util/typed-object-entries';
 import { waitUntilFileExists } from 'src/util/wait-until-file-exists';
@@ -332,37 +333,12 @@ const uploadRouter = new Elysia()
         encodings: headers['accept-encoding'],
       });
 
-      const file = await (async () => {
-        // If the file is already compressed, serve it directly
-        if (isCompressed) return realFile;
-
-        // On-the-fly compression
-        const supportedEncodings = headers['accept-encoding']?.split(',').map(e => e.trim()) ?? [];
-        for (const [encoding, extension] of typedObjectEntries(COMPRESSION_ENCODINGS)) {
-          if (!supportedEncodings.includes(encoding)) continue;
-          const compressedFile = () => Bun.file(`${realPath}${extension}`);
-          if (!(await compressedFile().exists())) {
-            const result = await compressFile(realPath, encoding).catch(error => {
-              err(`Failed compressing new file ${realPath}`, error);
-              return false;
-            });
-            if (!result) break;
-          }
-          set.headers['content-encoding'] = encoding;
-          set.headers['content-type'] = realFile.type;
-          return compressedFile();
-        }
-
-        // Fallback
-        return realFile;
-      })();
-
-      const ranges = parseHttpRangeHeaders(headers['range'] ?? '', file.size);
-      if (!ranges) return file;
+      const ranges = parseHttpRangeHeaders(headers['range'] ?? '', realFile.size);
+      if (!ranges) return realFile;
 
       if (ranges.length === 1) {
         const range = ranges[0];
-        return file.slice(range.start, range.end + 1);
+        return realFile.slice(range.start, range.end + 1);
       }
 
       return status(416, 'Range Not Satisfiable');
@@ -485,98 +461,82 @@ const uploadRouter = new Elysia()
         return;
       }
 
+      // Create archive using archiver
+      const zipPath = join(cwd, zipName);
+      const output = createWriteStream(zipPath);
+      const archive = archiver('zip', { zlib: { level: 5 } });
+
+      // Track progress
+      let lastSentProgress = 0;
+      let lastSentTime = 0;
+      const progressThreshold = 0.1; // 10% progress threshold
+      const timeThreshold = 200; // 200 milliseconds time threshold
+
+      // Create a promise that resolves when archiving is complete
+      const archiveComplete = new Promise<void>((resolve, reject) => {
+        output.on('close', resolve);
+        archive.on('error', reject);
+      });
+
+      // Create an async generator for progress updates
+      const progressUpdates: number[] = [];
+      let archiveDone = false;
+
+      archive.on('progress', progress => {
+        const currentProgress =
+          progress.entries.total > 0 ? progress.entries.processed / progress.entries.total : 0;
+        const now = Date.now();
+
+        const progressChanged = currentProgress - lastSentProgress >= progressThreshold;
+        const timeElapsed = now - lastSentTime >= timeThreshold;
+
+        if (progressChanged || timeElapsed) {
+          lastSentProgress = currentProgress;
+          lastSentTime = now;
+          progressUpdates.push(currentProgress);
+        }
+      });
+
+      archive.pipe(output);
+
       if (entity.mediaType === 'cloud' && type === 'processed') {
-        // Special case, we zip the whole /out directory
-        let isInFileList = false;
-        let counter = 0;
-        let totalFiles = -1;
-        let lastSentProgress = 0;
-        let lastSentTime = 0;
-        const progressThreshold = 0.1; // 10% progress threshold
-        const timeThreshold = 200; // 100 milliseconds time threshold
-        for await (const line of Bun.$`7zz a -bb3 -mx5 "../${zipName}" "./"`
-          .cwd(join(cwd, 'out'))
-          .lines()) {
-          if (!isInFileList) {
-            isInFileList = line.includes('Add new data to archive');
-            if (isInFileList) {
-              const match = line.match(/(\d+) files/);
-              if (match) {
-                totalFiles = parseInt(match[1], 10);
-              }
-            }
-            continue;
-          }
-          if (line.startsWith('+') || line.startsWith('U')) {
-            counter++;
-            const currentProgress = counter / totalFiles;
-            const now = Date.now();
-
-            const progressChanged = currentProgress - lastSentProgress >= progressThreshold;
-            const timeElapsed = now - lastSentTime >= timeThreshold;
-            const isComplete = counter === totalFiles;
-
-            if (progressChanged || timeElapsed || isComplete) {
-              lastSentProgress = currentProgress;
-              lastSentTime = now;
-              yield `${currentProgress}\n`;
-            }
-          }
-        }
-        yield '1\n';
-        return;
+        // Special case: zip the whole /out directory
+        archive.directory(join(cwd, 'out'), false);
       } else {
-        const fileList = fileArr.map(file => {
-          const path = join(RootDirectory, file);
-          const relativePath = path.replace(cwd + '/', '');
-          return relativePath;
-          // return `"${relativePath}"`;
-        });
-
-        if (await Bun.file(join(cwd, '7z_log.txt')).exists()) {
-          await Bun.file(join(cwd, '7z_log.txt')).unlink();
+        // Add files from the file list
+        for (const file of fileArr) {
+          const absolutePath = join(RootDirectory, file);
+          const relativePath = absolutePath.replace(cwd + '/', '');
+          archive.file(absolutePath, { name: relativePath });
         }
-
-        const process =
-          Bun.$`sh -c "stdbuf -oL 7zz a -bb3 -bsp1 -mx5 "${zipName}" ${fileList} >> 7z_log.txt"`.cwd(
-            cwd,
-          );
-
-        let resolved = false;
-        process.then(() => {
-          resolved = true;
-        });
-
-        while (true) {
-          try {
-            const logFile = Bun.file(join(cwd, '7z_log.txt'));
-            let logText = await logFile.text();
-            const progressLine = logText
-              .split('\n')
-              .filter(line => line.includes('%'))
-              .at(-1)!;
-            const matches = progressLine.matchAll(/(\d+(\.\d+)?)%/g);
-            if (matches) {
-              const lastMatch = Array.from(matches).pop();
-              if (lastMatch && lastMatch[1]) {
-                const progress = parseFloat(lastMatch[1]) / 100;
-                yield `${progress}\n`;
-              } else {
-                warn(`No valid progress found in line: ${progressLine}`);
-              }
-            }
-
-            logText = await logFile.text();
-          } catch (error) {
-            warn(`Could not read progress from logfile: ${error}`);
-          }
-          if (resolved) {
-            break;
-          }
-        }
-        yield '1\n';
-        return;
       }
+
+      archive.finalize();
+
+      // Yield progress updates while archiving
+      while (!archiveDone) {
+        // Wait a bit for progress updates
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Yield any accumulated progress updates
+        while (progressUpdates.length > 0) {
+          const progress = progressUpdates.shift()!;
+          yield `${progress}\n`;
+        }
+
+        // Check if archive is complete
+        const result = await Promise.race([
+          archiveComplete.then(() => 'done' as const),
+          new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 50)),
+        ]);
+
+        if (result === 'done') {
+          archiveDone = true;
+        }
+      }
+
+      yield '1\n';
+      return;
     },
     {
       params: t.Object({
@@ -614,6 +574,104 @@ const uploadRouter = new Elysia()
 
   .group('/upload', { isLoggedIn: true }, group =>
     group
+      .post('/chunk/init', async () => {
+        const uploadId = new ObjectId().toString();
+        const tempDir = join(uploadDir, 'chunks', uploadId);
+        await ensure(tempDir);
+        return { status: 'OK', uploadId };
+      })
+      .post(
+        '/chunk/upload',
+        async ({ body: { chunk, uploadId, index }, status }) => {
+          const tempDir = join(uploadDir, 'chunks', uploadId);
+          await ensure(tempDir);
+          const chunkPath = join(tempDir, `chunk_${index.toString().padStart(4, '0')}`);
+          const writeSuccess = await Bun.write(chunkPath, chunk)
+            .then(() => true)
+            .catch(e => {
+              err(e);
+              return false;
+            });
+          if (!writeSuccess) {
+            return status(500, 'Failed to write chunk to disk');
+          }
+          return { status: 'OK' };
+        },
+        {
+          body: t.Object({
+            chunk: t.File({ maxSize: '4m' }),
+            uploadId: t.String(),
+            index: t.Numeric(),
+          }),
+        },
+      )
+      .post(
+        '/chunk/finish',
+        async ({ status, body: { uploadId, filename, token, type, relativePath } }) => {
+          try {
+            const tempDir = join(uploadDir, 'chunks', uploadId);
+            if (!(await exists(tempDir))) {
+              return status(400, 'Invalid uploadId');
+            }
+            const basePath = join(uploadDir, type, token);
+            const sluggedRelativePath = slug(relativePath).trim();
+            const destPath =
+              sluggedRelativePath.length > 0
+                ? join(basePath, slug(relativePath))
+                : join(basePath, filename);
+
+            await ensure(destPath);
+
+            const chunkGlob = new Bun.Glob('chunk_*');
+            const chunkEntries = await Array.fromAsync(chunkGlob.scan({ cwd: tempDir }));
+
+            const fileWriter = Bun.file(destPath).writer();
+
+            try {
+              // Iterate through all expected chunks in order
+              for (let i = 0; i < chunkEntries.length; i++) {
+                const chunkPath = join(tempDir, `chunk_${i.toString().padStart(4, '0')}`);
+                const chunkFile = Bun.file(chunkPath);
+
+                if (!(await chunkFile.exists())) {
+                  throw new Error(`Missing chunk file: ${chunkPath}`);
+                }
+
+                const chunkStream = chunkFile.stream();
+                for await (const chunk of chunkStream) {
+                  fileWriter.write(chunk);
+                }
+              }
+
+              fileWriter.end();
+
+              // Calculate MD5 of the final file if needed
+              const serverChecksum = await calculateMD5(Bun.file(destPath).stream());
+
+              // Cleanup temp directory
+              await rm(tempDir, { recursive: true, force: true });
+
+              return { status: 'OK', path: destPath, serverChecksum };
+            } catch (e) {
+              fileWriter.end();
+              err(e);
+              return status(500, 'Failed to assemble file');
+            }
+          } catch (e) {
+            err(e);
+            return status(500, 'Internal server error during chunk finish');
+          }
+        },
+        {
+          body: t.Object({
+            uploadId: t.String(),
+            filename: t.String(),
+            relativePath: t.String(),
+            token: t.String(),
+            type: t.String(),
+          }),
+        },
+      )
       .post(
         '/file',
         async ({ status, body: { file, token, type, relativePath } }) => {
@@ -630,9 +688,7 @@ const uploadRouter = new Elysia()
         },
         {
           body: t.Object({
-            file: t.File({
-              maxSize: '4096m',
-            }),
+            file: t.File({ maxSize: '4096m' }),
             relativePath: t.String(),
             token: t.String(),
             type: t.String(),

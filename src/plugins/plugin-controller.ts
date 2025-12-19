@@ -44,7 +44,9 @@ export const PluginController = new (class {
   }
 })();
 
-const initializePlugin = async (file: string): Promise<boolean> => {
+const initializePlugin = async (
+  file: string,
+): Promise<{ shouldLoad: boolean; loaded: boolean }> => {
   const plugin = await import(file).then(module => module.default);
 
   if (typeof plugin !== 'object') {
@@ -63,8 +65,16 @@ const initializePlugin = async (file: string): Promise<boolean> => {
     throw new Error(`Plugin ${file} does not implement routers property`);
   }
 
+  if ('verifyShouldLoad' in plugin && typeof plugin.verifyShouldLoad === 'function') {
+    const shouldLoad = await plugin.verifyShouldLoad();
+    if (!shouldLoad) {
+      log(`Plugin ${file} chose not to load`);
+      return { shouldLoad: false, loaded: false };
+    }
+  }
+
   const loaded = await PluginController.loadPlugin(plugin);
-  return loaded;
+  return { shouldLoad: true, loaded };
 };
 
 const retryList = new Set<string>();
@@ -135,8 +145,8 @@ export const initializePlugins = async () => {
         throw new Error(`Unmet requirements for plugin ${file}`);
       }
 
-      const success = await initializePlugin(file);
-      if (!success) {
+      const { loaded, shouldLoad } = await initializePlugin(file);
+      if (!loaded && shouldLoad) {
         retryList.add(file);
       }
     } catch (error) {
