@@ -2,7 +2,7 @@ FROM docker.io/oven/bun:alpine AS builder
 
 COPY . /app
 WORKDIR /app
-RUN bun install && bun build --compile --minify --sourcemap ./src/index.ts --outfile kompakkt-server
+RUN bun install && bun build --compile-autoload-package-json --compile --minify --sourcemap ./src/index.ts --outfile kompakkt-server
 
 FROM docker.io/oven/bun:alpine AS production
 COPY --from=builder /app/kompakkt-server /app/kompakkt-server
