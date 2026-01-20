@@ -82,9 +82,6 @@ export const authService = new Elysia({ name: 'authService' })
   .decorate('useAuthController', async (body: SignInBody, strategy?: string) => {
     const wrappedUserdata = await (async () => {
       switch (strategy) {
-        case 'ldap':
-        case 'uni-cologne-ldap':
-          return AuthController.authenticate('UniCologneLDAPStrategy', body);
         default:
           return AuthController.authenticateAnyWithUsernamePassword(body);
       }

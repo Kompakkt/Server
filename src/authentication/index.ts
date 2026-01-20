@@ -1,16 +1,10 @@
 import { info } from 'src/logger';
 import { MongoDbStrategy } from './strategies/mongodb';
-import {
-  type AuthResult,
-  type AuthWithUsernamePassword,
-  AuthenticationStrategy,
-} from './strategies/strategy';
-import { UniCologneLDAPStrategy } from './strategies/uni-cologne-ldap';
+import { type AuthResult, type AuthWithUsernamePassword } from './strategies/strategy';
 
 export const AuthController = new (class {
   readonly strategies = {
     MongoDbStrategy: new MongoDbStrategy(),
-    UniCologneLDAPStrategy: new UniCologneLDAPStrategy(),
   };
   #disabledStrategies = new Set<string>();
 
@@ -55,7 +49,7 @@ export const AuthController = new (class {
     authObj: AuthWithUsernamePassword,
   ): Promise<AuthResult> {
     let result: AuthResult;
-    for (const strategy of ['MongoDbStrategy', 'UniCologneLDAPStrategy']) {
+    for (const strategy of ['MongoDbStrategy']) {
       result = await this.authenticate(strategy as keyof typeof this.strategies, authObj);
       if (result instanceof Error) {
       } else {
