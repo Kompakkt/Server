@@ -56,8 +56,9 @@ export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsern
   strategyName = 'UniCologneLDAPStrategy';
 
   async isAvailable(): Promise<boolean> {
-    const result = await sendLDAPSearchRequest('test', 'test');
-    return !(result instanceof Error || !result);
+    return Promise.resolve(false);
+    /*const result = await sendLDAPSearchRequest('test', 'test');
+    return !(result instanceof Error || !result);*/
   }
 
   async authenticate(authObj: AuthWithUsernamePassword): Promise<AuthResult> {
