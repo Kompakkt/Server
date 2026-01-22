@@ -2,7 +2,7 @@ import { Plugin } from '../plugin-controller';
 import cologenCaveRouter from './router';
 
 class CologneCavePlugin extends Plugin {
-  routers = [cologenCaveRouter];
+  routers = [cologneCaveRouter];
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     return true;

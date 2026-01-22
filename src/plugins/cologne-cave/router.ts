@@ -4,7 +4,7 @@ import { apiKeyService } from 'src/routers/handlers/api-key.service';
 import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 
-const cologenCaveRouter = new Elysia()
+const cologneCaveRouter = new Elysia()
   .use(configServer)
   .use(apiKeyService)
   .group('/cologne-cave-api', app =>
@@ -57,4 +57,4 @@ const cologenCaveRouter = new Elysia()
     ),
   );
 
-export default cologenCaveRouter;
+export default cologneCaveRouter;
