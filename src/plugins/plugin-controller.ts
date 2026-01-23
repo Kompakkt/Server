@@ -48,7 +48,7 @@ const initializePlugin = async (
   file: string,
 ): Promise<{ shouldLoad: boolean; loaded: boolean }> => {
   const plugin = await import(file).then(module => module.default);
-
+  console.log(`[Plugin] Loaded ${file}`);
   if (typeof plugin !== 'object') {
     throw new Error(`Plugin ${file} does not default export a class`);
   }

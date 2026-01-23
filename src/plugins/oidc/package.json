@@ -1,0 +1,8 @@
+{
+  "name": "oidc",
+  "type": "module",
+  "module": "index.ts",
+  "dependencies": {
+    "openid-client": "^6.0.0"
+  }
+}
