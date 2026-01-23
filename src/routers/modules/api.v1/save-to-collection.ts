@@ -196,8 +196,10 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
   };
 };
 
-const transformCompilation: TransformFn<ICompilation> = async body => {
+const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
   const asCompilation = body as unknown as Partial<ICompilation>;
+
+  const strippedUser = stripUser(user);
 
   // NOTE: We update the filterable properties using hook running in the background after save
   // This means that there might be a slight delay when filtering, but it should not be noticeable
@@ -221,7 +223,12 @@ const transformCompilation: TransformFn<ICompilation> = async body => {
     name: asCompilation.name ?? '',
     password: asCompilation.password ?? '',
     whitelist: asCompilation.whitelist,
-    access: asCompilation.access,
+    access: asCompilation.access ?? {
+      [strippedUser._id]: {
+        ...strippedUser,
+        role: EntityAccessRole.owner,
+      },
+    },
   };
 };
 
