@@ -1,5 +1,5 @@
 import { Plugin } from '../plugin-controller';
-import cologenCaveRouter from './router';
+import cologneCaveRouter from './router';
 
 class CologneCavePlugin extends Plugin {
   routers = [cologneCaveRouter];
