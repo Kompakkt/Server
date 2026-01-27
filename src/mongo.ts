@@ -21,6 +21,7 @@ import { info } from './logger';
 import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
 import { type IPublicProfile } from './common/interfaces';
+import { retryWithBackoff } from './util/retry-with-backoff';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
 export const mongoClient = ClientURL
@@ -31,8 +32,15 @@ export const mongoClient = ClientURL
         password: 'password',
       },
     });
-await mongoClient.connect();
-info('Connected to MongoDB');
+
+await retryWithBackoff(async () => await mongoClient.connect())
+  .then(() => {
+    info('Connected to MongoDB');
+  })
+  .catch(error => {
+    info('Failed to connect to MongoDB');
+    process.exit(1);
+  });
 
 const db = (name: string) => mongoClient.db(name);
 
