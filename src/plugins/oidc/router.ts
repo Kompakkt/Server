@@ -1,48 +1,74 @@
-import * as client from 'openid-client';
-import Elysia, { Cookie, t } from 'elysia';
+import Elysia, { t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { log, warn, err } from 'src/logger';
+import * as OpenIDClient from 'openid-client';
+import { UserRank } from 'src/common';
+import { err, log } from 'src/logger';
 import { userCollection } from 'src/mongo';
+import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { getOIDCConfig } from './config';
-import { UserRank } from 'src/common';
 
 const getClientConfig = async () => {
-  const config = await getOIDCConfig();
-  return await client.discovery(new URL(config.issuer), config.client_id, config.client_secret);
+  const config = getOIDCConfig();
+  return await OpenIDClient.discovery(
+    new URL(config.issuer),
+    config.client_id,
+    config.client_secret,
+  );
 };
 
 const oidcRouter = new Elysia()
   .use(configServer)
-  .get('/oidc/health', () => {
-    return { status: 'OK', message: 'OIDC authentication service is running' };
-  })
-  .get('/oidc/login', async ({ redirect, cookie: { oidc_state, oidc_code_verifier } }) => {
-    const config = await getClientConfig();
-    const oidcConfig = await getOIDCConfig();
+  .get(
+    '/oidc/health',
+    () => {
+      return { status: 'OK', message: 'OIDC authentication service is running' };
+    },
+    {
+      detail: {
+        description: 'Health check endpoint for OIDC authentication service',
+        tags: [RouterTags['OIDC Authentication']],
+      },
+    },
+  )
+  .get(
+    '/oidc/login',
+    async ({ redirect, cookie: { oidc_state, oidc_code_verifier } }) => {
+      const config = await getClientConfig();
+      const oidcConfig = getOIDCConfig();
 
-    const code_verifier = client.randomPKCECodeVerifier();
-    const code_challenge = await client.calculatePKCECodeChallenge(code_verifier);
-    const state = client.randomState();
+      const code_verifier = OpenIDClient.randomPKCECodeVerifier();
+      const code_challenge = await OpenIDClient.calculatePKCECodeChallenge(code_verifier);
+      const state = OpenIDClient.randomState();
 
-    oidc_state.set({ value: state, path: '/', httpOnly: true, maxAge: 300 });
-    oidc_code_verifier.set({ value: code_verifier, path: '/', httpOnly: true, maxAge: 300 });
+      oidc_state.set({ value: state, path: '/', httpOnly: true, maxAge: 300 });
+      oidc_code_verifier.set({ value: code_verifier, path: '/', httpOnly: true, maxAge: 300 });
 
-    const parameters: Record<string, string> = {
-      redirect_uri: oidcConfig.redirect_uri,
-      scope: oidcConfig.scope,
-      code_challenge,
-      code_challenge_method: 'S256',
-      state,
-    };
+      const parameters: Record<string, string> = {
+        redirect_uri: oidcConfig.redirect_uri,
+        scope: oidcConfig.scope,
+        code_challenge,
+        code_challenge_method: 'S256',
+        state,
+      };
 
-    const redirectTo = client.buildAuthorizationUrl(config, parameters);
-    return redirect(redirectTo.href);
-  })
+      const redirectTo = OpenIDClient.buildAuthorizationUrl(config, parameters);
+      return redirect(redirectTo.href);
+    },
+    {
+      cookie: t.Object({
+        oidc_state: t.Optional(t.String()),
+        oidc_code_verifier: t.Optional(t.String()),
+      }),
+      detail: {
+        description: 'Initiates OIDC authentication flow',
+        tags: [RouterTags['OIDC Authentication']],
+      },
+    },
+  )
   .get(
     '/oidc/callback',
     async ({
-      query,
       redirect,
       status,
       request,
@@ -51,14 +77,14 @@ const oidcRouter = new Elysia()
     }) => {
       try {
         const config = await getClientConfig();
-        const oidcConfig = await getOIDCConfig();
+        const oidcConfig = getOIDCConfig();
 
-        const tokens = await client.authorizationCodeGrant(config, new URL(request.url), {
+        const tokens = await OpenIDClient.authorizationCodeGrant(config, new URL(request.url), {
           pkceCodeVerifier: oidc_code_verifier.value,
           expectedState: oidc_state.value,
         });
 
-        const userinfo = await client.fetchUserInfo(
+        const userinfo = await OpenIDClient.fetchUserInfo(
           config,
           tokens.access_token,
           tokens.claims()?.sub!,
@@ -118,6 +144,16 @@ const oidcRouter = new Elysia()
         err('OIDC Callback Error:', error);
         return status(401, 'Authentication failed');
       }
+    },
+    {
+      cookie: t.Object({
+        oidc_code_verifier: t.Optional(t.String()),
+        oidc_state: t.Optional(t.String()),
+      }),
+      detail: {
+        description: 'Callback endpoint for OIDC authentication',
+        tags: [RouterTags['OIDC Authentication']],
+      },
     },
   );
 

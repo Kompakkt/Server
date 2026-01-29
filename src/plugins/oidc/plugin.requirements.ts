@@ -1,6 +1,11 @@
 import { warn } from 'src/logger';
 
-const neededEnvironmentVariables = ['OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_REDIRECT_URI'];
+const neededEnvironmentVariables = [
+  'OIDC_ISSUER',
+  'OIDC_CLIENT_ID',
+  'OIDC_REDIRECT_URI',
+  'OIDC_CLIENT_SECRET',
+];
 
 export default async () => {
   let hasMissingEnvVars = false;

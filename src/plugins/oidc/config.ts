@@ -1,10 +1,10 @@
 export const getOIDCConfig = () => {
   const { OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URI, OIDC_SCOPE } =
-    process.env;
+    Bun.env;
 
-  if (!OIDC_ISSUER || !OIDC_CLIENT_ID || !OIDC_REDIRECT_URI) {
+  if (!OIDC_ISSUER || !OIDC_CLIENT_ID || !OIDC_REDIRECT_URI || !OIDC_CLIENT_SECRET) {
     throw new Error(
-      'OIDC config is not set (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI are required)',
+      'OIDC config is not set (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI and OIDC_CLIENT_SECRET are required)',
     );
   }
 
