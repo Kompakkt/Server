@@ -8,7 +8,6 @@ import {
   type IDigitalEntity,
   type IDocument,
   type IEntity,
-  type IGroup,
   type IInstitution,
   type IPerson,
   type IPhysicalEntity,
@@ -20,7 +19,6 @@ import {
   isDigitalEntity,
   isDocument,
   isEntity,
-  isGroup,
   isInstitution,
   isPerson,
   isPhysicalEntity,
@@ -35,13 +33,10 @@ import {
   contactCollection,
   digitalEntityCollection,
   entityCollection,
-  groupCollection,
   institutionCollection,
   personCollection,
   physicalEntityCollection,
-  profileCollection,
   tagCollection,
-  userCollection,
 } from 'src/mongo';
 import { entitiesCache, resolveCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -274,71 +269,6 @@ const createResolver = <T extends ServerDocument<T>>(
   };
 };
 
-export const resolveGroup: ResolveFn<IGroup> = createResolver(
-  groupCollection,
-  isGroup,
-  async (group, depth) => {
-    const cached = await resolveCache.get<IGroup>(
-      `resolve::group-with-profiles::${group._id.toString()}`,
-    );
-    if (cached) return cached;
-
-    const userIds = Array.from(
-      new Set([
-        group.creator._id,
-        ...group.members.map(m => m._id),
-        ...group.owners.map(o => o._id),
-      ]),
-    );
-    const users = await userCollection
-      .find({ _id: { $in: userIds.map(id => new ObjectId(id.toString())) } })
-      .toArray();
-    const userProfileMap = Object.fromEntries(
-      users
-        .map(u => {
-          const profileId = Object.entries(u.profiles ?? {})
-            .find(([k, v]) => v === 'user')
-            ?.at(0);
-          if (!profileId) return undefined;
-          return [profileId, u._id.toString()];
-        })
-        .filter((obj): obj is [string, string] => !!obj),
-    );
-
-    const profiles = await profileCollection
-      .find(
-        {
-          _id: { $in: Object.keys(userProfileMap).map(id => new ObjectId(id)) },
-          imageUrl: { $exists: true, $ne: '' },
-        },
-        { projection: { imageUrl: 1, displayName: 1 } },
-      )
-      .toArray();
-
-    const getProfileForUserId = (userId: string) =>
-      profiles.find(p => userProfileMap[p._id.toString()] === userId);
-
-    const combined = {
-      ...group,
-      creator: {
-        ...group.creator,
-        profile: getProfileForUserId(group.creator._id.toString()),
-      },
-      members: group.members.map(m => ({
-        ...m,
-        profile: getProfileForUserId(m._id.toString()),
-      })),
-      owners: group.owners.map(o => ({
-        ...o,
-        profile: getProfileForUserId(o._id.toString()),
-      })),
-    };
-
-    await resolveCache.set(`resolve::group-with-profiles::${group._id.toString()}`, combined);
-
-    return combined;
-  },
-);
 export const resolveTag: ResolveFn<ITag> = createResolver(tagCollection, isTag);
 export const resolveAddress: ResolveFn<IAddress> = createResolver(addressCollection, isAddress);
 export const resolveContact: ResolveFn<IContact> = createResolver(contactCollection, isContact);
@@ -451,8 +381,6 @@ export const resolveAny = async <T extends Collection>(
   switch (collection) {
     case Collection.entity:
       return resolveEntity(obj, depth);
-    case Collection.group:
-      return resolveGroup(obj, depth);
     case Collection.address:
       return resolveAddress(obj, depth);
     case Collection.annotation:

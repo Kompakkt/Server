@@ -1,11 +1,5 @@
 import { Elysia, t } from 'elysia';
-import {
-  collectionMap,
-  entityCollection,
-  groupCollection,
-  profileCollection,
-  userCollection,
-} from 'src/mongo';
+import { collectionMap, entityCollection, profileCollection, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
@@ -737,49 +731,6 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Removes the logged-in user from editor or viewer to no special access on the specified document. The user must be either editor or viewer to use this endpoint.',
-          tags: [RouterTags['API V2']],
-        },
-      },
-    )
-    .post(
-      '/leave-group/:identifier',
-      async ({ params: { identifier }, status, userdata }) => {
-        if (!userdata) return status('Bad Request', 'Must be logged in to leave a group');
-        const group = await groupCollection.findOne({ _id: new ObjectId(identifier) });
-        if (!group) return status('Not Found', 'Group not found');
-        const isMember = group.members.find(m => m._id.toString() === userdata._id.toString());
-        const isOwner = group.owners.find(m => m._id.toString() === userdata._id.toString());
-        if (!isMember && !isOwner)
-          return status('Bad Request', 'You are not a member or owner of this group');
-
-        const isLastOwner = group.owners.length === 1 && isOwner;
-        if (isLastOwner)
-          return status('Bad Request', 'You are the last owner of this group and cannot leave it');
-
-        if (isMember) {
-          group.members = group.members.filter(m => m._id.toString() !== userdata._id.toString());
-        } else if (isOwner) {
-          group.owners = group.owners.filter(m => m._id.toString() !== userdata._id.toString());
-        }
-
-        const updateResult = await groupCollection.updateOne(
-          { _id: new ObjectId(identifier) },
-          { $set: { members: group.members, owners: group.owners } },
-        );
-        if (updateResult.modifiedCount === 0) {
-          return status('Internal Server Error', 'Failed to leave group');
-        }
-        return { status: 'OK', message: `You've left the group ${group.name}` };
-      },
-      {
-        params: t.Object({
-          identifier: t.String({
-            description: 'The identifier of the group to leave.',
-          }),
-        }),
-        isLoggedIn: true,
-        detail: {
-          description: 'Allows the logged-in user to leave a group they are a member of.',
           tags: [RouterTags['API V2']],
         },
       },

@@ -4,7 +4,7 @@ import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import type { Dirent } from 'node:fs';
 import { createWriteStream } from 'node:fs';
-import { exists, readdir, realpath, rm, rmdir, stat, symlink } from 'node:fs/promises';
+import { exists, readdir, realpath, rm, stat, symlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
 import type { IEntity, IFile } from 'src/common';
@@ -856,7 +856,7 @@ const uploadRouter = new Elysia()
 
           if (!pathStat || !pathStat.isDirectory()) return status(404);
 
-          await rmdir(path, { recursive: true }).catch(e => {
+          await rm(path, { recursive: true, force: true }).catch(e => {
             err(e);
           });
 

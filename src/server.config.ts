@@ -43,12 +43,14 @@ const configServer = new Elysia({
       if (key !== Configuration.Server.MonitoringToken)
         return status('Unauthorized', 'Incorrect API key');
     }
+    return;
   })
   .onError(({ error, code }) => {
     if (code === 'NOT_FOUND') {
       return;
     }
     err(error);
+    return;
   })
   .use(
     prometheusPlugin({
@@ -66,7 +68,7 @@ const configServer = new Elysia({
   .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
-  .use(timingPlugin({}))
+  .use(timingPlugin())
   .get('/previews/*', async ({ params, status }) => {
     const file = Bun.file(
       `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`,

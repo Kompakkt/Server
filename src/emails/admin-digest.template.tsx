@@ -5,11 +5,10 @@ import {
   annotationCollection,
   compilationCollection,
   entityCollection,
-  groupCollection,
   userCollection,
 } from '../mongo';
 import type { ServerDocument } from '../util/document-with-objectid-type';
-import type { IAnnotation, ICompilation, IEntity, IGroup, IUserData } from '../common';
+import type { IAnnotation, ICompilation, IEntity, IUserData } from '../common';
 import { Configuration } from '../configuration';
 import { EmailLayout } from './_base-layout';
 
@@ -153,35 +152,6 @@ const Compilations = (compilations: ServerDocument<ICompilation<false>>[]) => {
   );
 };
 
-const Groups = (groups: ServerDocument<IGroup>[]) => {
-  return (
-    <Table>
-      <TableHeader>
-        <TableHeaderCell>Database identifier</TableHeaderCell>
-        <TableHeaderCell>Name</TableHeaderCell>
-        <TableHeaderCell># Members</TableHeaderCell>
-        <TableHeaderCell>Created by</TableHeaderCell>
-        <TableHeaderCell>Created At</TableHeaderCell>
-      </TableHeader>
-      <TableBody>
-        {groups.map((group, index) => (
-          <TableRow key={index}>
-            <TableCell>{group._id.toString()}</TableCell>
-            <TableCell>{group.name}</TableCell>
-            <TableCell>{group.members.length}</TableCell>
-            <TableCell>
-              {group.creator.fullname} ({group.creator.username})
-            </TableCell>
-            <TableCell>
-              {new Date(new ObjectId(group._id).getTimestamp()).toLocaleDateString()}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
 const Annotations = (annotations: ServerDocument<IAnnotation>[]) => {
   return (
     <Table>
@@ -244,8 +214,6 @@ const RenderList = (items: unknown[], collection: string) => {
     return Entities(items as ServerDocument<IEntity<{}, false>>[]);
   } else if (collection === 'compilations') {
     return Compilations(items as ServerDocument<ICompilation<false>>[]);
-  } else if (collection === 'groups') {
-    return Groups(items as ServerDocument<IGroup>[]);
   } else if (collection === 'annotations') {
     return Annotations(items as ServerDocument<IAnnotation>[]);
   }
@@ -257,8 +225,8 @@ interface AdminDigestEmailProps {
 }
 
 export default async function AdminDigestEmail({ reason }: AdminDigestEmailProps) {
-  const { users, entities, compilations, groups, annotations } = await generateAdminDigest();
-  const Content = { users, entities, compilations, groups, annotations };
+  const { users, entities, compilations, annotations } = await generateAdminDigest();
+  const Content = { users, entities, compilations, annotations };
 
   return (
     <EmailLayout subject="Admin Digest - Weekly Report" maxWidth={1280}>
@@ -305,12 +273,11 @@ export const generateAdminDigest = async (reason: string = 'Automatic digest eve
     _id: { $gte: ObjectId.createFromTime(sinceTimestamp) },
   };
 
-  const [users, entities, annotations, compilations, groups] = await Promise.all([
+  const [users, entities, annotations, compilations] = await Promise.all([
     userCollection.find(timestampQuery).toArray(),
     entityCollection.find(timestampQuery).toArray(),
     annotationCollection.find(timestampQuery).toArray(),
     compilationCollection.find(timestampQuery).toArray(),
-    groupCollection.find(timestampQuery).toArray(),
   ]);
 
   return {
@@ -319,7 +286,6 @@ export const generateAdminDigest = async (reason: string = 'Automatic digest eve
     entities,
     annotations,
     compilations,
-    groups,
   };
 };
 

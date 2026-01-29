@@ -19,8 +19,8 @@
     "jsx": "react",
     // "plugins": [{ "name": "@kitajs/ts-html-plugin" }],
     "paths": {
-      "*": ["./*"]
-    }
+      "*": ["./*"],
+    },
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
 }

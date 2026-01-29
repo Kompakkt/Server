@@ -20,6 +20,7 @@ export const RouterTags = {
   'Lara3D Suite': 'Lara3D Suite',
   'Cologne Cave': 'Cologne Cave',
   'Sketchfab Importer': 'Sketchfab Importer',
+  'OIDC Authentication': 'OIDC Authentication',
 } as const;
 
 export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
@@ -42,6 +43,7 @@ export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
   'Lara3D Suite': 'Endpoints for Lara3D Suite functionalities',
   'Cologne Cave': 'Endpoints related to the Cologne Cave project',
   'Sketchfab Importer': 'Endpoints for importing models from Sketchfab',
+  'OIDC Authentication': 'Endpoints for OpenID Connect authentication',
 } as const;
 
 const routerTagToTagObject = (tag: keyof typeof RouterTags): OpenAPIV3.TagObject => ({

@@ -12,7 +12,7 @@ export const increasePopularity = async (
   document: ServerDocument<Partial<ISortable>>,
   collection: Collection,
   request: Request,
-  server: Bun.Server | null,
+  server: Bun.Server<unknown> | null,
 ) => {
   const address = server?.requestIP(request)?.address;
   if (!address) return;

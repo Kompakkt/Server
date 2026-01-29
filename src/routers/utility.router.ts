@@ -13,7 +13,6 @@ import {
   countEntityUses,
   findEntityOwnersQuery,
   findUserInCompilations,
-  findUserInGroups,
 } from './modules/utility/utility';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
@@ -125,9 +124,6 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
               params: t.Object({ id: t.String() }),
               body: t.Object({ annotationList: t.Array(t.String()) }),
             },
-          )
-          .get('/finduseringroups', ({ status, userdata }) =>
-            userdata ? findUserInGroups(userdata) : status('Forbidden'),
           )
           .get('/finduserincompilations', ({ status, userdata }) =>
             userdata ? findUserInCompilations(userdata) : status('Forbidden'),

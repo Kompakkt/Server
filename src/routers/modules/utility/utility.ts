@@ -11,7 +11,6 @@ import {
   annotationCollection,
   compilationCollection,
   entityCollection,
-  groupCollection,
   userCollection,
 } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -20,7 +19,6 @@ import {
   resolveAnnotation,
   resolveCompilation,
   resolveEntity,
-  resolveGroup,
 } from '../api.v1/resolving-strategies';
 import { makeUserOwnerOf, undoUserOwnerOf } from '../user-management/users';
 import { log } from 'src/logger';
@@ -31,9 +29,6 @@ const asIdQueryArray = (id: string | ObjectId) =>
 // Query helpers
 // TODO: This can be cached without trouble
 const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
-  // Get groups containing the user
-  const groups = await groupCollection.find(userInGroupQuery(user)).toArray();
-
   // Build query for whitelist containing the user in persons or in groups
   const query: Filter<ServerDocument<ICompilation>> = {
     'whitelist.enabled': { $eq: true },
@@ -45,12 +40,6 @@ const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
       },
     ],
   };
-  if (groups && groups.length > 0) {
-    const groupQuery = {
-      $elemMatch: { _id: { $in: groups.flatMap(g => asIdQueryArray(g._id)) } },
-    };
-    query.$or?.push({ 'whitelist.groups': groupQuery });
-  }
 
   return query;
 };
@@ -208,11 +197,6 @@ export const applyActionToEntityOwner = async ({
   })();
 
   return { changed };
-};
-
-export const findUserInGroups = async (userdata: ServerDocument<IUserData>) => {
-  const groups = await groupCollection.find(userInGroupQuery(userdata)).toArray();
-  return await Promise.all(groups.map(g => resolveGroup(g, RESOLVE_FULL_DEPTH)));
 };
 
 export const findUserInCompilations = async (userdata: ServerDocument<IUserData>) => {

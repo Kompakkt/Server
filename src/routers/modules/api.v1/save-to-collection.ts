@@ -7,7 +7,6 @@ import {
   type IDigitalEntity,
   type IDocument,
   type IEntity,
-  type IGroup,
   type IInstitution,
   type IPerson,
   type IPhysicalEntity,
@@ -28,7 +27,6 @@ import {
   contactCollection,
   digitalEntityCollection,
   entityCollection,
-  groupCollection,
   institutionCollection,
   personCollection,
   physicalEntityCollection,
@@ -324,24 +322,6 @@ const transformPhysicalEntity: TransformFn<IPhysicalEntity> = async body => {
   };
 };
 
-const transformGroup: TransformFn<IGroup> = async body => {
-  const asGroup = body as unknown as Partial<IGroup>;
-  if (asGroup.creator) delete asGroup.creator.profile;
-  if (asGroup.members) {
-    asGroup.members = asGroup.members.map(member => {
-      delete member.profile;
-      return member;
-    });
-  }
-  if (asGroup.owners) {
-    asGroup.owners = asGroup.owners.map(owner => {
-      delete owner.profile;
-      return owner;
-    });
-  }
-  return { ...asGroup };
-};
-
 const createSaver = <T extends ServerDocument<T>>(
   collection: DbCollection<T>,
   transform: TransformFn<T>,
@@ -423,11 +403,6 @@ const createSaver = <T extends ServerDocument<T>>(
 const addressSaver = createSaver(addressCollection, transformDocument);
 const annotationSaver = createSaver(annotationCollection, transformAnnotation);
 const contactSaver = createSaver(contactCollection, transformDocument);
-const groupSaver = createSaver(groupCollection, transformGroup, async (obj, userdata) => {
-  resolveCache
-    .scan(`*${obj._id.toString()}*`, async (key: string) => key)
-    .then(entries => Promise.all(entries.map(key => resolveCache.del(key))));
-});
 const tagSaver = createSaver(tagCollection, transformDocument);
 
 const compilationSaver = createSaver(
@@ -525,8 +500,6 @@ export const saveHandler = async ({
       return digitalEntitySaver(body, userdata);
     case Collection.entity:
       return entitySaver(body, userdata);
-    case Collection.group:
-      return groupSaver(body, userdata);
     case Collection.institution:
       return institutionSaver(body, userdata);
     case Collection.person:

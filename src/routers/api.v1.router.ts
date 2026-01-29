@@ -3,15 +3,14 @@ import { ObjectId } from 'mongodb';
 import {
   Collection,
   EntityAccessRole,
-  type IGroup,
   type IStrippedUserData,
   isAnnotation,
   isInstitution,
   isPerson,
 } from 'src/common';
-import { isEntitySettings, isGroup } from 'src/common/typeguards';
+import { isEntitySettings } from 'src/common/typeguards';
 import { err, info, log, warn } from 'src/logger';
-import { collectionMap, entityCollection, groupCollection, userCollection } from 'src/mongo';
+import { collectionMap, entityCollection, userCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';
 import configServer from 'src/server.config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -198,12 +197,6 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             },
           },
         )
-        .get('/get/groups', () => groupCollection.find({}).toArray(), {
-          detail: {
-            description: 'Get all groups',
-            tags: [RouterTags['API V1']],
-          },
-        })
         .post(
           '/post/push/:collection',
           async ({ status, params: { collection }, body, userdata, userRole }) => {
@@ -256,18 +249,6 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
                   `User has parent entity editor permission: ${hasParentPermission}, { parentEntity: ${parentEntity?._id} }`,
                 );
                 if (hasParentPermission) return true;
-              } else if (collection === Collection.group) {
-                // For groups, we allow editing if the user is creator or owner of group
-                const bodyAsGroup = body as IGroup;
-                if (!isGroup(bodyAsGroup)) return false;
-                const isCreator = bodyAsGroup.creator._id.toString() === userdata._id.toString();
-                const isOwner = bodyAsGroup.owners
-                  .map(o => o._id.toString())
-                  .includes(userdata._id.toString());
-                log(
-                  `User is group creator: ${isCreator}, is group owner: ${isOwner}, { group: ${body._id} }`,
-                );
-                if (isCreator || isOwner) return true;
               }
 
               return false;

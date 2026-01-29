@@ -6,8 +6,5 @@ export const isUserWhitelisted = (
   userdata?: ServerDocument<IUserData> | IStrippedUserData,
 ) => {
   if (!userdata) return false;
-  const isUserWhitelisted = entity.whitelist.persons
-    .concat(entity.whitelist.groups.flatMap(g => [...g.members, ...g.owners, g.creator]))
-    .some(p => p._id === userdata._id.toString());
-  return isUserWhitelisted;
+  return entity.whitelist.persons.some(p => p._id === userdata._id.toString());
 };

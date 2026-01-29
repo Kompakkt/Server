@@ -39,9 +39,9 @@ export const findSingleHandler = async (
           })
         : false;
       const userInAccess = userdata ? entity.access?.[userdata._id.toString()] : undefined;
-      const isUserWhitelisted = entity.whitelist.persons
-        .concat(entity.whitelist.groups.flatMap(g => g.members))
-        .some(p => p._id === userdata?._id.toString());
+      const isUserWhitelisted = entity.whitelist.persons.some(
+        p => p._id === userdata?._id.toString(),
+      );
       const isAdmin = userdata?.role === UserRank.admin;
 
       const userHasAccess =

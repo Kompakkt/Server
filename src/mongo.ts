@@ -8,7 +8,6 @@ import type {
   IDigitalEntity,
   IDocument,
   IEntity,
-  IGroup,
   IInstitution,
   IPerson,
   IPhysicalEntity,
@@ -17,7 +16,7 @@ import type {
 } from './common';
 import { Collection } from './common';
 import { Configuration } from './configuration';
-import { info } from './logger';
+import { err, info } from './logger';
 import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
 import { type IPublicProfile } from './common/interfaces';
@@ -33,12 +32,16 @@ export const mongoClient = ClientURL
       },
     });
 
+mongoClient.on('error', error => {
+  err('MongoDB error', error);
+});
+
 await retryWithBackoff(async () => await mongoClient.connect())
   .then(() => {
     info('Connected to MongoDB');
   })
   .catch(error => {
-    info('Failed to connect to MongoDB');
+    err('Failed to connect to MongoDB', error);
     process.exit(1);
   });
 
@@ -90,7 +93,6 @@ export const apiKeyCollection = accountsDb.collection<ServerDocument<ApiKeyDocum
 
 export const entitiesDb = db(Configuration.Mongo.RepositoryDB);
 export const entityCollection = entitiesDb.collection<ServerDocument<IEntity>>('entity');
-export const groupCollection = entitiesDb.collection<ServerDocument<IGroup>>('group');
 export const addressCollection = entitiesDb.collection<ServerDocument<IAddress>>('address');
 export const annotationCollection =
   entitiesDb.collection<ServerDocument<IAnnotation>>('annotation');
@@ -110,7 +112,6 @@ entityCollection.createIndex({ 'relatedDigitalEntity._id': 1 });
 
 export const collectionMap = {
   [Collection.entity]: entityCollection,
-  [Collection.group]: groupCollection,
   [Collection.address]: addressCollection,
   [Collection.annotation]: annotationCollection,
   [Collection.compilation]: compilationCollection,
