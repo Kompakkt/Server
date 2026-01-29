@@ -14,6 +14,11 @@ const getClientConfig = async () => {
     new URL(config.issuer),
     config.client_id,
     config.client_secret,
+    {
+      basic: OpenIDClient.ClientSecretBasic,
+      post: OpenIDClient.ClientSecretPost,
+      jwt: OpenIDClient.ClientSecretJwt,
+    }[config.oidc_auth_type](config.client_secret),
   );
 };
 
@@ -79,10 +84,19 @@ const oidcRouter = new Elysia()
         const config = await getClientConfig();
         const oidcConfig = getOIDCConfig();
 
-        const tokens = await OpenIDClient.authorizationCodeGrant(config, new URL(request.url), {
-          pkceCodeVerifier: oidc_code_verifier.value,
-          expectedState: oidc_state.value,
-        });
+        const tokens = await OpenIDClient.authorizationCodeGrant(
+          config,
+          oidcConfig.force_https
+            ? new URL(request.url.replace('http://', 'https://'))
+            : new URL(request.url),
+          {
+            pkceCodeVerifier: oidc_code_verifier.value,
+            expectedState: oidc_state.value,
+          },
+          {
+            redirect_uri: oidcConfig.redirect_uri,
+          },
+        );
 
         const userinfo = await OpenIDClient.fetchUserInfo(
           config,
@@ -141,7 +155,13 @@ const oidcRouter = new Elysia()
 
         return redirect('/');
       } catch (error) {
-        err('OIDC Callback Error:', error);
+        err('OIDC Callback Error:', error, request.url);
+        if (error instanceof Error) {
+          err('Error name:', error.name);
+          err('Error message:', error.message);
+          err('Error cause:', (error as any).cause);
+          err('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        }
         return status(401, 'Authentication failed');
       }
     },
@@ -149,6 +169,10 @@ const oidcRouter = new Elysia()
       cookie: t.Object({
         oidc_code_verifier: t.Optional(t.String()),
         oidc_state: t.Optional(t.String()),
+      }),
+      query: t.Object({
+        code: t.Optional(t.String()),
+        state: t.Optional(t.String()),
       }),
       detail: {
         description: 'Callback endpoint for OIDC authentication',
