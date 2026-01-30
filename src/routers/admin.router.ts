@@ -18,6 +18,7 @@ import { RESOLVE_FULL_DEPTH, resolveEntity } from './modules/api.v1/resolving-st
 import { resolveUsersDataObject } from './modules/user-management/users';
 import { exploreCache } from 'src/redis';
 import { RouterTags } from './tags';
+import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
 
 const gatherDbCollectionStats = async <T extends Document>(collection: Collection<T>) => {
   const items = await collection.find().toArray();
@@ -232,7 +233,7 @@ const adminRouter = new Elysia()
           if (!updateResult) return status('Internal Server Error');
 
           const success = await sendReactMail({
-            from: Configuration.Mailer?.Target?.contact ?? 'noreply@kompakkt.de',
+            from: `noreply@${getMailDomainFromPublicURL()}`,
             to: user.mail,
             subject: 'Kompakkt password reset request',
             jsx: passwordResetRequestTemplate({

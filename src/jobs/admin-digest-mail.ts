@@ -3,10 +3,10 @@ import { Configuration } from 'src/configuration';
 import { adminDigestTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';
 import { userCollection } from 'src/mongo';
+import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
 
 export const adminDigestMail = async () => {
-  let senderDomain = new URL(Configuration.Server.PublicURL).host;
-  if (senderDomain.includes('localhost')) senderDomain = 'kompakkt.de';
+  const senderDomain = getMailDomainFromPublicURL();
 
   const admins = await userCollection.find({ role: UserRank.admin }).toArray();
   const mails = admins.map(a => a.mail.trim()).filter(mail => !!mail);

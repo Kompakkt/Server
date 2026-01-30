@@ -14,6 +14,7 @@ import {
   welcomeNewAccountTemplate,
 } from '../emails';
 import { authService, signInBody } from './handlers/auth.service';
+import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
 
 const userManagementRouter = new Elysia()
   .use(configServer)
@@ -101,7 +102,7 @@ const userManagementRouter = new Elysia()
 
           info('Sending welcome mail');
           const success = await sendReactMail({
-            from: 'noreply@kompakkt.de',
+            from: `noreply@${getMailDomainFromPublicURL()}`,
             to: mail,
             subject: 'Welcome to Kompakkt!',
             jsx: welcomeNewAccountTemplate(adjustedUser),
@@ -168,7 +169,7 @@ const userManagementRouter = new Elysia()
             if (!updateResult) return status('Internal Server Error');
 
             const success = await sendReactMail({
-              from: 'noreply@kompakkt.de',
+              from: `noreply@${getMailDomainFromPublicURL()}`,
               to: user.mail,
               subject: 'Kompakkt password reset request',
               jsx: passwordResetRequestTemplate({ prename: user.prename, resetToken }),
@@ -235,7 +236,7 @@ const userManagementRouter = new Elysia()
           if (!user) return status(400);
 
           const success = await sendReactMail({
-            from: 'noreply@kompakkt.de',
+            from: `noreply@${getMailDomainFromPublicURL()}`,
             to: user.mail,
             subject: 'Your Kompakkt username',
             jsx: forgotUsernameTemplate(user),
