@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
 import { type IUserData, UserRank } from 'src/common';
-import { info } from 'src/logger';
+import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
@@ -153,30 +153,33 @@ const userManagementRouter = new Elysia()
       .post(
         '/help/request-reset',
         async ({ status, body: { username } }) => {
-          const user = await userCollection.findOne({ username });
-          if (!user) return status('Not Found');
+          try {
+            const user = await userCollection.findOne({ username });
+            if (!user) return status('Not Found');
 
-          const resetToken = randomBytes(32).toString('hex');
-          const tokenExpiration = Date.now() + 86400000; // 24 hours
+            const resetToken = randomBytes(32).toString('hex');
+            const tokenExpiration = Date.now() + 86400000; // 24 hours
 
-          const updateResult = await userTokenCollection.updateOne(
-            { username },
-            {
-              $set: { resetToken, tokenExpiration },
-            },
-            { upsert: true },
-          );
-          if (!updateResult) return status('Internal Server Error');
+            const updateResult = await userTokenCollection.updateOne(
+              { username },
+              { $set: { resetToken, tokenExpiration } },
+              { upsert: true },
+            );
+            if (!updateResult) return status('Internal Server Error');
 
-          const success = await sendReactMail({
-            from: 'noreply@kompakkt.de',
-            to: user.mail,
-            subject: 'Kompakkt password reset request',
-            jsx: passwordResetRequestTemplate({ prename: user.prename, resetToken }),
-          });
-          if (!success) return status('Internal Server Error');
+            const success = await sendReactMail({
+              from: 'noreply@kompakkt.de',
+              to: user.mail,
+              subject: 'Kompakkt password reset request',
+              jsx: passwordResetRequestTemplate({ prename: user.prename, resetToken }),
+            });
+            if (!success) return status('Internal Server Error');
 
-          return { status: 'OK' };
+            return { status: 'OK' };
+          } catch (error) {
+            warn('Error in /help/request-reset:', error);
+            return status(500, 'Internal Server Error');
+          }
         },
         {
           body: t.Object({
