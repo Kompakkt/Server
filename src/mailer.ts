@@ -7,7 +7,7 @@ import { err, info } from './logger';
 import { mailCollection, userCollection } from './mongo';
 import type { ServerDocument } from './util/document-with-objectid-type';
 import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { render } from '@react-email/render';
 
 export enum ETarget {
   contact = 'contact',
@@ -98,7 +98,7 @@ export const sendReactMail = async ({
     from,
     to,
     subject,
-    html: renderToStaticMarkup(jsx),
+    html: await render(jsx),
   });
 };
 
