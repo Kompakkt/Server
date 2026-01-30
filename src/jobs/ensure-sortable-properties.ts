@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { log } from 'src/logger';
+import { log, warn } from 'src/logger';
 import { compilationCollection, entityCollection, profileCollection } from 'src/mongo';
 
 /**
@@ -23,38 +23,44 @@ export const ensureSortableProperties = async () => {
       `Found ${entities.length} entities in ${collection.collectionName} without sortable properties...`,
     );
     for (const entity of entities) {
-      if (!entity.__createdAt) {
-        // Parse ObjectId timestamp to number
-        entity.__createdAt = new ObjectId(entity._id).getTimestamp().getTime();
-      }
-      if (!entity.__hits) {
-        entity.__hits = 0;
-      }
-      if (!entity.__annotationCount) {
-        if ('annotations' in entity) {
-          entity.__annotationCount = Object.keys(entity.annotations || {}).length;
-        } else {
-          entity.__annotationCount = 0;
+      try {
+        if (!entity.__createdAt) {
+          // Parse ObjectId timestamp to number
+          entity.__createdAt = new ObjectId(entity._id).getTimestamp().getTime();
         }
-      }
-      if (!entity.__normalizedName) {
-        if ('name' in entity) {
-          entity.__normalizedName = entity.name.trim().toLowerCase();
-        } else if ('displayName' in entity) {
-          entity.__normalizedName = entity.displayName?.trim().toLowerCase() ?? '';
+        if (!entity.__hits) {
+          entity.__hits = 0;
         }
-      }
-      await entityCollection.updateOne(
-        { _id: entity._id },
-        {
-          $set: {
-            __createdAt: entity.__createdAt,
-            __hits: entity.__hits,
-            __annotationCount: entity.__annotationCount,
-            __normalizedName: entity.__normalizedName,
+        if (!entity.__annotationCount) {
+          if ('annotations' in entity) {
+            entity.__annotationCount = Object.keys(entity.annotations || {}).length;
+          } else {
+            entity.__annotationCount = 0;
+          }
+        }
+        if (!entity.__normalizedName) {
+          if ('name' in entity) {
+            entity.__normalizedName = entity.name.trim().toLowerCase();
+          } else if ('displayName' in entity) {
+            entity.__normalizedName = entity.displayName?.trim().toLowerCase() ?? '';
+          }
+        }
+        await entityCollection.updateOne(
+          { _id: entity._id },
+          {
+            $set: {
+              __createdAt: entity.__createdAt,
+              __hits: entity.__hits,
+              __annotationCount: entity.__annotationCount,
+              __normalizedName: entity.__normalizedName,
+            },
           },
-        },
-      );
+        );
+      } catch (err) {
+        warn(
+          `Error updating entity ${entity._id.toString()} in collection ${collection.collectionName}: ${err}`,
+        );
+      }
     }
   }
 };

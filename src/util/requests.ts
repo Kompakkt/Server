@@ -57,7 +57,6 @@ const request = (method: string, url: string, obj: RequestOptions) => {
     urlObj.searchParams.set(key, value.toString());
   }
   const finalUrl = urlObj.toString();
-  info(`Making ${method} request to ${finalUrl}`);
   return Bun.fetch(finalUrl, {
     ...options,
     headers: {
@@ -67,7 +66,6 @@ const request = (method: string, url: string, obj: RequestOptions) => {
     method,
   }).then(response => {
     cookieJar.append(response.headers.getSetCookie());
-    log('Got response for', finalUrl);
     switch (responseFormat) {
       case 'blob':
         return response.blob();
