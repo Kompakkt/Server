@@ -304,6 +304,7 @@ const transformPhysicalEntity: TransformFn<IPhysicalEntity> = async body => {
     collection: asPhysicalEntity.collection ?? '',
     institutions: flattenDocumentArray(asPhysicalEntity.institutions),
     persons: flattenDocumentArray(asPhysicalEntity.persons),
+    dimensions: asPhysicalEntity.dimensions ?? [],
     place: {
       name: asPhysicalEntity.place?.name ?? '',
       geopolarea: asPhysicalEntity.place?.geopolarea ?? '',
