@@ -16,7 +16,7 @@ import {
   undoUserOwnerOf,
 } from './modules/user-management/users';
 import { resolveEntity, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
-import type { IPublicProfile } from 'src/common/interfaces';
+import type { IPublicProfile, IStrippedUserData } from 'src/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
@@ -26,6 +26,236 @@ import { exploreHandler } from './modules/api.v2/explore';
 import { ExploreRequest } from './modules/api.v2/types';
 import { PermissionHelper, permissionService } from './handlers/permission.service';
 import { searchCache } from 'src/redis';
+
+const profileRouter = new Elysia()
+  .use(configServer)
+  .use(authService)
+  .use(permissionService)
+  .get(
+    '/user-of-profile/:id',
+    async ({ params: { id }, status }) => {
+      const profile = await profileCollection.findOne({ _id: new ObjectId(id) });
+      if (!profile) return status(404, 'Profile not found');
+      const user = await userCollection.findOne({
+        [`profiles.${id}`]: { $exists: true },
+      });
+      if (!user) return status(404, 'User not found for the given profile ID');
+      return {
+        _id: user._id.toString(),
+        fullname: user.fullname,
+        username: user.username,
+      } satisfies IStrippedUserData;
+    },
+    {
+      params: t.Object({
+        id: t.String({ description: 'The ID of the profile to find the user for.' }),
+      }),
+      detail: {
+        description: 'Finds the user associated with a given profile ID.',
+        tags: [RouterTags['API V2']],
+      },
+    },
+  )
+  .get(
+    '/via-id/:id',
+    async ({ status, params: { id } }) => {
+      if (!ObjectId.isValid(id)) return status(400, 'Invalid profile ID format');
+
+      const profile = await profileCollection.findOne({ _id: new ObjectId(id) });
+      if (!profile) return status(404, 'Profile not found');
+      return profile;
+    },
+    {
+      params: t.Object({
+        id: t.String({
+          description: 'The id of the profile to retrieve',
+        }),
+      }),
+      detail: {
+        description: 'Retrieves a user or organization profile via id.',
+        tags: [RouterTags['API V2']],
+      },
+      isLoggedIn: false,
+    },
+  )
+  .post(
+    '/organization',
+    async ({ userdata, body, status }) => {
+      if (!userdata) return status(401);
+      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
+      if (body.type !== ProfileType.organization)
+        return status(400, 'Profile type must be "organization"');
+
+      const _id = new ObjectId();
+
+      // Save image if necessary
+      body.imageUrl = await (async () => {
+        if (!body.imageUrl) return undefined;
+        if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
+        return await updatePreviewImage(
+          body.imageUrl,
+          'profile-pictures',
+          _id.toString(),
+          MAX_PROFILE_IMAGE_RESOLUTION,
+        );
+      })();
+
+      const insertResult = await profileCollection.insertOne({ ...body, _id });
+
+      if (!insertResult.acknowledged) {
+        return status(500, 'Profile creation failed');
+      }
+
+      await userCollection.updateOne(
+        { _id: new ObjectId(userdata._id.toString()) },
+        {
+          $push: {
+            profiles: {
+              profileId: insertResult.insertedId.toString(),
+              type: ProfileType.organization,
+            },
+          },
+        },
+      );
+
+      return {
+        ...body,
+        _id: insertResult.insertedId.toString(),
+      };
+    },
+    {
+      isLoggedIn: true,
+      detail: {
+        description: 'Creates a new organizational profile.',
+        tags: [RouterTags['API V2']],
+      },
+    },
+  )
+  .post(
+    '/organization/:id',
+    async ({ userdata, body, status, params: { id: organizationId } }) => {
+      if (!userdata) return status(401);
+      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
+      if (body.type !== ProfileType.organization)
+        return status(400, 'Profile type must be "organization"');
+
+      const existingProfile = await profileCollection.findOne({
+        _id: new ObjectId(organizationId),
+      });
+      if (!existingProfile) return status(404, 'organizational profile not found');
+
+      // Save image if necessary
+      body.imageUrl = await (async () => {
+        if (!body.imageUrl) return undefined;
+        if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
+        return await updatePreviewImage(
+          body.imageUrl,
+          'profile-pictures',
+          organizationId,
+          MAX_PROFILE_IMAGE_RESOLUTION,
+        );
+      })();
+
+      // Ensure we don't overwrite the _id field
+      // @ts-expect-error: Ensure we don't overwrite the _id field
+      delete body._id;
+      const updateResult = await profileCollection.updateOne(
+        { _id: new ObjectId(organizationId) },
+        { $set: { ...body } },
+      );
+
+      if (updateResult.modifiedCount <= 0) {
+        return status(500, 'Profile update failed');
+      }
+
+      const updatedProfile = await profileCollection.findOne({
+        _id: new ObjectId(organizationId),
+      });
+      return updatedProfile;
+    },
+    {
+      isLoggedIn: true,
+      detail: {
+        description: 'Updates an existing organizational profile.',
+        tags: [RouterTags['API V2']],
+      },
+      params: t.Object({
+        id: t.String({
+          description: 'The ID of the organizational profile to update.',
+        }),
+      }),
+    },
+  )
+  .post(
+    '/user',
+    async ({ userdata, status, body }) => {
+      if (!userdata) return status(401);
+
+      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
+      if (body.type !== ProfileType.user) return status(400, 'Profile type must be "user"');
+
+      // Look for existing profile in userdata
+      const userProfile = userdata.profiles?.find(
+        ({ profileId, type }) => ObjectId.isValid(profileId) && type === ProfileType.user,
+      );
+
+      const profileId = userProfile?.profileId;
+      const profile = profileId
+        ? await profileCollection.findOne({ _id: new ObjectId(profileId) })
+        : undefined;
+      const existingProfileId = profile ? profile._id.toString() : undefined;
+      const _id = existingProfileId ? new ObjectId(existingProfileId) : new ObjectId();
+
+      // Save image if necessary
+      body.imageUrl = await (async () => {
+        if (!body.imageUrl) return undefined;
+        if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
+        return await updatePreviewImage(
+          body.imageUrl,
+          'profile-pictures',
+          _id.toString(),
+          MAX_PROFILE_IMAGE_RESOLUTION,
+        );
+      })();
+
+      // TODO: think if we need to merge?
+      // @ts-expect-error: Ensure we don't overwrite the _id field
+      delete body._id;
+      const updateResult = await profileCollection.updateOne(
+        { _id },
+        { $set: { ...body } },
+        { upsert: true },
+      );
+
+      if (!updateResult.acknowledged) {
+        return status(500, 'Profile update failed');
+      }
+
+      if (!userProfile) {
+        await userCollection.updateOne(
+          { _id: new ObjectId(userdata._id.toString()) },
+          {
+            $push: {
+              profiles: {
+                profileId: _id.toString(),
+                type: ProfileType.user,
+              },
+            },
+          },
+        );
+      }
+
+      const updatedProfile = await profileCollection.findOne({ _id });
+      return updatedProfile;
+    },
+    {
+      isLoggedIn: true,
+      detail: {
+        description: "Updates the logged-in user's profile with the provided data.",
+        tags: [RouterTags['API V2']],
+      },
+    },
+  );
 
 const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
   app
@@ -294,256 +524,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         },
       },
     )
-    .get(
-      '/user-data/profile/:idOrName',
-      async ({ status, params: { idOrName } }) => {
-        const profile = await profileCollection.findOne(
-          ObjectId.isValid(idOrName) ? { _id: new ObjectId(idOrName) } : { displayName: idOrName },
-        );
-
-        if (!profile) return status(404, 'Profile not found');
-        return profile;
-      },
-      {
-        params: t.Object({
-          idOrName: t.String({
-            description:
-              'The identifier of the user profile to retrieve, or the display name of the profile.',
-          }),
-        }),
-        detail: {
-          description: 'Retrieves a user profile by its ID or display name.',
-          tags: [RouterTags['API V2']],
-        },
-        isLoggedIn: false,
-      },
-    )
-    .get(
-      '/user-data/profile',
-      async ({ userdata, status }) => {
-        if (!userdata) return status(401);
-        const profileId = Object.entries(userdata.profiles ?? {}).find(
-          ([id, type]) => ObjectId.isValid(id) && type === ProfileType.user,
-        )?.[0];
-        const profile = profileId
-          ? await profileCollection.findOne({ _id: new ObjectId(profileId) })
-          : undefined;
-        if (!profile) {
-          // Create a default profile if none exists
-          const newProfile = {
-            type: ProfileType.user,
-            _id: new ObjectId(),
-            description: '',
-            displayName: userdata.fullname,
-            imageUrl: undefined,
-            location: undefined,
-            socials: {
-              website: undefined,
-            },
-          } satisfies ServerDocument<IPublicProfile>;
-          const insertResult = await profileCollection.insertOne(newProfile);
-          if (insertResult.acknowledged) {
-            await userCollection.updateOne(
-              { _id: new ObjectId(userdata._id.toString()) },
-              {
-                $set: {
-                  profiles: {
-                    ...userdata.profiles,
-                    [insertResult.insertedId.toString()]: ProfileType.user,
-                  },
-                },
-              },
-            );
-            return {
-              ...newProfile,
-              _id: insertResult.insertedId.toString(),
-            };
-          }
-        }
-        return profile;
-      },
-      {
-        isLoggedIn: true,
-        detail: {
-          description: "Retrieves the logged-in user's profile.",
-          tags: [RouterTags['API V2']],
-        },
-      },
-    )
-    .post(
-      '/institution/profile',
-      async ({ userdata, body, status }) => {
-        if (!userdata) return status(401);
-        if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
-        if (body.type !== ProfileType.institution)
-          return status(400, 'Profile type must be "institution"');
-
-        const _id = new ObjectId();
-
-        // Save image if necessary
-        body.imageUrl = await (async () => {
-          if (!body.imageUrl) return undefined;
-          if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(
-            body.imageUrl,
-            'profile-pictures',
-            _id.toString(),
-            MAX_PROFILE_IMAGE_RESOLUTION,
-          );
-        })();
-
-        const insertResult = await profileCollection.insertOne({ ...body, _id });
-
-        if (!insertResult.acknowledged) {
-          return status(500, 'Profile creation failed');
-        }
-
-        await userCollection.updateOne(
-          { _id: new ObjectId(userdata._id.toString()) },
-          {
-            $set: {
-              profiles: {
-                ...userdata.profiles,
-                [insertResult.insertedId.toString()]: ProfileType.institution,
-              },
-            },
-          },
-        );
-
-        return {
-          ...body,
-          _id: insertResult.insertedId.toString(),
-        };
-      },
-      {
-        isLoggedIn: true,
-        detail: {
-          description: 'Creates a new institutional profile.',
-          tags: [RouterTags['API V2']],
-        },
-      },
-    )
-    .post(
-      '/institution/profile/:id',
-      async ({ userdata, body, status, params: { id: institutionId } }) => {
-        if (!userdata) return status(401);
-        if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
-        if (body.type !== ProfileType.institution)
-          return status(400, 'Profile type must be "institution"');
-
-        const existingProfile = await profileCollection.findOne({
-          _id: new ObjectId(institutionId),
-        });
-        if (!existingProfile) return status(404, 'Institutional profile not found');
-
-        // Save image if necessary
-        body.imageUrl = await (async () => {
-          if (!body.imageUrl) return undefined;
-          if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(
-            body.imageUrl,
-            'profile-pictures',
-            institutionId,
-            MAX_PROFILE_IMAGE_RESOLUTION,
-          );
-        })();
-
-        // Ensure we don't overwrite the _id field
-        // @ts-expect-error: Ensure we don't overwrite the _id field
-        delete body._id;
-        const updateResult = await profileCollection.updateOne(
-          { _id: new ObjectId(institutionId) },
-          { $set: { ...body } },
-        );
-
-        if (updateResult.modifiedCount <= 0) {
-          return status(500, 'Profile update failed');
-        }
-
-        const updatedProfile = await profileCollection.findOne({
-          _id: new ObjectId(institutionId),
-        });
-        return updatedProfile;
-      },
-      {
-        isLoggedIn: true,
-        detail: {
-          description: 'Updates an existing institutional profile.',
-          tags: [RouterTags['API V2']],
-        },
-        params: t.Object({
-          id: t.String({
-            description: 'The ID of the institutional profile to update.',
-          }),
-        }),
-      },
-    )
-    .post(
-      '/user-data/profile',
-      async ({ userdata, status, body }) => {
-        if (!userdata) return status(401);
-
-        if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
-        if (body.type !== ProfileType.user) return status(400, 'Profile type must be "user"');
-
-        // Look for existing profile in userdata
-        const profileId = Object.entries(userdata.profiles ?? {}).find(
-          ([id, type]) => ObjectId.isValid(id) && type === ProfileType.user,
-        )?.[0];
-        const profile = profileId
-          ? await profileCollection.findOne({ _id: new ObjectId(profileId) })
-          : undefined;
-        const existingProfileId = profile ? profile._id.toString() : undefined;
-        const _id = existingProfileId ? new ObjectId(existingProfileId) : new ObjectId();
-
-        // Save image if necessary
-        body.imageUrl = await (async () => {
-          if (!body.imageUrl) return undefined;
-          if (!body.imageUrl.startsWith('data:image')) return body.imageUrl;
-          return await updatePreviewImage(
-            body.imageUrl,
-            'profile-pictures',
-            _id.toString(),
-            MAX_PROFILE_IMAGE_RESOLUTION,
-          );
-        })();
-
-        // TODO: think if we need to merge?
-        // @ts-expect-error: Ensure we don't overwrite the _id field
-        delete body._id;
-        const updateResult = await profileCollection.updateOne(
-          { _id },
-          { $set: { ...body } },
-          { upsert: true },
-        );
-
-        if (!updateResult.acknowledged) {
-          return status(500, 'Profile update failed');
-        }
-
-        await userCollection.updateOne(
-          { _id: new ObjectId(userdata._id.toString()) },
-          {
-            $set: {
-              profiles: {
-                ...userdata.profiles,
-                [_id.toString()]: ProfileType.user,
-              },
-            },
-          },
-        );
-
-        const updatedProfile = await profileCollection.findOne({ _id });
-        return updatedProfile;
-      },
-      {
-        isLoggedIn: true,
-        detail: {
-          description: "Updates the logged-in user's profile with the provided data.",
-          tags: [RouterTags['API V2']],
-        },
-      },
-    )
+    .group('/profile', app => app.use(profileRouter))
     .get(
       '/list-entity-formats',
       async () => {

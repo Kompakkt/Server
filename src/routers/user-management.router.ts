@@ -1,10 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { type IUserData, UserRank } from 'src/common';
+import { type IPublicProfile, type IUserData, ProfileType, UserRank } from 'src/common';
 import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
-import { userCollection, userTokenCollection } from 'src/mongo';
+import { profileCollection, userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { updateUserPassword } from 'src/util/authentication-helpers';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -15,6 +15,7 @@ import {
 } from '../emails';
 import { authService, signInBody } from './handlers/auth.service';
 import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
+import { createNewUserProfile } from 'src/util/create-new-user-profile';
 
 const userManagementRouter = new Elysia()
   .use(configServer)
@@ -87,8 +88,18 @@ const userManagementRouter = new Elysia()
             role,
             data: {},
             _id: new ObjectId(),
-            sessionID: '',
+            strategy: 'local',
+            profiles: [],
           };
+
+          const userProfile = await createNewUserProfile(adjustedUser).catch(err => {
+            warn('Error creating user profile for new user:', err);
+            return null;
+          });
+          if (!userProfile) {
+            return status(500, 'Failed creating user profile');
+          }
+          adjustedUser.profiles.push(userProfile);
 
           info('Creating user', adjustedUser);
           const transactionResult = await Promise.allSettled([

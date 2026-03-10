@@ -1,11 +1,12 @@
 import { SAML } from '@node-saml/node-saml';
 import Elysia, { Cookie, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { log } from 'src/logger';
+import { log, warn } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { getSAMLConfig } from './config';
 import { samlProfileToUser } from './saml';
+import { createNewUserProfile } from 'src/util/create-new-user-profile';
 
 const handleSAMLCallback = async ({
   redirect,
@@ -29,14 +30,23 @@ const handleSAMLCallback = async ({
   const user = samlProfileToUser(result.profile);
   if (!user) return status(401, 'Failed to extract user from SAML response');
 
-  const { username, mail } = user;
+  const { username, mail, strategy } = user;
 
   log(`${user.fullname} logging in using SSO-NFDI4Culture SAML strategy`);
 
   const userdata = await (async () => {
-    const resolvedUser = await userCollection.findOne({ username, mail });
+    const resolvedUser = await userCollection.findOne({ username, mail, strategy });
     if (!resolvedUser) {
       log(`${user.fullname} is not registered yet. Creating new account...`);
+      const userProfile = await createNewUserProfile(user).catch(err => {
+        warn('Error creating user profile for new user:', err);
+        return null;
+      });
+      if (!userProfile) {
+        return status(500, 'Failed creating user profile');
+      }
+      user.profiles.push(userProfile);
+
       const insertResult = await userCollection.insertOne({
         ...user,
         _id: new ObjectId(),

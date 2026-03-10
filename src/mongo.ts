@@ -80,6 +80,7 @@ export const followsCollection = accountsDb.collection<{
 }>('follows');
 
 followsCollection.createIndex({ follower: 1, following: 1 }, { unique: true });
+userCollection.createIndex({ 'profiles.profileId': 1, 'profiles.type': 1 }).catch(() => {});
 
 export type ApiKeyDocument = {
   routes: string[];

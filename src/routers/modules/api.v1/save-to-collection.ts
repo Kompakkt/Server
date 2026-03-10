@@ -11,6 +11,7 @@ import {
   type IPerson,
   type IPhysicalEntity,
   type IUserData,
+  ProfileType,
   isCompilation,
   isDigitalEntity,
   isEntity,
@@ -39,6 +40,7 @@ import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
 import { saveMetadataFiles } from 'src/util/save-metadata-files';
+import type { CreatorField } from 'src/common/interfaces';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,
@@ -106,7 +108,14 @@ const transformAnnotation: TransformFn<IAnnotation> = async (body, user) => {
 const transformEntity: TransformFn<IEntity> = async (body, user) => {
   const asEntity = body as unknown as Partial<IEntity>;
 
-  const strippedUser = stripUser(user);
+  const userProfile = user.profiles.find(p => p.type === ProfileType.user)!;
+  const strippedUser: CreatorField = {
+    ...stripUser(user),
+    profile: {
+      _id: userProfile.profileId,
+      type: userProfile.type,
+    },
+  };
 
   const digitalEntity = asEntity.relatedDigitalEntity?._id
     ? await digitalEntityCollection.findOne({

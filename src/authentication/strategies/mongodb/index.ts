@@ -19,7 +19,7 @@ export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePass
 
   async authenticate({ username, password }: AuthWithUsernamePassword): Promise<AuthResult> {
     const [userFindResult, passwordFindResult] = await Promise.all([
-      userCollection.findOne({ username }),
+      userCollection.findOne({ username, strategy: 'local' }),
       passwordCollection.findOne({ username }),
     ]);
     if (!userFindResult || !passwordFindResult) {

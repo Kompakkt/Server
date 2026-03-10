@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { type IUserData, UserRank } from 'src/common';
-import { log } from 'src/logger';
+import { log, warn } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import {
   type AuthResult,
@@ -8,6 +8,8 @@ import {
   AuthenticationStrategy,
 } from '../strategy';
 import { Configuration } from 'src/configuration';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { createNewUserProfile } from 'src/util/create-new-user-profile';
 
 let SEARCH_URL = `${Configuration.LDAP.SearchService}/search`;
 if (SEARCH_URL.includes('//search')) {
@@ -73,7 +75,8 @@ export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsern
       return new Error('Invalid username or password');
     }
 
-    const user: Omit<Omit<IUserData, 'sessionID'>, '_id'> & { strategy: string } = {
+    const user: ServerDocument<IUserData> = {
+      _id: new ObjectId(),
       username,
       fullname: `${prename} ${surname}`,
       prename,
@@ -82,13 +85,22 @@ export class UniCologneLDAPStrategy extends AuthenticationStrategy<AuthWithUsern
       role: UserRank.uploader,
       data: {},
       strategy: 'ldap',
+      profiles: [],
     };
 
     log(`${user.fullname} logging in using LDAP strategy`);
 
-    const resolvedUser = await userCollection.findOne({ username, mail });
+    const resolvedUser = await userCollection.findOne({ username, mail, strategy: user.strategy });
     if (!resolvedUser) {
       log(`${user.fullname} is not registered yet. Creating new account...`);
+      const userProfile = await createNewUserProfile(user).catch(err => {
+        warn('Error creating user profile for new user:', err);
+        return null;
+      });
+      if (!userProfile) {
+        return new Error('Failed creating user profile');
+      }
+      user.profiles.push(userProfile);
 
       const insertResult = await userCollection.insertOne({
         ...user,

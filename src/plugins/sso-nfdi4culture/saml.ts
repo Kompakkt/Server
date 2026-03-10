@@ -1,6 +1,8 @@
 import { type Profile } from '@node-saml/node-saml';
+import { ObjectId } from 'mongodb';
 import { UserRank, type IUserData } from 'src/common';
 import { err, log, warn } from 'src/logger';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export const samlProfileToUser = (profile: Profile) => {
   try {
@@ -11,7 +13,8 @@ export const samlProfileToUser = (profile: Profile) => {
       warn('Missing required fields from SAML response');
       return false;
     }
-    const adjustedUser: Omit<Omit<IUserData, 'sessionID'>, '_id'> & { strategy: string } = {
+    const adjustedUser: ServerDocument<IUserData> = {
+      _id: new ObjectId(),
       username: profile.uid.toString(),
       fullname: profile.cn?.toString() ?? `${profile.givenName} ${profile.sn}`,
       prename: profile.givenName.toString(),
@@ -20,6 +23,7 @@ export const samlProfileToUser = (profile: Profile) => {
       role: UserRank.uploader,
       data: {},
       strategy: 'sso-nfdi4culture',
+      profiles: [],
     };
 
     log(`${adjustedUser.fullname} logging in using SAML strategy`);
