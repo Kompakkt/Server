@@ -15,8 +15,8 @@ import {
   resolveUserDocument,
   undoUserOwnerOf,
 } from './modules/user-management/users';
-import { resolveEntity, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
-import type { IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
+import { resolveEntity, resolveCompilation, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
+import type { ICompilation, IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
@@ -26,6 +26,8 @@ import { exploreHandler } from './modules/api.v2/explore';
 import { ExploreRequest } from './modules/api.v2/types';
 import { PermissionHelper, permissionService } from './handlers/permission.service';
 import { searchCache } from 'src/redis';
+import { saveHandler } from './modules/api.v1/save-to-collection';
+import { deleteAny } from './modules/api.v1/deletion-strategies';
 
 const profileRouter = new Elysia()
   .use(configServer)
@@ -266,14 +268,27 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       async ({ userdata, status, params: { collection }, query: { full, depth } }) => {
         const user = structuredClone(userdata);
         if (!user) return status(500);
-        const data = user.data[collection] ?? [];
-        const resolved = await Promise.all(
-          Array.from(new Set(data)).map(docId =>
-            resolveUserDocument(docId, collection, depth ? depth : full ? RESOLVE_FULL_DEPTH : 0),
-          ),
-        );
-        const filtered = resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
-        return filtered;
+
+        const fromUserData = (async () => {
+          const data = user.data[collection] ?? [];
+          const resolved = await Promise.all(
+            Array.from(new Set(data)).map(docId =>
+              resolveUserDocument(docId, collection, depth ? depth : full ? RESOLVE_FULL_DEPTH : 0),
+            ),
+          );
+          const filtered = resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
+          return filtered;
+        })();
+
+        // TODO: After implementing access as array for indexing performance
+        const fromAccess = (async () => {
+          if (collection === Collection.entity) {
+          } else if (collection === Collection.compilation) {
+          }
+          return [];
+        })();
+
+        return await Promise.all([fromUserData, fromAccess]).then(results => results.flat());
       },
       {
         isLoggedIn: true,
@@ -712,6 +727,229 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         detail: {
           description:
             'Removes the logged-in user from editor or viewer to no special access on the specified document. The user must be either editor or viewer to use this endpoint.',
+          tags: [RouterTags['API V2']],
+        },
+      },
+    )
+    .post(
+      '/compilation/create-empty',
+      async ({ status, body, userdata }) => {
+        if (!userdata) {
+          return status(401, 'Unauthorized');
+        }
+
+        const associatedProfile = userdata.profiles?.find(p => p.profileId === body.profileId);
+        if (!associatedProfile) {
+          return status(400, 'The provided profileId is not associated with the user');
+        }
+
+        const newCompilation: ICompilation = {
+          _id: new ObjectId().toString(),
+          // Given fields
+          name: body.name,
+          description: body.description,
+          creator: {
+            _id: userdata._id.toString(),
+            username: userdata.username,
+            fullname: userdata.fullname,
+            profile: {
+              _id: body.profileId,
+              type: associatedProfile.type,
+            },
+          },
+          // Empty fields
+          whitelist: { enabled: false, persons: [] },
+          entities: {},
+          annotations: {},
+        };
+
+        const saved = await saveHandler({
+          collection: Collection.compilation,
+          body: newCompilation,
+          userdata,
+        });
+
+        if (!saved) {
+          return status(500, 'Failed to create compilation');
+        }
+
+        const resolved = await resolveCompilation({ _id: newCompilation._id }, 1);
+        if (!resolved) {
+          return status(500, 'Failed to resolve compilation after creation');
+        }
+
+        const ownerSuccess = await makeUserOwnerOf({
+          docs: resolved,
+          collection: Collection.compilation,
+          userdata,
+        }).catch(err => {
+          warn(
+            `Failed to add compilation ${newCompilation._id} to user data of ${userdata._id}: ${err}`,
+          );
+        });
+        if (!ownerSuccess) {
+          return status(500, 'Failed to add compilation to user data');
+        }
+
+        return resolved;
+      },
+      {
+        isLoggedIn: true,
+        body: t.Object({
+          name: t.String({ description: 'The name of the new compilation.' }),
+          description: t.String({ description: 'A description for the compilation.' }),
+          profileId: t.String({
+            description: 'The profile identifier to associate the compilation with.',
+          }),
+        }),
+        detail: {
+          description:
+            'Creates an empty compilation that can be added to with the normal compilation update endpoint.',
+          tags: [RouterTags['API V2']],
+        },
+      },
+    )
+    .post(
+      '/compilation/add-entities',
+      async ({ status, body: { compilationIds, entityIds }, userdata }) => {
+        if (!userdata) {
+          return status(401, 'Unauthorized');
+        }
+
+        // Compilation access check
+        const compilations = await Promise.all(
+          compilationIds.map(_id => resolveCompilation({ _id }, 0)),
+        );
+
+        for (const compilation of compilations) {
+          if (!compilation) return status(404, 'One or more compilations not found');
+          const userrole = compilation?.access?.[userdata._id.toString()]?.role;
+          if (!userrole)
+            return status(
+              403,
+              'You do not have access to one or more of the specified compilations',
+            );
+          if (userrole === EntityAccessRole.viewer)
+            return status(
+              403,
+              'You must have at least editor access to the specified compilations',
+            );
+        }
+
+        const entities = await Promise.all(entityIds.map(_id => resolveEntity({ _id }, 0)));
+
+        for (const entity of entities) {
+          if (!entity) return status(404, 'One or more entities not found');
+          if (!entity.finished)
+            return status(
+              400,
+              'One or more entities are not finished processing and cannot be added to compilations',
+            );
+          if (entity.online) continue; // Online entities are always accessible, no need to check access
+          const userrole = entity.access?.[userdata._id.toString()]?.role;
+          if (!userrole)
+            return status(403, 'You do not have access to one or more of the specified entities');
+        }
+
+        // If all checks passed, proceed to add entities to compilations
+        for (const compilation of compilations) {
+          if (!compilation) continue;
+          for (const entity of entities) {
+            if (!entity) continue;
+            compilation.entities[entity._id.toString()] = { _id: entity._id.toString() };
+          }
+
+          const saveResult = await saveHandler({
+            collection: Collection.compilation,
+            body: { ...compilation, _id: compilation._id.toString() },
+            userdata,
+          }).catch(err => {
+            warn(`Failed to add entities to compilation ${compilation._id}: ${err}`);
+            return false;
+          });
+          if (!saveResult) {
+            return status(500, 'Failed to add entities to one or more compilations');
+          }
+        }
+
+        return { success: true };
+      },
+      {
+        isLoggedIn: true,
+        body: t.Object({
+          compilationIds: t.Array(
+            t.String({ description: 'An array of compilation identifiers.' }),
+          ),
+          entityIds: t.Array(t.String(), {
+            description: 'An array of entity identifiers to add to the compilation(s).',
+          }),
+        }),
+        detail: {
+          description:
+            'Adds entities to one or more compilations. The user must have edit access to the compilation and at least viewer access to the entities.',
+          tags: [RouterTags['API V2']],
+        },
+      },
+    )
+    .post(
+      '/compilation/remove-entities',
+      async ({ status, body: { compilationId, entityIds }, userdata }) => {
+        if (!userdata) {
+          return status(401, 'Unauthorized');
+        }
+
+        const compilation = await resolveCompilation({ _id: compilationId }, 0);
+        if (!compilation) return status(404, 'Compilation not found');
+        const userrole = compilation.access?.[userdata._id.toString()]?.role;
+        if (!userrole) return status(403, 'You do not have access to the specified compilation');
+        if (userrole === EntityAccessRole.viewer)
+          return status(403, 'You must have at least editor access to the specified compilation');
+
+        for (const entityId of entityIds) {
+          delete compilation.entities[entityId];
+        }
+
+        const saveResult = await (async () => {
+          if (compilation.entities && Object.keys(compilation.entities).length > 0) {
+            return await saveHandler({
+              collection: Collection.compilation,
+              body: { ...compilation, _id: compilation._id.toString() },
+              userdata,
+            }).catch(err => {
+              warn(`Failed to remove entities from compilation ${compilation._id}: ${err}`);
+              return false;
+            });
+          } else {
+            // If no entities remain, delete the compilation
+            return deleteAny({
+              _id: compilation._id,
+              collection: Collection.compilation,
+              userdata,
+            }).catch(err => {
+              warn(
+                `Failed to delete compilation ${compilation._id} after removing all entities: ${err}`,
+              );
+              return false;
+            });
+          }
+        })();
+        if (!saveResult) {
+          return status(500, 'Failed to remove entities from compilation');
+        }
+
+        return { success: true };
+      },
+      {
+        isLoggedIn: true,
+        body: t.Object({
+          compilationId: t.String({ description: 'The identifier of the compilation.' }),
+          entityIds: t.Array(t.String(), {
+            description: 'An array of entity identifiers to remove from the compilation.',
+          }),
+        }),
+        detail: {
+          description:
+            'Removes entities from a compilation. The user must have edit access to the compilation.',
           tags: [RouterTags['API V2']],
         },
       },
