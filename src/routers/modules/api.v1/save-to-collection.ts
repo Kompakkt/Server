@@ -161,6 +161,7 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
     options: asEntity.options ?? {
       allowDownload: false,
     },
+    extensions: asEntity.extensions ?? {},
   };
 };
 
