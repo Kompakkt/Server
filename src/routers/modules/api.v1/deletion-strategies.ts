@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { Collection, type IUserData } from 'src/common';
+import { Collection, type IUserData } from '@kompakkt/common';
 import { log, warn } from 'src/logger';
 import { annotationCollection, collectionMap, compilationCollection } from 'src/mongo';
 import { combineUpdateResult } from 'src/util/combine-mongodb-results';

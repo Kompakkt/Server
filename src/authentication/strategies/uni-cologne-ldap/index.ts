@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { type IUserData, UserRank } from 'src/common';
+import { type IUserData, UserRank } from '@kompakkt/common';
 import { log, warn } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import {

@@ -13,13 +13,13 @@ import type {
   IPhysicalEntity,
   ITag,
   IUserData,
-} from './common';
-import { Collection } from './common';
+} from '@kompakkt/common';
+import { Collection } from '@kompakkt/common';
 import { Configuration } from './configuration';
 import { err, info } from './logger';
 import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
-import { type IPublicProfile } from './common/interfaces';
+import { type IPublicProfile } from '@kompakkt/common/interfaces';
 import { retryWithBackoff } from './util/retry-with-backoff';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 

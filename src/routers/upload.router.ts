@@ -7,7 +7,7 @@ import { createWriteStream } from 'node:fs';
 import { exists, readdir, realpath, rm, stat, symlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
-import type { IEntity, IFile } from 'src/common';
+import type { IEntity, IFile } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { err, info, log, warn } from 'src/logger';
@@ -21,27 +21,6 @@ import { authService } from './handlers/auth.service';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RouterTags } from './tags';
 import { parseHttpRangeHeaders } from 'src/util/parse-http-range-headers';
-
-// TODO: Do we still need this polyfill in Bun?
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/naming-convention
-  interface ReadableStream<R = any> {
-    [Symbol.asyncIterator](): AsyncIterableIterator<R>;
-  }
-}
-
-ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
-  const reader = this.getReader();
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) return;
-      yield value;
-    }
-  } finally {
-    reader.releaseLock();
-  }
-};
 
 type KompressorStateResponse = {
   progress: number;

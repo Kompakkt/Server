@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { type SendMailOptions, createTransport } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
-import { type IUserData, UserRank } from './common';
+import { type IUserData, UserRank } from '@kompakkt/common';
 import { Configuration, isMailConfiguration } from './configuration';
 import { err, info } from './logger';
 import { mailCollection, userCollection } from './mongo';

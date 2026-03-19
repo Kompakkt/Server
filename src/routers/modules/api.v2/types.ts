@@ -1,5 +1,5 @@
 import { t, type Static } from 'elysia';
-import { Collection, EntityAccessRole } from 'src/common';
+import { Collection, EntityAccessRole } from '@kompakkt/common';
 
 export enum FilterByOptions {
   objects = 'objects',

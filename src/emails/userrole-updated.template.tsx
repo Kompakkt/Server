@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Heading, Text, Link } from '@react-email/components';
 import { EmailLayout } from './_base-layout';
-import { UserRank } from '../common';
+import { UserRank } from '@kompakkt/common';
 import { Configuration } from '../configuration';
 
 const roleStrings: Record<UserRank, string> = {

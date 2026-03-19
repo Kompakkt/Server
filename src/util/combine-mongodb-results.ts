@@ -1,4 +1,4 @@
-import type { IDocument } from 'src/common';
+import type { IDocument } from '@kompakkt/common';
 import type { ServerDocument } from './document-with-objectid-type';
 import type { InferIdType, UpdateResult } from 'mongodb';
 

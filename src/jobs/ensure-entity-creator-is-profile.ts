@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { ProfileType } from 'src/common';
+import { ProfileType } from '@kompakkt/common';
 import { warn } from 'src/logger';
 import { entityCollection, userCollection } from 'src/mongo';
 

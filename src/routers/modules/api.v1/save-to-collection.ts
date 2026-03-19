@@ -19,7 +19,7 @@ import {
   isPerson,
   isPhysicalEntity,
   isUnresolved,
-} from 'src/common';
+} from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import {
   addressCollection,
@@ -40,7 +40,7 @@ import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
 import { saveMetadataFiles } from 'src/util/save-metadata-files';
-import type { CreatorField } from 'src/common/interfaces';
+import type { CreatorField } from '@kompakkt/common/interfaces';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,

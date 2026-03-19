@@ -12,7 +12,7 @@ import {
   type IPhysicalEntity,
   type ITag,
   type IUserData,
-} from 'src/common';
+} from '@kompakkt/common';
 import { info } from 'src/logger';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 

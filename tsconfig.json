@@ -6,6 +6,7 @@
     "moduleDetection": "force",
     "target": "ESNext",
     "sourceMap": true,
+    "rootDir": "./src/",
     "outDir": "./dist/",
     "strict": true,
     "skipLibCheck": true,
@@ -16,12 +17,12 @@
     "noImplicitReturns": true,
     "noImplicitAny": true,
     "verbatimModuleSyntax": true,
-    "lib": ["ESNext", "dom"],
+    "lib": ["ESNext", "DOM", "DOM.AsyncIterable"],
     "jsx": "react",
     // "plugins": [{ "name": "@kitajs/ts-html-plugin" }],
     "paths": {
-      "*": ["./*"],
-    },
+      "*": ["./*"]
+    }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts"]
 }

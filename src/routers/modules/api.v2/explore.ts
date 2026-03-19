@@ -6,7 +6,7 @@ import {
   type IEntity,
   type IInstitution,
   type IUserData,
-} from 'src/common';
+} from '@kompakkt/common';
 import { warn } from 'src/logger';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { searchCache } from 'src/redis';

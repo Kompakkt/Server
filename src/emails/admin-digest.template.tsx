@@ -8,7 +8,7 @@ import {
   userCollection,
 } from '../mongo';
 import type { ServerDocument } from '../util/document-with-objectid-type';
-import type { IAnnotation, ICompilation, IEntity, IUserData } from '../common';
+import type { IAnnotation, ICompilation, IEntity, IUserData } from '@kompakkt/common';
 import { Configuration } from '../configuration';
 import { EmailLayout } from './_base-layout';
 

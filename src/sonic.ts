@@ -16,7 +16,7 @@ import {
   type IEntity,
   type IPerson,
   type IPhysicalEntity,
-} from './common';
+} from '@kompakkt/common';
 import { HookManager } from './routers/modules/api.v1/hooks';
 import { findParentCompilations, findParentEntities } from './util/cascade-helpers';
 import {

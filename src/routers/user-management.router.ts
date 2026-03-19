@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { type IPublicProfile, type IUserData, ProfileType, UserRank } from 'src/common';
+import { type IPublicProfile, type IUserData, ProfileType, UserRank } from '@kompakkt/common';
 import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
 import { profileCollection, userCollection, userTokenCollection } from 'src/mongo';

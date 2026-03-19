@@ -24,7 +24,7 @@ import {
   isPhysicalEntity,
   isTag,
   isUnresolved,
-} from 'src/common';
+} from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import {
   addressCollection,

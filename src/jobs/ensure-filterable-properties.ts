@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { Collection, type IDigitalEntity, type IEntity } from 'src/common';
+import { Collection, type IDigitalEntity, type IEntity } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { compilationCollection, entityCollection, profileCollection } from 'src/mongo';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';

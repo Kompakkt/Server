@@ -1,4 +1,4 @@
-import type { IStrippedUserData, IUserData, IWhitelist } from 'src/common';
+import type { IStrippedUserData, IUserData, IWhitelist } from '@kompakkt/common';
 import type { ServerDocument } from './document-with-objectid-type';
 
 export const isUserWhitelisted = (

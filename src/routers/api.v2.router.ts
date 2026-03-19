@@ -9,14 +9,14 @@ import {
   type IDocument,
   isPublicProfile,
   ProfileType,
-} from 'src/common';
+} from '@kompakkt/common';
 import {
   makeUserOwnerOf,
   resolveUserDocument,
   undoUserOwnerOf,
 } from './modules/user-management/users';
 import { resolveEntity, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
-import type { IPublicProfile, IStrippedUserData } from 'src/common/interfaces';
+import type { IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';

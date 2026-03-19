@@ -1,4 +1,4 @@
-import { Collection } from 'src/common';
+import { Collection } from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import {

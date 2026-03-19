@@ -1,5 +1,11 @@
 import { ObjectId } from 'mongodb';
-import { Collection, isDocument, type IDocument, type ITag, type IUserData } from 'src/common';
+import {
+  Collection,
+  isDocument,
+  type IDocument,
+  type ITag,
+  type IUserData,
+} from '@kompakkt/common';
 import { userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny } from '../api.v1/resolving-strategies';

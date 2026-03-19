@@ -8,7 +8,7 @@ import { authService } from 'src/routers/handlers/auth.service';
 import { basename, join } from 'node:path';
 import { RootDirectory } from 'src/environment';
 import { Configuration } from 'src/configuration';
-import type { IFile } from 'src/common';
+import type { IFile } from '@kompakkt/common';
 
 const BASE_URL = 'https://api.sketchfab.com/';
 

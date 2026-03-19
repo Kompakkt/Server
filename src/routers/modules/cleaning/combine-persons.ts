@@ -1,4 +1,4 @@
-import type { IPerson } from 'src/common';
+import type { IPerson } from '@kompakkt/common';
 import { personCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RESOLVE_FULL_DEPTH, resolvePerson } from '../api.v1/resolving-strategies';

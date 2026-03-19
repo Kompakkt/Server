@@ -1,6 +1,6 @@
 import { type Static, t } from 'elysia';
-import type { ICompilation, IEntity, IUserData } from 'src/common';
-import { Collection, isAnnotation, isEntity } from 'src/common';
+import type { ICompilation, IEntity, IUserData } from '@kompakkt/common';
+import { Collection, isAnnotation, isEntity } from '@kompakkt/common';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';

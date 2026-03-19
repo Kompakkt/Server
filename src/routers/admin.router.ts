@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { UserRank } from 'src/common';
+import { UserRank } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';

@@ -6,7 +6,7 @@ import {
   type IStrippedUserData,
   type IUserData,
   isAnnotation,
-} from 'src/common';
+} from '@kompakkt/common';
 import {
   annotationCollection,
   compilationCollection,

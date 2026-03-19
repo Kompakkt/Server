@@ -1,4 +1,4 @@
-import type { IStrippedUserData, IUserData } from 'src/common';
+import type { IStrippedUserData, IUserData } from '@kompakkt/common';
 import type { ServerDocument } from './document-with-objectid-type';
 
 /**

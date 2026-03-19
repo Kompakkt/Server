@@ -7,8 +7,8 @@ import {
   isAnnotation,
   isInstitution,
   isPerson,
-} from 'src/common';
-import { isEntitySettings } from 'src/common/typeguards';
+} from '@kompakkt/common';
+import { isEntitySettings } from '@kompakkt/common/typeguards';
 import { err, info, log, warn } from 'src/logger';
 import { collectionMap, entityCollection, userCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';

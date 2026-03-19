@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { ProfileType, type IUserData } from 'src/common';
+import { ProfileType, type IUserData } from '@kompakkt/common';
 import { profileCollection } from 'src/mongo';
 import type { ServerDocument } from './document-with-objectid-type';
 

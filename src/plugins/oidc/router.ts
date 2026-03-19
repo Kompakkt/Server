@@ -1,7 +1,7 @@
 import Elysia, { t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import * as OpenIDClient from 'openid-client';
-import { UserRank } from 'src/common';
+import { UserRank } from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import { RouterTags } from 'src/routers/tags';

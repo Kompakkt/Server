@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { ProfileType } from 'src/common';
+import { ProfileType } from '@kompakkt/common';
 import { profileCollection, userCollection } from 'src/mongo';
 import { createNewUserProfile } from 'src/util/create-new-user-profile';
 

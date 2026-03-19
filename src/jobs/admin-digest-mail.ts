@@ -1,4 +1,4 @@
-import { UserRank } from 'src/common';
+import { UserRank } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { adminDigestTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';

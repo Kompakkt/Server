@@ -1,5 +1,5 @@
 import { userCollection } from 'src/mongo';
-import { ProfileType } from 'src/common';
+import { ProfileType } from '@kompakkt/common';
 
 export const migrateUserProfiles = async () => {
   // Find users where 'profiles' exists and is an object (not an array or undefined)

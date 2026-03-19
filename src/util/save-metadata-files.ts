@@ -1,7 +1,7 @@
 import type { ObjectId } from 'mongodb';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { IFile } from 'src/common';
+import type { IFile } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { warn } from 'src/logger';

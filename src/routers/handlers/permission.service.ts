@@ -1,6 +1,6 @@
 import Elysia from 'elysia';
 import { ObjectId } from 'mongodb';
-import { Collection, EntityAccessRole, type IUserData } from 'src/common';
+import { Collection, EntityAccessRole, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';

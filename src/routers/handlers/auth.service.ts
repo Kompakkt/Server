@@ -2,7 +2,7 @@ import jwt from '@elysiajs/jwt';
 import Elysia, { t, type Static } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
-import { UserRank, type IUserData } from 'src/common';
+import { UserRank, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { userCollection } from 'src/mongo';
 import configServer, { jwtOptions } from 'src/server.config';

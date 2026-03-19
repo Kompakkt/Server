@@ -9,8 +9,10 @@
     "start": "NODE_ENV=production bun dist/index.js",
     "dev": "bun run --watch src/index.ts",
     "test": "bun test",
-    "lint": "eslint src/",
-    "prettier": "prettier --config .prettierrc.json 'src/**/*.{ts,html,scss}' --write",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "email": "email dev --dir src/emails"
   },
   "repository": {
@@ -29,6 +31,7 @@
     "@elysiajs/openapi": "^1.4.14",
     "@elysiajs/server-timing": "^1.4.0",
     "@elysiajs/static": "^1.4.7",
+    "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#0406b95",
     "@react-email/components": "^1.0.6",
     "@react-email/preview-server": "^5.2.5",
     "@react-email/render": "^2.0.4",
@@ -41,7 +44,6 @@
     "elysia": "^1.4.22",
     "elysia-helmet": "^3.0.0",
     "elysia-prometheus": "^1.0.0",
-    "eslint-plugin-only-warn": "^1.1.0",
     "jose": "^6.1.3",
     "ky": "^1.14.3",
     "mongodb": "7.0.0",
@@ -65,13 +67,12 @@
     "@types/object-hash": "^3.0.6",
     "@types/react": "^19.2.9",
     "@types/react-dom": "^19.2.3",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.5",
+    "@typescript/native-preview": "^7.0.0-dev.20260319.1",
     "openapi-types": "^12.1.3",
-    "prettier": "^3.8.1",
-    "react-email": "^5.2.5",
-    "typescript-eslint": "^8.53.1"
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "oxlint-tsgolint": "^0.17.0",
+    "react-email": "^5.2.5"
   },
   "workspaces": [
     "src/plugins/*"

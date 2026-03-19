@@ -1,4 +1,4 @@
-import type { IDigitalEntity, IEntity } from 'src/common';
+import type { IDigitalEntity, IEntity } from '@kompakkt/common';
 import type { ServerDocument } from './document-with-objectid-type';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { ObjectId } from 'mongodb';

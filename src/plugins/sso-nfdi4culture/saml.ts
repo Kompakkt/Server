@@ -1,6 +1,6 @@
 import { type Profile } from '@node-saml/node-saml';
 import { ObjectId } from 'mongodb';
-import { UserRank, type IUserData } from 'src/common';
+import { UserRank, type IUserData } from '@kompakkt/common';
 import { err, log, warn } from 'src/logger';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
