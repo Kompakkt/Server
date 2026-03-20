@@ -1,4 +1,4 @@
-import { Collection, type IAnnotation, type IDigitalEntity } from 'src/common';
+import { Collection, type IAnnotation, type IDigitalEntity } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';

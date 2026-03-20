@@ -4,6 +4,7 @@ import {
   Collection,
   EntityAccessRole,
   type IStrippedUserData,
+  ProfileType,
   isAnnotation,
   isInstitution,
   isPerson,
@@ -19,11 +20,6 @@ import { authService, signInBody } from './handlers/auth.service';
 import { PermissionHelper, permissionService } from './handlers/permission.service';
 import { deleteAny } from './modules/api.v1/deletion-strategies';
 import {
-  ExploreRequest,
-  exploreCompilations,
-  exploreEntities,
-} from './modules/api.v1/explore-strategies';
-import {
   findAll,
   findAllParams,
   findSingleHandler,
@@ -34,6 +30,7 @@ import { saveHandler } from './modules/api.v1/save-to-collection';
 import { increasePopularity } from './modules/api.v2/increase-popularity';
 import { checkIsOwner, makeUserOwnerOf } from './modules/user-management/users';
 import { RouterTags } from './tags';
+import type { AccessField, AccessFieldEntry, CreatorField } from '@kompakkt/common/interfaces';
 
 /**
  * If the entity already exists we need to check for owner status
@@ -104,19 +101,14 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     })
     .post(
       '/post/explore',
-      async ({ body, userdata, status }) => {
-        const combined = { ...body, userData: userdata ?? undefined };
-        return (
-          body.searchEntity ? exploreEntities(combined) : exploreCompilations(combined)
-        ).catch(error => {
-          err(`Error during explore request ${error}`);
-          return status(500, 'Internal Server Error');
-        });
-      },
+      async ({ status }) =>
+        status(410, 'This endpoint is deprecated. Please use the API V2 Explore endpoint instead.'),
       {
-        body: ExploreRequest,
+        body: t.Object({}),
         detail: {
-          description: 'Explore entities or compilations based on search criteria',
+          description:
+            'Deprecation notice: This endpoint will be removed in the future. Switch to the API V2 Explore endpoint. Explore entities or compilations based on search criteria',
+          deprecated: true,
           tags: [RouterTags['API V1']],
         },
       },
@@ -178,18 +170,25 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           '/get/users',
           () =>
             userCollection
-              .find()
-              .toArray()
-              .then(users => {
-                return users.map(
-                  ({ _id, username, fullname }) =>
-                    ({
-                      _id,
-                      username,
-                      fullname,
-                    }) satisfies ServerDocument<IStrippedUserData>,
-                );
-              }),
+              .aggregate<CreatorField>([
+                {
+                  $project: {
+                    _id: { $toString: '$_id' },
+                    username: 1,
+                    fullname: 1,
+                    profile: {
+                      $first: {
+                        $filter: {
+                          input: '$profiles',
+                          as: 'p',
+                          cond: { $eq: ['$$p.type', ProfileType.user] },
+                        },
+                      },
+                    },
+                  },
+                },
+              ])
+              .toArray(),
           {
             detail: {
               description: 'Get all users with stripped data',
@@ -306,7 +305,9 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             if (!entity) return status(404, 'Entity not found');
 
             const hasAccess = await (async () => {
-              const currentAccess = entity.access?.[userdata._id.toString()];
+              const currentAccess = entity.access.find(
+                user => user._id === userdata._id.toString(),
+              );
               const isOwner = await checkIsOwner({
                 doc: entity,
                 collection: Collection.entity,

@@ -1,5 +1,11 @@
 import { Elysia, t } from 'elysia';
-import { collectionMap, entityCollection, profileCollection, userCollection } from 'src/mongo';
+import {
+  collectionMap,
+  compilationCollection,
+  entityCollection,
+  profileCollection,
+  userCollection,
+} from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import {
@@ -16,7 +22,7 @@ import {
   undoUserOwnerOf,
 } from './modules/user-management/users';
 import { resolveEntity, resolveCompilation, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
-import type { ICompilation, IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
+import type { CreatorField, ICompilation, IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
@@ -265,11 +271,15 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     .use(permissionService)
     .get(
       '/user-data/:collection',
-      async ({ userdata, status, params: { collection }, query: { full, depth } }) => {
+      async ({ userdata, status, params: { collection }, query: { full, depth, profileId } }) => {
         const user = structuredClone(userdata);
         if (!user) return status(500);
+        if (profileId && !user.profiles.some(profile => profile.profileId === profileId)) {
+          return status(403, 'You do not have access to the requested profile data');
+        }
 
         const fromUserData = (async () => {
+          if (profileId) return [];
           const data = user.data[collection] ?? [];
           const resolved = await Promise.all(
             Array.from(new Set(data)).map(docId =>
@@ -280,10 +290,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           return filtered;
         })();
 
-        // TODO: After implementing access as array for indexing performance
         const fromAccess = (async () => {
           if (collection === Collection.entity) {
+            return entityCollection.find({ 'access.profile.profileId': profileId }).toArray();
           } else if (collection === Collection.compilation) {
+            return compilationCollection.find({ 'access.profile.profileId': profileId }).toArray();
           }
           return [];
         })();
@@ -310,6 +321,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
                 'If provided, specifies the depth to which documents should be resolved. Will override "full" if set.',
             }),
           ),
+          profileId: t.Optional(
+            t.String({
+              description:
+                'If provided, retrieves documents associated with a specific user profile ID',
+            }),
+          ),
         }),
         detail: {
           description:
@@ -318,68 +335,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         },
       },
     )
-    .get(
-      '/user-data/entities-with-access/:role',
-      async ({ params: { role }, userdata, status }) => {
-        if (!userdata) return status(401);
-
-        role = role.toLowerCase();
-        const isRoleArray = role.includes(',');
-        const roles = isRoleArray ? role.split(',').map(r => r.trim()) : [role];
-
-        const validRoles = Object.values(EntityAccessRole);
-        const allRolesValid = roles.every(role => validRoles.includes(role as EntityAccessRole));
-        if (!allRolesValid) {
-          return status(
-            400,
-            `Invalid role(s) provided. Valid role values are: ${validRoles.join(', ')}`,
-          );
-        }
-
-        const entities = await entityCollection
-          .find({
-            $and: [
-              { [`access.${userdata._id.toString()}`]: { $exists: true, $ne: null } },
-              { [`access.${userdata._id.toString()}.role`]: { $in: roles } },
-            ],
-          })
-          .toArray();
-
-        const resolved = await Promise.all(entities.map(entity => resolveEntity(entity, 1))).then(
-          arr => arr.filter(isEntity),
-        );
-
-        // Combine with entities in userdata for legacy support
-        if (role === EntityAccessRole.owner && userdata.data.entity) {
-          const userEntities = userdata.data.entity
-            .filter((docId): docId is string | IDocument => !!docId)
-            .map(docId => resolveEntity({ _id: typeof docId === 'string' ? docId : docId._id }, 1));
-          const userResolved = await Promise.all(userEntities);
-          resolved.push(...userResolved.filter(isEntity));
-        }
-
-        return resolved;
-      },
-      {
-        isLoggedIn: true,
-        params: t.Object({
-          role: t.Union([
-            t.Enum(EntityAccessRole, {
-              description: 'The role to filter entities by, e.g., "owner", "editor", "viewer".',
-            }),
-            t.String({ description: 'List of roles, seperated by comma' }),
-          ]),
-        }),
-        detail: {
-          description: 'Retrieves entities the user has access to based on the specified role.',
-          tags: [RouterTags['API V2']],
-        },
-      },
-    )
     .post(
       '/user-data/update-entity-access',
       async ({ status, body: { _id: entityId, access }, userdata }) => {
         if (!userdata) return status(401);
+        const userProfile = userdata.profiles.find(profile => profile.type === ProfileType.user);
+        if (!userProfile) return status(403, 'User profile not found in userdata');
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
         if (!entity) return status(404, 'Entity not found');
 
@@ -392,33 +353,34 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           if (!entityExistsInUserdata) {
             return status(400, 'Entity not found in user data');
           }
-          entity.access = {
-            [userdata._id.toString()]: {
+          entity.access = [
+            {
               _id: userdata._id.toString(),
               fullname: userdata.fullname,
               username: userdata.username,
               role: EntityAccessRole.owner, // Default to owner if no access exists
+              profile: userProfile,
             },
-          };
+          ];
         }
 
         // Check if access update is valid (at least one owner, and user must currently be owner)
         // Is user owner?
-        const currentAccess = entity.access[userdata._id.toString()];
+        const currentAccess = entity.access.find(user => user._id === userdata._id.toString());
         if (!currentAccess || currentAccess.role !== EntityAccessRole.owner) {
           return status(403, 'You must be an owner to update access');
         }
 
         // Ensure at least one owner remains
-        const hasOneOwner = Object.values(access).find(
-          user => user.role === EntityAccessRole.owner,
-        );
+        const hasOneOwner = access.find(user => user.role === EntityAccessRole.owner);
         if (!hasOneOwner) {
           return status(400, 'At least one owner must remain');
         }
 
         // User remains owner in update?
-        const userRemainsOwner = access[userdata._id.toString()]?.role === EntityAccessRole.owner;
+        const userRemainsOwner =
+          access.find(user => user._id === userdata._id.toString())?.role ===
+          EntityAccessRole.owner;
         if (!userRemainsOwner) {
           return status(403, 'You must remain an owner to update access');
         }
@@ -444,14 +406,19 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         isLoggedIn: true,
         body: t.Object({
           _id: t.String({ description: 'Identifier of the entity' }),
-          access: t.Record(
-            t.String({ description: 'Identifier of a user' }),
+          access: t.Array(
             t.Object({
               _id: t.String({ description: 'Same identifier of the user' }),
               fullname: t.String({ description: 'Full name of the user' }),
               username: t.String({ description: 'Username of the user' }),
               role: t.Enum(EntityAccessRole, {
                 description: 'The access role of the user for the entity',
+              }),
+              profile: t.Object({
+                profileId: t.String({ description: 'The profile ID associated with the user' }),
+                type: t.Enum(ProfileType, {
+                  description: 'The type of the profile',
+                }),
               }),
             }),
           ),
@@ -470,24 +437,45 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
         if (!entity) return status(404, 'Entity not found');
         const targetOwner = await userCollection.findOne({ _id: new ObjectId(targetUserId) });
-        if (!targetOwner) return status(404, 'Target user not found');
+        const targetOwnerProfile = targetOwner?.profiles.find(
+          profile => profile.type === ProfileType.user,
+        );
+        if (!targetOwner || !targetOwnerProfile)
+          return status(404, 'Target user or profile not found');
 
         // Ensure the current user is the owner
         const isOwner =
-          entity.access?.[userdata._id.toString()]?.role === EntityAccessRole.owner ||
+          entity.access.find(user => user._id === userdata._id.toString())?.role ===
+            EntityAccessRole.owner ||
           userdata.data.entity?.find(id => !!id && (typeof id === 'string' ? true : !!id?._id));
         if (!isOwner) return status(403, 'You must be an owner to transfer ownership');
 
         // Add/set the target user as owner
-        entity.access ??= {};
-        entity.access[targetUserId] = {
-          _id: targetOwner._id.toString(),
-          fullname: targetOwner.fullname,
-          username: targetOwner.username,
-          role: EntityAccessRole.owner,
-        };
+        const targetUserIndex = entity.access.findIndex(user => user._id === targetUserId);
+        if (targetUserIndex >= 0) {
+          entity.access[targetUserIndex].role = EntityAccessRole.owner;
+        } else {
+          entity.access.push({
+            _id: targetOwner._id.toString(),
+            fullname: targetOwner.fullname,
+            username: targetOwner.username,
+            role: EntityAccessRole.owner,
+            profile: targetOwnerProfile,
+          });
+        }
+
         // Remove the current user as owner
-        delete entity.access[userdata._id.toString()];
+        const currentOwnerIndex = entity.access.findIndex(
+          user => user._id === userdata._id.toString(),
+        );
+        if (currentOwnerIndex >= 0) {
+          entity.access.splice(currentOwnerIndex, 1);
+        } else {
+          return status(
+            500,
+            'Current user not found in entity access list, cannot remove ownership',
+          );
+        }
 
         // Legacy: swap owner in userdata
         const legacyOwnerResults = await Promise.allSettled([
@@ -625,8 +613,8 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     )
     .post(
       '/explore',
-      async ({ body, status, userdata }) => {
-        const result = await exploreHandler(body, userdata).catch(err => {
+      async ({ body, status, userdata, query: { profileId } }) => {
+        const result = await exploreHandler(body, userdata, profileId).catch(err => {
           warn(`Error in exploreHandler: ${err}`);
           return undefined;
         });
@@ -642,6 +630,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           tags: [RouterTags['API V2']],
         },
         body: ExploreRequest,
+        query: t.Object({
+          profileId: t.Optional(
+            t.String({
+              description:
+                'If provided, retrieves results associated with a specific user profile ID',
+            }),
+          ),
+        }),
       },
     )
     .get(
@@ -704,7 +700,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
 
         const updateResult = await collectionMap[collection].updateOne(
           { _id: new ObjectId(identifier) },
-          { $unset: { [`access.${userdata._id.toString()}`]: '' } },
+          { $pull: { access: { _id: userdata._id.toString() } } },
         );
         info(
           `User ${userdata.username} (${userdata._id.toString()}) removed themselves from access of ${collection} ${identifier}`,
@@ -743,22 +739,24 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           return status(400, 'The provided profileId is not associated with the user');
         }
 
+        const creator: CreatorField = {
+          _id: userdata._id.toString(),
+          username: userdata.username,
+          fullname: userdata.fullname,
+          profile: {
+            profileId: body.profileId,
+            type: associatedProfile.type,
+          },
+        };
+
         const newCompilation: ICompilation = {
           _id: new ObjectId().toString(),
           // Given fields
           name: body.name,
           description: body.description,
-          creator: {
-            _id: userdata._id.toString(),
-            username: userdata.username,
-            fullname: userdata.fullname,
-            profile: {
-              _id: body.profileId,
-              type: associatedProfile.type,
-            },
-          },
+          creator,
+          access: [{ ...creator, role: EntityAccessRole.owner }],
           // Empty fields
-          whitelist: { enabled: false, persons: [] },
           entities: {},
           annotations: {},
         };
@@ -823,7 +821,9 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
 
         for (const compilation of compilations) {
           if (!compilation) return status(404, 'One or more compilations not found');
-          const userrole = compilation?.access?.[userdata._id.toString()]?.role;
+          const userrole = compilation?.access.find(
+            user => user._id === userdata._id.toString(),
+          )?.role;
           if (!userrole)
             return status(
               403,
@@ -846,7 +846,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
               'One or more entities are not finished processing and cannot be added to compilations',
             );
           if (entity.online) continue; // Online entities are always accessible, no need to check access
-          const userrole = entity.access?.[userdata._id.toString()]?.role;
+          const userrole = entity.access.find(user => user._id === userdata._id.toString())?.role;
           if (!userrole)
             return status(403, 'You do not have access to one or more of the specified entities');
         }
@@ -900,7 +900,9 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
 
         const compilation = await resolveCompilation({ _id: compilationId }, 0);
         if (!compilation) return status(404, 'Compilation not found');
-        const userrole = compilation.access?.[userdata._id.toString()]?.role;
+        const userrole = compilation.access.find(
+          user => user._id === userdata._id.toString(),
+        )?.role;
         if (!userrole) return status(403, 'You do not have access to the specified compilation');
         if (userrole === EntityAccessRole.viewer)
           return status(403, 'You must have at least editor access to the specified compilation');

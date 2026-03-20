@@ -1,10 +1,11 @@
 import Elysia from 'elysia';
 import { ObjectId } from 'mongodb';
-import { Collection, EntityAccessRole, type IUserData } from '@kompakkt/common';
+import { Collection, EntityAccessRole, type IEntity, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { authService } from './auth.service';
+import type { AccessField } from '@kompakkt/common/interfaces';
 
 const isRecord = (obj: unknown): obj is Record<string, unknown> => {
   return typeof obj === 'object' && obj !== null;
@@ -21,13 +22,18 @@ const isCollectionParam = (obj: unknown): obj is { collection: string } => {
 const isIdentifierParam = (obj: unknown): obj is { identifier: string } => {
   return isRecord(obj) && hasFieldOfType(obj, 'identifier', 'string');
 };
-const isAccessObject = (obj: unknown): obj is Record<string, { role: EntityAccessRole }> => {
+const isAccessObject = (obj: unknown): obj is AccessField => {
   if (!isRecord(obj)) return false;
-  return Object.values(obj).every(
-    value =>
-      isRecord(value) &&
-      hasFieldOfType(value, 'role', 'string') &&
-      Object.values(EntityAccessRole).includes(value.role as EntityAccessRole),
+  return (
+    Array.isArray(obj) &&
+    obj.every(entry => {
+      return (
+        isRecord(entry) &&
+        hasFieldOfType(entry, '_id', 'string') &&
+        hasFieldOfType(entry, 'role', 'string') &&
+        Object.values(EntityAccessRole).includes(entry.role as EntityAccessRole)
+      );
+    })
   );
 };
 
@@ -43,8 +49,9 @@ export const PermissionHelper = new (class {
   getUserRoleInAccess(document: unknown, userdata: ServerDocument<IUserData> | IUserData) {
     if (!isDocument(document)) return;
     if (!('access' in document)) return;
-    if (!isAccessObject(document.access)) return;
-    const userAccess = document.access[userdata._id.toString()];
+    const access = document.access;
+    if (!isAccessObject(access)) return;
+    const userAccess = access.find(user => user._id === userdata._id.toString());
     return userAccess ? userAccess.role : undefined;
   }
 

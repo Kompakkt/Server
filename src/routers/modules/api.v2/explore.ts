@@ -47,6 +47,7 @@ type ExploreDocument = IEntity | ICompilation | IInstitution;
 export const exploreHandler = async (
   options: ExploreRequest,
   userdata: ServerDocument<IUserData> | undefined = undefined,
+  profileId?: string,
 ): Promise<{
   results: ServerDocument<ExploreDocument>[];
   suggestions: string[];
@@ -89,11 +90,24 @@ export const exploreHandler = async (
       baseFilter._id = { $in: foundIds };
     }
 
-    // TODO: Figure out access, once its available in compilations
-    // Right now access data is only available in entities
-    if (collection === Collection.entity && options.access.length > 0) {
+    if (
+      (collection === Collection.entity || collection === Collection.compilation) &&
+      options.access.length > 0
+    ) {
       if (!userdata) return [[], 0];
-      baseFilter[`access.${userdata._id.toString()}.role`] = { $in: options.access };
+      if (profileId) {
+        baseFilter.access = {
+          $elemMatch: {
+            _id: userdata._id.toString(),
+            role: { $in: options.access },
+            profile: { profileId },
+          },
+        };
+      } else {
+        baseFilter.access = {
+          $elemMatch: { _id: userdata._id.toString(), role: { $in: options.access } },
+        };
+      }
     }
 
     // Note: We went from exclusive options to inclusive options, so we need to adjust the logic here

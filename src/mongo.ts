@@ -79,8 +79,14 @@ export const followsCollection = accountsDb.collection<{
   following: string | ObjectId;
 }>('follows');
 
-followsCollection.createIndex({ follower: 1, following: 1 }, { unique: true });
-userCollection.createIndex({ 'profiles.profileId': 1, 'profiles.type': 1 }).catch(() => {});
+export enum Migrations {
+  migrateCreatorAndAccessFields = 'migrateCreatorAndAccessFields',
+  migrateUserProfiles = 'migrateUserProfiles',
+}
+export const migrationCollection = accountsDb.collection<{
+  name: Migrations;
+  completedAt: number;
+}>('migrations');
 
 export type ApiKeyDocument = {
   routes: string[];
@@ -110,6 +116,22 @@ export const physicalEntityCollection =
 export const tagCollection = entitiesDb.collection<ServerDocument<ITag>>('tag');
 
 entityCollection.createIndex({ 'relatedDigitalEntity._id': 1 });
+followsCollection.createIndex({ follower: 1, following: 1 }, { unique: true }).catch(() => {});
+userCollection.createIndex({ 'profiles.profileId': 1, 'profiles.type': 1 }).catch(() => {});
+userCollection.createIndex({ 'profiles.type': 1 }).catch(() => {});
+migrationCollection
+  .findOne({ name: Migrations.migrateCreatorAndAccessFields })
+  .then((migrated): any =>
+    !!migrated
+      ? Promise.allSettled([
+          entityCollection.createIndex({ 'creator.profile.profileId': 1 }),
+          entityCollection.createIndex({ 'access.profile.profileId': 1 }),
+          compilationCollection.createIndex({ 'creator.profile.profileId': 1 }),
+          compilationCollection.createIndex({ 'access.profile.profileId': 1 }),
+        ])
+      : Promise.allSettled([]),
+  )
+  .catch(() => {});
 
 export const collectionMap = {
   [Collection.entity]: entityCollection,

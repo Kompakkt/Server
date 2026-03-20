@@ -40,7 +40,7 @@ import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
 import { saveMetadataFiles } from 'src/util/save-metadata-files';
-import type { CreatorField } from '@kompakkt/common/interfaces';
+import type { AccessField, CreatorField } from '@kompakkt/common/interfaces';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,
@@ -111,10 +111,7 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
   const userProfile = user.profiles.find(p => p.type === ProfileType.user)!;
   const strippedUser: CreatorField = {
     ...stripUser(user),
-    profile: {
-      _id: userProfile.profileId,
-      type: userProfile.type,
-    },
+    profile: userProfile,
   };
 
   const digitalEntity = asEntity.relatedDigitalEntity?._id
@@ -136,7 +133,6 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
     __mediaTypes: asEntity.__mediaTypes ?? (asEntity.mediaType ? [asEntity.mediaType] : []),
     _id: asEntity._id,
     annotations: flattenRecord(asEntity.annotations),
-    creator: asEntity.creator ?? strippedUser,
     dataSource: asEntity.dataSource,
     externalFile: asEntity.externalFile,
     files: asEntity.files,
@@ -160,13 +156,8 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
             )
           : asEntity.settings?.preview!,
     },
-    whitelist: asEntity.whitelist,
-    access: asEntity.access ?? {
-      [strippedUser._id]: {
-        ...strippedUser,
-        role: EntityAccessRole.owner,
-      },
-    },
+    creator: asEntity.creator,
+    access: asEntity.access,
     options: asEntity.options ?? {
       allowDownload: false,
     },
@@ -206,8 +197,6 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
 const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
   const asCompilation = body as unknown as Partial<ICompilation>;
 
-  const strippedUser = stripUser(user);
-
   // NOTE: We update the filterable properties using hook running in the background after save
   // This means that there might be a slight delay when filtering, but it should not be noticeable
   // and it avoids slowing down the save operation significantly
@@ -224,18 +213,12 @@ const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
     __mediaTypes: asCompilation.__mediaTypes ?? [],
     _id: asCompilation._id,
     annotations: flattenRecord(asCompilation.annotations),
-    creator: asCompilation.creator,
     description: asCompilation.description ?? '',
     entities: flattenRecord(asCompilation.entities),
     name: asCompilation.name ?? '',
     password: asCompilation.password ?? '',
-    whitelist: asCompilation.whitelist,
-    access: asCompilation.access ?? {
-      [strippedUser._id]: {
-        ...strippedUser,
-        role: EntityAccessRole.owner,
-      },
-    },
+    creator: asCompilation.creator,
+    access: asCompilation.access,
   };
 };
 

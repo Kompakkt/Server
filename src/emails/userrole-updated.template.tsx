@@ -7,8 +7,6 @@ import { Configuration } from '../configuration';
 const roleStrings: Record<UserRank, string> = {
   [UserRank.admin]: 'Admin',
   [UserRank.uploader]: 'Uploader',
-  [UserRank.uploadrequested]: 'Waiting for upload permission',
-  [UserRank.user]: 'User',
 };
 
 interface UserRoleUpdatedEmailProps {
@@ -49,6 +47,6 @@ export default function UserRoleUpdatedEmail({
 
 UserRoleUpdatedEmail.PreviewProps = {
   prename: 'Max',
-  prevRole: UserRank.user,
-  newRole: UserRank.uploader,
+  prevRole: UserRank.uploader,
+  newRole: UserRank.admin,
 } as UserRoleUpdatedEmailProps;

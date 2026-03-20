@@ -29,8 +29,6 @@ export const findSingleHandler = async (
       const entity = await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH);
       if (!entity) return undefined;
       // Check if user has access to the entity
-      // TODO: Remove whitelist after migration to new access system
-      const isWhitelistEnabled = entity.whitelist.enabled;
       const entityExistsInUserdata = userdata
         ? await checkIsOwner({
             collection: Collection.entity,
@@ -38,37 +36,31 @@ export const findSingleHandler = async (
             userdata,
           })
         : false;
-      const userInAccess = userdata ? entity.access?.[userdata._id.toString()] : undefined;
-      const isUserWhitelisted = entity.whitelist.persons.some(
-        p => p._id === userdata?._id.toString(),
-      );
+      const userInAccess = userdata
+        ? entity.access.find(user => user._id === userdata._id.toString())
+        : undefined;
       const isAdmin = userdata?.role === UserRank.admin;
 
-      const userHasAccess =
-        isAdmin || entityExistsInUserdata || isUserWhitelisted || !!userInAccess;
-      if (isAdmin && (isWhitelistEnabled || !entity.online))
+      const userHasAccess = isAdmin || entityExistsInUserdata || !!userInAccess;
+      if (isAdmin && !entity.online)
         log(`Admin ${userdata.username} requested access to ${entity._id.toString()}`);
 
-      if (entity.online && isWhitelistEnabled) {
-        return userHasAccess ? entity : undefined;
-      } else if (entity.online && !isWhitelistEnabled) {
+      if (entity.online) {
         return entity;
-      } else if (!entity.online) {
-        return !!userInAccess || entityExistsInUserdata || isAdmin ? entity : undefined;
+      } else {
+        return userHasAccess ? entity : undefined;
       }
-      return undefined;
     }
     case Collection.compilation: {
       const compilation = await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
       if (!compilation) return undefined;
       const _pw = compilation.password;
       const isPasswordProtected = _pw !== '';
-      const isUserOwner = JSON.stringify(userdata ?? {}).includes(identifier);
-      const isPasswordCorrect = _pw && _pw === password;
+      // Deprecate password access. We do not reveal these compilations at all anymore.
+      // May change in the future, but for now this is the safest way to handle this without breaking existing passwords and without revealing protected compilations at all.
+      if (isPasswordProtected) return undefined;
 
-      if (!isPasswordProtected || isUserOwner || isPasswordCorrect) return compilation;
-
-      return undefined;
+      return compilation;
     }
     default: {
       return undefined;

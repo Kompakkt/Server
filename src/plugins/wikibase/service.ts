@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { asVector3 } from 'src/common';
+import { asVector3 } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { err, info, log, warn } from 'src/logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';

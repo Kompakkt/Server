@@ -163,13 +163,6 @@ const addUserToDatabase = async (
   const user = await userCollection.findOne({ _id: new ObjectId(userdata._id) });
   if (!user) return false;
 
-  if (target === ETarget.upload && user?.role === UserRank.user) {
-    await userCollection.updateOne(
-      { _id: new ObjectId(userdata._id) },
-      { $set: { role: UserRank.uploadrequested } },
-    );
-  }
-
   const subject = obj.subject;
   const mailbody = obj.mailbody;
   const document = {

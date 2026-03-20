@@ -1,4 +1,4 @@
-import type { IAnnotation, IDigitalEntity } from 'src/common';
+import type { IAnnotation, IDigitalEntity } from '@kompakkt/common';
 import { Configuration, type IConfiguration } from 'src/configuration';
 import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } from './common';
 

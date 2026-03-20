@@ -1,4 +1,4 @@
-import type { IAnnotation } from 'src/common';
+import type { IAnnotation } from '@kompakkt/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 type Position = {
