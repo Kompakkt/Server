@@ -291,12 +291,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         })();
 
         const fromAccess = (async () => {
-          if (collection === Collection.entity) {
-            return entityCollection.find({ 'access.profile.profileId': profileId }).toArray();
-          } else if (collection === Collection.compilation) {
-            return compilationCollection.find({ 'access.profile.profileId': profileId }).toArray();
-          }
-          return [];
+          const documents = collection === Collection.entity ? await entityCollection.find({ 'access.profile.profileId': profileId }).toArray() : collection === Collection.compilation ? await compilationCollection.find({ 'access.profile.profileId': profileId }).toArray() : [];
+          const resolved = await Promise.all(
+            documents.map(entity => resolveUserDocument(entity._id, collection, depth ? depth : full ? RESOLVE_FULL_DEPTH : 0)),
+          );
+          return resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
         })();
 
         return await Promise.all([fromUserData, fromAccess]).then(results => results.flat());
