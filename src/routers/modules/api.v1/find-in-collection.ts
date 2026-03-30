@@ -37,7 +37,10 @@ export const findSingleHandler = async (
           })
         : false;
       const userInAccess = userdata
-        ? entity.access.find(user => user._id === userdata._id.toString())
+        // Hotfix: Some entities do not have an access field yet due to migration issues.
+        ? Array.isArray(entity.access)
+          ? entity.access.find(user => user._id === userdata._id.toString())
+          : undefined
         : undefined;
       const isAdmin = userdata?.role === UserRank.admin;
 

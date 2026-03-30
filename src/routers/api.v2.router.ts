@@ -21,8 +21,17 @@ import {
   resolveUserDocument,
   undoUserOwnerOf,
 } from './modules/user-management/users';
-import { resolveEntity, resolveCompilation, RESOLVE_FULL_DEPTH } from './modules/api.v1/resolving-strategies';
-import type { CreatorField, ICompilation, IPublicProfile, IStrippedUserData } from '@kompakkt/common/interfaces';
+import {
+  resolveEntity,
+  resolveCompilation,
+  RESOLVE_FULL_DEPTH,
+} from './modules/api.v1/resolving-strategies';
+import type {
+  CreatorField,
+  ICompilation,
+  IPublicProfile,
+  IStrippedUserData,
+} from '@kompakkt/common/interfaces';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';
@@ -291,9 +300,22 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         })();
 
         const fromAccess = (async () => {
-          const documents = collection === Collection.entity ? await entityCollection.find({ 'access.profile.profileId': profileId }).toArray() : collection === Collection.compilation ? await compilationCollection.find({ 'access.profile.profileId': profileId }).toArray() : [];
+          const documents =
+            collection === Collection.entity
+              ? await entityCollection.find({ 'access.profile.profileId': profileId }).toArray()
+              : collection === Collection.compilation
+                ? await compilationCollection
+                    .find({ 'access.profile.profileId': profileId })
+                    .toArray()
+                : [];
           const resolved = await Promise.all(
-            documents.map(entity => resolveUserDocument(entity._id, collection, depth ? depth : full ? RESOLVE_FULL_DEPTH : 0)),
+            documents.map(entity =>
+              resolveUserDocument(
+                entity._id,
+                collection,
+                depth ? depth : full ? RESOLVE_FULL_DEPTH : 0,
+              ),
+            ),
           );
           return resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
         })();
