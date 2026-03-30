@@ -70,10 +70,22 @@ const configServer = new Elysia({
   .use(corsPlugin({}))
   .use(timingPlugin())
   .get('/previews/*', async ({ params, status }) => {
+    let path = params['*'];
     const file = Bun.file(
-      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${params['*']}`,
+      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
     );
     if (await file.exists()) return file;
+
+    // PNG Fallback
+    // TODO: Migration to convert PNG to WEBP and remove this fallback
+    if (path.includes('.webp')) {
+      path = path.replace('.webp', '.png');
+      const file = Bun.file(
+        `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
+      );
+      if (await file.exists()) return file;
+    }
+
     return status(404, 'Preview not found');
   });
 
