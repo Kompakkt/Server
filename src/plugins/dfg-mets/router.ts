@@ -1,6 +1,5 @@
 import Elysia, { t } from 'elysia';
-import { isEntity } from 'src/common';
-import type { IEntity } from 'src/common/interfaces';
+import { isEntity, type IEntity } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { entityCollection } from 'src/mongo';
 import { apiKeyService } from 'src/routers/handlers/api-key.service';
