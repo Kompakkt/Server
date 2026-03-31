@@ -32,7 +32,19 @@ const MODEL_TYPE_MAP: Record<string, string> = {
   '.spz': '3D Gaussian Splatting',
 };
 
-const IMAGE_MIME_MAP: Record<string, string> = {
+const MIME_TYPE_MAP: Record<string, string> = {
+  '.obj': 'model/obj',
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.fbx': 'application/octet-stream',
+  '.stl': 'model/stl',
+  '.ply': 'application/octet-stream',
+  '.las': 'application/octet-stream',
+  '.laz': 'application/octet-stream',
+  '.e57': 'application/octet-stream',
+  '.vox': 'application/octet-stream',
+  '.spz': 'application/octet-stream',
+  '.spx': 'application/octet-stream',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -53,9 +65,9 @@ const getLicenseInfo = (code: string) => LICENSE_MAP[code] ?? { name: code, url:
 const getModelType = (fileFormat: string): string =>
   MODEL_TYPE_MAP[fileFormat.toLowerCase()] ?? 'Mesh';
 
-const getImageMime = (fileName: string): string => {
+const getMimeType = (fileName: string): string => {
   const ext = getFileExtension(fileName);
-  return IMAGE_MIME_MAP[ext] ?? 'image/png';
+  return MIME_TYPE_MAP[ext] ?? 'application/octet-stream';
 };
 
 const makeAbsoluteUrl = (path: string): string =>
@@ -270,7 +282,7 @@ ${
   primaryModelFile
     ? `      <mets:file
         ID="FILE_${entityId}_MODEL"
-        MIMETYPE="model/gltf-binary"
+        MIMETYPE="${getMimeType(primaryModelFile.file_name)}"
         SIZE="${primaryModelFile.file_size}">
         <mets:FLocat LOCTYPE="URL" xlink:href="${escapeXml(modelUrl)}"/>
       </mets:file>`
@@ -282,7 +294,7 @@ ${
     <mets:fileGrp USE="THUMBS">
 ${
   previewPath
-    ? `      <mets:file ID="FILE_${entityId}_THUMB_MAIN" MIMETYPE="${getImageMime(previewPath)}">
+    ? `      <mets:file ID="FILE_${entityId}_THUMB_MAIN" MIMETYPE="${getMimeType(previewPath)}">
         <mets:FLocat LOCTYPE="URL" xlink:href="${escapeXml(previewUrl)}"/>
       </mets:file>`
     : ''
