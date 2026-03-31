@@ -21,6 +21,7 @@ export const RouterTags = {
   'Cologne Cave': 'Cologne Cave',
   'Sketchfab Importer': 'Sketchfab Importer',
   'OIDC Authentication': 'OIDC Authentication',
+  'DFG METS': 'DFG METS',
 } as const;
 
 export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
@@ -44,6 +45,7 @@ export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
   'Cologne Cave': 'Endpoints related to the Cologne Cave project',
   'Sketchfab Importer': 'Endpoints for importing models from Sketchfab',
   'OIDC Authentication': 'Endpoints for OpenID Connect authentication',
+  'DFG METS': 'Endpoints for DFG METS metadata exchange',
 } as const;
 
 const routerTagToTagObject = (tag: keyof typeof RouterTags): OpenAPIV3.TagObject => ({
