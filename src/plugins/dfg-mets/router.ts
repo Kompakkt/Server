@@ -1,4 +1,5 @@
 import Elysia, { t } from 'elysia';
+import { ObjectId } from 'mongodb';
 import { isEntity, type IEntity } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { entityCollection } from 'src/mongo';
@@ -17,14 +18,16 @@ const dfgMetsRouter = new Elysia()
       .get(
         '/entity/:id',
         async ({ params: { id }, status }) => {
-          const entity = (await resolveEntity(id, RESOLVE_FULL_DEPTH)) as
+          const entity = (await resolveEntity({ _id: new ObjectId(id) }, RESOLVE_FULL_DEPTH)) as
             | IEntity<DfgMetsExtensionData, true>
             | undefined;
           if (!entity) return status(404, 'Entity not found');
           if (!entity.extensions?.dfgMets?.sharingEnabled)
             return status(403, 'DFG METS sharing not enabled for this entity');
 
-          return await buildMets({ entity });
+          return new Response(await buildMets({ entity }), {
+            headers: { 'Content-Type': 'application/xml' },
+          });
         },
         {
           hasValidApiKey: true,

@@ -48,8 +48,7 @@ const getFileExtension = (fileName: string): string => {
   return dot >= 0 ? fileName.substring(dot).toLowerCase() : '';
 };
 
-const getLicenseInfo = (code: string) =>
-  LICENSE_MAP[code] ?? { name: code, url: '' };
+const getLicenseInfo = (code: string) => LICENSE_MAP[code] ?? { name: code, url: '' };
 
 const getModelType = (fileFormat: string): string =>
   MODEL_TYPE_MAP[fileFormat.toLowerCase()] ?? 'Mesh';
@@ -70,17 +69,11 @@ const escapeXml = (str: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 
-export const buildMets = async ({
-  entity,
-}: {
-  entity: IEntity<DfgMetsExtensionData, true>;
-}) => {
+export const buildMets = async ({ entity }: { entity: IEntity<DfgMetsExtensionData, true> }) => {
   const digitalEntity = entity.relatedDigitalEntity;
   const entityId = entity._id;
   const title = escapeXml(entity.name);
-  const description = digitalEntity.description
-    ? escapeXml(digitalEntity.description)
-    : '';
+  const description = digitalEntity.description ? escapeXml(digitalEntity.description) : '';
   const licenseCode = digitalEntity.licence ?? '';
   const licenseInfo = getLicenseInfo(licenseCode);
 
@@ -89,9 +82,7 @@ export const buildMets = async ({
   const files = entity.files ?? [];
 
   const creators = persons.filter(p =>
-    Object.values(p.roles).some(roles =>
-      roles.some(r => r === 'CREATOR' || r === 'DATA_CREATOR'),
-    ),
+    Object.values(p.roles).some(roles => roles.some(r => r === 'CREATOR' || r === 'DATA_CREATOR')),
   );
 
   const funderInstitutions = institutions.filter(inst =>
@@ -100,12 +91,8 @@ export const buildMets = async ({
 
   const primaryModelFile = files.find(f => entity.processed.raw.includes(f.file_name));
 
-  const modelUrl = primaryModelFile
-    ? makeAbsoluteUrl(primaryModelFile.file_link)
-    : '';
-  const modelType = primaryModelFile
-    ? getModelType(primaryModelFile.file_format)
-    : 'Mesh';
+  const modelUrl = primaryModelFile ? makeAbsoluteUrl(primaryModelFile.file_link) : '';
+  const modelType = primaryModelFile ? getModelType(primaryModelFile.file_format) : 'Mesh';
 
   const previewPath = entity.settings?.preview;
   const previewUrl = previewPath ? makeAbsoluteUrl(previewPath) : '';
@@ -143,9 +130,7 @@ export const buildMets = async ({
 ${
   (digitalEntity.discipline ?? []).length > 0
     ? digitalEntity.discipline
-        .map(
-          d => `          <mods:genre>${escapeXml(d)}</mods:genre>`,
-        )
+        .map(d => `          <mods:genre>${escapeXml(d)}</mods:genre>`)
         .join('\n')
     : ''
 }
@@ -260,7 +245,8 @@ ${
   funderInstitutions.length > 0
     ? funderInstitutions
         .map(
-          inst => `            <dv:owner>${escapeXml(inst.name)}${inst.university ? `, ${escapeXml(inst.university)}` : ''}</dv:owner>`,
+          inst =>
+            `            <dv:owner>${escapeXml(inst.name)}${inst.university ? `, ${escapeXml(inst.university)}` : ''}</dv:owner>`,
         )
         .join('\n')
     : ''
@@ -319,16 +305,8 @@ ${
   <mets:structMap TYPE="PHYSICAL">
     <mets:div ID="PHYS_ROOT" TYPE="physSequence">
       <mets:div ID="PHYS_${entityId}" TYPE="object" ORDER="1" ORDERLABEL="1">
-${
-  primaryModelFile
-    ? `        <mets:fptr FILEID="FILE_${entityId}_MODEL"/>`
-    : ''
-}
-${
-  previewPath
-    ? `        <mets:fptr FILEID="FILE_${entityId}_THUMB_MAIN"/>`
-    : ''
-}
+${primaryModelFile ? `        <mets:fptr FILEID="FILE_${entityId}_MODEL"/>` : ''}
+${previewPath ? `        <mets:fptr FILEID="FILE_${entityId}_THUMB_MAIN"/>` : ''}
       </mets:div>
     </mets:div>
   </mets:structMap>
