@@ -31,6 +31,11 @@ const dfgMetsRouter = new Elysia()
         },
         {
           hasValidApiKey: true,
+          response: t.String({
+            type: 'string',
+            description: 'METS/MODS XML representation of the entity if found and sharing enabled',
+          }),
+
           query: t.Object({
             key: t.String({
               type: 'string',
@@ -68,21 +73,46 @@ const dfgMetsRouter = new Elysia()
           );
 
           return resolved.filter(isEntity).map(e => ({
-            _id: e._id,
+            _id: e._id.toString(),
             name: e.name,
             description: e.relatedDigitalEntity.description,
             thumbnailUrl: new URL(
               `/server/${e.settings.preview}`,
               Configuration.Server.PublicURL,
             ).toString(),
+            kompakktUrl: new URL(`/entity/${e._id}`, Configuration.Server.PublicURL).toString(),
             metsUrl: new URL(
-              `/dfg-mets-api/entity/${e._id}`,
+              `/server/dfg-mets-api/entity/${e._id}`,
               Configuration.Server.PublicURL,
             ).toString(),
           }));
         },
         {
           hasValidApiKey: true,
+          response: {
+            200: t.Array(
+              t.Object({
+                _id: t.String({ type: 'string', description: 'Entity ID' }),
+                name: t.String({ type: 'string', description: 'Entity name' }),
+                description: t.String({
+                  type: 'string',
+                  description: 'Description of the related digital entity',
+                }),
+                thumbnailUrl: t.String({
+                  type: 'string',
+                  description: 'URL to the entity thumbnail',
+                }),
+                kompakktUrl: t.String({
+                  type: 'string',
+                  description: 'URL to the entity in Kompakkt',
+                }),
+                metsUrl: t.String({
+                  type: 'string',
+                  description: 'URL to retrieve the METS/MODS XML for this entity',
+                }),
+              }),
+            ),
+          },
           query: t.Object({
             key: t.String({
               type: 'string',
