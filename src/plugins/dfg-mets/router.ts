@@ -31,11 +31,14 @@ const dfgMetsRouter = new Elysia()
         },
         {
           hasValidApiKey: true,
-          response: t.String({
-            type: 'string',
-            description: 'METS/MODS XML representation of the entity if found and sharing enabled',
-          }),
-
+          response: {
+            200: t.String({
+              type: 'string',
+              description: 'METS/MODS XML representation of the entity if found and sharing enabled',
+            }),
+            403: t.Any({}),
+            404: t.Any({}),
+          },
           query: t.Object({
             key: t.String({
               type: 'string',
