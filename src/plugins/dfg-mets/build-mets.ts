@@ -1,6 +1,7 @@
 import type { IEntity } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import type { DfgMetsExtensionData } from './types';
+import mime from 'mime';
 
 const LICENSE_MAP: Record<string, { name: string; url: string }> = {
   BY: { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' },
@@ -32,43 +33,13 @@ const MODEL_TYPE_MAP: Record<string, string> = {
   '.spz': '3D Gaussian Splatting',
 };
 
-const MIME_TYPE_MAP: Record<string, string> = {
-  '.obj': 'model/obj',
-  '.glb': 'model/gltf-binary',
-  '.gltf': 'model/gltf+json',
-  '.fbx': 'application/octet-stream',
-  '.stl': 'model/stl',
-  '.ply': 'application/octet-stream',
-  '.las': 'application/octet-stream',
-  '.laz': 'application/octet-stream',
-  '.e57': 'application/octet-stream',
-  '.vox': 'application/octet-stream',
-  '.spz': 'application/octet-stream',
-  '.spx': 'application/octet-stream',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.bmp': 'image/bmp',
-  '.svg': 'image/svg+xml',
-  '.tiff': 'image/tiff',
-};
-
-const getFileExtension = (fileName: string): string => {
-  const dot = fileName.lastIndexOf('.');
-  return dot >= 0 ? fileName.substring(dot).toLowerCase() : '';
-};
-
 const getLicenseInfo = (code: string) => LICENSE_MAP[code] ?? { name: code, url: '' };
 
 const getModelType = (fileFormat: string): string =>
   MODEL_TYPE_MAP[fileFormat.toLowerCase()] ?? 'Mesh';
 
-const getMimeType = (fileName: string): string => {
-  const ext = getFileExtension(fileName);
-  return MIME_TYPE_MAP[ext] ?? 'application/octet-stream';
-};
+const getMimeType = (fileName: string): string =>
+  mime.getType(fileName) ?? 'application/octet-stream';
 
 const makeAbsoluteUrl = (path: string): string =>
   new URL(`/server/${path}`, Configuration.Server.PublicURL).toString();
