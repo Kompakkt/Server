@@ -219,9 +219,9 @@ const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
     description: asCompilation.description ?? '',
     entities: flattenRecord(asCompilation.entities),
     name: asCompilation.name ?? '',
-    password: asCompilation.password ?? '',
     creator: asCompilation.creator,
     access: asCompilation.access,
+    online: asCompilation.online ?? true,
   };
 };
 

@@ -77,7 +77,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     )
     .get(
       '/get/find/:collection/:identifier/:password?',
-      ({ params, userdata }) => findSingleHandler(params, userdata),
+      ({ status }) => status(410, 'This endpoint is deprecated. Please use the /get/find/:collection/:identifier endpoint instead. Passwords are no longer supported for collections.'),
       {
         params: findSingleParams,
         detail: {

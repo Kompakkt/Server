@@ -13,61 +13,35 @@ import { checkIsOwner } from '../user-management/users';
 import { log } from 'src/logger';
 
 export const findSingleHandler = async (
-  {
-    collection,
-    identifier,
-    password,
-  }: {
-    collection: Collection;
-    identifier: string;
-    password?: string;
-  },
+  {    collection,    identifier,  }: {    collection: Collection;    identifier: string;  },
   userdata: ServerDocument<IUserData> | undefined,
 ) => {
-  switch (collection) {
-    case Collection.entity: {
-      const entity = await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH);
-      if (!entity) return undefined;
-      // Check if user has access to the entity
-      const entityExistsInUserdata = userdata
-        ? await checkIsOwner({
-            collection: Collection.entity,
-            doc: entity,
-            userdata,
-          })
-        : false;
-      const userInAccess = userdata
-        // Hotfix: Some entities do not have an access field yet due to migration issues.
-        ? Array.isArray(entity.access)
-          ? entity.access.find(user => user._id === userdata._id.toString())
-          : undefined
-        : undefined;
-      const isAdmin = userdata?.role === UserRank.admin;
+  if (collection !== Collection.entity && collection !== Collection.compilation) {
+    return undefined;
+  }
 
-      const userHasAccess = isAdmin || entityExistsInUserdata || !!userInAccess;
-      if (isAdmin && !entity.online)
-        log(`Admin ${userdata.username} requested access to ${entity._id.toString()}`);
+  const doc = collection === Collection.entity ? await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH) : await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
+  if (!doc) return undefined;
+  // Check if user has access to the entity
+  const existsInUserdata = userdata
+    ? await checkIsOwner({        collection,        doc,        userdata,      })
+    : false;
+  const userInAccess = userdata
+    ? // Hotfix: Some entities do not have an access field yet due to migration issues.
+      Array.isArray(doc.access)
+      ? doc.access.find(user => user._id === userdata._id.toString())
+      : undefined
+    : undefined;
+  const isAdmin = userdata?.role === UserRank.admin;
 
-      if (entity.online) {
-        return entity;
-      } else {
-        return userHasAccess ? entity : undefined;
-      }
-    }
-    case Collection.compilation: {
-      const compilation = await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
-      if (!compilation) return undefined;
-      const _pw = compilation.password;
-      const isPasswordProtected = _pw !== '';
-      // Deprecate password access. We do not reveal these compilations at all anymore.
-      // May change in the future, but for now this is the safest way to handle this without breaking existing passwords and without revealing protected compilations at all.
-      if (isPasswordProtected) return undefined;
+  const userHasAccess = isAdmin || existsInUserdata || !!userInAccess;
+  if (isAdmin && !doc.online)
+    log(`Admin ${userdata.username} requested access to ${doc._id.toString()}`);
 
-      return compilation;
-    }
-    default: {
-      return undefined;
-    }
+  if (doc.online) {
+    return doc;
+  } else {
+    return userHasAccess ? doc : undefined;
   }
 };
 

@@ -3,6 +3,7 @@ import {
   Collection,
   type IAnnotation,
   type ICompilation,
+  type IEntity,
   type IStrippedUserData,
   type IUserData,
   isAnnotation,
@@ -27,32 +28,14 @@ const asIdQueryArray = (id: string | ObjectId) =>
   [id.toString(), new ObjectId(id)] as [string, ObjectId];
 
 // Query helpers
-// TODO: This can be cached without trouble
-const userInWhitelistQuery = async (user: ServerDocument<IUserData>) => {
+// TODO: Verify if this is correct after whitelist -> access migration
+const userInAccessQuery = async (user: ServerDocument<IUserData>) => {
   // Build query for whitelist containing the user in persons or in groups
-  const query: Filter<ServerDocument<ICompilation>> = {
-    'whitelist.enabled': { $eq: true },
-    '$or': [
-      {
-        'whitelist.persons': {
-          $elemMatch: { _id: { $in: asIdQueryArray(user._id) } },
-        },
-      },
-    ],
+  const query: Filter<ServerDocument<IEntity | ICompilation>> = {
+    'access': {      $elemMatch: { _id: { $in: asIdQueryArray(user._id) } },    },
   };
 
   return query;
-};
-
-const userInGroupQuery = (userdata: ServerDocument<IUserData>) => {
-  const _idQuery = asIdQueryArray(userdata._id);
-  return {
-    $or: [
-      { 'creator._id': { $in: _idQuery } },
-      { members: { $elemMatch: { _id: { $in: _idQuery } } } },
-      { owners: { $elemMatch: { _id: { $in: _idQuery } } } },
-    ],
-  };
 };
 
 export const findEntityOwnersQuery = async (
@@ -73,13 +56,13 @@ export const countEntityUses = async (
   userdata?: ServerDocument<IUserData>,
 ) => {
   // Build query for:
-  // (Not password protected || user is creator || user is whitelisted) && has entity
-  const filter: Filter<ServerDocument<ICompilation>> = { $or: [{ password: { $eq: '' } }] };
+  // (user is creator || user is whitelisted) && has entity
+  const filter: Filter<ServerDocument<ICompilation>> = { $or: [] };
   if (userdata) {
     filter.$or?.push({
       'creator._id': { $in: asIdQueryArray(userdata._id) },
     });
-    filter.$or?.push(await userInWhitelistQuery(userdata));
+    filter.$or?.push(await userInAccessQuery(userdata));
   }
   filter[`entities.${identifier.toString()}`] = { $exists: true };
 
@@ -141,6 +124,8 @@ export const addAnnotationsToAnnotationList = async ({
     docs: correctedList,
     collection: Collection.annotation,
     userdata: userdata,
+  }).catch(err => {
+    log('Failed to add Annotations to user ownership after adding to Compilation', err);
   });
   return resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
 };
@@ -203,7 +188,7 @@ export const applyActionToEntityOwner = async ({
 
 export const findUserInCompilations = async (userdata: ServerDocument<IUserData>) => {
   // Only show compilations where the user is in the whitelist
-  const filter = await userInWhitelistQuery(userdata);
+  const filter = await userInAccessQuery(userdata);
   const compilations = await compilationCollection.find(filter).toArray();
   if (!compilations) return [];
 
