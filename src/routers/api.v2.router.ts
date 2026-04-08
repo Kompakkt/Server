@@ -453,10 +453,23 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     )
     .post(
       '/user-data/transfer-ownership',
-      async ({ body: { entityId, targetUserId }, status, userdata }) => {
+      async ({ body, status, userdata }) => {
         if (!userdata) return status(401);
-        const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        const docId = 'entityId' in body ? body.entityId : body.docId;
+        const collection = 'collection' in body ? body.collection : Collection.entity;
+        if (collection !== Collection.entity && collection !== Collection.compilation)
+          return status(
+            400,
+            `Invalid collection type. Only "${Collection.entity}" and "${Collection.compilation}" are supported.`,
+          );
+
+        const dbCollection = collectionMap[collection] as
+          | typeof entityCollection
+          | typeof compilationCollection;
+        const entity = await dbCollection.findOne({ _id: new ObjectId(docId) });
         if (!entity) return status(404, 'Entity not found');
+
+        const targetUserId = body.targetUserId;
         const targetOwner = await userCollection.findOne({ _id: new ObjectId(targetUserId) });
         const targetOwnerProfile = targetOwner?.profiles.find(
           profile => profile.type === ProfileType.user,
@@ -501,12 +514,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         // Legacy: swap owner in userdata
         const legacyOwnerResults = await Promise.allSettled([
           makeUserOwnerOf({
-            collection: Collection.entity,
+            collection,
             docs: [entity],
             userdata: targetOwner,
           }),
           undoUserOwnerOf({
-            collection: Collection.entity,
+            collection,
             docs: [entity],
             userdata,
           }),
@@ -515,13 +528,13 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         const legacySwapSuccess = legacyOwnerResults.every(result => result.status === 'fulfilled');
         if (!legacySwapSuccess) {
           warn(
-            `Failed to update ownership in userdata for one or more operations: ${{ entityId, targetUserId, userId: userdata._id.toString() }}`,
+            `Failed to update ownership in userdata for one or more operations: ${{ docId, targetUserId, userId: userdata._id.toString() }}`,
           );
         }
 
         // Update the entity in the database
-        const updateResult = await entityCollection.updateOne(
-          { _id: new ObjectId(entityId) },
+        const updateResult = await dbCollection.updateOne(
+          { _id: new ObjectId(docId) },
           { $set: { access: entity.access } },
         );
         if (updateResult.modifiedCount === 0) {
@@ -529,7 +542,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }
 
         // Return the updated entity
-        const updatedEntity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        const updatedEntity = await dbCollection.findOne({ _id: new ObjectId(docId) });
         if (!updatedEntity) {
           return status(404, 'Updated entity not found');
         }
@@ -537,13 +550,24 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
       {
         isLoggedIn: true,
-        body: t.Object({
-          entityId: t.String({ description: 'The ID of the entity to transfer ownership of.' }),
-          targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
-        }),
+        body: t.Union([
+          t.Object({
+            collection: t.Enum(Collection, {
+              description: `The collection type. Only "${Collection.entity}"" and "${Collection.compilation}" are supported as values`,
+            }),
+            docId: t.String({
+              description: 'The ID of the entity or compilation to transfer ownership of.',
+            }),
+            targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
+          }),
+          t.Object({
+            entityId: t.String({ description: 'The ID of the entity to transfer ownership of.' }),
+            targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
+          }),
+        ]),
         detail: {
           description:
-            'Transfers ownership of an entity to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
+            'Transfers ownership of an entity or compilation to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
           tags: [RouterTags['API V2']],
         },
       },
