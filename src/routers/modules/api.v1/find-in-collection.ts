@@ -13,19 +13,20 @@ import { checkIsOwner } from '../user-management/users';
 import { log } from 'src/logger';
 
 export const findSingleHandler = async (
-  {    collection,    identifier,  }: {    collection: Collection;    identifier: string;  },
+  { collection, identifier }: { collection: Collection; identifier: string },
   userdata: ServerDocument<IUserData> | undefined,
 ) => {
   if (collection !== Collection.entity && collection !== Collection.compilation) {
     return undefined;
   }
 
-  const doc = collection === Collection.entity ? await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH) : await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
+  const doc =
+    collection === Collection.entity
+      ? await resolveEntity({ _id: identifier }, RESOLVE_FULL_DEPTH)
+      : await resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
   if (!doc) return undefined;
   // Check if user has access to the entity
-  const existsInUserdata = userdata
-    ? await checkIsOwner({        collection,        doc,        userdata,      })
-    : false;
+  const existsInUserdata = userdata ? await checkIsOwner({ collection, doc, userdata }) : false;
   const userInAccess = userdata
     ? // Hotfix: Some entities do not have an access field yet due to migration issues.
       Array.isArray(doc.access)

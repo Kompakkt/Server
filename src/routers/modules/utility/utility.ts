@@ -32,7 +32,7 @@ const asIdQueryArray = (id: string | ObjectId) =>
 const userInAccessQuery = async (user: ServerDocument<IUserData>) => {
   // Build query for whitelist containing the user in persons or in groups
   const query: Filter<ServerDocument<IEntity | ICompilation>> = {
-    'access': {      $elemMatch: { _id: { $in: asIdQueryArray(user._id) } },    },
+    access: { $elemMatch: { _id: { $in: asIdQueryArray(user._id) } } },
   };
 
   return query;

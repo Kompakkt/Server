@@ -83,6 +83,7 @@ export enum Migrations {
   migrateCreatorAndAccessFields = 'migrateCreatorAndAccessFields',
   migrateUserProfiles = 'migrateUserProfiles',
   migrateFinishedDraftEntities = 'migrateFinishedDraftEntities',
+  migrateCompilationOnlineField = 'migrateCompilationOnlineField',
 }
 export const migrationCollection = accountsDb.collection<{
   name: Migrations;

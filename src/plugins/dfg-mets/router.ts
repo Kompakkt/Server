@@ -34,7 +34,8 @@ const dfgMetsRouter = new Elysia()
           response: {
             200: t.String({
               type: 'string',
-              description: 'METS/MODS XML representation of the entity if found and sharing enabled',
+              description:
+                'METS/MODS XML representation of the entity if found and sharing enabled',
             }),
             403: t.Any({}),
             404: t.Any({}),
