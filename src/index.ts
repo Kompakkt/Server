@@ -21,11 +21,13 @@ import { ensureEntityCreatorIsProfile } from './jobs/ensure-entity-creator-is-pr
 import { ensureDefaultPasswordStrategy } from './jobs/ensure-default-password-strategy';
 import { migrateCreatorAndAccessFields } from './jobs/migrate-creator-and-access-fields';
 import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-entities';
+import { migrateCompilationOnline } from './jobs/migrate-compilation-online';
 
 const jobs = {
   migrateUserProfiles,
   migrateCreatorAndAccessFields,
   migrateFinishedDraftEntities,
+  migrateCompilationOnline,
   cleanupPersons,
   decreatePopularityTimer,
   ensureDefaultPasswordStrategy,
