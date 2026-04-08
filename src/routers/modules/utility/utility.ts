@@ -57,12 +57,13 @@ export const countEntityUses = async (
 ) => {
   // Build query for:
   // (user is creator || user is whitelisted) && has entity
-  const filter: Filter<ServerDocument<ICompilation>> = { $or: [] };
+  const filter: Filter<ServerDocument<ICompilation>> = { };
   if (userdata) {
-    filter.$or?.push({
+    filter.$or ??= [];
+    filter.$or.push({
       'creator._id': { $in: asIdQueryArray(userdata._id) },
     });
-    filter.$or?.push(await userInAccessQuery(userdata));
+    filter.$or.push(await userInAccessQuery(userdata));
   }
   filter[`entities.${identifier.toString()}`] = { $exists: true };
 
