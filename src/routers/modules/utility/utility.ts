@@ -83,11 +83,13 @@ export const countEntityUses = async (
   }
   filter[`entities.${identifier.toString()}`] = { $exists: true };
 
-  const result = await compilationCollection.find(filter).toArray();
-  const compilations = result.map(compilation => ({
-    ...compilation,
-    password: !!compilation.password,
-  }));
+  const compilations = await compilationCollection
+    .find(filter)
+    .toArray()
+    .catch(err => {
+      log('Error counting entity uses', err, filter);
+      return [];
+    });
   const occurences = compilations.length;
 
   return { occurences, compilations };
