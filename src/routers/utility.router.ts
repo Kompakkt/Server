@@ -14,6 +14,8 @@ import {
   findEntityOwnersQuery,
   findUserInCompilations,
 } from './modules/utility/utility';
+import { checkIsOwner } from './modules/user-management/users';
+import { Collection, EntityAccessRole, UserRank } from '@kompakkt/common';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -29,9 +31,30 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
     )
     .post(
       '/generate-entity-video-preview',
-      async ({ body: { entityId, screenshots }, status }) => {
+      async ({ body: { entityId, screenshots }, status, userdata }) => {
+        if (!userdata) return status('Forbidden');
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
         if (!entity) return status('Not Found', 'Entity not found');
+
+        const hasAccess = await (async () => {
+          const currentAccess = entity.access.find(user => user._id === userdata._id.toString());
+          const isOwner = await checkIsOwner({
+            doc: entity,
+            collection: Collection.entity,
+            userdata,
+          });
+
+          const isAdmin = userdata.role === UserRank.admin;
+
+          return (
+            currentAccess?.role === EntityAccessRole.owner ||
+            currentAccess?.role === EntityAccessRole.editor ||
+            isOwner ||
+            isAdmin
+          );
+        })();
+
+        if (!hasAccess) return status(403);
 
         const mediaType =
           {
@@ -66,6 +89,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           screenshots: t.Array(t.String()),
           entityId: t.String(),
         }),
+        isLoggedIn: true,
       },
     )
     .guard(
