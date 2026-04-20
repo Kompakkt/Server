@@ -20,10 +20,12 @@ import { ensureDefaultUserProfile } from './jobs/ensure-default-user-profile';
 import { ensureEntityCreatorIsProfile } from './jobs/ensure-entity-creator-is-profile';
 import { ensureDefaultPasswordStrategy } from './jobs/ensure-default-password-strategy';
 import { migrateCreatorAndAccessFields } from './jobs/migrate-creator-and-access-fields';
+import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-entities';
 
 const jobs = {
   migrateUserProfiles,
   migrateCreatorAndAccessFields,
+  migrateFinishedDraftEntities,
   cleanupPersons,
   decreatePopularityTimer,
   ensureDefaultPasswordStrategy,

@@ -120,10 +120,12 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
       })
     : undefined;
 
+  const name = (digitalEntity?.title ?? asEntity.name ?? `Temp-${asEntity._id?.toString()}`).trim();
+
   return {
     __hits: asEntity.__hits ?? 0,
     __createdAt: asEntity.__createdAt ?? new ObjectId(asEntity._id).getTimestamp().getTime(),
-    __normalizedName: asEntity.name?.trim().toLowerCase() ?? '',
+    __normalizedName: name.toLowerCase(),
     __annotationCount: Object.keys(asEntity.annotations || {}).length,
     __downloadable: asEntity.__downloadable ?? asEntity.options?.allowDownload ?? false,
     __licenses:
@@ -138,7 +140,7 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
     files: asEntity.files,
     finished: asEntity.finished,
     mediaType: asEntity.mediaType,
-    name: asEntity.name,
+    name: name,
     online: asEntity.online,
     processed: asEntity.processed,
     relatedDigitalEntity: flattenDocument({
