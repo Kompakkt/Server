@@ -57,7 +57,7 @@ export const countEntityUses = async (
 ) => {
   // Build query for:
   // (user is creator || user is whitelisted) && has entity
-  const filter: Filter<ServerDocument<ICompilation>> = { };
+  const filter: Filter<ServerDocument<ICompilation>> = {};
   if (userdata) {
     filter.$or ??= [];
     filter.$or.push({

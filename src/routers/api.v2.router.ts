@@ -853,6 +853,62 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
     )
     .post(
+      '/compilation/update-metadata',
+      async ({ status, body, userdata }) => {
+        if (!userdata) {
+          return status(401, 'Unauthorized');
+        }
+
+        const associatedProfile = userdata.profiles?.find(p => p.profileId === body.profileId);
+        if (!associatedProfile) {
+          return status(400, 'The provided profileId is not associated with the user');
+        }
+
+        const compilation = await compilationCollection.findOne({ _id: new ObjectId(body._id) });
+        if (!compilation) {
+          return status(404, 'Compilation not found');
+        }
+
+        const userAccess = compilation.access.find(
+          user => user._id === userdata._id.toString() && user.profile.profileId === body.profileId,
+        );
+        if (!userAccess) {
+          return status(403, 'You do not have access to this compilation');
+        }
+
+        if (userAccess.role === EntityAccessRole.viewer) {
+          return status(403, 'You must have at least editor access to update the compilation');
+        }
+
+        const updateResult = await compilationCollection.updateOne(
+          { _id: new ObjectId(body._id) },
+          { $set: { name: body.name, description: body.description } },
+        );
+
+        if (updateResult.modifiedCount === 0) {
+          return status(500, 'Failed to update compilation metadata');
+        }
+
+        const updatedCompilation = await resolveCompilation({ _id: body._id }, 1);
+        if (!updatedCompilation) {
+          return status(404, 'Updated compilation not found');
+        }
+
+        return updatedCompilation;
+      },
+      {
+        isLoggedIn: true,
+        body: t.Object({
+          _id: t.String({ description: 'The identifier of the compilation to update.' }),
+          name: t.String({ description: 'The new name of the compilation.' }),
+          description: t.String({ description: 'The new description for the compilation.' }),
+          profileId: t.String({
+            description: 'The profile identifier updating the compilation.',
+          }),
+        }),
+      },
+    )
+    .post(
       '/compilation/add-entities',
       async ({ status, body: { compilationIds, entityIds }, userdata }) => {
         if (!userdata) {
