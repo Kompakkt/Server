@@ -82,6 +82,7 @@ export const followsCollection = accountsDb.collection<{
 export enum Migrations {
   migrateCreatorAndAccessFields = 'migrateCreatorAndAccessFields',
   migrateUserProfiles = 'migrateUserProfiles',
+  migrateFinishedDraftEntities = 'migrateFinishedDraftEntities',
 }
 export const migrationCollection = accountsDb.collection<{
   name: Migrations;
