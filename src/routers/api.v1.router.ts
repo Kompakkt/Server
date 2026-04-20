@@ -5,6 +5,7 @@ import {
   EntityAccessRole,
   type IStrippedUserData,
   ProfileType,
+  UserRank,
   isAnnotation,
   isInstitution,
   isPerson,
@@ -314,10 +315,13 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
                 userdata,
               });
 
+              const isAdmin = userdata.role === UserRank.admin;
+
               return (
                 currentAccess?.role === EntityAccessRole.owner ||
                 currentAccess?.role === EntityAccessRole.editor ||
-                isOwner
+                isOwner ||
+                isAdmin
               );
             })();
 
