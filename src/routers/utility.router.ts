@@ -6,14 +6,7 @@ import { RootDirectory } from 'src/environment';
 import { entityCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
-import {
-  Command,
-  addAnnotationsToAnnotationList,
-  applyActionToEntityOwner,
-  countEntityUses,
-  findEntityOwnersQuery,
-  findUserInCompilations,
-} from './modules/utility/utility';
+import { addAnnotationsToAnnotationList, countEntityUses } from './modules/utility/utility';
 import { checkIsOwner } from './modules/user-management/users';
 import { Collection, EntityAccessRole, UserRank } from '@kompakkt/common';
 
@@ -104,25 +97,6 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
       app =>
         app
           .post(
-            '/applyactiontoentityowner',
-            ({ status, userdata, body: { command, entityId, ownerUsername } }) =>
-              userdata
-                ? applyActionToEntityOwner({
-                    command,
-                    entityId,
-                    ownerUsername,
-                    userdata,
-                  })
-                : status('Forbidden'),
-            {
-              body: t.Object({
-                command: t.Enum(Command),
-                entityId: t.String(),
-                ownerUsername: t.String(),
-              }),
-            },
-          )
-          .post(
             '/checksumexists',
             async ({ body: { checksum } }) => {
               // TODO: Deprecate endpoint, keeping until removed from frontend
@@ -131,9 +105,6 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
             },
             { body: t.Object({ checksum: t.String() }) },
           )
-          .get('/findentityowners/:id', ({ params: { id } }) => findEntityOwnersQuery(id), {
-            params: t.Object({ id: t.String() }),
-          })
           .post(
             '/moveannotations/:id',
             ({ status, params: { id }, userdata, body: { annotationList } }) =>
@@ -148,9 +119,6 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
               params: t.Object({ id: t.String() }),
               body: t.Object({ annotationList: t.Array(t.String()) }),
             },
-          )
-          .get('/finduserincompilations', ({ status, userdata }) =>
-            userdata ? findUserInCompilations(userdata) : status('Forbidden'),
           ),
     ),
 );

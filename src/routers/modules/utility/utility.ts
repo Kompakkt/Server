@@ -4,24 +4,17 @@ import {
   type IAnnotation,
   type ICompilation,
   type IEntity,
-  type IStrippedUserData,
   type IUserData,
   isAnnotation,
 } from '@kompakkt/common';
-import {
-  annotationCollection,
-  compilationCollection,
-  entityCollection,
-  userCollection,
-} from 'src/mongo';
+import { annotationCollection, compilationCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import {
   RESOLVE_FULL_DEPTH,
   resolveAnnotation,
   resolveCompilation,
-  resolveEntity,
 } from '../api.v1/resolving-strategies';
-import { makeUserOwnerOf, undoUserOwnerOf } from '../user-management/users';
+import { makeUserOwnerOf } from '../user-management/users';
 import { log } from 'src/logger';
 
 const asIdQueryArray = (id: string | ObjectId) =>
@@ -36,19 +29,6 @@ const userInAccessQuery = async (user: ServerDocument<IUserData>) => {
   };
 
   return query;
-};
-
-export const findEntityOwnersQuery = async (
-  _id: string | ObjectId,
-): Promise<ServerDocument<IStrippedUserData>[]> => {
-  const accounts = await userCollection
-    .find({ 'data.entity': { $in: asIdQueryArray(_id) } })
-    .toArray();
-  return accounts.map(({ _id, username, fullname }) => ({
-    _id,
-    username,
-    fullname,
-  }));
 };
 
 export const countEntityUses = async (
@@ -129,93 +109,4 @@ export const addAnnotationsToAnnotationList = async ({
     log('Failed to add Annotations to user ownership after adding to Compilation', err);
   });
   return resolveCompilation({ _id: identifier }, RESOLVE_FULL_DEPTH);
-};
-
-export enum Command {
-  add = 'add',
-  remove = 'remove',
-}
-
-export const applyActionToEntityOwner = async ({
-  command,
-  ownerUsername,
-  entityId,
-  userdata,
-}: {
-  entityId: string | ObjectId;
-  command: Command;
-  ownerUsername: string;
-  userdata: ServerDocument<IUserData>;
-}) => {
-  const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
-  if (!entity) throw new Error('Entity not found');
-
-  const isUserOwner = userdata.data.entity?.includes(entityId.toString());
-  if (!isUserOwner) throw new Error('User is not an owner of the entity');
-
-  const otherUser = await userCollection.findOne({ username: ownerUsername });
-  if (!otherUser) throw new Error('User not found by username');
-
-  otherUser.data.entity = otherUser.data.entity?.filter(_ => _) ?? [];
-
-  log('applyActionToEntityOwner', otherUser._id, command, entityId);
-
-  if (command === 'remove') {
-    const entityUses = (await findEntityOwnersQuery(entityId)).length;
-    if (entityUses <= 1) throw new Error('Cannot remove last owner');
-  }
-
-  const changed = await (async () => {
-    switch (command) {
-      case Command.add: {
-        return await makeUserOwnerOf({
-          docs: entity,
-          collection: Collection.entity,
-          userdata: otherUser,
-        });
-      }
-      case Command.remove: {
-        return await undoUserOwnerOf({
-          docs: entity,
-          collection: Collection.entity,
-          userdata: otherUser,
-        });
-      }
-    }
-  })();
-
-  return { changed };
-};
-
-export const findUserInCompilations = async (userdata: ServerDocument<IUserData>) => {
-  // Only show compilations where the user is in the whitelist
-  const filter = await userInAccessQuery(userdata);
-  const compilations = await compilationCollection.find(filter).toArray();
-  if (!compilations) return [];
-
-  const resolved = await Promise.all(
-    compilations.map(comp => resolveCompilation({ _id: new ObjectId(comp._id) }, 1)),
-  );
-  const filtered = resolved.filter(_ => _) as ServerDocument<ICompilation>[];
-
-  return filtered.map(comp => ({
-    ...comp,
-    password: !!comp.password,
-  }));
-};
-
-export const findUserInMetadata = async (userdata: ServerDocument<IUserData>) => {
-  const entities = await entityCollection.find({}).toArray();
-
-  const resolvedEntities = (
-    await Promise.all(
-      entities.map(e => resolveEntity({ _id: new ObjectId(e._id) }, RESOLVE_FULL_DEPTH)),
-    )
-  ).filter(entity => {
-    if (!entity) return false;
-    const stringified = JSON.stringify(entity.relatedDigitalEntity);
-    return stringified.includes(userdata.fullname) || stringified.includes(userdata.mail);
-  });
-
-  return resolvedEntities;
 };
