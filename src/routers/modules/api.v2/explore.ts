@@ -160,6 +160,7 @@ export const exploreHandler = async (
         const filter: Filter<ServerDocument<ICompilation>> = {
           ...baseFilter,
           online: { $eq: true },
+          entities: { $ne: {} },
         };
 
         return await Promise.all([
