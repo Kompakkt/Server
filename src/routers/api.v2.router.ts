@@ -453,10 +453,23 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     )
     .post(
       '/user-data/transfer-ownership',
-      async ({ body: { entityId, targetUserId }, status, userdata }) => {
+      async ({ body, status, userdata }) => {
         if (!userdata) return status(401);
-        const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        const docId = 'entityId' in body ? body.entityId : body.docId;
+        const collection = 'collection' in body ? body.collection : Collection.entity;
+        if (collection !== Collection.entity && collection !== Collection.compilation)
+          return status(
+            400,
+            `Invalid collection type. Only "${Collection.entity}" and "${Collection.compilation}" are supported.`,
+          );
+
+        const dbCollection = collectionMap[collection] as
+          | typeof entityCollection
+          | typeof compilationCollection;
+        const entity = await dbCollection.findOne({ _id: new ObjectId(docId) });
         if (!entity) return status(404, 'Entity not found');
+
+        const targetUserId = body.targetUserId;
         const targetOwner = await userCollection.findOne({ _id: new ObjectId(targetUserId) });
         const targetOwnerProfile = targetOwner?.profiles.find(
           profile => profile.type === ProfileType.user,
@@ -501,12 +514,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         // Legacy: swap owner in userdata
         const legacyOwnerResults = await Promise.allSettled([
           makeUserOwnerOf({
-            collection: Collection.entity,
+            collection,
             docs: [entity],
             userdata: targetOwner,
           }),
           undoUserOwnerOf({
-            collection: Collection.entity,
+            collection,
             docs: [entity],
             userdata,
           }),
@@ -515,13 +528,13 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         const legacySwapSuccess = legacyOwnerResults.every(result => result.status === 'fulfilled');
         if (!legacySwapSuccess) {
           warn(
-            `Failed to update ownership in userdata for one or more operations: ${{ entityId, targetUserId, userId: userdata._id.toString() }}`,
+            `Failed to update ownership in userdata for one or more operations: ${{ docId, targetUserId, userId: userdata._id.toString() }}`,
           );
         }
 
         // Update the entity in the database
-        const updateResult = await entityCollection.updateOne(
-          { _id: new ObjectId(entityId) },
+        const updateResult = await dbCollection.updateOne(
+          { _id: new ObjectId(docId) },
           { $set: { access: entity.access } },
         );
         if (updateResult.modifiedCount === 0) {
@@ -529,7 +542,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         }
 
         // Return the updated entity
-        const updatedEntity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        const updatedEntity = await dbCollection.findOne({ _id: new ObjectId(docId) });
         if (!updatedEntity) {
           return status(404, 'Updated entity not found');
         }
@@ -537,13 +550,24 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
       {
         isLoggedIn: true,
-        body: t.Object({
-          entityId: t.String({ description: 'The ID of the entity to transfer ownership of.' }),
-          targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
-        }),
+        body: t.Union([
+          t.Object({
+            collection: t.Enum(Collection, {
+              description: `The collection type. Only "${Collection.entity}"" and "${Collection.compilation}" are supported as values`,
+            }),
+            docId: t.String({
+              description: 'The ID of the entity or compilation to transfer ownership of.',
+            }),
+            targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
+          }),
+          t.Object({
+            entityId: t.String({ description: 'The ID of the entity to transfer ownership of.' }),
+            targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
+          }),
+        ]),
         detail: {
           description:
-            'Transfers ownership of an entity to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
+            'Transfers ownership of an entity or compilation to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
           tags: [RouterTags['API V2']],
         },
       },
@@ -826,6 +850,62 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             'Creates an empty compilation that can be added to with the normal compilation update endpoint.',
           tags: [RouterTags['API V2']],
         },
+      },
+    )
+    .post(
+      '/compilation/update-metadata',
+      async ({ status, body, userdata }) => {
+        if (!userdata) {
+          return status(401, 'Unauthorized');
+        }
+
+        const associatedProfile = userdata.profiles?.find(p => p.profileId === body.profileId);
+        if (!associatedProfile) {
+          return status(400, 'The provided profileId is not associated with the user');
+        }
+
+        const compilation = await compilationCollection.findOne({ _id: new ObjectId(body._id) });
+        if (!compilation) {
+          return status(404, 'Compilation not found');
+        }
+
+        const userAccess = compilation.access.find(
+          user => user._id === userdata._id.toString() && user.profile.profileId === body.profileId,
+        );
+        if (!userAccess) {
+          return status(403, 'You do not have access to this compilation');
+        }
+
+        if (userAccess.role === EntityAccessRole.viewer) {
+          return status(403, 'You must have at least editor access to update the compilation');
+        }
+
+        const updateResult = await compilationCollection.updateOne(
+          { _id: new ObjectId(body._id) },
+          { $set: { name: body.name, description: body.description } },
+        );
+
+        if (updateResult.modifiedCount === 0) {
+          return status(500, 'Failed to update compilation metadata');
+        }
+
+        const updatedCompilation = await resolveCompilation({ _id: body._id }, 1);
+        if (!updatedCompilation) {
+          return status(404, 'Updated compilation not found');
+        }
+
+        return updatedCompilation;
+      },
+      {
+        isLoggedIn: true,
+        body: t.Object({
+          _id: t.String({ description: 'The identifier of the compilation to update.' }),
+          name: t.String({ description: 'The new name of the compilation.' }),
+          description: t.String({ description: 'The new description for the compilation.' }),
+          profileId: t.String({
+            description: 'The profile identifier updating the compilation.',
+          }),
+        }),
       },
     )
     .post(

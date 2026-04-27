@@ -140,6 +140,7 @@ export const exploreHandler = async (
 
     switch (collection) {
       case Collection.entity: {
+        // @ts-expect-error - Valid, filter type not correctly inferred until "password" to "online" migration is fully done
         const filter: Filter<ServerDocument<IEntity>> = {
           ...baseFilter,
           finished: true,
@@ -158,7 +159,8 @@ export const exploreHandler = async (
       case Collection.compilation: {
         const filter: Filter<ServerDocument<ICompilation>> = {
           ...baseFilter,
-          password: { $eq: '' },
+          online: { $eq: true },
+          entities: { $ne: {} },
         };
 
         return await Promise.all([
