@@ -13,15 +13,9 @@ import { Collection, EntityAccessRole, UserRank } from '@kompakkt/common';
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
     .use(authService)
-    .get(
-      '/countentityuses/:id',
-      async ({ params: { id }, userdata }) => countEntityUses(id, userdata),
-      {
-        params: t.Object({
-          id: t.String(),
-        }),
-      },
-    )
+    .get('/countentityuses/:id', async ({ params: { id } }) => countEntityUses(id), {
+      params: t.Object({ id: t.String() }),
+    })
     .post(
       '/generate-entity-video-preview',
       async ({ body: { entityId, screenshots }, status, userdata }) => {
