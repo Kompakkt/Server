@@ -31,21 +31,10 @@ const userInAccessQuery = async (user: ServerDocument<IUserData>) => {
   return query;
 };
 
-export const countEntityUses = async (
-  identifier: string | ObjectId,
-  userdata?: ServerDocument<IUserData>,
-) => {
-  // Build query for:
-  // (user is creator || user is whitelisted) && has entity
-  const filter: Filter<ServerDocument<ICompilation>> = {};
-  if (userdata) {
-    filter.$or ??= [];
-    filter.$or.push({
-      'creator._id': { $in: asIdQueryArray(userdata._id) },
-    });
-    filter.$or.push(await userInAccessQuery(userdata));
-  }
-  filter[`entities.${identifier.toString()}`] = { $exists: true };
+export const countEntityUses = async (identifier: string | ObjectId) => {
+  const filter: Filter<ServerDocument<ICompilation>> = {
+    [`entities.${identifier.toString()}`]: { $exists: true },
+  };
 
   const compilations = await compilationCollection
     .find(filter)
