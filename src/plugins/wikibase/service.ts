@@ -357,6 +357,20 @@ export class WikibaseService {
 
   // update digital entity
   public async updateDigitalEntity(fullEntity: ServerDocument<WikibaseDigitalEntity>) {
+    const parentEntity = await entityCollection.findOne({
+      'relatedDigitalEntity._id': fullEntity._id.toString(),
+    });
+
+    if (!parentEntity) {
+      log('No parent entity found for digital entity', fullEntity._id);
+      throw new Error('No parent entity found for digital entity');
+    }
+
+    if (!parentEntity.finished) {
+      info('Parent entity is not finished, skipping wikibase update', parentEntity._id);
+      return;
+    }
+
     const entity = extractWikibaseExtensionData(fullEntity);
     if (!entity) {
       throw new Error('Digital entity is missing wikibase extension data');
@@ -382,15 +396,6 @@ export class WikibaseService {
     }
     log(`Now updating digital entity with id ${id}`);
     // traverse to pull back kompakkt link for object page.
-
-    const parentEntity = await entityCollection.findOne({
-      'relatedDigitalEntity._id': fullEntity._id.toString(),
-    });
-
-    if (!parentEntity) {
-      log('No parent entity found for digital entity', fullEntity._id);
-      throw new Error('No parent entity found for digital entity');
-    }
 
     const wikibaseAnnotationIds = await (async () => {
       if (typeof parentEntity?.annotations !== 'object') return;
@@ -795,7 +800,7 @@ export class WikibaseService {
 
     const spark = getDigitalEntityMetadataSpark(wikibase_id);
     const metadata = await this.wikibaseRead<MetadataResponseItem>(spark);
-    log('fetchWikibaseMetadata metadata', metadata);
+    // log('fetchWikibaseMetadata metadata', metadata);
     if (!metadata) {
       log('no metadata found');
       return undefined;
@@ -806,7 +811,7 @@ export class WikibaseService {
       log('no metadata found');
       return undefined;
     }
-    log('fetchWikibaseMetadata processedMetadata', processedMetadata);
+    // log('fetchWikibaseMetadata processedMetadata', processedMetadata);
 
     const licence = processedMetadata.licence
       .map(item => getPQNumberFromID(getMetadataFieldValue(item)))
@@ -837,7 +842,7 @@ export class WikibaseService {
         : [],
     } satisfies IWikibaseDigitalEntityExtensionData;
 
-    log('fetchWikibaseMetadata finalDigitalEntity', digitalEntity);
+    // log('fetchWikibaseMetadata finalDigitalEntity', digitalEntity);
 
     return digitalEntity;
   }

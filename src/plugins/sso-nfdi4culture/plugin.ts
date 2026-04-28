@@ -3,6 +3,7 @@ import ssoNFDI4CultureRouter from './router';
 
 class SSONFDI4CulturePlugin extends Plugin {
   routers = [ssoNFDI4CultureRouter];
+  jobs = [];
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     return true;

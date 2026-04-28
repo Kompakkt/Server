@@ -1,6 +1,7 @@
 import type { IAnnotation, IDigitalEntity } from '@kompakkt/common';
 import { Configuration, type IConfiguration } from 'src/configuration';
 import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } from './common';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export type IWikibaseConfiguration = {
   KompakktAddress?: string;
@@ -33,4 +34,23 @@ export const WikibaseConfiguration = (
 ).Extensions?.Wikibase;
 
 export type WikibaseDigitalEntity = IDigitalEntity<IWikibaseDigitalEntityExtension>;
+
+export const isWikibaseDigitalEntity = (
+  digitalEntity: unknown,
+): digitalEntity is WikibaseDigitalEntity => {
+  return (
+    !!digitalEntity &&
+    typeof digitalEntity === 'object' &&
+    'extensions' in digitalEntity &&
+    typeof digitalEntity.extensions === 'object' &&
+    digitalEntity.extensions !== null &&
+    'wikibase' in digitalEntity.extensions &&
+    typeof digitalEntity.extensions.wikibase === 'object' &&
+    digitalEntity.extensions.wikibase !== null &&
+    'id' in digitalEntity.extensions.wikibase &&
+    typeof digitalEntity.extensions.wikibase.id === 'string' &&
+    digitalEntity.extensions.wikibase.id.trim().length > 0
+  );
+};
+
 export type WikibaseAnnotation = IAnnotation<IWikibaseAnnotationExtension>;

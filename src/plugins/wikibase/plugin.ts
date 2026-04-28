@@ -1,9 +1,15 @@
-import { Collection, type IAnnotation, type IDigitalEntity } from '@kompakkt/common';
+import {
+  Collection,
+  type IEntity,
+  isDigitalEntity,
+  type IAnnotation,
+  type IDigitalEntity,
+} from '@kompakkt/common';
 import { log } from 'src/logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';
+import { isWikibaseConfiguration, isWikibaseDigitalEntity, WikibaseConfiguration } from './config';
 import { Plugin } from '../plugin-controller';
-import { isWikibaseConfiguration, WikibaseConfiguration } from './config';
 import {
   ensureAnnotationExtensionData,
   ensureDigitalEntityExtensionData,
@@ -14,10 +20,78 @@ import { WikibaseService } from './service';
 import { pluginCache } from 'src/redis';
 import type { IWikibaseDigitalEntityExtensionData } from './common';
 import { restoreOriginalAnnotation } from './restore-original-data-model';
+import { SearchIndexJobState } from 'src/jobs/ensure-search-index';
+import { digitalEntityCollection, entityCollection } from 'src/mongo';
+import {
+  resolveDigitalEntity,
+  resolveEntity,
+} from 'src/routers/modules/api.v1/resolving-strategies';
+import { ObjectId } from 'mongodb';
 import { get } from 'src/util/requests';
+
+const disableDeletedWikibaseEntities = async (): Promise<void> => {
+  const service = WikibaseService.getInstance();
+  if (!service) {
+    log('Wikibase plugin not initialized');
+    return;
+  }
+
+  log('Waiting for search index to be built');
+  await new Promise<void>(resolve => {
+    const checkIsDone = () => {
+      if (SearchIndexJobState.isDone) {
+        resolve();
+      } else {
+        setTimeout(checkIsDone, 1000);
+      }
+    };
+    if (SearchIndexJobState.isDone) {
+      resolve();
+    } else {
+      checkIsDone();
+    }
+  });
+  log('Search index built');
+
+  const entitiesWithoutExtensionData = new Array<[string, string]>();
+
+  const entities = await entityCollection.find({ finished: true, online: true }).toArray();
+  for (const entity of entities) {
+    const resolved = await resolveDigitalEntity({ _id: entity.relatedDigitalEntity._id }, 0);
+    if (!resolved) continue;
+    if (typeof resolved !== 'object') continue;
+    if (!hasWikibaseExtension(resolved)) continue;
+
+    if (!isWikibaseDigitalEntity(resolved)) continue;
+    const hasLabel =
+      resolved.extensions?.wikibase?.label &&
+      'en' in resolved.extensions!.wikibase!.label &&
+      typeof resolved.extensions!.wikibase!.label.en === 'string' &&
+      resolved.extensions!.wikibase!.label.en.trim().length > 0;
+
+    if (!hasLabel) {
+      entitiesWithoutExtensionData.push([
+        entity._id.toString(),
+        resolved.extensions?.wikibase?.id ?? '',
+      ]);
+    }
+  }
+
+  for (const [entityId, wikibaseId] of entitiesWithoutExtensionData) {
+    log(`Disabling entity ${entityId} without wikibase data: ${wikibaseId}`);
+    await entityCollection.updateOne(
+      { _id: new ObjectId(entityId) },
+      { $set: { online: false, finished: false } },
+    );
+  }
+};
 
 class WikibasePlugin extends Plugin {
   routers = [wikibaseRouter];
+  jobs = [
+    // TODO: Test on dev instance
+    // disableDeletedWikibaseEntities
+  ];
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     if (!WikibaseConfiguration || !isWikibaseConfiguration(WikibaseConfiguration)) {
@@ -31,7 +105,7 @@ class WikibasePlugin extends Plugin {
       domain = `http://${domain}`;
     }
     const paramInfo = await get(
-      new URL('api.php?action=paraminfo&modules=&format=json', domain).toString(),
+      new URL('api.php?action=paraminfo&modules=query&format=json', domain).toString(),
       { responseFormat: 'json' },
     ).catch(() => undefined);
     if (!paramInfo) {
@@ -46,6 +120,53 @@ class WikibasePlugin extends Plugin {
     }
 
     log('Registering hooks');
+    HookManager.addHook<ServerDocument<IEntity>>({
+      collection: Collection.entity,
+      type: 'afterSave',
+      callback: async entity => {
+        // When an entity is saved, it could be because it is being finalized/set to finished.
+        // We can use this to ensure that the related digital entity is also updated in Wikibase.
+        if (!entity.finished) return entity;
+
+        const digitalEntity = await resolveDigitalEntity(
+          { _id: entity.relatedDigitalEntity._id },
+          0,
+        );
+        if (!digitalEntity) {
+          log(`Related digital entity not found for entity ${entity._id}`);
+          return entity;
+        }
+
+        // Transform digital entity
+        const doc = ensureDigitalEntityExtensionData(digitalEntity);
+        const result = await service.updateDigitalEntity(doc);
+        if (!result) {
+          throw new Error('Failed to update wikibase digital entity');
+        }
+        doc.extensions!.wikibase!.id = result.itemId;
+        doc.extensions!.wikibase!.address =
+          WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain;
+
+        // Now we just need to update the digital entity
+        log(
+          `Updating digital entity ${digitalEntity._id} with Wikibase extension data ${JSON.stringify(doc.extensions?.wikibase ?? {})}`,
+        );
+        const updateResult = await digitalEntityCollection
+          .updateOne(
+            { _id: new ObjectId(digitalEntity._id) },
+            { $set: { extensions: doc.extensions } },
+          )
+          .catch(error => {
+            log(`Failed to update digital entity ${digitalEntity._id}: ${error}`);
+          });
+        log(
+          `Updated digital entity ${digitalEntity._id} with Wikibase extension data, result: ${JSON.stringify(updateResult)}`,
+        );
+
+        return entity;
+      },
+    });
+
     HookManager.addHook<ServerDocument<IDigitalEntity>>({
       collection: Collection.digitalentity,
       type: 'onTransform',
@@ -67,6 +188,7 @@ class WikibasePlugin extends Plugin {
         return doc;
       },
     });
+
     HookManager.addHook<ServerDocument<IAnnotation>>({
       collection: Collection.annotation,
       type: 'onTransform',
@@ -99,6 +221,10 @@ class WikibasePlugin extends Plugin {
       type: 'onResolve',
       callback: async digitalEntity => {
         try {
+          if (!SearchIndexJobState.isDone) {
+            // log('Search index job is not done, skipping wikibase transform');
+            return digitalEntity;
+          }
           if (!hasWikibaseExtension(digitalEntity)) {
             log(`Item is probably not a wikibase digital entity`);
             return digitalEntity as ServerDocument<IDigitalEntity>;
@@ -140,6 +266,10 @@ class WikibasePlugin extends Plugin {
       type: 'onResolve',
       callback: async annotation => {
         try {
+          if (!SearchIndexJobState.isDone) {
+            // log('Search index job is not done, skipping wikibase transform');
+            return annotation;
+          }
           if (!hasWikibaseExtension(annotation)) {
             log(`Item is probably not a wikibase annotation`);
             return annotation as ServerDocument<IAnnotation>;
