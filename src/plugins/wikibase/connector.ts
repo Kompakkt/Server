@@ -29,6 +29,24 @@ type ClientLoginResponse = {
         messagecode: string;
       };
 };
+const isClientLoginResponse = (response: unknown): response is ClientLoginResponse => {
+  if (response === null || typeof response !== 'object') return false;
+  if (!('clientlogin' in response)) return false;
+  if (!response.clientlogin || typeof response.clientlogin !== 'object') return false;
+  if (!('status' in response.clientlogin) || typeof response.clientlogin.status !== 'string')
+    return false;
+  const clientlogin = (response as ClientLoginResponse).clientlogin;
+  return (
+    (clientlogin.status === 'PASS' &&
+      'username' in clientlogin &&
+      typeof clientlogin.username === 'string') ||
+    (clientlogin.status === 'FAIL' &&
+      'message' in clientlogin &&
+      'messagecode' in clientlogin &&
+      typeof clientlogin.message === 'string' &&
+      typeof clientlogin.messagecode === 'string')
+  );
+};
 
 type WikibaseImageResponse = {
   error?: {
@@ -134,8 +152,10 @@ export class WikibaseConnector {
         err('Login request failed', error);
         return undefined;
       });
-    if (!response) return undefined;
-
+    if (!isClientLoginResponse(response)) {
+      err('Invalid login response', response);
+      return undefined;
+    }
     if (response?.clientlogin.status !== 'PASS') {
       err('! login failed', response);
       return undefined;
