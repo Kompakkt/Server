@@ -11,6 +11,7 @@ import { Configuration } from 'src/configuration';
 import type { IFile } from '@kompakkt/common';
 
 const BASE_URL = 'https://api.sketchfab.com/';
+const CACHE_TIME_5_MINUTES = 300; // 5 minutes in seconds
 
 const getUrl = (path: string) => {
   if (path.startsWith(BASE_URL)) return path;
@@ -78,7 +79,7 @@ const sketchfabImportRouter = new Elysia()
             .then(res => res.json())
             .catch(() => undefined);
           if (!model) return status('Not Found', 'Model not found');
-          await pluginCache.set(cacheKey, model, 86400);
+          await pluginCache.set(cacheKey, model, CACHE_TIME_5_MINUTES);
           return model;
         },
         {
@@ -117,7 +118,7 @@ const sketchfabImportRouter = new Elysia()
             models: models.results,
           };
 
-          await pluginCache.set(cacheKey, result, 86400);
+          await pluginCache.set(cacheKey, result, CACHE_TIME_5_MINUTES);
 
           return {
             status: 'OK',
@@ -168,7 +169,7 @@ const sketchfabImportRouter = new Elysia()
             file_size: downloadDetails.glb.size,
           } satisfies IFile;
 
-          await pluginCache.set(cacheKey, result, 86400);
+          await pluginCache.set(cacheKey, result, CACHE_TIME_5_MINUTES);
 
           return result;
         },
