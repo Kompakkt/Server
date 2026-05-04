@@ -11,7 +11,6 @@ export const createKyClient = (baseUrl?: string) => {
           const url = request.url;
           const cookies = await cookieJar.getCookies(url);
           const cookieString = cookies.join('; ');
-          console.log('kyClient beforeRequest', { url, cookieString });
           request.headers.set('cookie', cookieString);
         },
       ],
@@ -19,14 +18,13 @@ export const createKyClient = (baseUrl?: string) => {
         async (request, options, response) => {
           const url = request.url;
           const cookies = response.headers.getSetCookie();
-          let cookieString = ''
+          let cookieString = '';
           if (cookies) {
             for (const cookie of cookies) {
               await cookieJar.setCookie(cookie, url);
               cookieString += cookie + '; ';
             }
           }
-          console.log('kyClient afterResponse', { url, cookieString });
         },
       ],
     },

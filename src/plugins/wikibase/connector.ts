@@ -142,8 +142,6 @@ export class WikibaseConnector {
     params.set('loginreturnurl', 'http://test');
     params.set('format', 'json');
 
-    console.log('[wikibase][connector] loginRequest', { url: url.toString(), params: Object.fromEntries(params) });
-
     const response = await this.client
       .post<ClientLoginResponse>(url, {
         body: params,
