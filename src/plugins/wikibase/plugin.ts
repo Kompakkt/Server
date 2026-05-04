@@ -311,6 +311,62 @@ class WikibasePlugin extends Plugin {
       },
     });
 
+    HookManager.addHook<ServerDocument<IEntity>>({
+      collection: Collection.entity,
+      type: 'onDelete',
+      callback: async entity => {
+        const digitalEntity = await resolveDigitalEntity(
+          { _id: entity.relatedDigitalEntity._id },
+          0,
+        ).catch(() => undefined);
+        if (!digitalEntity || typeof digitalEntity !== 'object') return entity;
+        if (!hasWikibaseExtension(digitalEntity)) return entity;
+
+        const wikibaseId = (digitalEntity as any).extensions?.wikibase?.id as string | undefined;
+        if (!wikibaseId) return entity;
+
+        log(`Removing wikibase item ${wikibaseId} for deleted entity ${entity._id}`);
+        service
+          .removeWikibaseItem(wikibaseId)
+          .catch(err => log(`Failed to remove wikibase item: ${err}`));
+        return entity;
+      },
+    });
+
+    HookManager.addHook<ServerDocument<IDigitalEntity>>({
+      collection: Collection.digitalentity,
+      type: 'onDelete',
+      callback: async digitalEntity => {
+        if (!hasWikibaseExtension(digitalEntity)) return digitalEntity;
+
+        const wikibaseId = (digitalEntity as any).extensions?.wikibase?.id as string | undefined;
+        if (!wikibaseId) return digitalEntity;
+
+        log(`Removing wikibase item ${wikibaseId} for deleted digital entity ${digitalEntity._id}`);
+        service
+          .removeWikibaseItem(wikibaseId)
+          .catch(err => log(`Failed to remove wikibase item: ${err}`));
+        return digitalEntity;
+      },
+    });
+
+    HookManager.addHook<ServerDocument<IAnnotation>>({
+      collection: Collection.annotation,
+      type: 'onDelete',
+      callback: async annotation => {
+        if (!hasWikibaseExtension(annotation)) return annotation;
+
+        const wikibaseId = (annotation as any).extensions?.wikibase?.id as string | undefined;
+        if (!wikibaseId) return annotation;
+
+        log(`Removing wikibase item ${wikibaseId} for deleted annotation ${annotation._id}`);
+        service
+          .removeWikibaseItem(wikibaseId)
+          .catch(err => log(`Failed to remove wikibase item: ${err}`));
+        return annotation;
+      },
+    });
+
     return true;
   }
 
