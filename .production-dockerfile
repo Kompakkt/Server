@@ -5,4 +5,4 @@ WORKDIR /app
 RUN bun install
 
 EXPOSE 3030
-CMD ["bun", "run", "./src/index.ts"]
+CMD ["bun", "run", "--watch", "./src/index.ts"]
