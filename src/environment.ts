@@ -4,6 +4,7 @@ const Environment = {
   configFile: `${__dirname}/config.json`,
   isE2eGenerator: Boolean(Bun.env['KOMPAKKT_SERVER_IS_E2E'] ?? 'false'),
 };
+console.info(`Environment: ${JSON.stringify(Environment)}`);
 
 const Verbose = Environment.verbose;
 const RootDirectory = Environment.rootDirectory;
