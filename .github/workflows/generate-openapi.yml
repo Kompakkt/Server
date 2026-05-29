@@ -29,10 +29,14 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Store files outside the repo temporarily
+          cp e2e-out/openapi-server-types.ts /tmp/openapi-server-types.ts
+          cp e2e-out/package.json /tmp/package.json
+          # Create orphan branch (clears working tree)
           git checkout --orphan openapi-types
-          git rm -rf --ignore-unmatch .
-          cp e2e-out/openapi-server-types.ts .
-          cp e2e-out/package.json .
+          # Move files back from temp
+          mv /tmp/openapi-server-types.ts .
+          mv /tmp/package.json .
           git add openapi-server-types.ts package.json
           git diff --staged --quiet || git commit -m "chore: update openapi types [skip ci]"
           git push --force origin openapi-types
