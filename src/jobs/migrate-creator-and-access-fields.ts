@@ -43,6 +43,8 @@ const migrateCollection = async (
 ) => {
   let skippedCount = 0;
   const cursor = collection.find();
+  const unmodifiedIds = new Set<string>();
+
   for await (const entity of cursor) {
     // Sanity checks
     if (!entity.creator && !entity.access) {
@@ -144,9 +146,15 @@ const migrateCollection = async (
       });
 
     if (!result || result.modifiedCount === 0) {
-      warn(`No modifications made to entity ${entity._id} during migration.`);
+      unmodifiedIds.add(entity._id.toString());
       skippedCount++;
     }
+  }
+
+  if (unmodifiedIds.size > 0) {
+    warn(
+      `Migration for collection ${collection.collectionName} completed with ${unmodifiedIds.size} documents that were not modified (IDs: ${[...unmodifiedIds].join(', ')}). This may indicate that those documents were already in the expected format or that there was an issue during the update operation.`,
+    );
   }
 
   return skippedCount;
