@@ -26,6 +26,7 @@ import {
 } from './routers/modules/api.v1/resolving-strategies';
 import { setImmediate } from 'node:timers';
 import { Configuration } from './configuration';
+import { Environment } from './environment';
 
 const options: Options = {
   host: Configuration.Sonic.Hostname,
@@ -330,9 +331,11 @@ class SonicSearchService {
 
 export const searchService = new SonicSearchService();
 
-await searchService.waitForConnection().catch(error => {
-  err(`Failed to connect to Sonic: ${error.message}`);
-});
+if (!Environment.isE2eGenerator) {
+  await searchService.waitForConnection().catch(error => {
+    err(`Failed to connect to Sonic: ${error.message}`);
+  });
+}
 
 HookManager.addHook({
   collection: Collection.entity,

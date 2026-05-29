@@ -1,7 +1,11 @@
 import { Collection } from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import { compilationCollection, entityCollection } from 'src/mongo';
-import { RESOLVE_FULL_DEPTH, resolveCompilation, resolveEntity } from 'src/routers/modules/api.v1/resolving-strategies';
+import {
+  RESOLVE_FULL_DEPTH,
+  resolveCompilation,
+  resolveEntity,
+} from 'src/routers/modules/api.v1/resolving-strategies';
 import { searchService } from 'src/sonic';
 
 export const SearchIndexJobState = new (class {

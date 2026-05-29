@@ -1,0 +1,16 @@
+{
+  "name": "@kompakkt/server-openapi",
+  "version": "0.0.1",
+  "description": "Generated OpenAPI types for Kompakkt Server",
+  "type": "module",
+  "types": "./openapi-server-types.ts",
+  "exports": {
+    ".": {
+      "types": "./openapi-server-types.ts",
+      "default": "./openapi-server-types.ts"
+    }
+  },
+  "files": [
+    "openapi-server-types.ts"
+  ]
+}

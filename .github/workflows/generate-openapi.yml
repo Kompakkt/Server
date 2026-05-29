@@ -1,0 +1,34 @@
+name: Generate OpenAPI Types
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  generate-openapi:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate OpenAPI types
+        run: bun run generate:openapi
+
+      - name: Deploy to openapi-types branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          publish_dir: ./e2e-out
+          publish_branch: openapi-types
+          force_orphan: true
+          commit_message: 'chore: update openapi types [skip ci]'

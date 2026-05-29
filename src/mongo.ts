@@ -21,6 +21,7 @@ import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
 import { type IPublicProfile } from '@kompakkt/common/interfaces';
 import { retryWithBackoff } from './util/retry-with-backoff';
+import { Environment } from './environment';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
 export const mongoClient = ClientURL
@@ -36,14 +37,16 @@ mongoClient.on('error', error => {
   err('MongoDB error', error);
 });
 
-await retryWithBackoff(async () => await mongoClient.connect())
-  .then(() => {
-    info('Connected to MongoDB');
-  })
-  .catch(error => {
-    err('Failed to connect to MongoDB', error);
-    process.exit(1);
-  });
+if (!Environment.isE2eGenerator) {
+  await retryWithBackoff(async () => await mongoClient.connect())
+    .then(() => {
+      info('Connected to MongoDB');
+    })
+    .catch(error => {
+      err('Failed to connect to MongoDB', error);
+      process.exit(1);
+    });
+}
 
 const db = (name: string) => mongoClient.db(name);
 

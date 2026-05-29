@@ -14,7 +14,8 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "email": "email dev --dir src/emails"
+    "email": "email dev --dir src/emails",
+    "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run src/e2e-generator.ts"
   },
   "repository": {
     "type": "git",
@@ -51,6 +52,7 @@
     "mongodb": "7.1.1",
     "nodemailer": "^8.0.4",
     "object-hash": "^3.0.0",
+    "openapi-typescript": "^7.13.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "rotating-file-stream": "^3.2.9",
