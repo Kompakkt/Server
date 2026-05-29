@@ -2,7 +2,9 @@ const Environment = {
   verbose: false,
   rootDirectory: `${__dirname}`,
   configFile: `${__dirname}/config.json`,
-  isE2eGenerator: Boolean(Bun.env['KOMPAKKT_SERVER_IS_E2E'] ?? 'false'),
+  isE2eGenerator: Bun.env['KOMPAKKT_SERVER_IS_E2E']
+    ? Bun.env['KOMPAKKT_SERVER_IS_E2E'] === 'true'
+    : false,
 };
 console.info(`Environment: ${JSON.stringify(Environment)}`);
 
