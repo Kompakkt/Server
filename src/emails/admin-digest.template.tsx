@@ -66,7 +66,7 @@ const Users = (users: ServerDocument<IUserData>[]) => {
   );
 };
 
-const Entities = (entities: ServerDocument<IEntity<{}, false>>[]) => {
+const Entities = (entities: ServerDocument<IEntity>[]) => {
   return (
     <Table>
       <TableHeader>
@@ -111,7 +111,7 @@ const Entities = (entities: ServerDocument<IEntity<{}, false>>[]) => {
   );
 };
 
-const Compilations = (compilations: ServerDocument<ICompilation<false>>[]) => {
+const Compilations = (compilations: ServerDocument<ICompilation>[]) => {
   return (
     <Table>
       <TableHeader>
@@ -211,9 +211,9 @@ const RenderList = (items: unknown[], collection: string) => {
   if (collection === 'users') {
     return Users(items as ServerDocument<IUserData>[]);
   } else if (collection === 'entities') {
-    return Entities(items as ServerDocument<IEntity<{}, false>>[]);
+    return Entities(items as ServerDocument<IEntity>[]);
   } else if (collection === 'compilations') {
-    return Compilations(items as ServerDocument<ICompilation<false>>[]);
+    return Compilations(items as ServerDocument<ICompilation>[]);
   } else if (collection === 'annotations') {
     return Annotations(items as ServerDocument<IAnnotation>[]);
   }

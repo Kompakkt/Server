@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import type { Collection } from '@kompakkt/common';
-import type { ISortable } from '@kompakkt/common/interfaces';
+import type { ISortable } from '@kompakkt/common';
 import { info } from 'src/logger';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';

@@ -1,11 +1,11 @@
 import Elysia from 'elysia';
 import { ObjectId } from 'mongodb';
-import { Collection, EntityAccessRole, type IEntity, type IUserData } from '@kompakkt/common';
+import { Collection, EntityAccessRole, isEntityAccessRole, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { authService } from './auth.service';
-import type { AccessField } from '@kompakkt/common/interfaces';
+import type { AccessField } from '@kompakkt/common';
 
 const isRecord = (obj: unknown): obj is Record<string, unknown> => {
   return typeof obj === 'object' && obj !== null;
@@ -124,7 +124,11 @@ const getUserRole = async (options: {
   // Legacy check
   const isUserLegacyOwner = PermissionHelper.isUserLegacyOwner(document, options.userdata);
 
-  return isUserLegacyOwner ? EntityAccessRole.owner : userRoleInAccess;
+  return isUserLegacyOwner
+    ? EntityAccessRole.owner
+    : isEntityAccessRole(userRoleInAccess)
+      ? userRoleInAccess
+      : undefined;
 };
 
 export const permissionService = new Elysia({ name: 'permissionService' })

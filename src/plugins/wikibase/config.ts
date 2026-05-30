@@ -33,7 +33,7 @@ export const WikibaseConfiguration = (
   Configuration as IConfiguration<{ Wikibase: IWikibaseConfiguration }>
 ).Extensions?.Wikibase;
 
-export type WikibaseDigitalEntity = IDigitalEntity<IWikibaseDigitalEntityExtension>;
+export type WikibaseDigitalEntity = IDigitalEntity & { extensions: IWikibaseDigitalEntityExtension };
 
 export const isWikibaseDigitalEntity = (
   digitalEntity: unknown,
@@ -53,4 +53,4 @@ export const isWikibaseDigitalEntity = (
   );
 };
 
-export type WikibaseAnnotation = IAnnotation<IWikibaseAnnotationExtension>;
+export type WikibaseAnnotation = IAnnotation & { extensions: IWikibaseAnnotationExtension };

@@ -138,6 +138,7 @@ class WikibasePlugin extends Plugin {
         }
 
         // Transform digital entity
+        // @ts-expect-error This is part of migration of old to new data, might be removable in future
         const doc = ensureDigitalEntityExtensionData(digitalEntity);
         const result = await service.updateDigitalEntity(doc);
         if (!result) {
@@ -278,6 +279,7 @@ class WikibasePlugin extends Plugin {
           log(`Resolving wikibase annotation ${annotation._id}`);
 
           const restored = restoreOriginalAnnotation(annotation);
+          // @ts-expect-error This is part of migration of old to new data, might be removable in future
           const doc = ensureAnnotationExtensionData(restored);
           const wikibaseId = doc.extensions?.wikibase?.id;
           if (!wikibaseId) {

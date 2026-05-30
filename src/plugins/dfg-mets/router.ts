@@ -1,6 +1,6 @@
 import Elysia, { t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { isEntity, type IEntity } from '@kompakkt/common';
+import { IEntityResolved, isEntity, type IEntityResolvedOnlyDigitalEntity } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { entityCollection } from 'src/mongo';
 import { apiKeyService } from 'src/routers/handlers/api-key.service';
@@ -8,7 +8,7 @@ import { RESOLVE_FULL_DEPTH, resolveEntity } from 'src/routers/modules/api.v1/re
 import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { buildMets } from './build-mets';
-import type { DfgMetsExtensionData } from './types';
+import { isMetsEntity } from './types';
 
 const dfgMetsRouter = new Elysia()
   .use(configServer)
@@ -19,9 +19,10 @@ const dfgMetsRouter = new Elysia()
         '/entity/:id',
         async ({ params: { id }, status }) => {
           const entity = (await resolveEntity({ _id: new ObjectId(id) }, RESOLVE_FULL_DEPTH)) as
-            | IEntity<DfgMetsExtensionData, true>
+            | IEntityResolved
             | undefined;
           if (!entity) return status(404, 'Entity not found');
+          if (!isMetsEntity(entity)) return status(404, 'DFG METS extension data does not exist for this entity');
           if (!entity.extensions?.dfgMets?.sharingEnabled)
             return status(403, 'DFG METS sharing not enabled for this entity');
 
@@ -73,7 +74,7 @@ const dfgMetsRouter = new Elysia()
             .toArray();
 
           const resolved = await Promise.all(
-            entities.map(e => resolveEntity(e, 1) as Promise<IEntity<unknown, true>>),
+            entities.map(e => resolveEntity(e, 1) as Promise<IEntityResolvedOnlyDigitalEntity>),
           );
 
           return resolved.filter(isEntity).map(e => ({

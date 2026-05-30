@@ -31,7 +31,7 @@ import type {
   ICompilation,
   IPublicProfile,
   IStrippedUserData,
-} from '@kompakkt/common/interfaces';
+} from '@kompakkt/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 import { info, warn } from 'src/logger';

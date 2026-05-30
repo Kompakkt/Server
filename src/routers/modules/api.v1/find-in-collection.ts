@@ -1,6 +1,6 @@
 import { t } from 'elysia';
 import { Collection, UserRank, type IUserData } from '@kompakkt/common';
-import type { IDocument } from '@kompakkt/common/interfaces';
+import type { IDocument } from '@kompakkt/common';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import {

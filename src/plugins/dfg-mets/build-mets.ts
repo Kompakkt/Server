@@ -1,6 +1,6 @@
-import type { IEntity } from '@kompakkt/common';
+import type { IEntity, IEntityResolved } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
-import type { DfgMetsExtensionData } from './types';
+import type { DfgMetsExtensionData, MetsEntity } from './types';
 import mime from 'mime';
 
 const LICENSE_MAP: Record<string, { name: string; url: string }> = {
@@ -52,7 +52,8 @@ const escapeXml = (str: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 
-export const buildMets = async ({ entity }: { entity: IEntity<DfgMetsExtensionData, true> }) => {
+
+export const buildMets = async ({ entity }: { entity: MetsEntity }) => {
   const digitalEntity = entity.relatedDigitalEntity;
   const entityId = entity._id;
   const title = escapeXml(entity.name);
