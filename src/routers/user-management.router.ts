@@ -1,10 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { type IPublicProfile, type IUserData, ProfileType, UserRank } from '@kompakkt/common';
+import { IUserData, IUserDataWithoutData, UserRank } from '@kompakkt/common';
 import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
-import { profileCollection, userCollection, userTokenCollection } from 'src/mongo';
+import { userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { updateUserPassword } from 'src/util/authentication-helpers';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -62,7 +62,14 @@ const userManagementRouter = new Elysia()
 
           return userdata;
         },
-        { params: t.Object({ strategy: t.Optional(t.String()) }), body: signInBody },
+        {
+          params: t.Object({ strategy: t.Optional(t.String()) }),
+          response: {
+            200: IUserData,
+            401: t.Any(),
+          },
+          body: signInBody,
+        },
       )
       .post(
         '/register',
@@ -131,6 +138,11 @@ const userManagementRouter = new Elysia()
             surname: t.String(),
             fullname: t.String(),
           }),
+          response: {
+            200: IUserData,
+            409: t.Any(),
+            500: t.Any(),
+          },
         },
       )
       .get(
@@ -143,31 +155,43 @@ const userManagementRouter = new Elysia()
           set.headers['Set-Cookie'] = 'auth=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
           return { status: 'OK' };
         },
-        { isLoggedIn: true },
+        {
+          isLoggedIn: true,
+          response: { 200: t.Object({ status: t.Literal('OK') }), 401: t.Any() },
+        },
       )
-      .get('/auth', async ({ userdata, status, extractedJwt, set: { headers } }) => {
-        if (!userdata || !extractedJwt) {
-          return status(401, 'User not found');
-        }
+      .get(
+        '/auth',
+        async ({ userdata, status, extractedJwt, set: { headers } }) => {
+          if (!userdata || !extractedJwt) {
+            return status(401, 'User not found');
+          }
 
-        headers['x-jwt'] = extractedJwt;
-        if (headers['access-control-expose-headers'] === undefined) {
-          headers['access-control-expose-headers'] = 'x-jwt';
-        } else {
-          headers['access-control-expose-headers'] += ', x-jwt';
-        }
+          headers['x-jwt'] = extractedJwt;
+          if (headers['access-control-expose-headers'] === undefined) {
+            headers['access-control-expose-headers'] = 'x-jwt';
+          } else {
+            headers['access-control-expose-headers'] += ', x-jwt';
+          }
 
-        // As IUserDataWithoutData
-        const user = { ...userdata };
-        delete (user as any).data;
-        return user;
-      })
+          // As IUserDataWithoutData
+          const user = { ...userdata };
+          delete (user as any).data;
+          return user;
+        },
+        {
+          response: {
+            200: IUserDataWithoutData,
+            401: t.Any(),
+          },
+        },
+      )
       .post(
         '/help/request-reset',
         async ({ status, body: { username } }) => {
           try {
             const user = await userCollection.findOne({ username });
-            if (!user) return status('Not Found');
+            if (!user) return status(404, 'Not Found');
 
             const resetToken = randomBytes(32).toString('hex');
             const tokenExpiration = Date.now() + 86400000; // 24 hours
@@ -177,7 +201,7 @@ const userManagementRouter = new Elysia()
               { $set: { resetToken, tokenExpiration } },
               { upsert: true },
             );
-            if (!updateResult) return status('Internal Server Error');
+            if (!updateResult) return status(500, 'Internal Server Error');
 
             const success = await sendReactMail({
               from: `noreply@${getMailDomainFromPublicURL()}`,
@@ -185,7 +209,7 @@ const userManagementRouter = new Elysia()
               subject: 'Kompakkt password reset request',
               jsx: passwordResetRequestTemplate({ prename: user.prename, resetToken }),
             });
-            if (!success) return status('Internal Server Error');
+            if (!success) return status(500, 'Internal Server Error');
 
             return { status: 'OK' };
           } catch (error) {
@@ -194,6 +218,11 @@ const userManagementRouter = new Elysia()
           }
         },
         {
+          response: {
+            200: t.Object({ status: t.Literal('OK') }),
+            404: t.Any(),
+            500: t.Any(),
+          },
           body: t.Object({
             username: t.String(),
           }),
@@ -203,9 +232,9 @@ const userManagementRouter = new Elysia()
         '/help/confirm-reset',
         async ({ status, body: { username, token, password } }) => {
           const user = await userCollection.findOne({ username });
-          if (!user) return status(400);
+          if (!user) return status(400, 'Invalid username');
           const userToken = await userTokenCollection.findOne({ username });
-          if (!userToken) return status(400);
+          if (!userToken) return status(400, 'No reset request found');
 
           const { resetToken, tokenExpiration } = userToken;
 
@@ -215,7 +244,7 @@ const userManagementRouter = new Elysia()
             tokenExpiration < Date.now() ||
             resetToken !== token
           )
-            return status(500);
+            return status(400, 'Invalid or expired token');
 
           // Remove token
           const updateResult = await userTokenCollection.updateOne(
@@ -224,15 +253,20 @@ const userManagementRouter = new Elysia()
               $unset: { resetToken: '', tokenExpiration: '' },
             },
           );
-          if (!updateResult) return status(500);
+          if (!updateResult) return status(500, 'Internal Server Error');
 
           // Update password
           const success = await updateUserPassword(user.username, password);
-          if (!success) return status(500);
+          if (!success) return status(500, 'Internal Server Error');
 
           return { status: 'OK' };
         },
         {
+          response: {
+            200: t.Object({ status: t.Literal('OK') }),
+            400: t.Any(),
+            500: t.Any(),
+          },
           body: t.Object({
             username: t.String(),
             token: t.String(),

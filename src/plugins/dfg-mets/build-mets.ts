@@ -52,7 +52,6 @@ const escapeXml = (str: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 
-
 export const buildMets = async ({ entity }: { entity: MetsEntity }) => {
   const digitalEntity = entity.relatedDigitalEntity;
   const entityId = entity._id;

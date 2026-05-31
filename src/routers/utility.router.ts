@@ -8,20 +8,42 @@ import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import { addAnnotationsToAnnotationList, countEntityUses } from './modules/utility/utility';
 import { checkIsOwner } from './modules/user-management/users';
-import { Collection, EntityAccessRole, UserRank } from '@kompakkt/common';
+import {
+  Collection,
+  EntityAccessRole,
+  ICompilation,
+  ICompilationResolved,
+  UserRank,
+} from '@kompakkt/common';
+import { info } from 'src/logger';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
     .use(authService)
-    .get('/countentityuses/:id', async ({ params: { id } }) => countEntityUses(id), {
-      params: t.Object({ id: t.String() }),
-    })
+    .get(
+      '/countentityuses/:id',
+      async ({ params: { id }, status }) => {
+        const result = countEntityUses(id).catch(err => {
+          info('Error in countEntityUses', err);
+          return undefined;
+        });
+        if (!result) return status(500, 'Internal Server Error - Error counting entity uses');
+        return result;
+      },
+      {
+        response: {
+          200: t.Object({ occurences: t.Number(), compilations: t.Array(ICompilation) }),
+          500: t.Any(),
+        },
+        params: t.Object({ id: t.String() }),
+      },
+    )
     .post(
       '/generate-entity-video-preview',
       async ({ body: { entityId, screenshots }, status, userdata }) => {
-        if (!userdata) return status('Forbidden');
+        if (!userdata) return status(403, 'Forbidden');
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
-        if (!entity) return status('Not Found', 'Entity not found');
+        if (!entity) return status(404, 'Not Found');
 
         const hasAccess = await (async () => {
           const currentAccess = entity.access.find(user => user._id === userdata._id.toString());
@@ -41,7 +63,11 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           );
         })();
 
-        if (!hasAccess) return status(403);
+        if (!hasAccess)
+          return status(
+            403,
+            'Forbidden - You do not have permission to generate a preview for this entity',
+          );
 
         const mediaType =
           {
@@ -72,6 +98,12 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         return { status: 'OK', videoUrl: finalPath };
       },
       {
+        response: {
+          200: t.Object({ status: t.Literal('OK'), videoUrl: t.String() }),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
         body: t.Object({
           screenshots: t.Array(t.String()),
           entityId: t.String(),
@@ -97,19 +129,39 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
               // const existing = await md5Cache.get<string>(checksum).catch(() => undefined);
               return { checksum, existing: false };
             },
-            { body: t.Object({ checksum: t.String() }) },
+            {
+              response: {
+                200: t.Object({ checksum: t.String(), existing: t.Boolean() }),
+              },
+              body: t.Object({ checksum: t.String() }),
+              detail: {
+                deprecated: true,
+                description:
+                  'This endpoint is deprecated and will be removed in a future version. It always returns existing: false.',
+              },
+            },
           )
           .post(
             '/moveannotations/:id',
-            ({ status, params: { id }, userdata, body: { annotationList } }) =>
-              userdata
-                ? addAnnotationsToAnnotationList({
-                    identifier: id,
-                    annotationList,
-                    userdata,
-                  })
-                : status('Forbidden'),
+            ({ status, params: { id }, userdata, body: { annotationList } }) => {
+              if (!userdata) return status(403, 'Forbidden');
+              const result = addAnnotationsToAnnotationList({
+                identifier: id,
+                annotationList,
+                userdata,
+              }).catch(err => {
+                info('Error in addAnnotationsToAnnotationList', err);
+                return undefined;
+              });
+              if (!result) return status(500, 'Internal Server Error - Error moving annotations');
+              return result;
+            },
             {
+              response: {
+                200: ICompilationResolved,
+                403: t.Any(),
+                500: t.Any(),
+              },
               params: t.Object({ id: t.String() }),
               body: t.Object({ annotationList: t.Array(t.String()) }),
             },

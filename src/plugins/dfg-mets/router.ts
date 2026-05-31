@@ -22,7 +22,8 @@ const dfgMetsRouter = new Elysia()
             | IEntityResolved
             | undefined;
           if (!entity) return status(404, 'Entity not found');
-          if (!isMetsEntity(entity)) return status(404, 'DFG METS extension data does not exist for this entity');
+          if (!isMetsEntity(entity))
+            return status(404, 'DFG METS extension data does not exist for this entity');
           if (!entity.extensions?.dfgMets?.sharingEnabled)
             return status(403, 'DFG METS sharing not enabled for this entity');
 

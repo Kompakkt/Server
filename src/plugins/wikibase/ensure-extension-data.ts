@@ -6,11 +6,18 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 export const hasWikibaseExtension = (
   entity: ServerDocument<IDigitalEntity | IAnnotation>,
 ): entity is ServerDocument<WikibaseDigitalEntity | WikibaseAnnotation> => {
-  return (hasExtensions(entity) && 'wikibase' in entity.extensions && entity.extensions?.wikibase !== undefined) || 'wikibase_id' in entity;
+  return (
+    (hasExtensions(entity) &&
+      'wikibase' in entity.extensions &&
+      entity.extensions?.wikibase !== undefined) ||
+    'wikibase_id' in entity
+  );
 };
 
 export const ensureDigitalEntityExtensionData = (
-  digitalEntity: ServerDocument<IDigitalEntity & { extensions: Partial<IWikibaseDigitalEntityExtension> }>,
+  digitalEntity: ServerDocument<
+    IDigitalEntity & { extensions: Partial<IWikibaseDigitalEntityExtension> }
+  >,
 ): ServerDocument<WikibaseDigitalEntity> => {
   digitalEntity.extensions ??= {};
   digitalEntity.extensions.wikibase ??= {};
