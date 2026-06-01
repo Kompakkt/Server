@@ -123,7 +123,6 @@ const profileRouter = new Elysia()
     '/organization',
     async ({ userdata, body, status }) => {
       if (!userdata) return status(401, 'User not authenticated');
-      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.organization)
         return status(400, 'Profile type must be "organization"');
 
@@ -171,6 +170,7 @@ const profileRouter = new Elysia()
         401: t.Any(),
         500: t.Any(),
       },
+      body: t.Omit(IPublicProfileSchema, ['_id']),
       isLoggedIn: true,
       detail: {
         description: 'Creates a new organizational profile.',
@@ -182,7 +182,6 @@ const profileRouter = new Elysia()
     '/organization/:id',
     async ({ userdata, body, status, params: { id: organizationId } }) => {
       if (!userdata) return status(401, 'User not authenticated');
-      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.organization)
         return status(400, 'Profile type must be "organization"');
 
@@ -226,6 +225,7 @@ const profileRouter = new Elysia()
         description: 'Updates an existing organizational profile.',
         tags: [RouterTags['API V2'], RouterTags.Profile],
       },
+      body: IPublicProfileSchema,
       params: t.Object({
         id: t.String({
           description: 'The ID of the organizational profile to update.',
@@ -244,8 +244,6 @@ const profileRouter = new Elysia()
     '/user',
     async ({ userdata, status, body }) => {
       if (!userdata) return status(401, 'User not authenticated');
-
-      if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.user) return status(400, 'Profile type must be "user"');
 
       // Look for existing profile in userdata
@@ -308,6 +306,7 @@ const profileRouter = new Elysia()
         description: "Updates the logged-in user's profile with the provided data.",
         tags: [RouterTags['API V2'], RouterTags.Profile],
       },
+      body: t.Omit(IPublicProfileSchema, ['_id']),
       response: {
         200: IPublicProfileSchema,
         400: t.Any(),

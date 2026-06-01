@@ -49,7 +49,6 @@ export const findSingleHandler = async (
 export const findSingleParams = t.Object({
   collection: t.Enum(Collection),
   identifier: t.String(),
-  password: t.Optional(t.String()),
 });
 
 export const findAll = async ({ collection }: { collection: Collection }) => {

@@ -117,12 +117,14 @@ const adminRouter = new Elysia()
             description: 'Get statistics about the database collections',
             tags: [RouterTags.Admin],
           },
-          response: t.Object({
-            entities: DbCollectionStatsSchema,
-            compilations: DbCollectionStatsSchema,
-            users: DbCollectionStatsSchema,
-            annotations: DbCollectionStatsSchema,
-          }),
+          response: {
+            200: t.Object({
+              entities: DbCollectionStatsSchema,
+              compilations: DbCollectionStatsSchema,
+              users: DbCollectionStatsSchema,
+              annotations: DbCollectionStatsSchema,
+            }),
+          },
         },
       )
       .post(

@@ -169,12 +169,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     )
     .post(
       '/post/remove/:collection/:identifier',
-      async ({
-        status,
-        params: { collection, identifier },
-        body: { username, password },
-        userdata,
-      }) => {
+      async ({ status, params: { collection, identifier }, body: { username }, userdata }) => {
         const _id = ObjectId.isValid(identifier) ? new ObjectId(identifier).toString() : identifier;
 
         if (!userdata) return status(403, 'User not authenticated');
@@ -342,7 +337,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             });
             if (!resolveResult) return status(500, 'Failed resolving saved document');
 
-            exploreCache.flush();
+            void exploreCache.flush();
 
             return resolveResult;
           },
@@ -350,7 +345,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             params: t.Object({
               collection: t.Enum(Collection),
             }),
-            body: t.Unknown(),
+            body: t.Partial(AllCollectionsSchemaUnion),
             detail: {
               description: 'Push an entity to a collection',
               tags: [RouterTags['API V1']],
@@ -368,7 +363,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           '/post/settings/:identifier',
           async ({ status, params: { identifier }, body, userdata }) => {
             if (!userdata) return status(401, 'User not authenticated');
-            if (!body || !isEntitySettings(body) || !userdata) return status(400, 'Invalid body');
+            if (!body || !isEntitySettings(body)) return status(400, 'Invalid body');
             const preview = body.preview;
             const entity = await entityCollection.findOne({
               _id: new ObjectId(identifier),
@@ -420,7 +415,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             params: t.Object({
               identifier: t.String(),
             }),
-            body: t.Unknown(),
+            body: t.Partial(IEntitySettingsSchema),
             response: {
               200: IEntitySettingsSchema,
               400: t.Any(),
