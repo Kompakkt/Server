@@ -1,11 +1,11 @@
 import corsPlugin from '@elysiajs/cors';
 import { type JWTOption, jwt } from '@elysiajs/jwt';
 import timingPlugin from '@elysiajs/server-timing';
-import prometheusPlugin from 'elysia-prometheus';
 import { Elysia, t } from 'elysia';
 import { Configuration } from './configuration';
 import { RootDirectory } from './environment';
-import { err, log, warn } from './logger';
+import { err } from './logger';
+import { RouterTags } from './routers/tags';
 
 export const jwtOptions: JWTOption = {
   secret: Bun.env.JWT_SECRET ?? 'secret',
@@ -31,7 +31,6 @@ const configServer = new Elysia({
       queueMicrotask(() => {
         const date = new Date().toISOString().replaceAll(/[TZ]/g, ' ').trim();
         const user = Bun.hash(headers.get('cookie') ?? '');
-        // eslint-disable-next-line no-console
         console.log(
           `\x1B[2m${date} \x1B[1m${method.padEnd(7, ' ')}\x1B[22m \x1B[2m${user}:${url}\x1B[22m`,
         );
@@ -52,41 +51,25 @@ const configServer = new Elysia({
     err(error);
     return;
   })
-  .use(
-    prometheusPlugin({
-      metricsPath: '/metrics',
-      staticLabels: { service: 'kompakkt-server' },
-      dynamicLabels: {
-        userAgent: ctx => ctx.request.headers.get('user-agent') ?? 'unknown',
+  .get(
+    '/health',
+    ({ set }) => {
+      set.status = 200;
+      return { status: 'OK' };
+    },
+    {
+      response: {
+        200: t.Object({ status: t.Literal('OK') }),
       },
-    }),
+      detail: {
+        description: 'Health check endpoint',
+        tags: [RouterTags.Monitoring],
+      },
+    },
   )
-  .get('/health', ({ set }) => {
-    set.status = 200;
-    return { status: 'OK' };
-  })
   .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
-  .use(timingPlugin())
-  .get('/previews/*', async ({ params, status }) => {
-    let path = params['*'];
-    const file = Bun.file(
-      `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
-    );
-    if (await file.exists()) return file;
-
-    // PNG Fallback
-    // TODO: Migration to convert PNG to WEBP and remove this fallback
-    if (path.includes('.webp')) {
-      path = path.replace('.webp', '.png');
-      const file = Bun.file(
-        `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
-      );
-      if (await file.exists()) return file;
-    }
-
-    return status(404, 'Preview not found');
-  });
+  .use(timingPlugin());
 
 export default configServer;

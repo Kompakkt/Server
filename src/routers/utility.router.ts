@@ -16,6 +16,7 @@ import {
   UserRank,
 } from '@kompakkt/common';
 import { info } from 'src/logger';
+import { RouterTags } from './tags';
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -36,6 +37,10 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           500: t.Any(),
         },
         params: t.Object({ id: t.String() }),
+        detail: {
+          description: 'Count the number of times an entity is used in compilations',
+          tags: [RouterTags.Utility],
+        },
       },
     )
     .post(
@@ -109,6 +114,11 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
           entityId: t.String(),
         }),
         isLoggedIn: true,
+        detail: {
+          description:
+            'Generate a video preview for an entity based on provided screenshots. You must have access to the entity to use this endpoint.',
+          tags: [RouterTags.Utility],
+        },
       },
     )
     .guard(
@@ -138,6 +148,8 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
                 deprecated: true,
                 description:
                   'This endpoint is deprecated and will be removed in a future version. It always returns existing: false.',
+
+                tags: [RouterTags.Utility],
               },
             },
           )
@@ -164,6 +176,11 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
               },
               params: t.Object({ id: t.String() }),
               body: t.Object({ annotationList: t.Array(t.String()) }),
+              detail: {
+                description:
+                  'Move annotations from one entity to another by providing a list of annotation IDs. The endpoint will return the updated compilation with the moved annotations.',
+                tags: [RouterTags.Utility],
+              },
             },
           ),
     ),

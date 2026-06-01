@@ -69,7 +69,7 @@ const profileRouter = new Elysia()
       }),
       detail: {
         description: 'Finds the user associated with a given profile ID.',
-        tags: [RouterTags['API V2']],
+        tags: [RouterTags['API V2'], RouterTags.Profile],
       },
     },
   )
@@ -90,7 +90,7 @@ const profileRouter = new Elysia()
       }),
       detail: {
         description: 'Retrieves a user or organization profile via id.',
-        tags: [RouterTags['API V2']],
+        tags: [RouterTags['API V2'], RouterTags.Profile],
       },
       isLoggedIn: false,
     },
@@ -144,7 +144,7 @@ const profileRouter = new Elysia()
       isLoggedIn: true,
       detail: {
         description: 'Creates a new organizational profile.',
-        tags: [RouterTags['API V2']],
+        tags: [RouterTags['API V2'], RouterTags.Profile],
       },
     },
   )
@@ -194,7 +194,7 @@ const profileRouter = new Elysia()
       isLoggedIn: true,
       detail: {
         description: 'Updates an existing organizational profile.',
-        tags: [RouterTags['API V2']],
+        tags: [RouterTags['API V2'], RouterTags.Profile],
       },
       params: t.Object({
         id: t.String({
@@ -269,7 +269,7 @@ const profileRouter = new Elysia()
       isLoggedIn: true,
       detail: {
         description: "Updates the logged-in user's profile with the provided data.",
-        tags: [RouterTags['API V2']],
+        tags: [RouterTags['API V2'], RouterTags.Profile],
       },
     },
   );
@@ -725,6 +725,10 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             }),
           ),
         }),
+        detail: {
+          description: 'Retrieves the most popular search queries for a given collection.',
+          tags: [RouterTags['API V2']],
+        },
       },
     )
     .post(
@@ -906,6 +910,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'The profile identifier updating the compilation.',
           }),
         }),
+        detail: {
+          description:
+            'Updates the metadata of a compilation, such as name and description. The user must have editor access to the compilation.',
+          tags: [RouterTags['API V2']],
+        },
       },
     )
     .post(

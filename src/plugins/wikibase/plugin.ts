@@ -15,7 +15,7 @@ import {
   ensureDigitalEntityExtensionData,
   hasWikibaseExtension,
 } from './ensure-extension-data';
-import wikibaseRouter from './router';
+import wikibaseRouter, { wikibaseRouterTag } from './router';
 import { WikibaseService } from './service';
 import { pluginCache } from 'src/redis';
 import type { IWikibaseDigitalEntityExtensionData } from './common';
@@ -87,7 +87,13 @@ const disableDeletedWikibaseEntities = async (): Promise<void> => {
 };
 
 class WikibasePlugin extends Plugin {
-  routers = [wikibaseRouter];
+  routers = {
+    wikibaseRouter: {
+      router: wikibaseRouter,
+      tag: wikibaseRouterTag,
+      description: 'Wikibase integration API endpoints',
+    },
+  };
   jobs = [
     // TODO: Test on dev instance
     // disableDeletedWikibaseEntities

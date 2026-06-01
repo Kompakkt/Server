@@ -1,8 +1,14 @@
 import { Plugin } from '../plugin-controller';
-import oidcRouter from './router';
+import oidcRouter, { oidcRouterTag } from './router';
 
 class OIDCPlugin extends Plugin {
-  routers = [oidcRouter];
+  routers = {
+    oidcRouter: {
+      router: oidcRouter,
+      tag: oidcRouterTag,
+      description: 'OIDC authentication endpoints',
+    },
+  };
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     return true;

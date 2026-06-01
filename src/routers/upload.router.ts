@@ -415,6 +415,10 @@ const uploadRouter = new Elysia()
       params: t.Object({
         entityId: t.String(),
       }),
+      detail: {
+        description: 'Get available download options and file types for an entity',
+        tags: [RouterTags.Upload],
+      },
     },
   )
   .get(
@@ -522,6 +526,11 @@ const uploadRouter = new Elysia()
         entityId: t.String(),
         type: t.Enum(DownloadType),
       }),
+      detail: {
+        description:
+          'Prepare a ZIP archive for download and receive progress updates as a stream. The response is a stream of newline-delimited progress values between 0 and 1, followed by a final "1" when the archive is ready.',
+        tags: [RouterTags.Upload],
+      },
     },
   )
   .get(
@@ -548,17 +557,32 @@ const uploadRouter = new Elysia()
         entityId: t.String(),
         type: t.Enum(DownloadType),
       }),
+      detail: {
+        description:
+          'Download the prepared ZIP archive for an entity. The archive must have been prepared using the /download/prepare endpoint.',
+        tags: [RouterTags.Upload],
+      },
     },
   )
 
   .group('/upload', { isLoggedIn: true }, group =>
     group
-      .post('/chunk/init', async () => {
-        const uploadId = new ObjectId().toString();
-        const tempDir = join(uploadDir, 'chunks', uploadId);
-        await ensure(tempDir);
-        return { status: 'OK', uploadId };
-      })
+      .post(
+        '/chunk/init',
+        async () => {
+          const uploadId = new ObjectId().toString();
+          const tempDir = join(uploadDir, 'chunks', uploadId);
+          await ensure(tempDir);
+          return { status: 'OK', uploadId };
+        },
+        {
+          detail: {
+            description:
+              'Initialize a new chunked upload session and receive a unique uploadId for subsequent chunk uploads.',
+            tags: [RouterTags.Upload],
+          },
+        },
+      )
       .post(
         '/chunk/upload',
         async ({ body: { chunk, uploadId, index }, status }) => {
@@ -582,6 +606,10 @@ const uploadRouter = new Elysia()
             uploadId: t.String(),
             index: t.Numeric(),
           }),
+          detail: {
+            description: 'Upload a chunk of a file for a given uploadId.',
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -649,6 +677,10 @@ const uploadRouter = new Elysia()
             token: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description: 'Finish a chunked upload by assembling all chunks into the final file.',
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -672,6 +704,12 @@ const uploadRouter = new Elysia()
             token: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description:
+              'Upload a file directly without chunking. Deprecated in favor of chunked uploads for stability with large files.',
+            deprecated: true,
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -748,6 +786,11 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description:
+              'Start processing uploaded files with Kompressor (internal pre-processing service) if needed. Checks if processing is required based on file types and existing processed files, and initiates processing by calling the Kompressor service.',
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -780,6 +823,11 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description:
+              'Get processing progress information from Kompressor for a given upload. This endpoint queries the Kompressor service for the current processing state and progress percentage of the uploaded files.',
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -822,6 +870,11 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description:
+              'Finalize the upload process by retrieving the list of uploaded files, checking for processed versions, and returning the final file information. This endpoint is called after processing is complete to get the final file details for the uploaded entity.',
+            tags: [RouterTags.Upload],
+          },
         },
       )
       .post(
@@ -846,6 +899,11 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          detail: {
+            description:
+              'Cancel an ongoing upload by deleting the temporary upload directory. This endpoint allows clients to cancel an upload session and clean up any uploaded chunks or files associated with the given uploadId.',
+            tags: [RouterTags.Upload],
+          },
         },
       ),
   );

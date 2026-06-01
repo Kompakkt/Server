@@ -83,6 +83,10 @@ const adminRouter = new Elysia()
             finished: t.Optional(t.Boolean()),
             restricted: t.Optional(t.Boolean()),
           }),
+          detail: {
+            description: 'Get a digest of entities created within a specific time range',
+            tags: [RouterTags.Admin],
+          },
         },
       )
       .post(

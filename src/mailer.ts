@@ -1,39 +1,14 @@
 import { ObjectId } from 'mongodb';
 import { type SendMailOptions, createTransport } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
-import { type IUserData, UserRank } from '@kompakkt/common';
+import { type IUserData } from '@kompakkt/common';
 import { Configuration, isMailConfiguration } from './configuration';
 import { err, info } from './logger';
 import { mailCollection, userCollection } from './mongo';
 import type { ServerDocument } from './util/document-with-objectid-type';
 import React from 'react';
 import { render } from '@react-email/render';
-
-export enum ETarget {
-  contact = 'contact',
-  upload = 'upload',
-  bugreport = 'bugreport',
-}
-
-type ISendMailRequest = {
-  subject: string;
-  mailbody: string;
-  target: ETarget;
-};
-
-const isMailTarget = (obj: any): obj is ETarget => {
-  return obj === 'contact' || obj === 'upload' || obj === 'bugreport';
-};
-
-const isSendMailRequest = (obj: any): obj is ISendMailRequest => {
-  return (
-    !!obj &&
-    obj.subject !== undefined &&
-    obj.mailbody !== undefined &&
-    obj.target !== undefined &&
-    isMailTarget(obj.target)
-  );
-};
+import { ETarget, isMailTarget, isSendMailRequest, type ISendMailRequest } from './types/mails';
 
 const transporter = (() => {
   if (!isMailConfiguration(Configuration.Mailer)) {
@@ -148,6 +123,7 @@ export const sendMailRequest = async (
 
   return addUserToDatabase(obj, userdata, result).catch(error => {
     err('Failed adding users mail request to DB', error);
+    return false;
   });
 };
 
@@ -169,7 +145,7 @@ const addUserToDatabase = async (
     target,
     content: { mailbody, subject },
     timestamp: new Date().toISOString(),
-    user: user._id,
+    user: user._id.toString(),
     answered: false,
     mailSent,
   };
@@ -214,13 +190,8 @@ export const toggleMailAnswered = async (identifier: string | ObjectId) => {
   if (!oldEntry || !!oldEntry.answered) throw new Error('Invalid mail entry in database');
 
   const isAnswered = oldEntry.answered;
-  const updateResult = await mailCollection.updateOne(
-    { _id },
-    {
-      $set: { answered: !isAnswered },
-    },
-  );
+  const updateResult = await mailCollection.updateOne({ _id }, { $set: { answered: !isAnswered } });
   if (!updateResult) throw new Error('Failed updating entry');
 
-  return mailCollection.findOne({ _id });
+  return mailCollection.findOne({ _id }) || undefined;
 };

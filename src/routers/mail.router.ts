@@ -1,13 +1,10 @@
 import { Elysia, t } from 'elysia';
-import {
-  ETarget,
-  getMailRelatedDatabaseEntries,
-  sendMailRequest,
-  toggleMailAnswered,
-} from 'src/mailer';
+import { getMailRelatedDatabaseEntries, sendMailRequest, toggleMailAnswered } from 'src/mailer';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import { RouterTags } from './tags';
+import { info } from 'src/logger';
+import { ETarget, MailCollectionSchema } from 'src/types/mails';
 
 const mailRouter = new Elysia()
   .use(configServer)
@@ -16,19 +13,23 @@ const mailRouter = new Elysia()
     group
       .post(
         '/sendmail',
-        ({ status, body: { mailbody, subject, target }, userdata }) => {
-          return userdata
-            ? sendMailRequest(
-                {
-                  mailbody,
-                  subject,
-                  target,
-                },
-                userdata,
-              ).catch(() => status('Internal Server Error'))
-            : status('Forbidden');
+        async ({ status, body: { mailbody, subject, target }, userdata }) => {
+          if (!userdata) return status(403, 'Forbidden');
+          const result = await sendMailRequest({ mailbody, subject, target }, userdata).catch(
+            err => {
+              info('Failed to send mail request', err);
+              return false;
+            },
+          );
+          if (!result) return status(500, 'Failed to send mail request');
+          return result;
         },
         {
+          response: {
+            200: t.Boolean(),
+            403: t.Any(),
+            500: t.Any(),
+          },
           body: t.Object({
             mailbody: t.String(),
             subject: t.String(),
@@ -43,9 +44,21 @@ const mailRouter = new Elysia()
       .post(
         '/getmailentries',
         async ({ status }) => {
-          return getMailRelatedDatabaseEntries().catch(() => status('Internal Server Error'));
+          const result = getMailRelatedDatabaseEntries().catch(err => {
+            info('Failed to get mail entries', err);
+            return undefined;
+          });
+          if (!result) return status(500, 'Failed to get mail entries');
+          return result;
         },
         {
+          response: {
+            200: t.Object({
+              targets: t.Array(t.String()),
+              entries: t.Array(MailCollectionSchema),
+            }),
+            500: t.Any(),
+          },
           isAdmin: true,
           detail: {
             description: 'Get all mail entries from the database',
@@ -56,9 +69,18 @@ const mailRouter = new Elysia()
       .post(
         '/toggleanswered/:target/:identifier',
         async ({ status, params: { identifier } }) => {
-          return toggleMailAnswered(identifier).catch(() => status('Internal Server Error'));
+          const result = await toggleMailAnswered(identifier).catch(err => {
+            info('Failed to toggle mail answered status', err);
+            return undefined;
+          });
+          if (!result) return status(500, 'Failed to toggle mail answered status');
+          return result;
         },
         {
+          response: {
+            200: MailCollectionSchema,
+            500: t.Any(),
+          },
           isAdmin: true,
           params: t.Object({
             target: t.String(),

@@ -11,19 +11,31 @@ import {
   WBPredicates,
   WBValues,
 } from './parsed-model';
+import { authService } from 'src/routers/handlers/auth.service';
+
+export const wikibaseRouterTag = 'Wikibase';
 
 const wikibaseRouter = new Elysia()
   .use(configServer)
-  .get('/wikibase/parsed-model', ({ set }) => {
-    set.headers['Content-Type'] = 'application/json';
-    return {
-      WBValues,
-      WBPredicates,
-      WBAnnotationPredicates,
-      WBClasses,
-      WBLicenses,
-    };
-  })
+  .get(
+    '/wikibase/parsed-model',
+    ({ set }) => {
+      set.headers['Content-Type'] = 'application/json';
+      return {
+        WBValues,
+        WBPredicates,
+        WBAnnotationPredicates,
+        WBClasses,
+        WBLicenses,
+      };
+    },
+    {
+      detail: {
+        tags: [wikibaseRouterTag],
+        description: 'Endpoint to retrieve the parsed Wikibase model',
+      },
+    },
+  )
   .get(
     '/wikibase/choices/metadata',
     async ({ query: { force } }) => {
@@ -33,6 +45,10 @@ const wikibaseRouter = new Elysia()
       query: t.Object({
         force: t.Optional(t.Boolean()),
       }),
+      detail: {
+        tags: [wikibaseRouterTag],
+        description: 'Endpoint to retrieve choices for Wikibase metadata fields used in frontend',
+      },
     },
   )
   .get(
@@ -44,27 +60,25 @@ const wikibaseRouter = new Elysia()
       query: t.Object({
         force: t.Optional(t.Boolean()),
       }),
+      detail: {
+        tags: [wikibaseRouterTag],
+        description: 'Endpoint to retrieve choices for annotation link fields used in frontend',
+      },
     },
   )
-  .get('/wikibase/instance/info', async () => {
-    return {
-      instance: WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain,
-    };
-  })
-  .post(
-    '/admin/generateWikiSecret',
+  .get(
+    '/wikibase/instance/info',
     async () => {
-      const coll = mongoClient.db('wikibase').collection<{ secret: string }>('wikisecrets');
-      const wikiSecret = await coll.findOne({});
-      if (!wikiSecret) {
-        const secret = randomBytes(32).toString('base64');
-        await coll.insertOne({ secret });
-        return secret;
-      }
-      return wikiSecret.secret;
+      return {
+        instance: WikibaseConfiguration?.Public ?? WikibaseConfiguration?.Domain,
+      };
     },
-    {},
-  )
-  .post('/admin/repairannotations', () => {}, {});
+    {
+      detail: {
+        tags: [wikibaseRouterTag],
+        description: 'Endpoint to retrieve basic information about the Wikibase instance',
+      },
+    },
+  );
 
 export default wikibaseRouter;

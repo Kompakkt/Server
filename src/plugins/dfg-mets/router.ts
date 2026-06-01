@@ -9,10 +9,11 @@ import { Configuration } from 'src/configuration';
 import { entityCollection } from 'src/mongo';
 import { apiKeyService } from 'src/routers/handlers/api-key.service';
 import { RESOLVE_FULL_DEPTH, resolveEntity } from 'src/routers/modules/api.v1/resolving-strategies';
-import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { buildMets } from './build-mets';
 import { isMetsEntity } from './types';
+
+export const dfgMetsRouterTag = 'DFG METS';
 
 const dfgMetsRouter = new Elysia()
   .use(configServer)
@@ -59,7 +60,7 @@ const dfgMetsRouter = new Elysia()
             }),
           }),
           detail: {
-            tags: [RouterTags['DFG METS']],
+            tags: [dfgMetsRouterTag],
             description:
               'Retrieve a specific entity by ID if it has DFG METS sharing enabled, returning METS/MODS XML format. Requires valid API key.',
           },
@@ -154,7 +155,7 @@ const dfgMetsRouter = new Elysia()
             ),
           }),
           detail: {
-            tags: [RouterTags['DFG METS']],
+            tags: [dfgMetsRouterTag],
             description:
               'Retrieves a list of entities with DFG METS sharing enabled. Requires valid API key.',
           },

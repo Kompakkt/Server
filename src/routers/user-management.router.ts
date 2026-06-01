@@ -21,6 +21,7 @@ import {
 import { authService, signInBody } from './handlers/auth.service';
 import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
 import { createNewUserProfile } from 'src/util/create-new-user-profile';
+import { RouterTags } from './tags';
 
 const userManagementRouter = new Elysia()
   .use(configServer)
@@ -74,6 +75,11 @@ const userManagementRouter = new Elysia()
             401: t.Any(),
           },
           body: signInBody,
+          detail: {
+            description:
+              'Endpoint to log in a user using the specified strategy. Returns user data upon successful authentication.',
+            tags: [RouterTags['User Management']],
+          },
         },
       )
       .post(
@@ -148,6 +154,11 @@ const userManagementRouter = new Elysia()
             409: t.Any(),
             500: t.Any(),
           },
+          detail: {
+            description:
+              'Endpoint to register a new user. The first ever registered user gets admin privileges. A welcome email is sent upon successful registration.',
+            tags: [RouterTags['User Management']],
+          },
         },
       )
       .get(
@@ -163,6 +174,10 @@ const userManagementRouter = new Elysia()
         {
           isLoggedIn: true,
           response: { 200: t.Object({ status: t.Literal('OK') }), 401: t.Any() },
+          detail: {
+            description: 'Endpoint to log out the user.',
+            tags: [RouterTags['User Management']],
+          },
         },
       )
       .get(
@@ -188,6 +203,11 @@ const userManagementRouter = new Elysia()
           response: {
             200: IUserDataWithoutDataSchema,
             401: t.Any(),
+          },
+          detail: {
+            description:
+              'Endpoint to check if the user is authenticated and retrieve their user data.',
+            tags: [RouterTags['User Management']],
           },
         },
       )
@@ -231,6 +251,11 @@ const userManagementRouter = new Elysia()
           body: t.Object({
             username: t.String(),
           }),
+          detail: {
+            description:
+              'Endpoint to request a password reset, which generates a token and sends it via email to the user.',
+            tags: [RouterTags['User Management']],
+          },
         },
       )
       .post(
@@ -277,6 +302,11 @@ const userManagementRouter = new Elysia()
             token: t.String(),
             password: t.String(),
           }),
+          detail: {
+            description:
+              'Endpoint to confirm a password reset request using a token sent via email.',
+            tags: [RouterTags['User Management']],
+          },
         },
       )
       .post(
@@ -299,6 +329,11 @@ const userManagementRouter = new Elysia()
           body: t.Object({
             mail: t.String(),
           }),
+          detail: {
+            description:
+              'Endpoint to request a reminder of the username associated with an email address.',
+            tags: [RouterTags['User Management']],
+          },
         },
       ),
   );

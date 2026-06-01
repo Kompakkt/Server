@@ -1,8 +1,14 @@
 import { Plugin } from '../plugin-controller';
-import dfgMetsRouter from './router';
+import dfgMetsRouter, { dfgMetsRouterTag } from './router';
 
 class DfgMetsPlugin extends Plugin {
-  routers = [dfgMetsRouter];
+  routers = {
+    dfgMetsRouter: {
+      router: dfgMetsRouter,
+      tag: dfgMetsRouterTag,
+      description: 'Router for DFG METS extension API endpoints',
+    },
+  };
 
   async load(pluginArgs?: unknown): Promise<boolean> {
     return true;

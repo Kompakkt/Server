@@ -6,11 +6,17 @@ import { err, info, log } from 'src/logger';
 import configServer from 'src/server.config';
 
 // Elysia with all generics set to any for maximum compatibility
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyElysia = Elysia<any, any, any, any, any, any, any>;
 
 export abstract class Plugin {
-  abstract routers: AnyElysia[];
+  abstract routers: Record<
+    string,
+    {
+      router: AnyElysia;
+      tag: string;
+      description: string;
+    }
+  >;
   abstract load(pluginArgs?: unknown): Promise<boolean>;
 }
 
@@ -20,9 +26,7 @@ const getRoutes = (router: AnyElysia) => {
 
 export const PluginController = new (class {
   #plugins$ = new BehaviorSubject<Plugin[]>([]);
-  readonly routers$ = this.#plugins$.pipe(
-    map(plugins => plugins.flatMap(plugin => plugin.routers)),
-  );
+  readonly routers$ = this.#plugins$.pipe(map(plugins => plugins.map(plugin => plugin.routers)));
 
   async loadPlugin(plugin: Plugin, pluginArgs?: unknown) {
     log(`Loading plugin ${plugin.constructor.name}`);
@@ -34,8 +38,8 @@ export const PluginController = new (class {
     if (!loaded) return false;
     this.#plugins$.next([...this.#plugins$.getValue(), plugin]);
     const configServerRoutes = getRoutes(configServer);
-    const routes = plugin.routers
-      .flatMap(getRoutes)
+    const routes = Object.values(plugin.routers)
+      .flatMap(config => getRoutes(config.router))
       .filter(route => !configServerRoutes.includes(route));
     log(
       `Registered plugin ${plugin.constructor.name} with ${routes.length} routes\n${routes.join('\n')}`,
