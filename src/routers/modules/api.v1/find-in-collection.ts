@@ -53,7 +53,7 @@ export const findSingleParams = t.Object({
 });
 
 export const findAll = async ({ collection }: { collection: Collection }) => {
-  const allowed = [Collection.person, Collection.institution, Collection.tag];
+  const allowed = [Collection.person, Collection.institution, Collection.tag] as Collection[];
   if (!allowed.includes(collection)) return [];
 
   const docs = await collectionMap[collection].find({}).toArray();

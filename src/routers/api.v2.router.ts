@@ -15,6 +15,20 @@ import {
   type IDocument,
   isPublicProfile,
   ProfileType,
+  IStrippedUserDataSchema,
+  IPublicProfileSchema,
+  IEntitySchema,
+  ICompilationSchema,
+  ICompilationResolvedOnlyEntitiesSchema,
+  IAddressSchema,
+  IAnnotationSchema,
+  IContactSchema,
+  IDigitalEntitySchema,
+  IDocumentSchema,
+  IInstitutionSchema,
+  IPersonSchema,
+  IPhysicalEntitySchema,
+  ITagSchema,
 } from '@kompakkt/common';
 import {
   makeUserOwnerOf,
@@ -43,6 +57,7 @@ import { PermissionHelper, permissionService } from './handlers/permission.servi
 import { searchCache } from 'src/redis';
 import { saveHandler } from './modules/api.v1/save-to-collection';
 import { deleteAny } from './modules/api.v1/deletion-strategies';
+import { AllCollectionsArraySchemaUnion } from 'src/types/schema-unions';
 
 const profileRouter = new Elysia()
   .use(configServer)
@@ -64,6 +79,10 @@ const profileRouter = new Elysia()
       } satisfies IStrippedUserData;
     },
     {
+      response: {
+        200: IStrippedUserDataSchema,
+        404: t.Any(),
+      },
       params: t.Object({
         id: t.String({ description: 'The ID of the profile to find the user for.' }),
       }),
@@ -83,6 +102,11 @@ const profileRouter = new Elysia()
       return profile;
     },
     {
+      response: {
+        200: IPublicProfileSchema,
+        400: t.Any(),
+        404: t.Any(),
+      },
       params: t.Object({
         id: t.String({
           description: 'The id of the profile to retrieve',
@@ -98,7 +122,7 @@ const profileRouter = new Elysia()
   .post(
     '/organization',
     async ({ userdata, body, status }) => {
-      if (!userdata) return status(401);
+      if (!userdata) return status(401, 'User not authenticated');
       if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.organization)
         return status(400, 'Profile type must be "organization"');
@@ -141,6 +165,12 @@ const profileRouter = new Elysia()
       };
     },
     {
+      response: {
+        200: IPublicProfileSchema,
+        400: t.Any(),
+        401: t.Any(),
+        500: t.Any(),
+      },
       isLoggedIn: true,
       detail: {
         description: 'Creates a new organizational profile.',
@@ -151,7 +181,7 @@ const profileRouter = new Elysia()
   .post(
     '/organization/:id',
     async ({ userdata, body, status, params: { id: organizationId } }) => {
-      if (!userdata) return status(401);
+      if (!userdata) return status(401, 'User not authenticated');
       if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.organization)
         return status(400, 'Profile type must be "organization"');
@@ -201,12 +231,19 @@ const profileRouter = new Elysia()
           description: 'The ID of the organizational profile to update.',
         }),
       }),
+      response: {
+        200: IPublicProfileSchema,
+        400: t.Any(),
+        401: t.Any(),
+        404: t.Any(),
+        500: t.Any(),
+      },
     },
   )
   .post(
     '/user',
     async ({ userdata, status, body }) => {
-      if (!userdata) return status(401);
+      if (!userdata) return status(401, 'User not authenticated');
 
       if (!body || !isPublicProfile(body)) return status(400, 'Invalid profile data');
       if (body.type !== ProfileType.user) return status(400, 'Profile type must be "user"');
@@ -271,6 +308,12 @@ const profileRouter = new Elysia()
         description: "Updates the logged-in user's profile with the provided data.",
         tags: [RouterTags['API V2'], RouterTags.Profile],
       },
+      response: {
+        200: IPublicProfileSchema,
+        400: t.Any(),
+        401: t.Any(),
+        500: t.Any(),
+      },
     },
   );
 
@@ -282,7 +325,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       '/user-data/:collection',
       async ({ userdata, status, params: { collection }, query: { full, depth, profileId } }) => {
         const user = structuredClone(userdata);
-        if (!user) return status(500);
+        if (!user) return status(500, 'Failed to retrieve user data');
         if (profileId && !user.profiles.some(profile => profile.profileId === profileId)) {
           return status(403, 'You do not have access to the requested profile data');
         }
@@ -330,6 +373,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
               'The collection to retrieve user data from, e.g., "entity", "compilation", etc.',
           }),
         }),
+        response: {
+          200: AllCollectionsArraySchemaUnion,
+          403: t.Any(),
+          500: t.Any(),
+        },
         query: t.Object({
           full: t.Optional(
             t.Boolean({
@@ -359,7 +407,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     .post(
       '/user-data/update-entity-access',
       async ({ status, body: { _id: entityId, access }, userdata }) => {
-        if (!userdata) return status(401);
+        if (!userdata) return status(401, 'User not authenticated');
         const userProfile = userdata.profiles.find(profile => profile.type === ProfileType.user);
         if (!userProfile) return status(403, 'User profile not found in userdata');
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
@@ -425,25 +473,15 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
       },
       {
         isLoggedIn: true,
-        body: t.Object({
-          _id: t.String({ description: 'Identifier of the entity' }),
-          access: t.Array(
-            t.Object({
-              _id: t.String({ description: 'Same identifier of the user' }),
-              fullname: t.String({ description: 'Full name of the user' }),
-              username: t.String({ description: 'Username of the user' }),
-              role: t.Enum(EntityAccessRole, {
-                description: 'The access role of the user for the entity',
-              }),
-              profile: t.Object({
-                profileId: t.String({ description: 'The profile ID associated with the user' }),
-                type: t.Enum(ProfileType, {
-                  description: 'The type of the profile',
-                }),
-              }),
-            }),
-          ),
-        }),
+        response: {
+          200: IEntitySchema,
+          400: t.Any(),
+          401: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
+        body: t.Pick(IEntitySchema, ['_id', 'access']),
         detail: {
           description:
             'Updates the access permissions for an entity, ensuring at least one owner remains.',
@@ -454,7 +492,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     .post(
       '/user-data/transfer-ownership',
       async ({ body, status, userdata }) => {
-        if (!userdata) return status(401);
+        if (!userdata) return status(401, 'User not authenticated');
         const docId = 'entityId' in body ? body.entityId : body.docId;
         const collection = 'collection' in body ? body.collection : Collection.entity;
         if (collection !== Collection.entity && collection !== Collection.compilation)
@@ -565,6 +603,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             targetUserId: t.String({ description: 'The ID of the user to transfer ownership to.' }),
           }),
         ]),
+        response: {
+          200: IEntitySchema,
+          400: t.Any(),
+          401: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
         detail: {
           description:
             'Transfers ownership of an entity or compilation to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
@@ -594,6 +640,9 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         return Array.from(formats).sort();
       },
       {
+        response: {
+          200: t.Array(t.String()),
+        },
         detail: {
           description: 'Lists all unique file formats of processed entities.',
           tags: [RouterTags['API V2']],
@@ -639,7 +688,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
 
         return {
           formats: formatList,
-          entities: Array.from(new Set(results.map(e => e._id))).sort(),
+          entities: Array.from(new Set(results.map(e => e._id))).sort((a, b) => a.localeCompare(b)),
         };
       },
       {
@@ -649,6 +698,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
               'The format to filter entities by to retrieve, e.g., "glb", "obj", etc.\nCan be a comma separated list of formats.',
           }),
         }),
+        response: {
+          200: t.Object({
+            formats: t.Array(t.String()),
+            entities: t.Array(t.String()),
+          }),
+        },
         detail: {
           description:
             'Retrieves entities that match the specified file formats, filtering by processed raw paths.',
@@ -675,6 +730,18 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           tags: [RouterTags['API V2']],
         },
         body: ExploreRequest,
+        response: {
+          200: t.Object({
+            results: t.Union([
+              t.Array(IEntitySchema, { title: 'IEntity[]' }),
+              t.Array(ICompilationSchema, { title: 'ICompilation[]' }),
+            ]),
+            suggestions: t.Array(t.String()),
+            requestTime: t.Number(),
+            count: t.Number(),
+          }),
+          500: t.Any(),
+        },
         query: t.Object({
           profileId: t.Optional(
             t.String({
@@ -700,16 +767,16 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             (limit ?? 10).toString(),
             'WITHSCORES',
           ])
-          .then(result =>
-            result.filter((entry: any): entry is [string, number] => {
+          .then(result => {
+            return result.filter((entry: unknown): entry is [string, number] => {
               if (!Array.isArray(entry)) return false;
               const [query, score] = entry;
               return typeof query === 'string' && !isNaN(Number(score));
-            }),
-          )
+            }) as [string, number][];
+          })
           .catch(err => {
             warn(`Failed to retrieve popular searches for collection "${collection}": ${err}`);
-            return [];
+            return [] as [string, number][];
           });
         return topN;
       },
@@ -725,6 +792,9 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             }),
           ),
         }),
+        response: {
+          200: t.Array(t.Tuple([t.String(), t.Number()])),
+        },
         detail: {
           description: 'Retrieves the most popular search queries for a given collection.',
           tags: [RouterTags['API V2']],
@@ -734,18 +804,18 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
     .post(
       '/remove-self-from-access/:collection/:identifier',
       async ({ params: { collection, identifier }, userdata, userRole, status }) => {
-        if (!userdata) return status('Forbidden', 'Must be logged in to remove self from access');
+        if (!userdata) return status(403, 'Must be logged in to remove self from access');
         if (userRole === EntityAccessRole.owner)
-          return status('Forbidden', 'Owner cannot remove themselves');
+          return status(403, 'Owner cannot remove themselves');
         if (!PermissionHelper.isEditorCollection(collection))
           return status(
-            'Bad Request',
+            400,
             `Collection "${collection}" has no access field or does not allow modification of access field.`,
           );
 
         const document = await collectionMap[collection].findOne({ _id: new ObjectId(identifier) });
-        if (!document) return status('Not Found', 'Document not found');
-        if (!('access' in document)) return status('Bad Request', 'Document has no access field');
+        if (!document) return status(404, 'Document not found');
+        if (!('access' in document)) return status(400, 'Document has no access field');
 
         const updateResult = await collectionMap[collection].updateOne(
           { _id: new ObjectId(identifier) },
@@ -767,6 +837,15 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'The identifier of the document to remove self from.',
           }),
         }),
+        response: {
+          200: t.Object({
+            status: t.String(),
+            message: t.String(),
+          }),
+          400: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+        },
         hasRole: EntityAccessRole.viewer,
         isLoggedIn: true,
         detail: {
@@ -849,6 +928,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'The profile identifier to associate the compilation with.',
           }),
         }),
+        response: {
+          200: ICompilationResolvedOnlyEntitiesSchema,
+          400: t.Any(),
+          401: t.Any(),
+          500: t.Any(),
+        },
         detail: {
           description:
             'Creates an empty compilation that can be added to with the normal compilation update endpoint.',
@@ -910,6 +995,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'The profile identifier updating the compilation.',
           }),
         }),
+        response: {
+          200: ICompilationResolvedOnlyEntitiesSchema,
+          400: t.Any(),
+          401: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
         detail: {
           description:
             'Updates the metadata of a compilation, such as name and description. The user must have editor access to the compilation.',
@@ -994,6 +1087,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'An array of entity identifiers to add to the compilation(s).',
           }),
         }),
+        response: {
+          200: t.Object({ success: t.Boolean() }),
+          400: t.Any(),
+          401: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
         detail: {
           description:
             'Adds entities to one or more compilations. The user must have edit access to the compilation and at least viewer access to the entities.',
@@ -1059,6 +1160,14 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             description: 'An array of entity identifiers to remove from the compilation.',
           }),
         }),
+        response: {
+          200: t.Object({ success: t.Boolean() }),
+          400: t.Any(),
+          401: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          500: t.Any(),
+        },
         detail: {
           description:
             'Removes entities from a compilation. The user must have edit access to the compilation.',

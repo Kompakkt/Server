@@ -14,6 +14,7 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
+    "update:kompakkt:common": "bun run update-git-dependency.ts -d @kompakkt/common -o Kompakkt -r Common -b master",
     "email": "email dev --dir src/emails",
     "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run src/e2e-generator.ts"
   },
@@ -33,7 +34,7 @@
     "@elysiajs/openapi": "^1.4.14",
     "@elysiajs/server-timing": "^1.4.0",
     "@elysiajs/static": "^1.4.7",
-    "@kompakkt/common": "git+https://github.com/Kompakkt/Common#157a59059e8e2085e8eef5aa481244d62032b37c",
+    "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#a2d9410e08cea48a3798d76c7cb6cc97364f1621",
     "@react-email/components": "^1.0.11",
     "@react-email/preview-server": "^5.2.10",
     "@react-email/render": "^2.0.5",

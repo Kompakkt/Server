@@ -1,12 +1,6 @@
 import type { Filter } from 'mongodb';
 import objectHash from 'object-hash';
-import {
-  Collection,
-  type ICompilation,
-  type IEntity,
-  type IInstitution,
-  type IUserData,
-} from '@kompakkt/common';
+import { Collection, type ICompilation, type IEntity, type IUserData } from '@kompakkt/common';
 import { warn } from 'src/logger';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import { searchCache } from 'src/redis';
@@ -42,7 +36,7 @@ const getSortObject = (sortOptions: SortOptions) => {
   return sort;
 };
 
-type ExploreDocument = IEntity | ICompilation | IInstitution;
+type ExploreDocument = IEntity | ICompilation;
 
 export const exploreHandler = async (
   options: ExploreRequest,

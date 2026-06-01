@@ -1,7 +1,7 @@
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type TSchema } from 'elysia';
 import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { isUserRank, UserRank } from '@kompakkt/common';
+import { IEntitySchema, isUserRank, IUserDataSchema, UserRank } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';
@@ -19,6 +19,7 @@ import { resolveUsersDataObject } from './modules/user-management/users';
 import { exploreCache } from 'src/redis';
 import { RouterTags } from './tags';
 import { getMailDomainFromPublicURL } from 'src/util/get-mail-domain';
+import { info } from 'src/logger';
 
 const gatherDbCollectionStats = async <T extends Document>(collection: Collection<T>) => {
   const items = await collection.find().toArray();
@@ -55,6 +56,14 @@ const gatherDbCollectionStats = async <T extends Document>(collection: Collectio
   return { byYear, currentYearCount, averagePerYear, currentMonthCount, currentWeekCount };
 };
 
+const DbCollectionStatsSchema = t.Object({
+  byYear: t.Record(t.Number(), t.Number()),
+  currentYearCount: t.Number(),
+  averagePerYear: t.Number(),
+  currentMonthCount: t.Number(),
+  currentWeekCount: t.Number(),
+});
+
 const adminRouter = new Elysia()
   .use(configServer)
   .use(authService)
@@ -64,7 +73,7 @@ const adminRouter = new Elysia()
         '/digest',
         async ({ query: { from, to, finished, restricted }, status }) => {
           // Check if timespan is larger than 31 days
-          if (to - from > 31 * 24 * 60 * 60 * 1000) return status('Bad Request', 'Range too large');
+          if (to - from > 31 * 24 * 60 * 60 * 1000) return status(400, 'Range too large');
 
           const entities = await entityCollection
             .find({
@@ -77,6 +86,10 @@ const adminRouter = new Elysia()
           return resolvedEntities;
         },
         {
+          response: {
+            200: t.Array(IEntitySchema),
+            400: t.Any(),
+          },
           query: t.Object({
             from: t.Number(),
             to: t.Number(),
@@ -104,11 +117,17 @@ const adminRouter = new Elysia()
             description: 'Get statistics about the database collections',
             tags: [RouterTags.Admin],
           },
+          response: t.Object({
+            entities: DbCollectionStatsSchema,
+            compilations: DbCollectionStatsSchema,
+            users: DbCollectionStatsSchema,
+            annotations: DbCollectionStatsSchema,
+          }),
         },
       )
       .post(
         '/getusers',
-        async () => {
+        async ({ status }) => {
           const allAccounts = await userCollection
             .find(
               {},
@@ -121,13 +140,22 @@ const adminRouter = new Elysia()
                 },
               },
             )
-            .toArray();
+            .toArray()
+            .catch(err => {
+              info(`Error fetching users for admin`, err);
+              return undefined;
+            });
+          if (!allAccounts) return status(500, 'Internal Server Error');
           return allAccounts;
         },
         {
           detail: {
             description: 'Get all users with limited data',
             tags: [RouterTags.Admin],
+          },
+          response: {
+            200: t.Array(IUserDataSchema),
+            500: t.Any(),
           },
         },
       )
@@ -138,7 +166,7 @@ const adminRouter = new Elysia()
             { _id: new ObjectId(identifier) },
             { projection: { sessionID: 0, rank: 0, prename: 0, surname: 0 } },
           );
-          if (!user) return status(404);
+          if (!user) return status(404, 'User not found');
 
           const userWithData = resolveUsersDataObject(user);
           return userWithData;
@@ -151,6 +179,10 @@ const adminRouter = new Elysia()
             description: 'Get a specific user by identifier with limited data',
             tags: [RouterTags.Admin],
           },
+          response: {
+            200: IUserDataSchema,
+            404: t.Any(),
+          },
         },
       )
       .post(
@@ -159,10 +191,10 @@ const adminRouter = new Elysia()
           const _id = new ObjectId(identifier);
 
           const user = await userCollection.findOne({ _id });
-          if (!user) return status('Not Found');
+          if (!user) return status(404, 'Not Found');
 
           const updateResult = await userCollection.updateOne({ _id }, { $set: { role } });
-          if (!updateResult) return status('Internal Server Error');
+          if (!updateResult) return status(500, 'Internal Server Error');
 
           if (Configuration.Mailer?.Target && isUserRank(user.role)) {
             void sendReactMail({
@@ -188,6 +220,11 @@ const adminRouter = new Elysia()
             description: 'Promote a user to a different role',
             tags: [RouterTags.Admin],
           },
+          response: {
+            200: t.Object({ status: t.String() }),
+            404: t.Any(),
+            500: t.Any(),
+          },
         },
       )
       .post(
@@ -195,7 +232,7 @@ const adminRouter = new Elysia()
         async ({ status, body: { identifier } }) => {
           const _id = new ObjectId(identifier);
           const entity = await entityCollection.findOne({ _id });
-          if (!entity) return status('Not Found');
+          if (!entity) return status(404, 'Not Found');
 
           const isEntityOnline: boolean = !!entity.online;
           const updateResult = await entityCollection.updateOne(
@@ -204,9 +241,9 @@ const adminRouter = new Elysia()
               $set: { online: !isEntityOnline },
             },
           );
-          if (!updateResult) return status('Internal Server Error');
+          if (!updateResult) return status(500, 'Internal Server Error');
 
-          exploreCache.flush();
+          void exploreCache.flush();
 
           return resolveEntity({ _id }, RESOLVE_FULL_DEPTH);
         },
@@ -218,13 +255,18 @@ const adminRouter = new Elysia()
             description: 'Toggle the online/published status of an entity',
             tags: [RouterTags.Admin],
           },
+          response: {
+            200: IEntitySchema,
+            404: t.Any(),
+            500: t.Any(),
+          },
         },
       )
       .post(
         '/resetpassword/:username',
         async ({ status, params: { username } }) => {
           const user = await userCollection.findOne({ username });
-          if (!user) return status('Not Found', 'User not found');
+          if (!user) return status(404, 'User not found');
 
           const resetToken = randomBytes(32).toString('hex');
           const tokenExpiration = Date.now() + 86400000; // 24 hours
@@ -234,7 +276,7 @@ const adminRouter = new Elysia()
             { $set: { resetToken, tokenExpiration } },
             { upsert: true },
           );
-          if (!updateResult) return status('Internal Server Error');
+          if (!updateResult) return status(500, 'Internal Server Error');
 
           const success = await sendReactMail({
             from: `noreply@${getMailDomainFromPublicURL()}`,
@@ -246,7 +288,7 @@ const adminRouter = new Elysia()
               requestedByAdministrator: true,
             }),
           });
-          if (!success) return status('Internal Server Error');
+          if (!success) return status(500, 'Internal Server Error');
 
           return { status: 'OK' };
         },
@@ -257,6 +299,11 @@ const adminRouter = new Elysia()
           detail: {
             description: 'Request a password reset for a user by username',
             tags: [RouterTags.Admin],
+          },
+          response: {
+            200: t.Object({ status: t.String() }),
+            404: t.Any(),
+            500: t.Any(),
           },
         },
       ),
