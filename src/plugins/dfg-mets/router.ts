@@ -1,14 +1,19 @@
 import Elysia, { t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { isEntity, type IEntity } from '@kompakkt/common';
+import {
+  type IEntityResolved,
+  isEntity,
+  type IEntityResolvedOnlyDigitalEntity,
+} from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { entityCollection } from 'src/mongo';
 import { apiKeyService } from 'src/routers/handlers/api-key.service';
 import { RESOLVE_FULL_DEPTH, resolveEntity } from 'src/routers/modules/api.v1/resolving-strategies';
-import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { buildMets } from './build-mets';
-import type { DfgMetsExtensionData } from './types';
+import { isMetsEntity } from './types';
+
+export const dfgMetsRouterTag = 'DFG METS';
 
 const dfgMetsRouter = new Elysia()
   .use(configServer)
@@ -19,9 +24,11 @@ const dfgMetsRouter = new Elysia()
         '/entity/:id',
         async ({ params: { id }, status }) => {
           const entity = (await resolveEntity({ _id: new ObjectId(id) }, RESOLVE_FULL_DEPTH)) as
-            | IEntity<DfgMetsExtensionData, true>
+            | IEntityResolved
             | undefined;
           if (!entity) return status(404, 'Entity not found');
+          if (!isMetsEntity(entity))
+            return status(404, 'DFG METS extension data does not exist for this entity');
           if (!entity.extensions?.dfgMets?.sharingEnabled)
             return status(403, 'DFG METS sharing not enabled for this entity');
 
@@ -53,7 +60,7 @@ const dfgMetsRouter = new Elysia()
             }),
           }),
           detail: {
-            tags: [RouterTags['DFG METS']],
+            tags: [dfgMetsRouterTag],
             description:
               'Retrieve a specific entity by ID if it has DFG METS sharing enabled, returning METS/MODS XML format. Requires valid API key.',
           },
@@ -73,23 +80,34 @@ const dfgMetsRouter = new Elysia()
             .toArray();
 
           const resolved = await Promise.all(
-            entities.map(e => resolveEntity(e, 1) as Promise<IEntity<unknown, true>>),
+            entities.map(
+              e => resolveEntity(e, 1) as Promise<IEntityResolvedOnlyDigitalEntity | undefined>,
+            ),
           );
 
-          return resolved.filter(isEntity).map(e => ({
-            _id: e._id.toString(),
-            name: e.name,
-            description: e.relatedDigitalEntity.description,
-            thumbnailUrl: new URL(
-              `/server/${e.settings.preview}`,
-              Configuration.Server.PublicURL,
-            ).toString(),
-            kompakktUrl: new URL(`/entity/${e._id}`, Configuration.Server.PublicURL).toString(),
-            metsUrl: new URL(
-              `/server/dfg-mets-api/entity/${e._id}`,
-              Configuration.Server.PublicURL,
-            ).toString(),
-          }));
+          return resolved
+            .map(e =>
+              isEntity(e)
+                ? {
+                    _id: e._id.toString(),
+                    name: e.name,
+                    description: e.relatedDigitalEntity.description,
+                    thumbnailUrl: new URL(
+                      `/server/${e.settings.preview}`,
+                      Configuration.Server.PublicURL,
+                    ).toString(),
+                    kompakktUrl: new URL(
+                      `/entity/${e._id}`,
+                      Configuration.Server.PublicURL,
+                    ).toString(),
+                    metsUrl: new URL(
+                      `/server/dfg-mets-api/entity/${e._id}`,
+                      Configuration.Server.PublicURL,
+                    ).toString(),
+                  }
+                : undefined,
+            )
+            .filter((e): e is Exclude<typeof e, undefined> => e !== undefined);
         },
         {
           hasValidApiKey: true,
@@ -137,7 +155,7 @@ const dfgMetsRouter = new Elysia()
             ),
           }),
           detail: {
-            tags: [RouterTags['DFG METS']],
+            tags: [dfgMetsRouterTag],
             description:
               'Retrieves a list of entities with DFG METS sharing enabled. Requires valid API key.',
           },

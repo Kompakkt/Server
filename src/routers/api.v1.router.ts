@@ -10,7 +10,7 @@ import {
   isInstitution,
   isPerson,
 } from '@kompakkt/common';
-import { isEntitySettings } from '@kompakkt/common/typeguards';
+import { isEntitySettings } from '@kompakkt/common';
 import { err, info, log, warn } from 'src/logger';
 import { collectionMap, entityCollection, userCollection } from 'src/mongo';
 import { exploreCache } from 'src/redis';
@@ -31,7 +31,7 @@ import { saveHandler } from './modules/api.v1/save-to-collection';
 import { increasePopularity } from './modules/api.v2/increase-popularity';
 import { checkIsOwner, makeUserOwnerOf } from './modules/user-management/users';
 import { RouterTags } from './tags';
-import type { AccessField, AccessFieldEntry, CreatorField } from '@kompakkt/common/interfaces';
+import type { AccessField, AccessFieldEntry, CreatorField } from '@kompakkt/common';
 
 /**
  * If the entity already exists we need to check for owner status

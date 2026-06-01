@@ -7,7 +7,7 @@ import type {
   IEntity,
   IStrippedUserData,
   IUserData,
-} from '@kompakkt/common/interfaces';
+} from '@kompakkt/common';
 import { warn } from 'src/logger';
 import {
   collectionMap,

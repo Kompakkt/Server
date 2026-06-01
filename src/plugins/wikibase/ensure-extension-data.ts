@@ -1,4 +1,4 @@
-import type { IAnnotation, IDigitalEntity } from '@kompakkt/common';
+import { hasExtensions, type IAnnotation, type IDigitalEntity } from '@kompakkt/common';
 import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } from './common';
 import type { WikibaseAnnotation, WikibaseDigitalEntity } from './config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -6,11 +6,18 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 export const hasWikibaseExtension = (
   entity: ServerDocument<IDigitalEntity | IAnnotation>,
 ): entity is ServerDocument<WikibaseDigitalEntity | WikibaseAnnotation> => {
-  return entity.extensions?.wikibase !== undefined || 'wikibase_id' in entity;
+  return (
+    (hasExtensions(entity) &&
+      'wikibase' in entity.extensions &&
+      entity.extensions?.wikibase !== undefined) ||
+    'wikibase_id' in entity
+  );
 };
 
 export const ensureDigitalEntityExtensionData = (
-  digitalEntity: ServerDocument<IDigitalEntity<Partial<IWikibaseDigitalEntityExtension>>>,
+  digitalEntity: ServerDocument<
+    IDigitalEntity & { extensions: Partial<IWikibaseDigitalEntityExtension> }
+  >,
 ): ServerDocument<WikibaseDigitalEntity> => {
   digitalEntity.extensions ??= {};
   digitalEntity.extensions.wikibase ??= {};
@@ -28,7 +35,7 @@ export const ensureDigitalEntityExtensionData = (
 };
 
 export const ensureAnnotationExtensionData = (
-  annotation: ServerDocument<IAnnotation<Partial<IWikibaseAnnotationExtension>>>,
+  annotation: ServerDocument<IAnnotation & { extensions: Partial<IWikibaseAnnotationExtension> }>,
 ): ServerDocument<WikibaseAnnotation> => {
   annotation.extensions ??= {};
   annotation.extensions.wikibase ??= {};

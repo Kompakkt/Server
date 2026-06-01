@@ -1,8 +1,6 @@
 import Elysia, { t } from 'elysia';
-import { apiKeyService, isResolvedAPIKeyDetails } from 'src/routers/handlers/api-key.service';
 import configServer from 'src/server.config';
 import { ObjectId } from 'mongodb';
-import { RouterTags } from 'src/routers/tags';
 import { pluginCache } from 'src/redis';
 import { authService } from 'src/routers/handlers/auth.service';
 import { basename, join } from 'node:path';
@@ -56,6 +54,8 @@ const buildRequest = (path: string, token: string, init?: RequestInit) =>
     },
   });
 
+export const sketchfabImportRouterTag = 'Sketchfab Importer';
+
 const sketchfabImportRouter = new Elysia()
   .use(configServer)
   .use(authService)
@@ -65,7 +65,7 @@ const sketchfabImportRouter = new Elysia()
         isLoggedIn: true,
         detail: {
           description: 'Health check endpoint to verify the service is running.',
-          tags: [RouterTags['Sketchfab Importer']],
+          tags: [sketchfabImportRouterTag],
         },
       })
       .get(
@@ -90,7 +90,7 @@ const sketchfabImportRouter = new Elysia()
           detail: {
             description:
               'Fetches detailed information about a specific Sketchfab model using its ID.',
-            tags: [RouterTags['Sketchfab Importer']],
+            tags: [sketchfabImportRouterTag],
           },
         },
       )
@@ -132,7 +132,7 @@ const sketchfabImportRouter = new Elysia()
             token: t.String({ description: 'Sketchfab API token' }),
           }),
           detail: {
-            tags: [RouterTags['Sketchfab Importer']],
+            tags: [sketchfabImportRouterTag],
           },
         },
       )
@@ -180,7 +180,7 @@ const sketchfabImportRouter = new Elysia()
             modelId: t.String({ description: 'Sketchfab model ID' }),
           }),
           detail: {
-            tags: [RouterTags['Sketchfab Importer']],
+            tags: [sketchfabImportRouterTag],
           },
         },
       ),

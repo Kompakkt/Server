@@ -6,7 +6,6 @@ import type {
   ICompilation,
   IContact,
   IDigitalEntity,
-  IDocument,
   IEntity,
   IInstitution,
   IPerson,
@@ -17,11 +16,11 @@ import type {
 import { Collection } from '@kompakkt/common';
 import { Configuration } from './configuration';
 import { err, info } from './logger';
-import type { ETarget } from './mailer';
 import type { ServerDocument } from './util/document-with-objectid-type';
-import { type IPublicProfile } from '@kompakkt/common/interfaces';
+import { type IPublicProfile } from '@kompakkt/common';
 import { retryWithBackoff } from './util/retry-with-backoff';
 import { Environment } from './environment';
+import type { IMailCollection } from './types/mails';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
 export const mongoClient = ClientURL
@@ -61,17 +60,7 @@ export type PasswordDocument = {
   };
 };
 export const passwordCollection = accountsDb.collection<PasswordDocument>('passwords');
-export const mailCollection = accountsDb.collection<{
-  target: ETarget;
-  content: {
-    subject: string;
-    mailbody: string;
-  };
-  timestamp: string;
-  user: string | IDocument | ObjectId;
-  answered: boolean;
-  mailSent: boolean;
-}>('mails');
+export const mailCollection = accountsDb.collection<IMailCollection>('mails');
 export const userTokenCollection = accountsDb.collection<{
   username: string;
   resetToken?: string;

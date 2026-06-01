@@ -1,11 +1,14 @@
 import { openapi } from '@elysiajs/openapi';
-import Elysia from 'elysia';
+import prometheusPlugin from 'elysia-prometheus';
+import Elysia, { t } from 'elysia';
+import type { OpenAPIV3 } from 'openapi-types';
 import './util/patch-structured-clone';
 
 import { err, info, log } from './logger';
+import { buildCommonComponentsSchemas } from './openapi-schemas';
 import { initializePlugins, PluginController, type AnyElysia } from './plugins/plugin-controller';
 import finalServer from './server.final';
-import { RouterTagsAsTagObjects } from './routers/tags';
+import { RouterTags, RouterTagsAsTagObjects } from './routers/tags';
 
 import { migrateUserProfiles } from './jobs/migrate-user-profiles';
 import { cleanupPersons } from './jobs/cleanup-persons';
@@ -22,6 +25,8 @@ import { ensureDefaultPasswordStrategy } from './jobs/ensure-default-password-st
 import { migrateCreatorAndAccessFields } from './jobs/migrate-creator-and-access-fields';
 import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-entities';
 import { migrateCompilationOnline } from './jobs/migrate-compilation-online';
+import { RootDirectory } from './environment';
+import { Configuration } from './configuration';
 
 const jobs = {
   migrateUserProfiles,
@@ -49,12 +54,24 @@ for (const [name, job] of Object.entries(jobs)) {
 let final: AnyElysia | undefined;
 await initializePlugins();
 
-PluginController.routers$.subscribe(async routers => {
+PluginController.routers$.subscribe(async routerConfigs => {
   let app: AnyElysia = new Elysia();
 
-  for (const router of routers) {
-    app = app.use(router);
+  for (const pluginRouter of Object.values(routerConfigs)) {
+    for (const config of Object.values(pluginRouter)) {
+      app = app.use(config.router);
+    }
   }
+  const pluginRouterTags: OpenAPIV3.TagObject[] = Object.values(routerConfigs).flatMap(
+    pluginRouter =>
+      Object.values(pluginRouter).map(
+        config =>
+          ({
+            name: config.tag,
+            description: config.description,
+          }) satisfies OpenAPIV3.TagObject,
+      ),
+  );
 
   if (final) {
     await final.stop(true);
@@ -73,14 +90,74 @@ PluginController.routers$.subscribe(async routers => {
     .use(finalServer)
     .use(
       openapi({
+        scalar: {
+          agent: {
+            disabled: true,
+          },
+          mcp: {
+            disabled: true,
+          },
+          favicon: '/server/favicon.ico',
+          telemetry: false,
+          showDeveloperTools: 'always',
+          withDefaultFonts: false,
+        },
         documentation: {
           info: {
-            title: 'Kompakkt API Documentation',
+            title: 'Kompakkt API',
+            description:
+              'Documentation for available routes of the Kompakkt Server, including schemas for data structures used in requests and responses, and in code.',
             version: '2.0.0',
           },
-          tags: RouterTagsAsTagObjects,
+          tags: [...RouterTagsAsTagObjects, ...pluginRouterTags],
+          components: { schemas: buildCommonComponentsSchemas() },
+        },
+        exclude: {
+          paths: ['/server/metrics', '/server/csp-report'],
         },
       }),
+    )
+    .use(
+      prometheusPlugin({
+        metricsPath: '/metrics',
+        staticLabels: { service: 'kompakkt-server' },
+        dynamicLabels: {
+          userAgent: ctx => ctx.request.headers.get('user-agent') ?? 'unknown',
+        },
+      }),
+    )
+    .get(
+      '/previews/*',
+      async ({ params, status }) => {
+        let path = params['*'];
+        const file = Bun.file(
+          `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
+        );
+        if (await file.exists()) return file;
+
+        // PNG Fallback
+        // TODO: Migration to convert PNG to WEBP and remove this fallback
+        if (path.includes('.webp')) {
+          path = path.replace('.webp', '.png');
+          const file = Bun.file(
+            `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${path}`,
+          );
+          if (await file.exists()) return file;
+        }
+
+        return status(404, 'Preview not found');
+      },
+      {
+        response: {
+          200: t.File(),
+          404: t.Any(),
+        },
+        detail: {
+          description:
+            'Serve preview files. This endpoint is used internally by the frontend and should not be used directly.',
+          tags: [RouterTags.Utility],
+        },
+      },
     )
     .post('/csp-report', ({ status }) => {
       return status(200);

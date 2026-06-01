@@ -4,7 +4,6 @@ import * as OpenIDClient from 'openid-client';
 import { UserRank } from '@kompakkt/common';
 import { err, log } from 'src/logger';
 import { userCollection } from 'src/mongo';
-import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { getOIDCConfig } from './config';
 
@@ -22,6 +21,8 @@ const getClientConfig = async () => {
   );
 };
 
+export const oidcRouterTag = 'OIDC Authentication';
+
 const oidcRouter = new Elysia()
   .use(configServer)
   .get(
@@ -32,7 +33,7 @@ const oidcRouter = new Elysia()
     {
       detail: {
         description: 'Health check endpoint for OIDC authentication service',
-        tags: [RouterTags['OIDC Authentication']],
+        tags: [oidcRouterTag],
       },
     },
   )
@@ -67,7 +68,7 @@ const oidcRouter = new Elysia()
       }),
       detail: {
         description: 'Initiates OIDC authentication flow',
-        tags: [RouterTags['OIDC Authentication']],
+        tags: [oidcRouterTag],
       },
     },
   )
@@ -176,7 +177,7 @@ const oidcRouter = new Elysia()
       }),
       detail: {
         description: 'Callback endpoint for OIDC authentication',
-        tags: [RouterTags['OIDC Authentication']],
+        tags: [oidcRouterTag],
       },
     },
   );

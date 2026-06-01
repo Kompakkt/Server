@@ -1,8 +1,9 @@
 import Elysia, { t } from 'elysia';
 import { entityCollection } from 'src/mongo';
 import { apiKeyService } from 'src/routers/handlers/api-key.service';
-import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
+
+export const cologneCaveRouterTag = 'Cologne Cave';
 
 const cologneCaveRouter = new Elysia()
   .use(configServer)
@@ -49,7 +50,7 @@ const cologneCaveRouter = new Elysia()
           }),
         },
         detail: {
-          tags: [RouterTags['Cologne Cave']],
+          tags: [cologneCaveRouterTag],
           description:
             'Retrieve all CAVE compatible entities that are marked as online and finished, with optional pagination. CAVE: https://itcc.uni-koeln.de/en/hpc/visualization/cave',
         },

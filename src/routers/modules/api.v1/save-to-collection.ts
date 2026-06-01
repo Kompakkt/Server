@@ -40,7 +40,7 @@ import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
 import { saveMetadataFiles } from 'src/util/save-metadata-files';
-import type { AccessField, CreatorField } from '@kompakkt/common/interfaces';
+import type { AccessField, CreatorField } from '@kompakkt/common';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,

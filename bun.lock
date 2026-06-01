@@ -10,7 +10,6 @@
         "@elysiajs/openapi": "^1.4.14",
         "@elysiajs/server-timing": "^1.4.0",
         "@elysiajs/static": "^1.4.7",
-        "@kompakkt/common": "git+https://github.com/Kompakkt/Common#802b2f0",
         "@react-email/components": "^1.0.11",
         "@react-email/preview-server": "^5.2.10",
         "@react-email/render": "^2.0.5",
@@ -23,6 +22,7 @@
         "elysia": "^1.4.28",
         "elysia-helmet": "^3.1.0",
         "elysia-prometheus": "^1.1.1",
+        "@kompakkt/common": "git+https://github.com/Kompakkt/Common#157a59059e8e2085e8eef5aa481244d62032b37c",
         "jose": "^6.2.2",
         "ky": "^1.14.3",
         "mime": "^4.1.0",
@@ -225,7 +225,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#802b2f0", {}, "Kompakkt-Common-802b2f0", "sha512-oqEJBqsyBNAZ5InLdgd/q+R1PSTHYtSqebAzF9lxQ+kdUyP4G5yKwRvzJjgCDftNh74qRAS07xMuX+gSy6F4Sw=="],
+    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#157a590", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-157a590", "sha512-txnvhNPJ13hoF+Ic/L4lDwvSylOPEm7BWox3AcVPrtz3gR1pqsJS3HgKbJanw2+zCFEyE0xguA7/b6Y2TDgCFg=="],
 
     "@mongodb-js/saslprep": ["@mongodb-js/saslprep@1.4.5", "", { "dependencies": { "sparse-bitfield": "^3.0.3" } }, "sha512-k64Lbyb7ycCSXHSLzxVdb2xsKGPMvYZfCICXvDsI8Z65CeWQzTEKS4YmGbnqw+U9RBvLPTsB6UCmwkgsDTGWIw=="],
 

@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { UserRank } from '@kompakkt/common';
+import { isUserRank, UserRank } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';
@@ -83,6 +83,10 @@ const adminRouter = new Elysia()
             finished: t.Optional(t.Boolean()),
             restricted: t.Optional(t.Boolean()),
           }),
+          detail: {
+            description: 'Get a digest of entities created within a specific time range',
+            tags: [RouterTags.Admin],
+          },
         },
       )
       .post(
@@ -160,8 +164,8 @@ const adminRouter = new Elysia()
           const updateResult = await userCollection.updateOne({ _id }, { $set: { role } });
           if (!updateResult) return status('Internal Server Error');
 
-          if (Configuration.Mailer?.Target) {
-            sendReactMail({
+          if (Configuration.Mailer?.Target && isUserRank(user.role)) {
+            void sendReactMail({
               from: Configuration.Mailer.Target.contact,
               to: user.mail,
               subject: 'Your Kompakkt status has been updated',

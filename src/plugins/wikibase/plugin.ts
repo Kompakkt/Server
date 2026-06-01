@@ -15,7 +15,7 @@ import {
   ensureDigitalEntityExtensionData,
   hasWikibaseExtension,
 } from './ensure-extension-data';
-import wikibaseRouter from './router';
+import wikibaseRouter, { wikibaseRouterTag } from './router';
 import { WikibaseService } from './service';
 import { pluginCache } from 'src/redis';
 import type { IWikibaseDigitalEntityExtensionData } from './common';
@@ -87,7 +87,13 @@ const disableDeletedWikibaseEntities = async (): Promise<void> => {
 };
 
 class WikibasePlugin extends Plugin {
-  routers = [wikibaseRouter];
+  routers = {
+    wikibaseRouter: {
+      router: wikibaseRouter,
+      tag: wikibaseRouterTag,
+      description: 'Wikibase integration API endpoints',
+    },
+  };
   jobs = [
     // TODO: Test on dev instance
     // disableDeletedWikibaseEntities
@@ -138,6 +144,7 @@ class WikibasePlugin extends Plugin {
         }
 
         // Transform digital entity
+        // @ts-expect-error This is part of migration of old to new data, might be removable in future
         const doc = ensureDigitalEntityExtensionData(digitalEntity);
         const result = await service.updateDigitalEntity(doc);
         if (!result) {
@@ -278,6 +285,7 @@ class WikibasePlugin extends Plugin {
           log(`Resolving wikibase annotation ${annotation._id}`);
 
           const restored = restoreOriginalAnnotation(annotation);
+          // @ts-expect-error This is part of migration of old to new data, might be removable in future
           const doc = ensureAnnotationExtensionData(restored);
           const wikibaseId = doc.extensions?.wikibase?.id;
           if (!wikibaseId) {
