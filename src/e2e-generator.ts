@@ -59,6 +59,7 @@ const ast = await openapiTS(OpenAPISpec, {
   exportType: true,
   enum: true,
   makePathsEnum: true,
+  dedupeEnums: true,
 });
 const contents = astToString(ast);
 
