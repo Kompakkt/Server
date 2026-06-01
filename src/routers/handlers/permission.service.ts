@@ -1,6 +1,6 @@
 import Elysia from 'elysia';
 import { ObjectId } from 'mongodb';
-import { Collection, EntityAccessRole, isEntityAccessRole, type IUserData } from '@kompakkt/common';
+import { Collection, EntityAccessRole, isCollection, isEntityAccessRole, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { collectionMap } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -89,8 +89,9 @@ export const PermissionHelper = new (class {
   /**
    * Check if the collection regulates permission via access field and EntityAccessRole.
    */
-  isEditorCollection(collection: string | Collection) {
-    return editorCollections.includes(collection as Collection);
+  isEditorCollection(collection: string) {
+    if (!isCollection(collection)) return false;
+    return (editorCollections as Collection[]).includes(collection);
   }
 })();
 
