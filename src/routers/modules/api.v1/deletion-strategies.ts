@@ -32,10 +32,11 @@ const removeEntityFromCompilations = async (entityId: string | ObjectId) =>
 const deleteAnnotationsAboutEntityOrCompilation = async (
   docId: string | ObjectId,
   type: Collection,
-) =>
-{
+) => {
   if (type !== Collection.entity && type !== Collection.compilation) {
-    throw new Error(`deleteAnnotationsAboutEntityOrCompilation only works for entity and compilation, not ${type}`);
+    throw new Error(
+      `deleteAnnotationsAboutEntityOrCompilation only works for entity and compilation, not ${type}`,
+    );
   }
   return annotationCollection
     .find(
@@ -54,7 +55,8 @@ const deleteAnnotationsAboutEntityOrCompilation = async (
       annotationCollection.deleteMany({
         _id: { $in: annotations.map(a => new ObjectId(a._id.toString())) },
       }),
-    )};
+    );
+};
 
 export const deleteAny = async ({
   collection,

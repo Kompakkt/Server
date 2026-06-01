@@ -92,29 +92,8 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           description: 'Find a single entity in a collection by its identifier',
           tags: [RouterTags['API V1']],
         },
-        repsonse: {
-          200: t.Union([t.Undefined(), IEntityResolvedSchema, ICompilationResolvedSchema]),
-        },
-      },
-    )
-    .get(
-      '/get/find/:collection/:identifier/:password?',
-      ({ status }) => {
-        return status(
-          410,
-          'This endpoint is deprecated. Please use the /get/find/:collection/:identifier endpoint instead. Passwords are no longer supported for collections.',
-        );
-      },
-      {
-        params: findSingleParams,
-        detail: {
-          description:
-            'Find a single entity in a collection, and decode it with the provided password',
-          tags: [RouterTags['API V1']],
-          deprecated: true,
-        },
         response: {
-          410: t.Any(),
+          200: t.Union([t.Undefined(), IEntityResolvedSchema, ICompilationResolvedSchema]),
         },
       },
     )

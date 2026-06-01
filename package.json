@@ -31,7 +31,7 @@
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/jwt": "^1.4.1",
-    "@elysiajs/openapi": "^1.4.14",
+    "@elysiajs/openapi": "^1.4.15",
     "@elysiajs/server-timing": "^1.4.0",
     "@elysiajs/static": "^1.4.7",
     "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#99ae0c1561d8be69419e3b99b069bd08d9854e32",
