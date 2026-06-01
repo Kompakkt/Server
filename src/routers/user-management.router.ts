@@ -1,7 +1,12 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { IUserData, IUserDataWithoutData, UserRank } from '@kompakkt/common';
+import {
+  type IUserData,
+  IUserDataSchema,
+  IUserDataWithoutDataSchema,
+  UserRank,
+} from '@kompakkt/common';
 import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
 import { userCollection, userTokenCollection } from 'src/mongo';
@@ -65,7 +70,7 @@ const userManagementRouter = new Elysia()
         {
           params: t.Object({ strategy: t.Optional(t.String()) }),
           response: {
-            200: IUserData,
+            200: IUserDataSchema,
             401: t.Any(),
           },
           body: signInBody,
@@ -139,7 +144,7 @@ const userManagementRouter = new Elysia()
             fullname: t.String(),
           }),
           response: {
-            200: IUserData,
+            200: IUserDataSchema,
             409: t.Any(),
             500: t.Any(),
           },
@@ -181,7 +186,7 @@ const userManagementRouter = new Elysia()
         },
         {
           response: {
-            200: IUserDataWithoutData,
+            200: IUserDataWithoutDataSchema,
             401: t.Any(),
           },
         },

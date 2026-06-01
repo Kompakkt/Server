@@ -11,8 +11,8 @@ import { checkIsOwner } from './modules/user-management/users';
 import {
   Collection,
   EntityAccessRole,
-  ICompilation,
-  ICompilationResolved,
+  ICompilationResolvedSchema,
+  ICompilationSchema,
   UserRank,
 } from '@kompakkt/common';
 import { info } from 'src/logger';
@@ -32,7 +32,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
       },
       {
         response: {
-          200: t.Object({ occurences: t.Number(), compilations: t.Array(ICompilation) }),
+          200: t.Object({ occurences: t.Number(), compilations: t.Array(ICompilationSchema) }),
           500: t.Any(),
         },
         params: t.Object({ id: t.String() }),
@@ -158,7 +158,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
             },
             {
               response: {
-                200: ICompilationResolved,
+                200: ICompilationResolvedSchema,
                 403: t.Any(),
                 500: t.Any(),
               },
