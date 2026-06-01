@@ -9,9 +9,7 @@ export const RouterTags = {
   'Upload': 'Upload',
   'Utility': 'Utility',
   'Monitoring': 'Monitoring',
-
   'Profile': 'Profile',
-  'Entity Management': 'Entity Management',
 } as const;
 
 export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
@@ -23,9 +21,7 @@ export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
   'Upload': 'Endpoints for handling file uploads and retrieving uploaded files',
   'Utility': 'Utility endpoints for various helper functions',
   'Monitoring': 'Endpoints for monitoring system health and performance',
-
   'Profile': 'Endpoints related to public user & institution profiles',
-  'Entity Management': 'Endpoints for managing entities and collections',
 } as const;
 
 const routerTagToTagObject = (tag: keyof typeof RouterTags): OpenAPIV3.TagObject => ({
