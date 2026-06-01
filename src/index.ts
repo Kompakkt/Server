@@ -104,7 +104,8 @@ PluginController.routers$.subscribe(async routerConfigs => {
         },
         documentation: {
           info: {
-            title: 'Kompakkt API Documentation',
+            title: 'Kompakkt API',
+            description: 'Documentation for available routes of the Kompakkt Server, including schemas for data structures used in requests and responses, and in code.',
             version: '2.0.0',
           },
           tags: [...RouterTagsAsTagObjects, ...pluginRouterTags],
