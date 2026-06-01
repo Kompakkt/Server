@@ -57,7 +57,8 @@ const OpenAPISpec = await Bun.fetch('http://localhost:45765/server/openapi/json'
 );
 const ast = await openapiTS(OpenAPISpec, {
   exportType: true,
-  enum: true,
+  enum: false,
+  enumValues: false,
   makePathsEnum: true,
   dedupeEnums: true,
 });
