@@ -97,6 +97,10 @@ PluginController.routers$.subscribe(async routerConfigs => {
           mcp: {
             disabled: true,
           },
+          favicon: '/server/favicon.ico',
+          telemetry: false,
+          showDeveloperTools: 'always',
+          withDefaultFonts: false,
         },
         documentation: {
           info: {
