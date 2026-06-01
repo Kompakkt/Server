@@ -5,6 +5,7 @@ import type { OpenAPIV3 } from 'openapi-types';
 import './util/patch-structured-clone';
 
 import { err, info, log } from './logger';
+import { buildCommonComponentsSchemas } from './openapi-schemas';
 import { initializePlugins, PluginController, type AnyElysia } from './plugins/plugin-controller';
 import finalServer from './server.final';
 import { RouterTags, RouterTagsAsTagObjects } from './routers/tags';
@@ -89,12 +90,24 @@ PluginController.routers$.subscribe(async routerConfigs => {
     .use(finalServer)
     .use(
       openapi({
+        scalar: {
+          agent: {
+            disabled: true,
+          },
+          mcp: {
+            disabled: true,
+          },
+        },
         documentation: {
           info: {
             title: 'Kompakkt API Documentation',
             version: '2.0.0',
           },
           tags: [...RouterTagsAsTagObjects, ...pluginRouterTags],
+          components: { schemas: buildCommonComponentsSchemas() },
+        },
+        exclude: {
+          paths: ['/server/metrics', '/server/csp-report'],
         },
       }),
     )
