@@ -562,7 +562,10 @@ const uploadRouter = new Elysia()
         type: t.Enum(DownloadType),
       }),
       response: {
-        200: t.String(),
+        200: t.Unknown({
+          description:
+            'Stream of newline-delimited progress values between 0 and 1, followed by a final "1" when the archive is ready.',
+        }),
         403: t.Any(),
         404: t.Any(),
       },
