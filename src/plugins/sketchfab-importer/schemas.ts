@@ -21,7 +21,7 @@ export namespace SketchfabSchemas {
       t.Intersect(
         LicenseSchema.omit(['url']),
         t.Object({
-          url: t.String().nullable(),
+          url: t.Nullable(t.String()),
         })
       ),
     ]),
