@@ -828,6 +828,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         return { status: 'OK', message: `You've removed your access to the specified object` };
       },
       {
+        body: t.Object({}),
         params: t.Object({
           collection: t.Enum(Collection, {
             description: 'The collection of the document to remove self from.',
