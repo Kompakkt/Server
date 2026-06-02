@@ -2,7 +2,7 @@ name: Generate OpenAPI Types
 
 on:
   push:
-    branches: [main]
+    branches: [main, openapi-staging]
 
 jobs:
   generate-openapi:
@@ -25,17 +25,23 @@ jobs:
       - name: Generate OpenAPI types
         run: bun run generate:openapi
 
-      - name: Deploy to openapi-types branch
+      - name: Deploy to target branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Map source branch to target orphan branch
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            TARGET_BRANCH="openapi-types"
+          else
+            TARGET_BRANCH="openapi-types-staging"
+          fi
           # Store files outside the repo temporarily
           cp e2e-out/openapi-server-types.ts /tmp/openapi-server-types.ts
           cp e2e-out/kompakkt-api-helpers.ts /tmp/kompakkt-api-helpers.ts
           cp e2e-out/package.json /tmp/package.json
-          # Create orphan branch (index is populated with all files from main — must be cleared)
-          git checkout --orphan openapi-types
-          # Remove all staged files from the index (they were inherited from main)
+          # Create orphan branch (index is populated with all files from source — must be cleared)
+          git checkout --orphan "$TARGET_BRANCH"
+          # Remove all staged files from the index (they were inherited from source)
           git rm -rf --cached .
           # Remove all working-tree files except .git
           find . -maxdepth 1 -not -name . -not -name .git -exec rm -rf {} +
@@ -45,4 +51,4 @@ jobs:
           mv /tmp/package.json .
           git add openapi-server-types.ts kompakkt-api-helpers.ts package.json
           git diff --staged --quiet || git commit -m "chore: update openapi types [skip ci]"
-          git push --force origin openapi-types
+          git push --force origin "$TARGET_BRANCH"

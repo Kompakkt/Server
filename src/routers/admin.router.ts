@@ -93,8 +93,8 @@ const adminRouter = new Elysia()
           query: t.Object({
             from: t.Number(),
             to: t.Number(),
-            finished: t.Optional(t.Boolean()),
-            restricted: t.Optional(t.Boolean()),
+            finished: t.Optional(t.String()),
+            restricted: t.Optional(t.String()),
           }),
           detail: {
             description: 'Get a digest of entities created within a specific time range',
