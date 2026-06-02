@@ -65,26 +65,33 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
     .use(permissionService)
     .get(
       '/get/find/:collection/:identifier',
-      async ({ params, userdata, request, server }) => {
-        const result = await findSingleHandler(params, userdata).catch(error => {
-          err(
-            `Error finding single handler for ${params.collection} ${params.identifier}: ${error}`,
-          );
-          return undefined;
-        });
-
-        const validCollection = (params.collection =
-          Collection.entity || params.collection === Collection.compilation);
-        if (result && validCollection) {
-          try {
-            void increasePopularity(result, params.collection, request, server);
-          } catch (error) {
-            warn(
-              `Failed increasing popularity for ${params.collection} ${params.identifier}: ${error}`,
+      async ({ params, userdata, request, server, status }) => {
+        try {
+          const result = await findSingleHandler(params, userdata).catch(error => {
+            err(
+              `Error finding single handler for ${params.collection} ${params.identifier}: ${error}`,
             );
+            return undefined;
+          });
+
+          const validCollection = (params.collection =
+            Collection.entity || params.collection === Collection.compilation);
+          if (result && validCollection) {
+            try {
+              void increasePopularity(result, params.collection, request, server);
+            } catch (error) {
+              warn(
+                `Failed increasing popularity for ${params.collection} ${params.identifier}: ${error}`,
+              );
+            }
           }
+          return result;
+        } catch (error) {
+          err(
+            `Error in find single endpoint for ${params.collection} ${params.identifier}: ${error}`,
+          );
+          return status(500, 'Internal server error');
         }
-        return result;
       },
       {
         params: findSingleParams,
@@ -94,6 +101,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
         },
         response: {
           200: t.Union([t.Undefined(), IEntityResolvedSchema, ICompilationResolvedSchema]),
+          500: t.Any(),
         },
       },
     )

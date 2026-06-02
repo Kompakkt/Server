@@ -1,4 +1,4 @@
-import { t, type Static } from 'elysia';
+import { t, type UnwrapSchema } from 'elysia';
 import { Collection, EntityAccessRole } from '@kompakkt/common';
 
 export enum FilterByOptions {
@@ -44,4 +44,4 @@ export const ExploreRequest = t.Object({
   sortBy: t.Enum(SortOrder),
 });
 
-export type ExploreRequest = Static<typeof ExploreRequest>;
+export type ExploreRequest = UnwrapSchema<typeof ExploreRequest>;

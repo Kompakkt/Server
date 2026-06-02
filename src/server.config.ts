@@ -51,9 +51,8 @@ const configServer = new Elysia({
     err(error);
     return;
   })
-
   .use(jwt(jwtOptions))
-  .use(corsPlugin({}))
+  .use(corsPlugin())
   .use(timingPlugin());
 
 export default configServer;
