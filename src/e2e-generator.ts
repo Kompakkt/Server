@@ -102,10 +102,18 @@ export type Endpoint<M extends HttpMethod, P extends keyof paths> =
 
 type Empty = Record<string, never>;
 
-type _PathParams<E>   = E extends { parameters: { path:   infer P } } ? (P extends Empty ? Empty : P) : Empty;
-type _QueryParams<E>  = E extends { parameters: { query:  infer Q } } ? (Q extends Empty ? Empty : Q) : Empty;
-type _HeaderParams<E> = E extends { parameters: { header: infer H } } ? (H extends Empty ? Empty : H) : Empty;
-type _CookieParams<E> = E extends { parameters: { cookie: infer C } } ? (C extends Empty ? Empty : C) : Empty;
+type _ExtractProp<T, K extends string> = K extends keyof T ? T[K] : never;
+type _Normalize<T> = [T] extends [Empty] ? Empty : [T] extends [never] ? Empty : T;
+type _Get<E, K extends string> =
+  E extends { parameters: infer P }
+    ? [P] extends [Empty]
+      ? Empty
+      : _Normalize<NonNullable<_ExtractProp<P, K>>>
+    : Empty;
+type _PathParams<E>   = _Get<E, 'path'>;
+type _QueryParams<E>  = _Get<E, 'query'>;
+type _HeaderParams<E> = _Get<E, 'header'>;
+type _CookieParams<E> = _Get<E, 'cookie'>;
 
 export type PathParams<E>   = _PathParams<E>;
 export type QueryParams<E>  = _QueryParams<E>;
