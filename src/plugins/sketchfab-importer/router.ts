@@ -34,20 +34,24 @@ const sketchfabImportRouter = new Elysia()
   .use(authService)
   .group('/sketchfab-import', app =>
     app
-      .get('/health', () => {
-        return { status: 'OK' } as const;
-      }, {
-        isLoggedIn: true,
-        detail: {
-          description: 'Health check endpoint to verify the service is running.',
-          tags: [sketchfabImportRouterTag],
+      .get(
+        '/health',
+        () => {
+          return { status: 'OK' } as const;
         },
-        response: {
-          200: t.Object({
-            status: t.Literal('OK'),
-          }),
-        }
-      })
+        {
+          isLoggedIn: true,
+          detail: {
+            description: 'Health check endpoint to verify the service is running.',
+            tags: [sketchfabImportRouterTag],
+          },
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+            }),
+          },
+        },
+      )
       .get(
         '/model-info/:id',
         async ({ params: { id }, status }) => {
@@ -141,8 +145,7 @@ const sketchfabImportRouter = new Elysia()
           const downloadDetails = await buildRequest(`/v3/models/${modelId}/download`, token)
             .then(res => res.json() as Promise<SketchfabSchemas.DownloadResponse>)
             .catch(() => undefined);
-          if (!downloadDetails?.glb?.url)
-            return status(404, 'Model not found or not downloadable');
+          if (!downloadDetails?.glb?.url) return status(404, 'Model not found or not downloadable');
 
           const uploadsDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
           const outDir = join(uploadsDir, 'model', new ObjectId().toString());
