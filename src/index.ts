@@ -127,6 +127,23 @@ PluginController.routers$.subscribe(async routerConfigs => {
       }),
     )
     .get(
+      '/health',
+      ({ set }) => {
+        set.status = 200;
+        return { status: 'OK' };
+      },
+      {
+        response: {
+          200: t.Object({ status: t.Literal('OK') }),
+        },
+        detail: {
+          description: 'Health check endpoint',
+          tags: [RouterTags.Monitoring],
+        },
+      },
+    )
+    .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
+    .get(
       '/previews/*',
       async ({ params, status }) => {
         let path = params['*'];

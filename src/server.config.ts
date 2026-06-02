@@ -51,23 +51,7 @@ const configServer = new Elysia({
     err(error);
     return;
   })
-  .get(
-    '/health',
-    ({ set }) => {
-      set.status = 200;
-      return { status: 'OK' };
-    },
-    {
-      response: {
-        200: t.Object({ status: t.Literal('OK') }),
-      },
-      detail: {
-        description: 'Health check endpoint',
-        tags: [RouterTags.Monitoring],
-      },
-    },
-  )
-  .get('/favicon.ico', () => Bun.file(`${RootDirectory}/assets/favicon.ico`))
+
   .use(jwt(jwtOptions))
   .use(corsPlugin({}))
   .use(timingPlugin());
