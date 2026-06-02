@@ -61,6 +61,9 @@ const OpenAPISpec = await Bun.fetch('http://localhost:45765/server/openapi/json'
     console.error('Error fetching OpenAPI spec:', err);
     process.exit(1);
   });
+
+await Bun.write('./e2e-out/openapi-spec.json', JSON.stringify(OpenAPISpec, null, 2));
+
 const ast = await openapiTS(OpenAPISpec, {
   exportType: true,
   enum: false,
