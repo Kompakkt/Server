@@ -52,15 +52,24 @@ const final = new Elysia({
 
 final.listen(45765);
 
-const OpenAPISpec = await Bun.fetch('http://localhost:45765/server/openapi/json').then(res =>
-  res.json(),
-);
+console.log('Waiting for server to start and OpenAPI spec to be available...');
+await setTimeout(5000);
+
+const OpenAPISpec = await Bun.fetch('http://localhost:45765/server/openapi/json')
+  .then(res => res.json())
+  .catch(err => {
+    console.error('Error fetching OpenAPI spec:', err);
+    process.exit(1);
+  });
 const ast = await openapiTS(OpenAPISpec, {
   exportType: true,
   enum: false,
   enumValues: false,
   makePathsEnum: true,
   dedupeEnums: true,
+}).catch(err => {
+  console.error('Error generating TypeScript types from OpenAPI spec:', err);
+  process.exit(1);
 });
 const contents = astToString(ast);
 
