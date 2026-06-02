@@ -875,7 +875,7 @@ const uploadRouter = new Elysia()
           }),
           response: {
             200: t.Object({
-              status: t.Pick(KompressorQueueResponseSchema, ['status']),
+              status: KompressorQueueResponseSchema.properties.status,
               uuid: t.String(),
               type: t.String(),
               requiresProcessing: t.Boolean(),
@@ -923,7 +923,7 @@ const uploadRouter = new Elysia()
           }),
           response: {
             200: t.Object({
-              status: t.Pick(KompressorStateResponseSchema, ['state']),
+              status: KompressorStateResponseSchema.properties.state,
               uuid: t.String(),
               type: t.String(),
               progress: t.Number(),
