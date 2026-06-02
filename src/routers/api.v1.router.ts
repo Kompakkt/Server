@@ -248,7 +248,17 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               tags: [RouterTags['API V1']],
             },
             response: {
-              200: t.Array(IStrippedUserDataSchema),
+              200: t.Array(
+                t.Union([
+                  IStrippedUserDataSchema,
+                  t.Object({
+                    profile: t.Object({
+                      type: t.Enum(ProfileType),
+                      profileId: t.String(),
+                    }),
+                  }),
+                ]),
+              ),
             },
           },
         )
