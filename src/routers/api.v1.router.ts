@@ -249,7 +249,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             },
             response: {
               200: t.Array(
-                t.Union([
+                t.Intersect([
                   IStrippedUserDataSchema,
                   t.Object({
                     profile: t.Object({
