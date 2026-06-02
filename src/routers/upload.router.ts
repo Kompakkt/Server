@@ -1,6 +1,6 @@
 import archiver from 'archiver';
 import { fetch } from 'bun';
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type UnwrapSchema } from 'elysia';
 import { ObjectId } from 'mongodb';
 import type { Dirent } from 'node:fs';
 import { createWriteStream } from 'node:fs';
@@ -22,17 +22,34 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RouterTags } from './tags';
 import { parseHttpRangeHeaders } from 'src/util/parse-http-range-headers';
 
-type KompressorStateResponse = {
-  progress: number;
-  finished: boolean;
-  state: 'DONE' | 'PROCESSING' | 'ERROR' | 'QUEUED';
-  message: string;
+const KompressorStateResponseSchema = t.Object({
+  progress: t.Number(),
+  finished: t.Boolean(),
+  state: t.UnionEnum(['DONE', 'PROCESSING', 'ERROR', 'QUEUED']),
+  message: t.String(),
+});
+type KompressorStateResponse = UnwrapSchema<typeof KompressorStateResponseSchema>;
+const isKompressorStateResponse = (obj: unknown): obj is KompressorStateResponse => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'progress' in obj &&
+    'finished' in obj &&
+    'state' in obj &&
+    'message' in obj
+  );
 };
 
-type KompressorQueueResponse = {
-  status: 'OK' | 'ERROR';
-  message: string;
-  id: string;
+const KompressorQueueResponseSchema = t.Object({
+  status: t.UnionEnum(['OK', 'ERROR']),
+  message: t.String(),
+  id: t.String(),
+});
+type KompressorQueueResponse = UnwrapSchema<typeof KompressorQueueResponseSchema>;
+const isKompressorQueueResponse = (obj: unknown): obj is KompressorQueueResponse => {
+  return (
+    typeof obj === 'object' && obj !== null && 'status' in obj && 'message' in obj && 'id' in obj
+  );
 };
 
 // Helper functions
@@ -821,12 +838,17 @@ const uploadRouter = new Elysia()
           }
 
           try {
-            const queueResponse = await fetch(
+            const response = await fetch(
               `http://${Hostname}:${Port}/process/${type}/${ids.at(0)!}`,
-            ).then(response => response.json() as Promise<KompressorQueueResponse>);
+            ).then(response => response.json());
+            if (!isKompressorQueueResponse(response)) {
+              throw new Error(
+                `Invalid response from Kompressor queue endpoint: ${Bun.inspect(response)}`,
+              );
+            }
 
             return {
-              status: queueResponse.status,
+              status: response.status,
               uuid,
               type,
               requiresProcessing: true,
@@ -853,7 +875,7 @@ const uploadRouter = new Elysia()
           }),
           response: {
             200: t.Object({
-              status: t.Union([t.Literal('OK'), t.Literal('Error')]),
+              status: t.Pick(KompressorQueueResponseSchema, ['status']),
               uuid: t.String(),
               type: t.String(),
               requiresProcessing: t.Boolean(),
@@ -870,7 +892,7 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/process/info',
-        async ({ body: { uuid, type } }) => {
+        async ({ body: { uuid, type }, status }) => {
           const { Enabled, Hostname, Port } = Configuration.Kompressor;
           if (!Enabled) {
             return {
@@ -884,14 +906,15 @@ const uploadRouter = new Elysia()
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
           const { ids } = await getUploadedFiles({ type, path });
 
-          const response = await fetch(`http://${Hostname}:${Port}/progress/${ids.at(0)!}`);
-          const info = (await response.json()) as KompressorStateResponse;
-          return {
-            status: 'OK',
-            uuid,
-            type,
-            progress: info.progress,
-          };
+          const response = await fetch(`http://${Hostname}:${Port}/progress/${ids.at(0)!}`).then(
+            res => res.json(),
+          );
+          if (!isKompressorStateResponse(response)) {
+            err(`Invalid response from Kompressor progress endpoint: ${Bun.inspect(response)}`);
+            return status(500, 'Invalid response from Kompressor');
+          }
+
+          return { status: 'OK', uuid, type, progress: response.progress };
         },
         {
           body: t.Object({
@@ -900,7 +923,7 @@ const uploadRouter = new Elysia()
           }),
           response: {
             200: t.Object({
-              status: t.Literal('OK'),
+              status: t.Pick(KompressorStateResponseSchema, ['state']),
               uuid: t.String(),
               type: t.String(),
               progress: t.Number(),
