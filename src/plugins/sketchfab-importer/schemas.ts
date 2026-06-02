@@ -6,7 +6,7 @@ export namespace SketchfabSchemas {
     label: t.String(),
     requirements: t.String(),
     uri: t.String(),
-    url: t.String().nullable(),
+    url: t.Nullable(t.String()),
     slug: t.String(),
   });
   export type License = UnwrapSchema<typeof LicenseSchema>;
