@@ -34,6 +34,9 @@ while (!spec) {
   spec = await getSpec();
 }
 
+// Frontend consuming those types expects _id to be a string, which is true after conversion by the server
+spec = JSON.parse(JSON.stringify(spec).replaceAll(`"_id":{}`, `"_id":{"type": "string"}`));
+
 if (!values.onlyTs)
   await Bun.write(join(outDir, 'openapi-spec.json'), JSON.stringify(spec, null, 2));
 

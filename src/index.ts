@@ -86,6 +86,42 @@ PluginController.routers$.subscribe(async routerConfigs => {
       idleTimeout: 255,
     },
   })
+    .onRequest(({ request: { url, method, headers }, status }) => {
+      url = url.slice(url.indexOf('/server/') + 7);
+      if (url.indexOf('/previews') === -1) {
+        queueMicrotask(() => {
+          const date = new Date().toISOString().replaceAll(/[TZ]/g, ' ').trim();
+          const user = Bun.hash(headers.get('cookie') ?? '');
+          console.log(
+            `\x1B[2m${date} \x1B[1m${method.padEnd(7, ' ')}\x1B[22m \x1B[2m${user}:${url}\x1B[22m`,
+          );
+        });
+      }
+      if (url.indexOf('/metrics') >= 0) {
+        const key = new URL(`http://example.com${url}`).searchParams.get('key');
+        if (!key) return status('Unauthorized', 'Incorrect API key');
+        if (key !== Configuration.Server.MonitoringToken)
+          return status('Unauthorized', 'Incorrect API key');
+      }
+      return;
+    })
+    .onError(({ error, code, status, path }) => {
+      if (
+        code === 'VALIDATION' &&
+        typeof error.messageValue === 'object' &&
+        error.messageValue != null &&
+        'path' in error.messageValue &&
+        typeof error.messageValue.path === 'string'
+      ) {
+        // Check if error is because of _id being ObjectId instead of string
+        if (error.messageValue.path.endsWith('/_id')) {
+          // Check if it was the only validation error
+          if (error.messageValue.errors.length === 1) {
+            return status(200, error.value);
+          }
+        }
+      }
+    })
     .use(app)
     .use(finalServer)
     .use(

@@ -74,8 +74,8 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             return undefined;
           });
 
-          const validCollection = (params.collection =
-            Collection.entity || params.collection === Collection.compilation);
+          const validCollection =
+            params.collection === Collection.entity || params.collection === Collection.compilation;
           if (result && validCollection) {
             try {
               void increasePopularity(result, params.collection, request, server);

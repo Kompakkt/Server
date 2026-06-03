@@ -23,7 +23,7 @@ import { Environment } from './environment';
 import type { IMailCollection } from './types/mails';
 const { Hostname, Port, ClientURL } = Configuration.Mongo;
 
-export const mongoClient = ClientURL
+const mongoClient = ClientURL
   ? new MongoClient(ClientURL)
   : new MongoClient(`mongodb://${Hostname}:${Port}`, {
       auth: {
@@ -31,6 +31,15 @@ export const mongoClient = ClientURL
         password: 'password',
       },
     });
+
+export const isMongoAvailable = async (): Promise<boolean> => {
+  try {
+    await mongoClient.db('admin').command({ ping: 1 });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 mongoClient.on('error', error => {
   err('MongoDB error', error);
@@ -49,7 +58,7 @@ if (!Environment.isE2eGenerator) {
 
 const db = (name: string) => mongoClient.db(name);
 
-export const accountsDb = db(Configuration.Mongo.AccountsDB);
+const accountsDb = db(Configuration.Mongo.AccountsDB);
 export const userCollection = accountsDb.collection<ServerDocument<IUserData>>('users');
 export const profileCollection = accountsDb.collection<ServerDocument<IPublicProfile>>('profiles');
 export type PasswordDocument = {
@@ -92,7 +101,7 @@ export type ApiKeyDocument = {
 };
 export const apiKeyCollection = accountsDb.collection<ServerDocument<ApiKeyDocument>>('apikeys');
 
-export const entitiesDb = db(Configuration.Mongo.RepositoryDB);
+const entitiesDb = db(Configuration.Mongo.RepositoryDB);
 export const entityCollection = entitiesDb.collection<ServerDocument<IEntity>>('entity');
 export const addressCollection = entitiesDb.collection<ServerDocument<IAddress>>('address');
 export const annotationCollection =

@@ -1,6 +1,4 @@
-import { randomBytes } from 'node:crypto';
 import Elysia, { t } from 'elysia';
-import { mongoClient } from 'src/mongo';
 import configServer from 'src/server.config';
 import { WikibaseConfiguration } from './config';
 import { WikibaseService } from './service';
