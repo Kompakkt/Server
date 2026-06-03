@@ -101,8 +101,6 @@ export const authService = new Elysia({ name: 'authService' })
       },
     },
     verifyLoginData: {
-      body: signInBody,
-      params: strategyParams,
       resolve: async ({ status, body, params, useAuthController }) => {
         if (!isSignInBody(body)) return status('Forbidden', 'Invalid sign-in data');
         if (!body?.username || !body?.password)
