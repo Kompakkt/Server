@@ -129,35 +129,31 @@ const configuration = {
   },
   [Collection.compilation]: {
     guard: isCompilation,
-    schema: t.Union([
-      ICompilationSchema,
-      ICompilationResolvedOnlyEntitiesSchema,
-      ICompilationResolvedSchema,
-    ]),
+    schema: ICompilationSchema,
   },
   [Collection.contact]: {
     guard: isContact,
-    schema: t.Union([IContactSchema]),
+    schema: IContactSchema,
   },
   [Collection.digitalentity]: {
     guard: isDigitalEntity,
-    schema: t.Union([IDigitalEntitySchema, IDigitalEntityResolvedSchema]),
+    schema: IDigitalEntitySchema,
   },
   [Collection.entity]: {
     guard: isEntity,
-    schema: t.Union([IEntitySchema, IEntityResolvedOnlyDigitalEntitySchema, IEntityResolvedSchema]),
+    schema: IEntitySchema,
   },
   [Collection.institution]: {
     guard: isInstitution,
-    schema: t.Union([IInstitutionSchema, IInstitutionResolvedSchema]),
+    schema: IInstitutionSchema,
   },
   [Collection.person]: {
     guard: isPerson,
-    schema: t.Union([IPersonSchema, IPersonResolvedSchema]),
+    schema: IPersonSchema,
   },
   [Collection.physicalentity]: {
     guard: isPhysicalEntity,
-    schema: t.Union([IPhysicalEntitySchema, IPhysicalEntityResolvedSchema]),
+    schema: IPhysicalEntitySchema,
   },
   [Collection.tag]: {
     guard: isTag,

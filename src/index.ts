@@ -119,6 +119,8 @@ PluginController.routers$.subscribe(async routerConfigs => {
           if (error.messageValue.errors.length === 1) {
             return status(200, error.value);
           }
+        } else {
+          console.log('We got a validation error', Bun.inspect(error.messageValue, { depth: 2 }));
         }
       }
     })
