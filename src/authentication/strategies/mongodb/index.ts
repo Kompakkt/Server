@@ -4,6 +4,7 @@ import {
   type AuthWithUsernamePassword,
   AuthenticationStrategy,
 } from '../strategy';
+import { verifyPassword } from 'src/util/authentication-helpers';
 
 export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
   strategyName = 'MongoDbStrategy';
