@@ -180,6 +180,7 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
     externalLink: asDigitalEntity.externalLink ?? [],
     files: asDigitalEntity.files ?? [],
     licence: asDigitalEntity.licence ?? '',
+    licenceAttribution: asDigitalEntity.licenceAttribution ?? '',
     metadata_files: await saveMetadataFiles(
       asDigitalEntity._id!,
       asDigitalEntity.metadata_files ?? [],
