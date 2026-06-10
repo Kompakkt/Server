@@ -26,7 +26,7 @@ const KompressorStateResponseSchema = t.Object({
   progress: t.Number(),
   finished: t.Boolean(),
   state: t.UnionEnum(['DONE', 'PROCESSING', 'ERROR', 'QUEUED']),
-  message: t.String(),
+  message: t.Optional(t.String()),
 });
 type KompressorStateResponse = UnwrapSchema<typeof KompressorStateResponseSchema>;
 const isKompressorStateResponse = (obj: unknown): obj is KompressorStateResponse => {
@@ -35,8 +35,7 @@ const isKompressorStateResponse = (obj: unknown): obj is KompressorStateResponse
     obj !== null &&
     'progress' in obj &&
     'finished' in obj &&
-    'state' in obj &&
-    'message' in obj
+    'state' in obj
   );
 };
 
@@ -293,7 +292,7 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ request: { url }, set, headers, status }) => {
+    async ({ request: { url }, headers, status }) => {
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
 
       const requestedPath = url.split('/uploads').at(-1)!;
@@ -334,7 +333,17 @@ const uploadRouter = new Elysia()
 
       if (ranges.length === 1) {
         const range = ranges[0];
-        return realFile.slice(range.start, range.end + 1);
+        // Just returning "slice" send an incorrect amount of bytes
+        const bytes = await realFile.slice(range.start, range.end + 1).bytes();
+        return new Response(bytes, {
+          status: 206,
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-length': String(range.end - range.start + 1),
+            'content-range': `bytes ${range.start}-${range.end}/${realFile.size}`,
+            'accept-ranges': 'bytes',
+          },
+        });
       }
 
       return status(416, 'Range Not Satisfiable');
@@ -458,7 +467,7 @@ const uploadRouter = new Elysia()
   )
   .get(
     '/download/prepare/:entityId/:type',
-    async function* ({ status, params: { entityId, type }, set }) {
+    async function* ({ status, params: { entityId, type } }) {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
       if (!entity) return status(404, 'Entity not found');
       if (!entity.options?.allowDownload)
@@ -529,7 +538,7 @@ const uploadRouter = new Elysia()
         }
       }
 
-      archive.finalize();
+      void archive.finalize();
 
       // Yield progress updates while archiving
       while (!archiveDone) {
@@ -578,7 +587,7 @@ const uploadRouter = new Elysia()
   )
   .get(
     '/download/:entityId/:type',
-    async ({ status, params: { entityId, type }, set }) => {
+    async ({ status, params: { entityId, type } }) => {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
       if (!entity) return status(404, 'Entity not found');
       if (!entity.options?.allowDownload)
@@ -650,7 +659,7 @@ const uploadRouter = new Elysia()
         '/chunk/upload',
         async ({ body: { chunk, uploadId, index }, status }) => {
           const tempDir = join(uploadDir, 'chunks', uploadId);
-          await ensure(tempDir);
+          await ensure(tempDir, false);
           const chunkPath = join(tempDir, `chunk_${index.toString().padStart(4, '0')}`);
           const writeSuccess = await Bun.write(chunkPath, chunk)
             .then(() => true)
@@ -926,7 +935,7 @@ const uploadRouter = new Elysia()
           }),
           response: {
             200: t.Object({
-              status: KompressorStateResponseSchema.properties.state,
+              status: t.Literal('OK'),
               uuid: t.String(),
               type: t.String(),
               progress: t.Number(),
