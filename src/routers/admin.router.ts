@@ -156,7 +156,7 @@ const adminRouter = new Elysia()
             tags: [RouterTags.Admin],
           },
           response: {
-            200: t.Array(IUserDataSchema),
+            200: t.Array(t.Omit(IUserDataSchema, ['sessionID', 'rank', 'prename', 'surname'])),
             500: t.Any(),
           },
         },

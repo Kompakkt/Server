@@ -100,7 +100,15 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           tags: [RouterTags['API V1']],
         },
         response: {
-          200: t.Union([t.Undefined(), IEntityResolvedSchema, ICompilationResolvedSchema]),
+          // While the findSingleHandler theoretically always tries to resolve, on initial upload the relatedDigitalEntity might not exist yet
+          // Important: Resolved schema needs to precede unresolved schema, otherwise the resolved properties will be omitted
+          200: t.Union([
+            t.Undefined(),
+            IEntityResolvedSchema,
+            IEntitySchema,
+            ICompilationResolvedSchema,
+            ICompilationSchema,
+          ]),
           500: t.Any(),
         },
       },

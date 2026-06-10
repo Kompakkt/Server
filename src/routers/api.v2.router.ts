@@ -231,7 +231,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           }),
         ]),
         response: {
-          200: IEntitySchema,
+          200: t.Union([IEntitySchema, ICompilationSchema]),
           400: t.Any(),
           401: t.Any(),
           403: t.Any(),
