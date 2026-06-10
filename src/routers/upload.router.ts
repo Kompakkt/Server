@@ -333,9 +333,12 @@ const uploadRouter = new Elysia()
 
       if (ranges.length === 1) {
         const range = ranges[0];
+        // 2026-06-11: Returning the file is broken on elysia upstream as of right now
         // Just returning "slice" send an incorrect amount of bytes
-        const bytes = await realFile.slice(range.start, range.end + 1).bytes();
-        return new Response(bytes, {
+        // https://github.com/elysiajs/elysia/issues/1868
+        // We apply a patch in the package.json
+        // TODO: Monitor the upstream issue and switch back to returning the sliced file once it's fixed.
+        return new Response(realFile.slice(range.start, range.end + 1), {
           status: 206,
           headers: {
             'content-type': 'application/octet-stream',

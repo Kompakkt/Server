@@ -81,5 +81,8 @@
   },
   "workspaces": [
     "src/plugins/*"
-  ]
+  ],
+  "patchedDependencies": {
+    "elysia@1.4.28": "patches/elysia@1.4.28.patch"
+  }
 }
