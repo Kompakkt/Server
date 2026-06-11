@@ -7,9 +7,9 @@ import { info, warn } from 'src/logger';
  * @param path
  * @returns
  */
-export const ensure = async (path: string) => {
+export const ensure = async (path: string, infoLog = true) => {
   try {
-    info(`Ensuring path exists: ${path}`);
+    if (infoLog) info(`Ensuring path exists: ${path}`);
     await mkdir(dirname(path), { recursive: true });
   } catch (err) {
     warn(`Failed to ensure path exists: ${path}`, err);

@@ -20,80 +20,37 @@ import {
 } from '@kompakkt/common';
 import { t } from 'elysia';
 
+/**
+ * Union type for all possible collection schemas.
+ * Used by routes which catch-all collection types.
+ * Unfortunately some validations fail if the resolved schemas are after the non-resolved ones, so the resolved schemas are placed before the non-resolved ones in the union.
+ *
+ * TODO: Refactor the server to not have any catch-all routes, and instead have specific routes for each collection type. This would allow us to remove this union type and the associated complexity.
+ * Alternatively, maybe we can do some "additionalProperties"-shenanigans on the non-resolved schemas to not automatically omit properties of the resolved schemas?
+ */
 export const AllCollectionsSchemaUnion = t.Union([
   IAddressSchema,
   IAnnotationSchema,
-  ICompilationSchema,
   IContactSchema,
-  IDigitalEntitySchema,
-  IEntitySchema,
-  IInstitutionSchema,
-  IPersonSchema,
-  IPhysicalEntitySchema,
   ITagSchema,
-  IEntityResolvedOnlyDigitalEntitySchema,
+
   IEntityResolvedSchema,
+  IEntityResolvedOnlyDigitalEntitySchema,
+  IEntitySchema,
+
   IPersonResolvedSchema,
+  IPersonSchema,
+
   ICompilationResolvedOnlyEntitiesSchema,
   ICompilationResolvedSchema,
-  IInstitutionResolvedSchema,
-  IDigitalEntityResolvedSchema,
-  IPhysicalEntityResolvedSchema,
-]);
+  ICompilationSchema,
 
-export const AllCollectionsArraySchemaUnion = t.Union([
-  t.Array(IAddressSchema, {
-    title: 'IAddress[]',
-  }),
-  t.Array(IAnnotationSchema, {
-    title: 'IAnnotation[]',
-  }),
-  t.Array(ICompilationSchema, {
-    title: 'ICompilation[]',
-  }),
-  t.Array(IContactSchema, {
-    title: 'IContact[]',
-  }),
-  t.Array(IDigitalEntitySchema, {
-    title: 'IDigitalEntity[]',
-  }),
-  t.Array(IEntitySchema, {
-    title: 'IEntity[]',
-  }),
-  t.Array(IInstitutionSchema, {
-    title: 'IInstitution[]',
-  }),
-  t.Array(IPersonSchema, {
-    title: 'IPerson[]',
-  }),
-  t.Array(IPhysicalEntitySchema, {
-    title: 'IPhysicalEntity[]',
-  }),
-  t.Array(ITagSchema, {
-    title: 'ITag[]',
-  }),
-  t.Array(IEntityResolvedOnlyDigitalEntitySchema, {
-    title: 'IEntity[] with relatedDigitalEntity resolved',
-  }),
-  t.Array(IEntityResolvedSchema, {
-    title: 'IEntity[] fully resolved',
-  }),
-  t.Array(IPersonResolvedSchema, {
-    title: 'IPerson[] fully resolved',
-  }),
-  t.Array(ICompilationResolvedOnlyEntitiesSchema, {
-    title: 'ICompilation[] with entities resolved',
-  }),
-  t.Array(ICompilationResolvedSchema, {
-    title: 'ICompilation[] fully resolved',
-  }),
-  t.Array(IInstitutionResolvedSchema, {
-    title: 'IInstitution[] fully resolved',
-  }),
-  t.Array(IDigitalEntityResolvedSchema, {
-    title: 'IDigitalEntity[] fully resolved',
-  }),
-  t.Array(IPhysicalEntityResolvedSchema, {
-    title: 'IPhysicalEntity[] fully resolved',
-  }),
+  IInstitutionResolvedSchema,
+  IInstitutionSchema,
+
+  IDigitalEntityResolvedSchema,
+  IDigitalEntitySchema,
+
+  IPhysicalEntityResolvedSchema,
+  IPhysicalEntitySchema,
 ]);

@@ -1,18 +1,17 @@
-import jwt from '@elysiajs/jwt';
-import Elysia, { t, type Static } from 'elysia';
+import Elysia, { t, type UnwrapSchema } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
 import { UserRank, type IUserData } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { userCollection } from 'src/mongo';
-import configServer, { jwtOptions } from 'src/server.config';
+import configServer from 'src/server.config';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export const signInBody = t.Object({
   username: t.String(),
   password: t.String(),
 });
-export type SignInBody = Static<typeof signInBody>;
+export type SignInBody = UnwrapSchema<typeof signInBody>;
 export const isSignInBody = (data: unknown): data is SignInBody => {
   return (
     typeof data === 'object' &&
@@ -29,7 +28,7 @@ export const strategyParams = t.Optional(
     strategy: t.String(),
   }),
 );
-export type StrategyParams = Static<typeof strategyParams>;
+export type StrategyParams = UnwrapSchema<typeof strategyParams>;
 export const isStrategyParams = (data: unknown): data is StrategyParams => {
   return (
     typeof data === 'object' &&
@@ -41,7 +40,6 @@ export const isStrategyParams = (data: unknown): data is StrategyParams => {
 
 export const authService = new Elysia({ name: 'authService' })
   .use(configServer)
-  .use(jwt(jwtOptions))
   .resolve(
     { as: 'global' },
     async ({
@@ -91,30 +89,29 @@ export const authService = new Elysia({ name: 'authService' })
   .macro({
     isLoggedIn: {
       resolve: ({ status, userdata }) => {
-        if (!userdata) return status('Forbidden');
+        if (!userdata) return status('Forbidden', 'You must be logged in to access this resource');
         return;
       },
     },
     isAdmin: {
       resolve: ({ status, userdata }) => {
-        if (userdata?.role !== UserRank.admin) return status('Forbidden');
+        if (userdata?.role !== UserRank.admin)
+          return status('Forbidden', 'You must be an admin to access this resource');
         return;
       },
     },
     verifyLoginData: {
-      // TODO: These are bugged due to: https://github.com/elysiajs/elysia/issues/1282
-      // body: signInBody,
-      // params: strategyParams,
       resolve: async ({ status, body, params, useAuthController }) => {
-        if (!isSignInBody(body)) return status('Forbidden');
-        if (!body?.username || !body?.password) return status('Forbidden');
+        if (!isSignInBody(body)) return status('Forbidden', 'Invalid sign-in data');
+        if (!body?.username || !body?.password)
+          return status('Forbidden', 'Missing username or password');
         const strategy =
           'strategy' in params && typeof params.strategy === 'string' ? params.strategy : undefined;
 
         const authResult = await useAuthController(body, strategy);
         if (authResult instanceof Error) {
           log(`Failed login attempt for user ${body.username} using strategy ${strategy}`);
-          return status('Forbidden');
+          return status('Forbidden', 'Invalid username or password');
         }
         return;
       },

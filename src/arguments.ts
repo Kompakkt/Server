@@ -10,14 +10,13 @@ const { values } = parseArgs({
       type: 'boolean',
     },
   },
-  strict: true,
+  strict: false,
   allowPositionals: true,
 });
 
 export const CommandLineArguments = values;
 
 if (CommandLineArguments.help) {
-  // eslint-disable-next-line no-console
   console.log(
     `
 Usage: ./server [options]

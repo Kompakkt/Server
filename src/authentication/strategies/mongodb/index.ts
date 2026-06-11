@@ -1,20 +1,16 @@
-import { mongoClient, passwordCollection, userCollection } from 'src/mongo';
-import { verifyPassword } from 'src/util/authentication-helpers';
+import { isMongoAvailable, passwordCollection, userCollection } from 'src/mongo';
 import {
   type AuthResult,
   type AuthWithUsernamePassword,
   AuthenticationStrategy,
 } from '../strategy';
+import { verifyPassword } from 'src/util/authentication-helpers';
 
 export class MongoDbStrategy extends AuthenticationStrategy<AuthWithUsernamePassword> {
   strategyName = 'MongoDbStrategy';
 
   async isAvailable(): Promise<boolean> {
-    return mongoClient
-      .db('admin')
-      .command({ ping: 1 })
-      .then(_ => true)
-      .catch(_ => false);
+    return isMongoAvailable();
   }
 
   async authenticate({ username, password }: AuthWithUsernamePassword): Promise<AuthResult> {

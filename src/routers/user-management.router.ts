@@ -87,7 +87,7 @@ const userManagementRouter = new Elysia()
         async ({ status, body }) => {
           info('Registering new user');
           // First user gets admin
-          const isFirstUser = (await userCollection.findOne({})) === undefined;
+          const isFirstUser = (await userCollection.countDocuments()) === 0;
           const role = isFirstUser ? UserRank.admin : UserRank.uploader;
 
           const { username, password } = body;

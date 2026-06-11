@@ -1,0 +1,74 @@
+diff --git a/dist/adapter/utils.js b/dist/adapter/utils.js
+index 9d72eb489cfe093f03e2e79150c9b6d98d98f69d..14d01defc8715a7d32d3b218dd3e490c5a050496 100644
+--- a/dist/adapter/utils.js
++++ b/dist/adapter/utils.js
+@@ -268,12 +268,31 @@ function mergeHeaders(responseHeaders, setHeaders) {
+ function mergeStatus(responseStatus, setStatus) {
+   return typeof setStatus == "string" && (setStatus = import_utils.StatusMap[setStatus]), responseStatus === 200 ? setStatus : responseStatus;
+ }
++function mergeHeadersInPlace(target, source) {
++  if (source instanceof Headers) {
++    for (const key of source.keys())
++      if (key === "set-cookie") {
++        if (target.has("set-cookie")) continue;
++        for (const cookie of source.getSetCookie())
++          target.append("set-cookie", cookie);
++      } else target.has(key) || target.set(key, source.get(key) ?? "");
++  } else
++    for (const key in source)
++      key === "set-cookie" ? target.append(key, source[key]) : target.has(key) || target.set(key, source[key]);
++}
+ const createResponseHandler = (handler) => {
+   const handleStream = createStreamHandler(handler);
+   return (response, set, request) => {
++    const mergedStatus = mergeStatus(response.status, set.status);
++    if (import_utils2.isBun && mergedStatus === response.status) {
++      const cloned = response.clone();
++      mergeHeadersInPlace(cloned.headers, set.headers);
++      const needsStreamHandling = !cloned.headers.has("content-length") && cloned.headers.get("transfer-encoding") === "chunked";
++      if (!needsStreamHandling) return cloned;
++    }
+     const newResponse = new Response(response.body, {
+       headers: mergeHeaders(response.headers, set.headers),
+-      status: mergeStatus(response.status, set.status)
++      status: mergedStatus
+     });
+     return !newResponse.headers.has("content-length") && newResponse.headers.get("transfer-encoding") === "chunked" ? handleStream(
+       streamResponse(newResponse),
+diff --git a/dist/adapter/utils.mjs b/dist/adapter/utils.mjs
+index f4135d629a882d1963f244dcf79a8deb7f10d684..d76d6571d33176bcf8a6787b9c6698fe7bb7c061 100644
+--- a/dist/adapter/utils.mjs
++++ b/dist/adapter/utils.mjs
+@@ -241,12 +241,31 @@ function mergeHeaders(responseHeaders, setHeaders) {
+ function mergeStatus(responseStatus, setStatus) {
+   return typeof setStatus == "string" && (setStatus = StatusMap[setStatus]), responseStatus === 200 ? setStatus : responseStatus;
+ }
++function mergeHeadersInPlace(target, source) {
++  if (source instanceof Headers) {
++    for (const key of source.keys())
++      if (key === "set-cookie") {
++        if (target.has("set-cookie")) continue;
++        for (const cookie of source.getSetCookie())
++          target.append("set-cookie", cookie);
++      } else target.has(key) || target.set(key, source.get(key) ?? "");
++  } else
++    for (const key in source)
++      key === "set-cookie" ? target.append(key, source[key]) : target.has(key) || target.set(key, source[key]);
++}
+ const createResponseHandler = (handler) => {
+   const handleStream = createStreamHandler(handler);
+   return (response, set, request) => {
++    const mergedStatus = mergeStatus(response.status, set.status);
++    if (isBun && mergedStatus === response.status) {
++      const cloned = response.clone();
++      mergeHeadersInPlace(cloned.headers, set.headers);
++      const needsStreamHandling = !cloned.headers.has("content-length") && cloned.headers.get("transfer-encoding") === "chunked";
++      if (!needsStreamHandling) return cloned;
++    }
+     const newResponse = new Response(response.body, {
+       headers: mergeHeaders(response.headers, set.headers),
+-      status: mergeStatus(response.status, set.status)
++      status: mergedStatus
+     });
+     return !newResponse.headers.has("content-length") && newResponse.headers.get("transfer-encoding") === "chunked" ? handleStream(
+       streamResponse(newResponse),

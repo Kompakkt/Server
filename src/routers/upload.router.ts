@@ -1,13 +1,13 @@
 import archiver from 'archiver';
 import { fetch } from 'bun';
-import { Elysia, t } from 'elysia';
+import { Elysia, t, type UnwrapSchema } from 'elysia';
 import { ObjectId } from 'mongodb';
 import type { Dirent } from 'node:fs';
 import { createWriteStream } from 'node:fs';
 import { exists, readdir, realpath, rm, stat, symlink } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import slugify from 'slugify';
-import type { IEntity, IFile } from '@kompakkt/common';
+import { IFileSchema, type IEntity, type IFile } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { err, info, log, warn } from 'src/logger';
@@ -22,17 +22,33 @@ import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RouterTags } from './tags';
 import { parseHttpRangeHeaders } from 'src/util/parse-http-range-headers';
 
-type KompressorStateResponse = {
-  progress: number;
-  finished: boolean;
-  state: 'DONE' | 'PROCESSING' | 'ERROR' | 'QUEUED';
-  message: string;
+const KompressorStateResponseSchema = t.Object({
+  progress: t.Number(),
+  finished: t.Boolean(),
+  state: t.UnionEnum(['DONE', 'PROCESSING', 'ERROR', 'QUEUED']),
+  message: t.Optional(t.String()),
+});
+type KompressorStateResponse = UnwrapSchema<typeof KompressorStateResponseSchema>;
+const isKompressorStateResponse = (obj: unknown): obj is KompressorStateResponse => {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'progress' in obj &&
+    'finished' in obj &&
+    'state' in obj
+  );
 };
 
-type KompressorQueueResponse = {
-  status: 'OK' | 'ERROR';
-  message: string;
-  id: string;
+const KompressorQueueResponseSchema = t.Object({
+  status: t.UnionEnum(['OK', 'ERROR']),
+  message: t.String(),
+  id: t.String(),
+});
+type KompressorQueueResponse = UnwrapSchema<typeof KompressorQueueResponseSchema>;
+const isKompressorQueueResponse = (obj: unknown): obj is KompressorQueueResponse => {
+  return (
+    typeof obj === 'object' && obj !== null && 'status' in obj && 'message' in obj && 'id' in obj
+  );
 };
 
 // Helper functions
@@ -276,7 +292,7 @@ const uploadRouter = new Elysia()
   .use(authService)
   .get(
     'uploads/*',
-    async ({ request: { url }, set, headers, status }) => {
+    async ({ request: { url }, headers, status }) => {
       const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
 
       const requestedPath = url.split('/uploads').at(-1)!;
@@ -317,7 +333,20 @@ const uploadRouter = new Elysia()
 
       if (ranges.length === 1) {
         const range = ranges[0];
-        return realFile.slice(range.start, range.end + 1);
+        // 2026-06-11: Returning the file is broken on elysia upstream as of right now
+        // Just returning "slice" send an incorrect amount of bytes
+        // https://github.com/elysiajs/elysia/issues/1868
+        // We apply a patch in the package.json
+        // TODO: Monitor the upstream issue and switch back to returning the sliced file once it's fixed.
+        return new Response(realFile.slice(range.start, range.end + 1), {
+          status: 206,
+          headers: {
+            'content-type': 'application/octet-stream',
+            'content-length': String(range.end - range.start + 1),
+            'content-range': `bytes ${range.start}-${range.end}/${realFile.size}`,
+            'accept-ranges': 'bytes',
+          },
+        });
       }
 
       return status(416, 'Range Not Satisfiable');
@@ -335,6 +364,12 @@ const uploadRouter = new Elysia()
           }),
         ),
       }),
+      response: {
+        200: t.File(),
+        403: t.Any(),
+        404: t.Any(),
+        416: t.Any(),
+      },
       detail: {
         description: 'Serve uploaded files with on-the-fly compression',
         tags: [RouterTags.Upload],
@@ -415,6 +450,18 @@ const uploadRouter = new Elysia()
       params: t.Object({
         entityId: t.String(),
       }),
+      response: {
+        200: t.Object({
+          zipStats: t.Record(t.Enum(DownloadType), t.Number()),
+          rawSize: t.Number(),
+          processedSize: t.Number(),
+          hasCompressedFiles: t.Boolean(),
+          rawFileTypes: t.Array(t.String()),
+          processedFileTypes: t.Array(t.String()),
+        }),
+        403: t.Any(),
+        404: t.Any(),
+      },
       detail: {
         description: 'Get available download options and file types for an entity',
         tags: [RouterTags.Upload],
@@ -423,7 +470,7 @@ const uploadRouter = new Elysia()
   )
   .get(
     '/download/prepare/:entityId/:type',
-    async function* ({ status, params: { entityId, type }, set }) {
+    async function* ({ status, params: { entityId, type } }) {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
       if (!entity) return status(404, 'Entity not found');
       if (!entity.options?.allowDownload)
@@ -494,7 +541,7 @@ const uploadRouter = new Elysia()
         }
       }
 
-      archive.finalize();
+      void archive.finalize();
 
       // Yield progress updates while archiving
       while (!archiveDone) {
@@ -526,6 +573,14 @@ const uploadRouter = new Elysia()
         entityId: t.String(),
         type: t.Enum(DownloadType),
       }),
+      response: {
+        200: t.Unknown({
+          description:
+            'Stream of newline-delimited progress values between 0 and 1, followed by a final "1" when the archive is ready.',
+        }),
+        403: t.Any(),
+        404: t.Any(),
+      },
       detail: {
         description:
           'Prepare a ZIP archive for download and receive progress updates as a stream. The response is a stream of newline-delimited progress values between 0 and 1, followed by a final "1" when the archive is ready.',
@@ -535,7 +590,7 @@ const uploadRouter = new Elysia()
   )
   .get(
     '/download/:entityId/:type',
-    async ({ status, params: { entityId, type }, set }) => {
+    async ({ status, params: { entityId, type } }) => {
       const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
       if (!entity) return status(404, 'Entity not found');
       if (!entity.options?.allowDownload)
@@ -557,6 +612,11 @@ const uploadRouter = new Elysia()
         entityId: t.String(),
         type: t.Enum(DownloadType),
       }),
+      response: {
+        200: t.File(),
+        403: t.Any(),
+        404: t.Any(),
+      },
       detail: {
         description:
           'Download the prepared ZIP archive for an entity. The archive must have been prepared using the /download/prepare endpoint.',
@@ -569,10 +629,18 @@ const uploadRouter = new Elysia()
     group
       .post(
         '/chunk/init',
-        async () => {
+        async ({ status }) => {
           const uploadId = new ObjectId().toString();
           const tempDir = join(uploadDir, 'chunks', uploadId);
-          await ensure(tempDir);
+          const result = await ensure(tempDir)
+            .then(() => true)
+            .catch(e => {
+              err(e);
+              return false;
+            });
+          if (!result) {
+            return status(500, 'Failed to initialize upload session');
+          }
           return { status: 'OK', uploadId };
         },
         {
@@ -581,13 +649,20 @@ const uploadRouter = new Elysia()
               'Initialize a new chunked upload session and receive a unique uploadId for subsequent chunk uploads.',
             tags: [RouterTags.Upload],
           },
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+              uploadId: t.String(),
+            }),
+            500: t.Any(),
+          },
         },
       )
       .post(
         '/chunk/upload',
         async ({ body: { chunk, uploadId, index }, status }) => {
           const tempDir = join(uploadDir, 'chunks', uploadId);
-          await ensure(tempDir);
+          await ensure(tempDir, false);
           const chunkPath = join(tempDir, `chunk_${index.toString().padStart(4, '0')}`);
           const writeSuccess = await Bun.write(chunkPath, chunk)
             .then(() => true)
@@ -606,6 +681,12 @@ const uploadRouter = new Elysia()
             uploadId: t.String(),
             index: t.Numeric(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+            }),
+            500: t.Any(),
+          },
           detail: {
             description: 'Upload a chunk of a file for a given uploadId.',
             tags: [RouterTags.Upload],
@@ -646,11 +727,11 @@ const uploadRouter = new Elysia()
 
                 const chunkStream = chunkFile.stream();
                 for await (const chunk of chunkStream) {
-                  fileWriter.write(chunk);
+                  await fileWriter.write(chunk);
                 }
               }
 
-              fileWriter.end();
+              await fileWriter.end();
 
               // Calculate MD5 of the final file if needed
               const serverChecksum = await calculateMD5(Bun.file(destPath).stream());
@@ -660,7 +741,7 @@ const uploadRouter = new Elysia()
 
               return { status: 'OK', path: destPath, serverChecksum };
             } catch (e) {
-              fileWriter.end();
+              await fileWriter.end();
               err(e);
               return status(500, 'Failed to assemble file');
             }
@@ -677,6 +758,15 @@ const uploadRouter = new Elysia()
             token: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+              path: t.String(),
+              serverChecksum: t.String(),
+            }),
+            400: t.Any(),
+            500: t.Any(),
+          },
           detail: {
             description: 'Finish a chunked upload by assembling all chunks into the final file.',
             tags: [RouterTags.Upload],
@@ -695,7 +785,7 @@ const uploadRouter = new Elysia()
               : join(basePath, file.name);
 
           const success = await writeStreamToDisk(file.stream(), destPath);
-          return success ? { status: 'OK', serverChecksum } : status('Internal Server Error');
+          return success ? { status: 'OK', serverChecksum } : status(500, 'Internal Server Error');
         },
         {
           body: t.Object({
@@ -704,6 +794,13 @@ const uploadRouter = new Elysia()
             token: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+              serverChecksum: t.String(),
+            }),
+            500: t.Any(),
+          },
           detail: {
             description:
               'Upload a file directly without chunking. Deprecated in favor of chunked uploads for stability with large files.',
@@ -756,12 +853,17 @@ const uploadRouter = new Elysia()
           }
 
           try {
-            const queueResponse = await fetch(
+            const response = await fetch(
               `http://${Hostname}:${Port}/process/${type}/${ids.at(0)!}`,
-            ).then(response => response.json() as Promise<KompressorQueueResponse>);
+            ).then(response => response.json());
+            if (!isKompressorQueueResponse(response)) {
+              throw new Error(
+                `Invalid response from Kompressor queue endpoint: ${Bun.inspect(response)}`,
+              );
+            }
 
             return {
-              status: queueResponse.status,
+              status: response.status,
               uuid,
               type,
               requiresProcessing: true,
@@ -786,6 +888,16 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: KompressorQueueResponseSchema.properties.status,
+              uuid: t.String(),
+              type: t.String(),
+              requiresProcessing: t.Boolean(),
+            }),
+            404: t.Any(),
+            500: t.Any(),
+          },
           detail: {
             description:
               'Start processing uploaded files with Kompressor (internal pre-processing service) if needed. Checks if processing is required based on file types and existing processed files, and initiates processing by calling the Kompressor service.',
@@ -795,7 +907,7 @@ const uploadRouter = new Elysia()
       )
       .post(
         '/process/info',
-        async ({ body: { uuid, type } }) => {
+        async ({ body: { uuid, type }, status }) => {
           const { Enabled, Hostname, Port } = Configuration.Kompressor;
           if (!Enabled) {
             return {
@@ -809,20 +921,30 @@ const uploadRouter = new Elysia()
           const path = `${RootDirectory}/${UploadDirectory}/${type}/${uuid}`;
           const { ids } = await getUploadedFiles({ type, path });
 
-          const response = await fetch(`http://${Hostname}:${Port}/progress/${ids.at(0)!}`);
-          const info = (await response.json()) as KompressorStateResponse;
-          return {
-            status: 'OK',
-            uuid,
-            type,
-            progress: info.progress,
-          };
+          const response = await fetch(`http://${Hostname}:${Port}/progress/${ids.at(0)!}`).then(
+            res => res.json(),
+          );
+          if (!isKompressorStateResponse(response)) {
+            err(`Invalid response from Kompressor progress endpoint: ${Bun.inspect(response)}`);
+            return status(500, 'Invalid response from Kompressor');
+          }
+
+          return { status: 'OK', uuid, type, progress: response.progress };
         },
         {
           body: t.Object({
             uuid: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+              uuid: t.String(),
+              type: t.String(),
+              progress: t.Number(),
+            }),
+            500: t.Any(),
+          },
           detail: {
             description:
               'Get processing progress information from Kompressor for a given upload. This endpoint queries the Kompressor service for the current processing state and progress percentage of the uploaded files.',
@@ -870,6 +992,13 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+              files: t.Array(IFileSchema),
+            }),
+            404: t.Any(),
+          },
           detail: {
             description:
               'Finalize the upload process by retrieving the list of uploaded files, checking for processed versions, and returning the final file information. This endpoint is called after processing is complete to get the final file details for the uploaded entity.',
@@ -886,11 +1015,17 @@ const uploadRouter = new Elysia()
             return undefined;
           });
 
-          if (!pathStat || !pathStat.isDirectory()) return status(404);
+          if (!pathStat || !pathStat.isDirectory()) return status(404, 'Directory not found');
 
-          await rm(path, { recursive: true, force: true }).catch(e => {
-            err(e);
-          });
+          const rmResult = await rm(path, { recursive: true, force: true })
+            .then(() => true)
+            .catch(e => {
+              err(e);
+              return false;
+            });
+          if (!rmResult) {
+            return status(500, 'Failed to cancel upload');
+          }
 
           return { status: 'OK' };
         },
@@ -899,6 +1034,13 @@ const uploadRouter = new Elysia()
             uuid: t.String(),
             type: t.String(),
           }),
+          response: {
+            200: t.Object({
+              status: t.Literal('OK'),
+            }),
+            404: t.Any(),
+            500: t.Any(),
+          },
           detail: {
             description:
               'Cancel an ongoing upload by deleting the temporary upload directory. This endpoint allows clients to cancel an upload session and clean up any uploaded chunks or files associated with the given uploadId.',

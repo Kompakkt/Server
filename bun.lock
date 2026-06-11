@@ -10,7 +10,7 @@
         "@elysiajs/openapi": "^1.4.15",
         "@elysiajs/server-timing": "^1.4.0",
         "@elysiajs/static": "^1.4.7",
-        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#99ae0c1561d8be69419e3b99b069bd08d9854e32",
+        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#d054b5d50529445251f806a3242916d6f8b02e7f",
         "@react-email/components": "^1.0.11",
         "@react-email/preview-server": "^5.2.10",
         "@react-email/render": "^2.0.5",
@@ -75,6 +75,9 @@
         "wikibase-sdk": "^11.3.1",
       },
     },
+  },
+  "patchedDependencies": {
+    "elysia@1.4.28": "patches/elysia@1.4.28.patch",
   },
   "packages": {
     "@ark/schema": ["@ark/schema@0.56.0", "", { "dependencies": { "@ark/util": "0.56.0" } }, "sha512-ECg3hox/6Z/nLajxXqNhgPtNdHWC9zNsDyskwO28WinoFEnWow4IsERNz9AnXRhTZJnYIlAJ4uGn3nlLk65vZA=="],
@@ -225,7 +228,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#99ae0c1", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-99ae0c1", "sha512-JzzG0vGFIz1eVYZrEye0WklRQLyrKJYdxobFSZQCIZlgMTGL+dTLAamsbkNl33zbBGcFHJWLLj/7TRry/pSfxg=="],
+    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#d054b5d", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-d054b5d", "sha512-0lgOYb0mdVuP6eNB3z7G5vyPgFhz3kq1bVI4Dl4fPzkXl31HvaWu5dfv1ma4UQBbqYYirpr3Wu7JunDFCI7lkA=="],
 
     "@mongodb-js/saslprep": ["@mongodb-js/saslprep@1.4.5", "", { "dependencies": { "sparse-bitfield": "^3.0.3" } }, "sha512-k64Lbyb7ycCSXHSLzxVdb2xsKGPMvYZfCICXvDsI8Z65CeWQzTEKS4YmGbnqw+U9RBvLPTsB6UCmwkgsDTGWIw=="],
 
