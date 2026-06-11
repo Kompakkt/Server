@@ -18,7 +18,7 @@ export const ensureUploadStructure = async () => {
   if (allExist.every(d => d)) return true;
   info('Ensuring upload structure');
   try {
-    await Promise.all(directories.map(ensure));
+    await Promise.all(directories.map(directory => ensure(directory, false)));
   } catch (e) {
     err('Failed ensuring upload structure', e);
     return false;
