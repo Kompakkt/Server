@@ -122,10 +122,9 @@ PluginController.routers$.subscribe(async routerConfigs => {
         } else {
           console.log('We got a validation error', Bun.inspect(error.messageValue, { depth: 2 }));
         }
-      } else {
-        err(`Error on ${path}:`, error);
-        return status(500, { error: 'Internal Server Error' });
       }
+      err(`Error on ${path}:`, error);
+      return status(500, { error: 'Internal Server Error' });
     })
     .use(app)
     .use(finalServer)
