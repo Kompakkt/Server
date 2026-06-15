@@ -63,12 +63,14 @@ export const apiKeyService = new Elysia({ name: 'apiKeyService' })
   )
   .macro({
     hasValidApiKey: {
-      query: t.Object({
-        key: t.String({
-          type: 'string',
-          description: 'API key for authentication',
+      query: t.NoValidate(
+        t.Object({
+          key: t.String({
+            type: 'string',
+            description: 'API key for authentication',
+          }),
         }),
-      }),
+      ),
       resolve: async ({ status, route, apiKey }) => {
         if (!isResolvedAPIKeyDetails(apiKey)) return status(400, 'API key is required');
         const { keyDocument, valid, expired, validRoute } = apiKey;
