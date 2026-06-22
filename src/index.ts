@@ -121,6 +121,7 @@ PluginController.routers$.subscribe(async routerConfigs => {
           }
         } else {
           console.log('We got a validation error', Bun.inspect(error.messageValue, { depth: 2 }));
+          return status(200, error.value);
         }
       }
       err(`Error on ${path}:`, error);
