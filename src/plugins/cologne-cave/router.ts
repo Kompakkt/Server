@@ -11,13 +11,17 @@ const cologneCaveRouter = new Elysia()
   .group('/cologne-cave-api', app =>
     app.get(
       '/all-entities',
-      async ({ query: { limit, offset } }) => {
+      async ({ query: { limit, offset, format } }) => {
+        const formats = (format ?? 'glb')
+          .split(',')
+          .map(f => f.trim().toLowerCase())
+          .filter(f => /^[a-z0-9]+$/.test(f));
+        const regex = formats.length ? new RegExp(`\\.(${formats.join('|')})$`, 'i') : /\.glb$/i;
         const entities = await entityCollection
           .find({
             'online': true,
             'finished': true,
-            // Does raw filename end with '.glb'?
-            'processed.raw': { $regex: /\.glb$/i },
+            'processed.raw': { $regex: regex },
           })
           .skip(offset ?? 0)
           .limit(limit ?? Number.MAX_SAFE_INTEGER)
@@ -41,6 +45,13 @@ const cologneCaveRouter = new Elysia()
             t.Number({
               type: 'number',
               description: 'Offset for pagination',
+            }),
+          ),
+          format: t.Optional(
+            t.String({
+              type: 'string',
+              description:
+                'Comma-separated list of file formats to filter by (e.g. "obj,glb"). Defaults to "glb".',
             }),
           ),
         }),
