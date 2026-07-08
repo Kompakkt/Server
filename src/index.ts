@@ -11,6 +11,7 @@ import finalServer from './server.final';
 import { RouterTags, RouterTagsAsTagObjects } from './routers/tags';
 
 import { migrateUserProfiles } from './jobs/migrate-user-profiles';
+import { migrateInstitutionProfiles } from './jobs/migrate-institution-profiles';
 import { cleanupPersons } from './jobs/cleanup-persons';
 import { decreatePopularityTimer } from './jobs/decrease-popularity-timer';
 import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
@@ -30,6 +31,7 @@ import { Configuration } from './configuration';
 
 const jobs = {
   migrateUserProfiles,
+  migrateInstitutionProfiles,
   migrateCreatorAndAccessFields,
   migrateFinishedDraftEntities,
   migrateCompilationOnline,
