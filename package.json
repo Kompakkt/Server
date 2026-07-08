@@ -34,7 +34,7 @@
     "@elysiajs/openapi": "^1.4.15",
     "@elysiajs/server-timing": "^1.4.0",
     "@elysiajs/static": "^1.4.7",
-    "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#5f54d5fb5ddca32ea1d6dda7bb7ed2a679e3349a",
+    "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#532e7bd4ec3a8db19a6212638089e4c3d0fdb457",
     "@react-email/components": "^1.0.11",
     "@react-email/preview-server": "^5.2.10",
     "@react-email/render": "^2.0.5",
