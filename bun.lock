@@ -22,7 +22,7 @@
         "elysia": "^1.4.28",
         "elysia-helmet": "^3.1.0",
         "elysia-prometheus": "^1.1.1",
-        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#21a7ad9861044ef8149ba6936089b70dacebaa43",
+        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#0495f13cbc5135f77f83d0b7bafe246363c29d38",
         "jose": "^6.2.2",
         "ky": "^1.14.3",
         "mime": "^4.1.0",
@@ -228,7 +228,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#21a7ad9", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-21a7ad9", "sha512-WV/SYpdv2WcV2VsAXk5ugh4T0+BV/dZqaCTPcNceStOCBLb5aSUUMbY4rjbU4DiRL1IE5TqQVvRyXHcoAWqpug=="],
+    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#0495f13", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-0495f13", "sha512-5IiGDrw2y0j6YLJaRo2MMgVCg0u1uADZ49pobL9EfOX9H5RbO+DJA2w0YijTM6at7VJpZALJGXKf1JWL4dcfiA=="],
 
     "@mongodb-js/saslprep": ["@mongodb-js/saslprep@1.4.5", "", { "dependencies": { "sparse-bitfield": "^3.0.3" } }, "sha512-k64Lbyb7ycCSXHSLzxVdb2xsKGPMvYZfCICXvDsI8Z65CeWQzTEKS4YmGbnqw+U9RBvLPTsB6UCmwkgsDTGWIw=="],
 
