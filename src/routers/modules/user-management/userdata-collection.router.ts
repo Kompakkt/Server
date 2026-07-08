@@ -67,7 +67,8 @@ const resolveUserDataCollection = async <
   }
 
   const fromUserData = (async () => {
-    if (profileId) return [];
+    // TODO: Migrate all user data to be profile-specific, then uncomment this line to prevent returning all user data when a profileId is specified
+    // if (profileId) return [];
     const data = user.data[collection] ?? [];
     const resolved = await Promise.all(
       Array.from(new Set(data)).map(docId => resolveUserDocument(docId, collection, depth)),
