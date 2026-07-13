@@ -90,9 +90,18 @@ const resolveUserDataCollection = async <
     return resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
   })();
 
-  return await Promise.all([fromUserData, fromAccess]).then(results =>
-    results.flat().filter(v => guard(v)),
-  );
+  // Combine results from both sources, filter by guard, and ensure uniqueness
+  return await Promise.all([fromUserData, fromAccess]).then(results => {
+    const guarded = results.flat().filter(v => guard(v));
+    const uniqueIds = new Set<string>();
+    const uniqueDocuments = guarded.filter(doc => {
+      const id = (doc as IDocument)._id.toString();
+      if (uniqueIds.has(id)) return false;
+      uniqueIds.add(id);
+      return true;
+    });
+    return uniqueDocuments;
+  });
 };
 
 const userDataRouterQuerySchema = t.Object({
