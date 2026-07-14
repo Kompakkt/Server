@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import * as OpenIDClient from 'openid-client';
 import { UserRank } from '@kompakkt/common';
 import { err, log } from 'src/logger';
-import { userCollection } from 'src/mongo';
+import { type AuthUser, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { getOIDCConfig } from './config';
 
@@ -143,7 +143,11 @@ const oidcRouter = new Elysia()
         const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
 
         auth.set({
-          value: await jwt.sign({ username: userdata.username, _id: userdata._id.toString() }),
+          value: await jwt.sign({
+            username: userdata.username,
+            _id: userdata._id.toString(),
+            tokenVersion: (userdata as AuthUser).tokenVersion ?? 0,
+          }),
           path: '/',
           httpOnly: true,
           sameSite: isLocalhost ? 'none' : 'lax',

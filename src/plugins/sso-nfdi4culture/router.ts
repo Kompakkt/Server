@@ -72,7 +72,11 @@ const handleSAMLCallback = async ({
   const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
 
   auth.set({
-    value: await jwt.sign({ username: userdata.username, _id: userdata._id.toString() }),
+    value: await jwt.sign({
+      username: userdata.username,
+      _id: userdata._id.toString(),
+      tokenVersion: userdata.tokenVersion ?? 0,
+    }),
     path: '/',
     httpOnly: true,
     sameSite: isLocalhost ? 'none' : 'lax',

@@ -9,7 +9,7 @@ import {
 } from '@kompakkt/common';
 import { info, warn } from 'src/logger';
 import { sendReactMail } from 'src/mailer';
-import { userCollection, userTokenCollection } from 'src/mongo';
+import { type AuthUser, userCollection, userTokenCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { updateUserPassword } from 'src/util/authentication-helpers';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
@@ -51,6 +51,7 @@ const userManagementRouter = new Elysia()
           const token = await jwt.sign({
             username: userdata.username,
             _id: userdata._id.toString(),
+            tokenVersion: (userdata as AuthUser).tokenVersion ?? 0,
           });
           auth.set({
             value: token,
@@ -163,19 +164,23 @@ const userManagementRouter = new Elysia()
       )
       .get(
         '/logout',
-        ({ status, cookie: { auth }, set }) => {
-          if (!auth.value) {
-            return status(401, 'No session');
-          }
+        async ({ status, userdata, cookie: { auth }, set }) => {
+          if (!userdata) return status(401, 'No session');
+          const result = await userCollection.updateOne(
+            { _id: userdata._id },
+            { $inc: { tokenVersion: 1 } },
+          );
+          if (!result.modifiedCount) return status(500, 'Logout failed');
           auth.set({ value: '', path: '/', sameSite: 'lax', maxAge: 0, expires: new Date(0) });
           set.headers['Set-Cookie'] = 'auth=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
           return { status: 'OK' };
         },
         {
           isLoggedIn: true,
-          response: { 200: t.Object({ status: t.Literal('OK') }), 401: t.Any() },
+          response: { 200: t.Object({ status: t.Literal('OK') }), 401: t.Any(), 500: t.Any() },
           detail: {
-            description: 'Endpoint to log out the user.',
+            description:
+              'Endpoint to log out the user. Invalidates all tokens for this user across all devices.',
             tags: [RouterTags['User Management']],
           },
         },
@@ -288,6 +293,12 @@ const userManagementRouter = new Elysia()
           // Update password
           const success = await updateUserPassword(user.username, password);
           if (!success) return status(500, 'Internal Server Error');
+
+          const incResult = await userCollection.updateOne(
+            { _id: user._id },
+            { $inc: { tokenVersion: 1 } },
+          );
+          if (!incResult.modifiedCount) return status(500, 'Internal Server Error');
 
           return { status: 'OK' };
         },

@@ -1,11 +1,10 @@
 import Elysia, { t, type UnwrapSchema } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
-import { UserRank, type IUserData } from '@kompakkt/common';
+import { UserRank } from '@kompakkt/common';
 import { log } from 'src/logger';
-import { userCollection } from 'src/mongo';
+import { type AuthUser, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
-import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export const signInBody = t.Object({
   username: t.String(),
@@ -47,7 +46,7 @@ export const authService = new Elysia({ name: 'authService' })
       cookie: { auth },
       headers: { authorization },
     }): Promise<{
-      userdata: ServerDocument<IUserData> | undefined;
+      userdata: AuthUser | undefined;
       isLoggedIn: boolean;
       isAdmin: boolean;
       extractedJwt: string | undefined;
@@ -64,9 +63,16 @@ export const authService = new Elysia({ name: 'authService' })
       if (!result) {
         return { userdata: undefined, isLoggedIn: false, isAdmin: false, extractedJwt: undefined };
       }
-      const { username, _id } = result as { username: string; _id: string };
+      const { username, _id, tokenVersion } = result as {
+        username: string;
+        _id: string;
+        tokenVersion?: number;
+      };
       const user = await userCollection.findOne({ username, _id: new ObjectId(_id) });
       if (!user) {
+        return { userdata: undefined, isLoggedIn: false, isAdmin: false, extractedJwt: undefined };
+      }
+      if ((user.tokenVersion ?? 0) !== (tokenVersion ?? 0)) {
         return { userdata: undefined, isLoggedIn: false, isAdmin: false, extractedJwt: undefined };
       }
       return {

@@ -59,7 +59,8 @@ if (!Environment.isE2eGenerator) {
 const db = (name: string) => mongoClient.db(name);
 
 const accountsDb = db(Configuration.Mongo.AccountsDB);
-export const userCollection = accountsDb.collection<ServerDocument<IUserData>>('users');
+export type AuthUser = ServerDocument<IUserData> & { tokenVersion?: number };
+export const userCollection = accountsDb.collection<AuthUser>('users');
 export const profileCollection = accountsDb.collection<ServerDocument<IPublicProfile>>('profiles');
 export type PasswordDocument = {
   username: string;
