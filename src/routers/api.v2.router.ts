@@ -143,10 +143,12 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           return status(404, 'Target user or profile not found');
 
         // Ensure the current user is the owner
-        const isOwner =
-          entity.access.find(user => user._id === userdata._id.toString())?.role ===
-            EntityAccessRole.owner ||
-          userdata.data.entity?.find(id => !!id && (typeof id === 'string' ? true : !!id?._id));
+        const isOwner = entity.access?.length
+          ? entity.access.find(user => user._id === userdata._id.toString())?.role ===
+            EntityAccessRole.owner
+          : (userdata.data.entity?.some(
+              other => docId === (typeof other === 'string' ? other : other?._id?.toString()),
+            ) ?? false);
         if (!isOwner) return status(403, 'You must be an owner to transfer ownership');
 
         // Add/set the target user as owner
