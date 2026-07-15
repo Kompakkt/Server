@@ -42,6 +42,7 @@ import { RESOLVE_FULL_DEPTH } from '../api.v1/resolving-strategies';
 import { resolveUserDocument } from './users';
 import { compilationCollection, entityCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
+import { ObjectId } from 'mongodb';
 
 /**
  * Resolves documents of a specific collection associated with the user through both direct association in userdata and access permissions, with an optional depth for nested document resolution.
@@ -100,7 +101,10 @@ const resolveUserDataCollection = async <
       uniqueIds.add(id);
       return true;
     });
-    return uniqueDocuments;
+    return uniqueDocuments.toSorted(
+      (a, b) =>
+        new ObjectId(b._id).getTimestamp().getTime() - new ObjectId(a._id).getTimestamp().getTime(),
+    );
   });
 };
 
