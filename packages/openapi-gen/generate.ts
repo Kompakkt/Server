@@ -1,6 +1,6 @@
 import openapiTS, { astToString } from 'openapi-typescript';
 import { setTimeout } from 'node:timers/promises';
-import { EndToEndServer } from './e2e-server';
+import { EndToEndServer } from '../../src/e2e-server';
 import { parseArgs } from 'node:util';
 import { join } from 'node:path';
 

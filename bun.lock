@@ -29,7 +29,6 @@
         "mongodb": "7.1.1",
         "nodemailer": "^8.0.4",
         "object-hash": "^3.0.0",
-        "openapi-typescript": "^7.13.0",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
         "rotating-file-stream": "^3.2.9",
@@ -53,6 +52,14 @@
         "oxlint": "^1.75.0",
         "oxlint-tsgolint": "^7.0.2001",
         "react-email": "^5.2.10",
+      },
+    },
+    "packages/openapi-gen": {
+      "name": "@kompakkt/openapi-gen",
+      "version": "0.0.1",
+      "dependencies": {
+        "openapi-typescript": "^7.13.0",
+        "typescript": "~5.8.0",
       },
     },
     "src/plugins/oidc": {
@@ -225,6 +232,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#0495f13", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-0495f13", "sha512-5IiGDrw2y0j6YLJaRo2MMgVCg0u1uADZ49pobL9EfOX9H5RbO+DJA2w0YijTM6at7VJpZALJGXKf1JWL4dcfiA=="],
+
+    "@kompakkt/openapi-gen": ["@kompakkt/openapi-gen@workspace:packages/openapi-gen"],
 
     "@mongodb-js/saslprep": ["@mongodb-js/saslprep@1.4.5", "", { "dependencies": { "sparse-bitfield": "^3.0.3" } }, "sha512-k64Lbyb7ycCSXHSLzxVdb2xsKGPMvYZfCICXvDsI8Z65CeWQzTEKS4YmGbnqw+U9RBvLPTsB6UCmwkgsDTGWIw=="],
 
@@ -1097,6 +1106,8 @@
     "@elysiajs/jwt/jose": ["jose@6.2.3", "", {}, "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="],
 
     "@isaacs/cliui/string-width": ["string-width@5.1.2", "", { "dependencies": { "eastasianwidth": "^0.2.0", "emoji-regex": "^9.2.2", "strip-ansi": "^7.0.1" } }, "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA=="],
+
+    "@kompakkt/openapi-gen/typescript": ["typescript@5.8.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ=="],
 
     "@parcel/watcher/detect-libc": ["detect-libc@1.0.3", "", { "bin": { "detect-libc": "./bin/detect-libc.js" } }, "sha512-pGjwhsmsp4kL2RTz08wcOlGN83otlqHeD/Z5T8GXZB+/YcpQ/dgo+lbU8ZsGxV0HIvqqxo9l7mqYwyYMD9bKDg=="],
 

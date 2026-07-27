@@ -16,7 +16,7 @@
     "format:check": "oxfmt --check",
     "update:kompakkt:common": "bun run update-git-dependency.ts -d @kompakkt/common -o Kompakkt -r Common -b main",
     "email": "email dev --dir src/emails",
-    "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run src/e2e-generator.ts"
+    "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run packages/openapi-gen/generate.ts"
   },
   "repository": {
     "type": "git",
@@ -53,7 +53,6 @@
     "mongodb": "7.1.1",
     "nodemailer": "^8.0.4",
     "object-hash": "^3.0.0",
-    "openapi-typescript": "^7.13.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "rotating-file-stream": "^3.2.9",
@@ -79,7 +78,8 @@
     "react-email": "^5.2.10"
   },
   "workspaces": [
-    "src/plugins/*"
+    "src/plugins/*",
+    "packages/openapi-gen"
   ],
   "patchedDependencies": {
     "elysia@1.4.28": "patches/elysia@1.4.28.patch"

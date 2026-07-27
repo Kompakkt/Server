@@ -1,0 +1,13 @@
+{
+  "name": "@kompakkt/openapi-gen",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "generate": "KOMPAKKT_SERVER_IS_E2E=true bun run ./generate.ts"
+  },
+  "dependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "~5.8.0"
+  }
+}
