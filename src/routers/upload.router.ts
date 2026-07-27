@@ -137,8 +137,8 @@ const getUploadedFiles = async ({
       filter.length > 0 ? filter.some(ext => file.toLowerCase().endsWith(ext)) : true,
     );
 
-  const ids = filteredFiles.map(
-    file => file.replace(`${RootDirectory}/${UploadDirectory}/${type}/`, '').split('/').at(0)!,
+  const ids = filteredFiles.map(file =>
+    file.replace(`${RootDirectory}/${UploadDirectory}/${type}/`, '').split('/').at(0)!,
   );
 
   return { files: filteredFiles, ids: unique(ids) };
@@ -179,8 +179,8 @@ const getProcessedFiles = async (paths: string[], mediaType: string) => {
 };
 
 enum DownloadType {
-  'raw' = 'raw',
-  'processed' = 'processed',
+  raw = 'raw',
+  processed = 'processed',
 }
 const getDownloadOptions = async (entity: ServerDocument<IEntity>) => {
   const dirnames = Array.from(new Set(entity.files.map(file => dirname(file.file_link))));
