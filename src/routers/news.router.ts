@@ -62,7 +62,7 @@ export const newsRouter = new Elysia()
           if (!userdata) return status(403, 'Not authenticated');
 
           const { title, content, link, imageUrl, published } = body;
-          const now = new Date();
+          const now = new Date().toISOString();
 
           const doc = {
             title,
