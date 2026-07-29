@@ -1,7 +1,7 @@
 import { Elysia, t, type TSchema } from 'elysia';
 import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { IEntitySchema, isUserRank, IUserDataSchema, UserRank } from '@kompakkt/common';
+import { IEntitySchema, isUserRank, IUserDataSchema, UserRank, UserFlagEnumSchema } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
 import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';
@@ -306,6 +306,35 @@ const adminRouter = new Elysia()
             200: t.Object({ status: t.String() }),
             404: t.Any(),
             500: t.Any(),
+          },
+        },
+      )
+      .post(
+        '/setuserflags',
+        async ({ status, body: { identifier, flags } }) => {
+          const _id = new ObjectId(identifier);
+
+          const user = await userCollection.findOne({ _id });
+          if (!user) return status(404, 'Not Found');
+
+          const updateResult = await userCollection.updateOne({ _id }, { $set: { flags } });
+          if (!updateResult) return status(500, 'Internal Server Error');
+
+          return { status: 'OK' as const };
+        },
+        {
+          body: t.Object({
+            identifier: t.String(),
+            flags: t.Array(UserFlagEnumSchema),
+          }),
+          response: {
+            200: t.Object({ status: t.Literal('OK') }),
+            404: t.Any(),
+            500: t.Any(),
+          },
+          detail: {
+            description: 'Set permission flags for a user',
+            tags: [RouterTags.Admin],
           },
         },
       ),

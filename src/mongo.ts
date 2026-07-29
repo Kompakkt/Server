@@ -8,6 +8,7 @@ import type {
   IDigitalEntity,
   IEntity,
   IInstitution,
+  INewsItem,
   IPerson,
   IPhysicalEntity,
   ITag,
@@ -86,6 +87,7 @@ export enum Migrations {
   migrateUserProfiles = 'migrateUserProfiles',
   migrateFinishedDraftEntities = 'migrateFinishedDraftEntities',
   migrateCompilationOnlineField = 'migrateCompilationOnlineField',
+  migrateUserFlags = 'migrateUserFlags',
 }
 export const migrationCollection = accountsDb.collection<{
   name: Migrations;
@@ -101,6 +103,7 @@ export type ApiKeyDocument = {
   expirationDate?: number;
 };
 export const apiKeyCollection = accountsDb.collection<ServerDocument<ApiKeyDocument>>('apikeys');
+export const newsCollection = accountsDb.collection<ServerDocument<INewsItem>>('news');
 
 const entitiesDb = db(Configuration.Mongo.RepositoryDB);
 export const entityCollection = entitiesDb.collection<ServerDocument<IEntity>>('entity');

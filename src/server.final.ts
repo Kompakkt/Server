@@ -3,6 +3,7 @@ import adminRouter from './routers/admin.router';
 import apiV1Router from './routers/api.v1.router';
 import apiV2Router from './routers/api.v2.router';
 import mailRouter from './routers/mail.router';
+import { newsRouter } from './routers/news.router';
 import uploadRouter from './routers/upload.router';
 import userManagementRouter from './routers/user-management.router';
 import utilityRouter from './routers/utility.router';
@@ -15,6 +16,7 @@ const finalServer = new Elysia()
   .use(utilityRouter)
   .use(apiV1Router)
   .use(apiV2Router)
+  .use(newsRouter)
   .use(mailRouter)
   .use(uploadRouter);
 

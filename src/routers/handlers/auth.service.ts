@@ -1,7 +1,7 @@
 import Elysia, { t, type UnwrapSchema } from 'elysia';
 import { ObjectId } from 'mongodb';
 import { AuthController } from 'src/authentication';
-import { UserRank } from '@kompakkt/common';
+import { UserFlag, UserRank } from '@kompakkt/common';
 import { log } from 'src/logger';
 import { type AuthUser, userCollection } from 'src/mongo';
 import configServer from 'src/server.config';
@@ -103,6 +103,13 @@ export const authService = new Elysia({ name: 'authService' })
       resolve: ({ status, userdata }) => {
         if (userdata?.role !== UserRank.admin)
           return status('Forbidden', 'You must be an admin to access this resource');
+        return;
+      },
+    },
+    canModifyNews: {
+      resolve: ({ status, userdata }) => {
+        if (!userdata?.flags?.includes(UserFlag.canModifyNews))
+          return status('Forbidden', 'You need the canModifyNews flag to access this resource');
         return;
       },
     },

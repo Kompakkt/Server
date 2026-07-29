@@ -10,6 +10,7 @@ export const RouterTags = {
   'Utility': 'Utility',
   'Monitoring': 'Monitoring',
   'Profile': 'Profile',
+  'News': 'News',
 } as const;
 
 export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
@@ -22,6 +23,7 @@ export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
   'Utility': 'Utility endpoints for various helper functions',
   'Monitoring': 'Endpoints for monitoring system health and performance',
   'Profile': 'Endpoints related to public user & institution profiles',
+  'News': 'Endpoints for managing news items displayed on the home page',
 } as const;
 
 const routerTagToTagObject = (tag: keyof typeof RouterTags): OpenAPIV3.TagObject => ({

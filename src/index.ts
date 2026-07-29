@@ -26,6 +26,7 @@ import { ensureDefaultPasswordStrategy } from './jobs/ensure-default-password-st
 import { migrateCreatorAndAccessFields } from './jobs/migrate-creator-and-access-fields';
 import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-entities';
 import { migrateCompilationOnline } from './jobs/migrate-compilation-online';
+import { migrateUserFlags } from './jobs/migrate-user-flags';
 import { RootDirectory } from './environment';
 import { Configuration } from './configuration';
 
@@ -46,6 +47,7 @@ const jobs = {
   ensureEntitySettingsScaleAsVector,
   ensureDefaultUserProfile,
   ensureEntityCreatorIsProfile,
+  migrateUserFlags,
 } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);
