@@ -254,7 +254,9 @@ class SonicSearchService {
     const documentId = document._id.toString();
     const searchableText = buildSearchableText(document);
     try {
-      await this.#ingestChannel.push(collection, bucket, documentId, searchableText);
+      await this.#ingestChannel.push(collection, bucket, documentId, searchableText, {
+        lang: 'none',
+      });
     } catch (error) {
       err(`Failed to index document ${documentId} in collection ${collection}:`, error);
       throw error;
@@ -271,7 +273,9 @@ class SonicSearchService {
 
     try {
       await this.#ingestChannel.flusho(collection, bucket, documentId);
-      await this.#ingestChannel.push(collection, bucket, documentId, searchableText);
+      await this.#ingestChannel.push(collection, bucket, documentId, searchableText, {
+        lang: 'none',
+      });
     } catch (error) {
       err(`Failed to update document ${documentId} in collection ${collection}:`, error);
       throw error;
@@ -300,7 +304,10 @@ class SonicSearchService {
   ): Promise<ObjectId[]> {
     limit = Math.min(limit, 100);
     try {
-      const sonicResults = await this.#searchChannel.query(collection, bucket, query, { limit });
+      const sonicResults = await this.#searchChannel.query(collection, bucket, query, {
+        limit,
+        lang: 'none',
+      });
       log(
         `Searched in collection ${collection} with query "${query}" and bucket "${bucket}", found ${sonicResults?.length} results`,
       );
@@ -318,10 +325,16 @@ class SonicSearchService {
     limit = 20,
   ): Promise<string[]> {
     limit = Math.min(limit, 20);
+    query = query.trim();
+    const words = query.split(/\s+/);
+    if (words.length === 0) return [];
+    const prefix = words.slice(0, -1).join(' ');
+    const lastWord = words[words.length - 1];
+    query = lastWord;
     try {
       const sonicResults = await this.#searchChannel.suggest(collection, bucket, query, { limit });
       log(`Suggest result`, sonicResults.join(' '));
-      return sonicResults;
+      return sonicResults.map(suggestion => (prefix ? `${prefix} ${suggestion}` : suggestion));
     } catch (error) {
       err(`Failed to search in collection ${collection}:`, error);
       return [];
