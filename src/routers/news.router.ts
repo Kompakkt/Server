@@ -167,33 +167,39 @@ export const newsRouter = new Elysia()
       // Flag-gated: upload an image for a news item
       .post(
         '/upload-image',
-        async ({ body: { file } }) => {
-          await ensureUploadDir();
+        async ({ body: { file }, status }) => {
+          try {
+            await ensureUploadDir();
 
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
-          const filepath = join(NEWS_UPLOAD_DIR, filename);
+            const buffer = Buffer.from(file, 'base64');
+            const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+            const filepath = join(NEWS_UPLOAD_DIR, filename);
 
-          await sharp(buffer)
-            .resize({
-              fit: 'inside',
-              width: MAX_NEWS_IMAGE_RESOLUTION,
-              height: MAX_NEWS_IMAGE_RESOLUTION,
-            })
-            .webp({ quality: 80 })
-            .toFile(filepath);
+            await sharp(buffer)
+              .resize({
+                fit: 'inside',
+                width: MAX_NEWS_IMAGE_RESOLUTION,
+                height: MAX_NEWS_IMAGE_RESOLUTION,
+              })
+              .webp({ quality: 80 })
+              .toFile(filepath);
 
-          info(`News image uploaded: ${filename}`);
-          return { url: `/server/uploads/news/${filename}` };
+            info(`News image uploaded: ${filename}`);
+            return { url: `/server/uploads/news/${filename}` };
+          } catch (error) {
+            info(`Failed to upload news image: ${error}`);
+            return status(500, 'Failed to upload image');
+          }
         },
         {
           canModifyNews: true,
           body: t.Object({
-            file: t.File(),
+            file: t.String({ description: 'Base64-encoded image file' }),
           }),
           response: {
             200: t.Object({ url: t.String() }),
             403: t.Any(),
+            500: t.Any(),
           },
           type: 'multipart/form-data',
           detail: {
