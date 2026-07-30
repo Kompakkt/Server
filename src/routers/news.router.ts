@@ -175,7 +175,11 @@ export const newsRouter = new Elysia()
           const filepath = join(NEWS_UPLOAD_DIR, filename);
 
           await sharp(buffer)
-            .resize({ fit: 'inside', width: MAX_NEWS_IMAGE_RESOLUTION, height: MAX_NEWS_IMAGE_RESOLUTION })
+            .resize({
+              fit: 'inside',
+              width: MAX_NEWS_IMAGE_RESOLUTION,
+              height: MAX_NEWS_IMAGE_RESOLUTION,
+            })
             .webp({ quality: 80 })
             .toFile(filepath);
 

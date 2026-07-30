@@ -10,9 +10,7 @@ export const migrateUserFlags = async () => {
     return;
   }
 
-  const usersWithoutFlags = await userCollection
-    .find({ flags: { $exists: false } })
-    .toArray();
+  const usersWithoutFlags = await userCollection.find({ flags: { $exists: false } }).toArray();
 
   if (usersWithoutFlags.length === 0) {
     log('All users already have flags property, skipping migration.');
@@ -23,13 +21,12 @@ export const migrateUserFlags = async () => {
     return;
   }
 
-  log(`Found ${usersWithoutFlags.length} users without flags property, adding empty flags array...`);
+  log(
+    `Found ${usersWithoutFlags.length} users without flags property, adding empty flags array...`,
+  );
 
   for (const user of usersWithoutFlags) {
-    await userCollection.updateOne(
-      { _id: user._id },
-      { $set: { flags: [] } },
-    );
+    await userCollection.updateOne({ _id: user._id }, { $set: { flags: [] } });
   }
 
   await migrationCollection.insertOne({

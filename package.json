@@ -38,6 +38,7 @@
     "@react-email/components": "^1.0.11",
     "@react-email/preview-server": "^5.2.10",
     "@react-email/render": "^2.0.5",
+    "@sinclair/typebox": "0.34.48",
     "@tailwindcss/cli": "^4.2.2",
     "@types/archiver": "^7.0.0",
     "archiver": "^7.0.1",

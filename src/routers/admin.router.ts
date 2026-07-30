@@ -1,7 +1,15 @@
 import { Elysia, t, type TSchema } from 'elysia';
 import { Collection, ObjectId, type Document } from 'mongodb';
 import { randomBytes } from 'node:crypto';
-import { IEntitySchema, isUserRank, IUserDataSchema, UserRank, UserFlagEnumSchema } from '@kompakkt/common';
+import {
+  IEntitySchema,
+  isUserRank,
+  IUserDataSchema,
+  UserRank,
+  UserFlagEnumSchema,
+  Collection as EntityCollection,
+} from '@kompakkt/common';
+import { validateDocuments } from 'src/util/schema-validator';
 import { Configuration } from 'src/configuration';
 import { passwordResetRequestTemplate, userroleUpdatedTemplate } from 'src/emails';
 import { sendReactMail } from 'src/mailer';
@@ -337,7 +345,51 @@ const adminRouter = new Elysia()
             tags: [RouterTags.Admin],
           },
         },
-      ),
+      )
+      .post('/validate-schema', async ({ body }) => validateDocuments(body), {
+        body: t.Object({
+          collection: t.Optional(
+            t.UnionEnum([
+              EntityCollection.address,
+              EntityCollection.annotation,
+              EntityCollection.compilation,
+              EntityCollection.contact,
+              EntityCollection.digitalentity,
+              EntityCollection.entity,
+              EntityCollection.institution,
+              EntityCollection.person,
+              EntityCollection.physicalentity,
+              EntityCollection.tag,
+            ]),
+          ),
+          limit: t.Optional(t.Number({ minimum: 1, maximum: 10000 })),
+          skip: t.Optional(t.Number({ minimum: 0 })),
+        }),
+        response: {
+          200: t.Object({
+            totalChecked: t.Number(),
+            totalInvalid: t.Number(),
+            results: t.Array(
+              t.Object({
+                collection: t.String(),
+                documentId: t.String(),
+                valid: t.Boolean(),
+                issues: t.Array(
+                  t.Object({
+                    path: t.String(),
+                    message: t.String(),
+                  }),
+                ),
+              }),
+            ),
+          }),
+        },
+        detail: {
+          description:
+            'Read documents from the entitiesrepository database and validate them against the matching TypeBox schema from @kompakkt/common. Returns a per-document list of validation issues. Use the `collection` field to limit the check to one collection; otherwise every entity-related collection is checked. `limit` (default 1000) and `skip` (default 0) support pagination for large collections.',
+          tags: [RouterTags.Admin],
+        },
+      }),
   );
 
 export default adminRouter;
