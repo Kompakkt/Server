@@ -364,6 +364,7 @@ const adminRouter = new Elysia()
           ),
           limit: t.Optional(t.Number({ minimum: 1, maximum: 10000 })),
           skip: t.Optional(t.Number({ minimum: 0 })),
+          invalidOnly: t.Optional(t.Boolean()),
         }),
         response: {
           200: t.Object({
@@ -378,6 +379,8 @@ const adminRouter = new Elysia()
                   t.Object({
                     path: t.String(),
                     message: t.String(),
+                    value: t.Optional(t.Any()),
+                    expectedType: t.Optional(t.String()),
                   }),
                 ),
               }),

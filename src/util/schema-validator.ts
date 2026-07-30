@@ -20,6 +20,8 @@ import { info } from 'src/logger';
 export interface IValidationIssue {
   path: string;
   message: string;
+  value?: unknown;
+  expectedType?: string;
 }
 
 export interface IDocumentValidationResult {
@@ -40,6 +42,7 @@ export interface IValidateOptions {
   collection?: Collection;
   limit?: number;
   skip?: number;
+  invalidOnly?: boolean;
 }
 
 export const collectionSchemaMap: Record<Collection, TSchema> = {
@@ -57,10 +60,28 @@ export const collectionSchemaMap: Record<Collection, TSchema> = {
 
 const DEFAULT_LIMIT = 1000;
 
-export const validateDocument = (schema: TSchema, doc: unknown): IValidationIssue[] =>
+const describeExpectedType = (schema: unknown): string => {
+  if (typeof schema !== 'object' || schema === null) return 'unknown';
+  const s = schema as Record<string, unknown>;
+  if (typeof s.type === 'string') return s.type;
+  if (Array.isArray(s.enum)) return `enum(${s.enum.join(', ')})`;
+  if (s.const !== undefined) return `const(${JSON.stringify(s.const)})`;
+  if (Array.isArray(s.anyOf)) return 'anyOf';
+  if (Array.isArray(s.oneOf)) return 'oneOf';
+  if (Array.isArray(s.allOf)) return 'allOf';
+  if (typeof s.$ref === 'string') return s.$ref;
+  return 'unknown';
+};
+
+export const validateDocument = (
+  schema: TSchema,
+  doc: unknown,
+  detailed?: boolean,
+): IValidationIssue[] =>
   [...Errors(schema, doc)].map(err => ({
     path: err.path,
     message: err.message,
+    ...(detailed ? { value: err.value, expectedType: describeExpectedType(err.schema) } : {}),
   }));
 
 const documentIdString = (doc: Document): string =>
@@ -69,7 +90,7 @@ const documentIdString = (doc: Document): string =>
 export const validateDocuments = async (
   options: IValidateOptions = {},
 ): Promise<IValidationSummary> => {
-  const { collection, limit = DEFAULT_LIMIT, skip = 0 } = options;
+  const { collection, limit = DEFAULT_LIMIT, skip = 0, invalidOnly = false } = options;
   const collections = collection ? [collection] : (Object.values(Collection) as Collection[]);
   const results: IDocumentValidationResult[] = [];
 
@@ -79,14 +100,16 @@ export const validateDocuments = async (
     info(`Validating ${docs.length} document(s) from "${coll}"`);
     const schema = collectionSchemaMap[coll];
     for (const doc of docs) {
-      const issues = validateDocument(schema, doc);
-      results.push({
-        collection: coll,
-        documentId: documentIdString(doc),
-        valid: issues.length === 0,
-        issues,
-        hasMore: count > skip + docs.length,
-      });
+      const issues = validateDocument(schema, doc, invalidOnly);
+      if (!invalidOnly || issues.length > 0) {
+        results.push({
+          collection: coll,
+          documentId: documentIdString(doc),
+          valid: issues.length === 0,
+          issues,
+          hasMore: count > skip + docs.length,
+        });
+      }
     }
   }
 
