@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { ObjectId } from 'mongodb';
-import { INewsItemSchema } from '@kompakkt/common';
+import { INewsItemSchema, UserFlag } from '@kompakkt/common';
 import { newsCollection } from 'src/mongo';
 import { RootDirectory } from 'src/environment';
 import { Configuration } from 'src/configuration';
@@ -24,33 +24,19 @@ export const newsRouter = new Elysia()
   .use(authService)
   .group('/api/v2/news', app =>
     app
-      // Public: get all published news items, sorted by date descending
+      // Get news items. Returns all items for users with canModifyNews flag, only published for others.
       .get(
         '/',
-        async () => {
-          const items = await newsCollection.find({ published: true }).sort({ date: -1 }).toArray();
+        async ({ userdata }) => {
+          const canSeeAll = userdata?.flags?.includes(UserFlag.canModifyNews);
+          const query = canSeeAll ? {} : { published: true };
+          const items = await newsCollection.find(query).sort({ date: -1 }).toArray();
           return items;
         },
         {
           response: { 200: t.Array(INewsItemSchema) },
           detail: {
-            description: 'Get all published news items sorted by date (newest first)',
-            tags: [RouterTags.News],
-          },
-        },
-      )
-      // Flag-gated: get all news items (including unpublished) for management
-      .get(
-        '/all',
-        async () => {
-          const items = await newsCollection.find().sort({ date: -1 }).toArray();
-          return items;
-        },
-        {
-          canModifyNews: true,
-          response: { 200: t.Array(INewsItemSchema) },
-          detail: {
-            description: 'Get all news items including unpublished (requires canModifyNews flag)',
+            description: 'Get news items. Returns all items for users with canModifyNews flag, only published for others.',
             tags: [RouterTags.News],
           },
         },
