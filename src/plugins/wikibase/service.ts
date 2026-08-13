@@ -10,7 +10,6 @@ import WBEdit, {
   type EditEntitySimplifiedModeParams,
   type SimplifiedEditableClaim,
 } from 'wikibase-edit';
-import WBK from 'wikibase-sdk';
 import {
   type IAnnotationLinkChoices,
   type IMediaAgent,
@@ -43,6 +42,7 @@ import {
   getHierarchySpark,
   getWikibaseClassInstancesSpark,
 } from './sparks';
+import { simplifySparqlResults, sparqlQueryUrl } from './sparql';
 
 type UndoPartial<T> = T extends Partial<infer R> ? R : T;
 
@@ -175,7 +175,6 @@ export class WikibaseService {
   static instance: WikibaseService;
   wbConnect: WikibaseConnector;
   wbEdit: ReturnType<typeof WBEdit>;
-  wbSDK: ReturnType<typeof WBK>;
 
   constructor() {
     let domain = WikibaseConfiguration?.Domain;
@@ -195,7 +194,6 @@ export class WikibaseService {
 
     this.wbConnect = new WikibaseConnector(instance, { username, password });
     this.wbEdit = WBEdit({ instance, credentials: { username, password } });
-    this.wbSDK = WBK({ instance, sparqlEndpoint });
   }
 
   public static getInstance(): WikibaseService | undefined {
@@ -652,21 +650,16 @@ export class WikibaseService {
   }
 
   public async wikibaseRead<T>(spark: string): Promise<T[] | undefined> {
-    // info('wikibaseRead wikibase-sdk', spark);
-    const query = this.wbSDK.sparqlQuery(spark);
-    // info('wikibaseRead wikibase-sdk sparqlQuery', query);
+    const query = sparqlQueryUrl(spark);
 
     const result = await get(query, {}).catch(error => {
       log('wikibaseRead', error.message, error.config?.url);
       return undefined;
     });
-    // info('wikibaseRead result', Bun.inspect(result));
 
     if (!result) return undefined;
-    //const result = await this.wbConnect.requestSDKquery(query);
-    const simple = this.wbSDK.simplify.sparqlResults(result);
-    // info('wikibaseRead simplified result', Bun.inspect(simple));
-    return simple as T[];
+    const simple = simplifySparqlResults<T>(result);
+    return simple;
   }
 
   private async wikibaseClassInstances(classArray: string[]) {

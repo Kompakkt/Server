@@ -80,7 +80,6 @@
       "devDependencies": {
         "orval": "^8.23.0",
         "wikibase-edit": "^8.1.2",
-        "wikibase-sdk": "^11.3.1",
       },
     },
   },
