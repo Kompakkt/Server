@@ -4,6 +4,7 @@
   "type": "module",
   "devDependencies": {
     "wikibase-edit": "^8.1.2",
-    "wikibase-sdk": "^11.3.1"
+    "wikibase-sdk": "^11.3.1",
+    "orval": "^8.23.0"
   }
 }

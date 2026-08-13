@@ -14,6 +14,8 @@ export type IWikibaseConfiguration = {
   AdminUsername: string;
   AdminPassword: string;
   TTLFileURL?: string;
+  OpenApiUrl?: string;
+  OAuthToken?: string;
 };
 
 export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfiguration => {
