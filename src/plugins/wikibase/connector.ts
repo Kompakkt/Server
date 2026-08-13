@@ -342,4 +342,40 @@ export class WikibaseConnector {
         return undefined;
       });
   }
+
+  public async removeItem(id: string) {
+    const csrfToken = await this.getCsrfToken();
+    if (!csrfToken) {
+      throw new Error('Failed to get CSRF token');
+    }
+
+    const url = new URL(this.wikibaseUrl);
+    const params = new URLSearchParams();
+    params.set('action', 'delete');
+    params.set('title', id);
+    params.set('token', csrfToken);
+    params.set('format', 'json');
+
+    return await this.client
+      .post(url, {
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      .then(response => response.json())
+      .then(response => {
+        if (response && typeof response === 'object' && 'error' in response) {
+          err('removeItem', (response as { error?: unknown }).error);
+          return false;
+        }
+        if (response && typeof response === 'object' && 'delete' in response) {
+          return true;
+        }
+        warn('Unknown delete response', response);
+        return false;
+      })
+      .catch(error => {
+        err('removeItem', error);
+        return false;
+      });
+  }
 }
