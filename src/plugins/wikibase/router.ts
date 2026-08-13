@@ -9,7 +9,6 @@ import {
   WBPredicates,
   WBValues,
 } from './parsed-model';
-import { authService } from 'src/routers/handlers/auth.service';
 
 export const wikibaseRouterTag = 'Wikibase';
 

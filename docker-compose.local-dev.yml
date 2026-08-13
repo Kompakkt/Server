@@ -50,6 +50,10 @@ services:
       - CONFIGURATION_MAILER_HOST=mailhog
       - CONFIGURATION_MAILER_PORT=1025
       - CONFIGURATION_EXTENSION_WIKIBASE_SPARQL_ENDPOINT=http://query.wb.local/proxy/wdqs/bigdata/namespace/wdq/sparql
+      # Wikibase REST API + OAuth. Fill these in for the local dev Wikibase (assumed at http://wb.local):
+      # - CONFIGURATION_EXTENSION_WIKIBASE_DOMAIN=http://wb.local
+      # - CONFIGURATION_EXTENSION_WIKIBASE_REST_API_URL=http://wb.local/w/rest_v1
+      # - CONFIGURATION_EXTENSION_WIKIBASE_OAUTH_TOKEN=<registered OAuth 2.0 consumer token>
 
 volumes:
   uploads:
