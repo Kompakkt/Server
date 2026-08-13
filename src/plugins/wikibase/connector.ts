@@ -1,62 +1,26 @@
-import type { KyInstance } from 'ky';
 import { join } from 'node:path';
 import { Configuration } from 'src/configuration';
 import { err, log, warn } from 'src/logger';
-import { createKyClient } from 'src/util/create-ky-client';
 import { RootDirectory } from '../../environment';
+import { WikibaseConfiguration } from './config';
 
-type QueryTokenResponse<K extends 'logintoken' | 'csrftoken'> = {
-  batchcomplete: string;
+type CSRFTokenResponse = {
+  batchcomplete?: string;
   query: {
     tokens: {
-      [key in K]: string;
+      csrftoken: string;
     };
   };
 };
 
-type LoginTokenResponse = QueryTokenResponse<'logintoken'>;
-type CSRFTokenResponse = QueryTokenResponse<'csrftoken'>;
-
-type ClientLoginResponse = {
-  clientlogin:
-    | {
-        status: 'PASS';
-        username: string;
-      }
-    | {
-        status: 'FAIL';
-        message: string;
-        messagecode: string;
-      };
-};
-const isClientLoginResponse = (response: unknown): response is ClientLoginResponse => {
+const isCSRFTokenResponse = (response: unknown): response is CSRFTokenResponse => {
   if (response === null || typeof response !== 'object') return false;
-  if (!('clientlogin' in response)) return false;
-  if (!response.clientlogin || typeof response.clientlogin !== 'object') return false;
-  if (!('status' in response.clientlogin) || typeof response.clientlogin.status !== 'string')
-    return false;
-  const clientlogin = (response as ClientLoginResponse).clientlogin;
-  return (
-    (clientlogin.status === 'PASS' &&
-      'username' in clientlogin &&
-      typeof clientlogin.username === 'string') ||
-    (clientlogin.status === 'FAIL' &&
-      'message' in clientlogin &&
-      'messagecode' in clientlogin &&
-      typeof clientlogin.message === 'string' &&
-      typeof clientlogin.messagecode === 'string')
-  );
-};
-
-type WikibaseImageResponse = {
-  error?: {
-    code: string;
-    info?: string;
-  };
-  upload?: {
-    result: 'Success';
-    filename: string;
-  };
+  const query = (response as { query?: unknown }).query;
+  if (!query || typeof query !== 'object') return false;
+  const tokens = (query as { tokens?: unknown }).tokens;
+  if (!tokens || typeof tokens !== 'object') return false;
+  const csrftoken = (tokens as { csrftoken?: unknown }).csrftoken;
+  return typeof csrftoken === 'string';
 };
 
 type LinkbackResponse = {
@@ -86,6 +50,17 @@ const isEditResponse = (response: unknown): response is EditResponse => {
   );
 };
 
+type WikibaseImageResponse = {
+  error?: {
+    code: string;
+    info?: string;
+  };
+  upload?: {
+    result: 'Success';
+    filename: string;
+  };
+};
+
 const isWikibaseImageResponse = (response: unknown): response is WikibaseImageResponse => {
   if (response === null || typeof response !== 'object') return false;
   if (Object.hasOwn(response, 'error')) {
@@ -100,158 +75,84 @@ const isWikibaseImageResponse = (response: unknown): response is WikibaseImageRe
 };
 
 export class WikibaseConnector {
-  private wikibaseUrl: string;
-  private login: string;
-  private password: string;
-  private client: KyInstance;
-  private requestAttempts = 0;
+  private apiUrl: string;
+  private oauthToken: string;
+  private csrfToken: string | null = null;
 
-  loginToken: string | null;
-  csrfToken: string | null;
+  constructor(instance: string) {
+    const token = WikibaseConfiguration?.OauthToken;
+    if (!token) throw new Error('Wikibase OAuth token not configured');
 
-  constructor(instance: string, credentials: { username: string; password: string }) {
-    if (!instance.endsWith('api.php')) {
-      if (!instance.endsWith('/')) instance += '/';
-      instance += 'api.php';
+    let url = instance;
+    if (!url.endsWith('api.php')) {
+      if (!url.endsWith('/')) url += '/';
+      url += 'api.php';
     }
 
-    this.wikibaseUrl = instance;
-    this.login = credentials.username;
-    this.password = credentials.password;
-
-    this.loginToken = null;
-    this.csrfToken = null;
-
-    this.client = createKyClient();
-
-    this.loginRequest();
+    this.apiUrl = url;
+    this.oauthToken = token;
   }
 
-  // Account management methods
-
-  private async loginRequest() {
-    const loginToken = await this.getLoginToken();
-    if (!loginToken) return undefined;
-
-    const url = new URL(this.wikibaseUrl);
-    const params = new URLSearchParams();
-    params.set('action', 'clientlogin');
-    params.set('username', this.login);
-    params.set('password', this.password);
-    params.set('logintoken', loginToken);
-    params.set('loginreturnurl', 'http://test');
-    params.set('format', 'json');
-
-    const response = await this.client
-      .post<ClientLoginResponse>(url, {
-        body: params,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .then(response => response.json())
-      .catch(error => {
-        err('Login request failed', error);
-        return undefined;
-      });
-    if (!isClientLoginResponse(response)) {
-      err('Invalid login response', response);
-      return undefined;
-    }
-    if (response?.clientlogin.status !== 'PASS') {
-      err('! login failed', response);
-      return undefined;
-    }
-
-    const token = await this.requestCsrfToken();
-    if (!token) return undefined;
-    this.csrfToken = token;
+  private authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+    return { Authorization: `Bearer ${this.oauthToken}`, ...extra };
   }
 
-  // Token management methods
-
-  private async requestLoginToken() {
-    const url = new URL(this.wikibaseUrl);
-    url.searchParams.set('action', 'query');
-    url.searchParams.set('meta', 'tokens');
-    url.searchParams.set('type', 'login');
-    url.searchParams.set('format', 'json');
-
-    const queryLoginTokenResponse = await this.client
-      .get<LoginTokenResponse>(url)
-      .then(response => response.json())
+  private async apiGet(params: Record<string, string>): Promise<unknown> {
+    const url = new URL(this.apiUrl);
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    return await Bun.fetch(url, { headers: this.authHeaders() })
+      .then(res => res.json())
       .catch(error => {
-        warn(`Failed getting wikibase login token: ${error}`);
+        warn(`Wikibase API GET failed: ${error}`);
         return undefined;
       });
+  }
 
-    return queryLoginTokenResponse?.query.tokens.logintoken ?? undefined;
+  private async apiPost(params: Record<string, string>, formData?: FormData): Promise<unknown> {
+    const url = new URL(this.apiUrl);
+    const headers = formData ? this.authHeaders() : this.authHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    let body: URLSearchParams | FormData;
+    if (formData) {
+      for (const [key, value] of Object.entries(params)) formData.append(key, value);
+      body = formData;
+    } else {
+      body = new URLSearchParams(params);
+    }
+    return await Bun.fetch(url, { method: 'POST', headers, body })
+      .then(res => res.json())
+      .catch(error => {
+        warn(`Wikibase API POST failed: ${error}`);
+        return undefined;
+      });
   }
 
   private async requestCsrfToken(): Promise<string | undefined> {
-    const url = new URL(this.wikibaseUrl);
-    url.searchParams.set('action', 'query');
-    url.searchParams.set('meta', 'tokens');
-    url.searchParams.set('type', 'csrf');
-    url.searchParams.set('format', 'json');
-    const csfrTokenResponse = await this.client
-      .get<CSRFTokenResponse>(url)
-      .then(response => response.json())
-      .catch(error => {
-        warn(`Failed getting wikibase CSRF token: ${error}`);
-        return undefined;
-      });
-
-    if (!csfrTokenResponse) {
+    const response = await this.apiGet({
+      action: 'query',
+      meta: 'tokens',
+      type: 'csrf',
+      format: 'json',
+    });
+    if (!isCSRFTokenResponse(response)) {
+      warn('Invalid CSRF token response', response);
       return undefined;
     }
-
-    const token = csfrTokenResponse.query.tokens.csrftoken;
-
-    if (token === '+\\') {
-      log('requestCsrfToken', 'Token expired, requesting new one.');
-      this.requestAttempts++;
-      if (this.requestAttempts >= 5) {
-        log('requestCsrfToken', 'Shutting down the application');
-        process.exit(1);
-      }
-      await this.loginRequest();
-      return this.requestCsrfToken();
-    }
-    this.requestAttempts = 0;
-    log('requestCsrfToken', token);
+    const token = response.query.tokens.csrftoken;
+    log('csrfToken', token);
     return token;
-  }
-
-  async refreshToken() {
-    const token = await this.requestCsrfToken();
-    if (!token) return undefined;
-    this.csrfToken = token;
-    return token;
-  }
-
-  async getLoginToken() {
-    if (!this.loginToken) {
-      const token = await this.requestLoginToken();
-      if (!token) {
-        return undefined;
-      }
-      this.loginToken = token;
-    }
-    return this.loginToken;
   }
 
   async getCsrfToken(forceRefresh = false): Promise<string | undefined> {
     if (forceRefresh || !this.csrfToken || this.csrfToken === '+\\') {
-      const token = await this.refreshToken();
-      if (!token) {
-        return undefined;
+      const token = await this.requestCsrfToken();
+      if (!token) return undefined;
+      if (token === '+\\') {
+        throw new Error('Wikibase CSRF token unavailable; check the OAuth token grants');
       }
       this.csrfToken = token;
     }
-    log('csrfToken', this.csrfToken);
     return this.csrfToken;
   }
-
-  // Annotation methods
 
   public async writeAnnotation(id: string, text: string) {
     const csrfToken = await this.getCsrfToken();
@@ -259,32 +160,24 @@ export class WikibaseConnector {
       throw new Error('Failed to get CSRF token');
     }
 
-    const url = new URL(this.wikibaseUrl);
-    const formData = new FormData();
-    formData.append('ignorewarnings', '1');
-    formData.append('title', `Annotation:${id}`);
-    formData.append('text', text);
-    formData.append('token', csrfToken);
-    formData.append('action', 'edit');
-    formData.append('format', 'json');
+    const response = await this.apiPost({
+      action: 'edit',
+      title: `Annotation:${id}`,
+      text: text,
+      token: csrfToken,
+      format: 'json',
+      ignorewarnings: '1',
+    });
 
-    return await this.client
-      .post(url, { body: formData })
-      .then(response => response.json())
-      .then(response => {
-        if (isLinkbackResponse(response) && response.success === 1) {
-          return true;
-        }
-        if (isEditResponse(response) && response?.edit?.result === 'Success') {
-          return true;
-        }
-        warn(`Unknown response type ${response}`);
-        throw new Error('Failed to write annotation');
-      })
-      .catch(error => {
-        err('writeAnnotation', error);
-        return false;
-      });
+    if (isLinkbackResponse(response) && response.success === 1) {
+      return true;
+    }
+    if (isEditResponse(response) && response?.edit?.result === 'Success') {
+      return true;
+    }
+    warn(`Unknown writeAnnotation response`, response);
+    err('writeAnnotation failed', response);
+    return false;
   }
 
   public async writeImage(id: string, path: string) {
@@ -298,49 +191,40 @@ export class WikibaseConnector {
     const file = Bun.file(join(RootDirectory, Configuration.Uploads.UploadDirectory, path));
     const extension = path.split('.').pop();
     const filename = `Preview${id}.${extension}`;
-
-    const url = new URL(this.wikibaseUrl);
-    const formData = new FormData();
     const blob = await Bun.readableStreamToBlob(file.stream());
+    const formData = new FormData();
     formData.append('file', blob, filename);
     formData.append('filename', filename);
-    formData.append('ignorewarnings', '1');
-    formData.append('token', csrfToken);
-    formData.append('action', 'upload');
-    formData.append('format', 'json');
 
-    return this.client
-      .post(url, { body: formData })
-      .then(response => response.json())
-      .then(response => {
-        log('writeImage', response);
-        if (!isWikibaseImageResponse(response)) {
-          err('Invalid response received.');
-          return '';
-        }
+    const response = await this.apiPost(
+      {
+        action: 'upload',
+        ignorewarnings: '1',
+        token: csrfToken,
+        format: 'json',
+      },
+      formData,
+    );
 
-        // Check if error exists and has a code property
-        if ('error' in response && !!response.error?.info) {
-          const info = response.error.info;
-          const filename = response.error.info?.match(/\[\[\:\w+\:(\w+\.\w+)\]\]/)?.at(1);
-          if (filename) {
-            warn(`Using duplicate file: ${info}. Filename: ${filename}`);
-            return filename;
-          } else {
-            warn(`Error uploading image: ${info}`);
-          }
-        }
-        // Check if upload result is "Success"
-        else if ('upload' in response && !!response.upload?.filename) {
-          return response.upload.filename;
-        }
+    log('writeImage', response);
+    if (!isWikibaseImageResponse(response)) {
+      err('Invalid writeImage response.');
+      return '';
+    }
 
-        return undefined;
-      })
-      .catch(error => {
-        log(error);
-        return undefined;
-      });
+    if ('error' in response && !!response.error?.info) {
+      const info = response.error.info;
+      const matchedFilename = info?.match(/\[\[\:\w+\:(\w+\.\w+)\]\]/)?.at(1);
+      if (matchedFilename) {
+        warn(`Using duplicate file: ${info}. Filename: ${matchedFilename}`);
+        return matchedFilename;
+      }
+      warn(`Error uploading image: ${info}`);
+    } else if ('upload' in response && !!response.upload?.filename) {
+      return response.upload.filename;
+    }
+
+    return undefined;
   }
 
   public async removeItem(id: string) {
@@ -349,33 +233,21 @@ export class WikibaseConnector {
       throw new Error('Failed to get CSRF token');
     }
 
-    const url = new URL(this.wikibaseUrl);
-    const params = new URLSearchParams();
-    params.set('action', 'delete');
-    params.set('title', id);
-    params.set('token', csrfToken);
-    params.set('format', 'json');
+    const response = await this.apiPost({
+      action: 'delete',
+      title: id,
+      token: csrfToken,
+      format: 'json',
+    });
 
-    return await this.client
-      .post(url, {
-        body: params,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      })
-      .then(response => response.json())
-      .then(response => {
-        if (response && typeof response === 'object' && 'error' in response) {
-          err('removeItem', (response as { error?: unknown }).error);
-          return false;
-        }
-        if (response && typeof response === 'object' && 'delete' in response) {
-          return true;
-        }
-        warn('Unknown delete response', response);
-        return false;
-      })
-      .catch(error => {
-        err('removeItem', error);
-        return false;
-      });
+    if (response && typeof response === 'object' && 'error' in response) {
+      err('removeItem', (response as { error?: unknown }).error);
+      return false;
+    }
+    if (response && typeof response === 'object' && 'delete' in response) {
+      return true;
+    }
+    warn('Unknown delete response', response);
+    return false;
   }
 }

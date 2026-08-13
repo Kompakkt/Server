@@ -198,11 +198,9 @@ export class WikibaseService {
 
   constructor() {
     let domain = WikibaseConfiguration?.Domain;
-    const username = WikibaseConfiguration?.AdminUsername;
-    const password = WikibaseConfiguration?.AdminPassword;
     const sparqlEndpoint = WikibaseConfiguration?.SPARQLEndpoint;
 
-    if (!domain || !username || !password || !sparqlEndpoint) {
+    if (!domain || !sparqlEndpoint) {
       throw new Error('Wikibase configuration not found');
     }
 
@@ -212,7 +210,7 @@ export class WikibaseService {
 
     const instance = domain as `http${string}`;
 
-    this.wbConnect = new WikibaseConnector(instance, { username, password });
+    this.wbConnect = new WikibaseConnector(instance);
   }
 
   public static getInstance(): WikibaseService | undefined {

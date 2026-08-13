@@ -10,13 +10,13 @@ export type IWikibaseConfiguration = {
   Domain: string;
   SPARQLEndpoint: string;
   RestAPIURL: string;
-  Username: string;
-  Password: string;
-  AdminUsername: string;
-  AdminPassword: string;
+  OauthToken: string;
+  Username?: string;
+  Password?: string;
+  AdminUsername?: string;
+  AdminPassword?: string;
   TTLFileURL?: string;
   OpenApiUrl?: string;
-  OAuthToken?: string;
 };
 
 export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfiguration => {
@@ -24,12 +24,9 @@ export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfigura
     !!obj &&
     typeof obj === 'object' &&
     'Domain' in obj &&
-    'Username' in obj &&
-    'Password' in obj &&
-    'AdminUsername' in obj &&
-    'AdminPassword' in obj &&
     'SPARQLEndpoint' in obj &&
-    'RestAPIURL' in obj
+    'RestAPIURL' in obj &&
+    'OauthToken' in obj
   );
 };
 
