@@ -9,6 +9,7 @@ export type IWikibaseConfiguration = {
   PrefixDomain?: string;
   Domain: string;
   SPARQLEndpoint: string;
+  RestAPIURL: string;
   Username: string;
   Password: string;
   AdminUsername: string;
@@ -27,7 +28,8 @@ export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfigura
     'Password' in obj &&
     'AdminUsername' in obj &&
     'AdminPassword' in obj &&
-    'SPARQLEndpoint' in obj
+    'SPARQLEndpoint' in obj &&
+    'RestAPIURL' in obj
   );
 };
 

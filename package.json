@@ -16,7 +16,8 @@
     "format:check": "oxfmt --check",
     "update:kompakkt:common": "bun run update-git-dependency.ts -d @kompakkt/common -o Kompakkt -r Common -b main",
     "email": "email dev --dir src/emails",
-    "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run packages/openapi-gen/generate.ts"
+    "generate:openapi": "KOMPAKKT_SERVER_IS_E2E=true bun run packages/openapi-gen/generate.ts",
+    "generate:wikibase-client": "bun run src/plugins/wikibase/generate-rest-api-client.ts"
   },
   "repository": {
     "type": "git",
