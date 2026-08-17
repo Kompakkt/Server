@@ -23,8 +23,8 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
     .use(authService)
     .get(
       '/countentityuses/:id',
-      async ({ params: { id }, status }) => {
-        const result = countEntityUses(id).catch(err => {
+      async ({ params: { id }, status, userdata }) => {
+        const result = countEntityUses(id, userdata).catch(err => {
           info('Error in countEntityUses', err);
           return undefined;
         });

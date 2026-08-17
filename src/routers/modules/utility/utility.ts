@@ -31,7 +31,10 @@ const userInAccessQuery = async (user: ServerDocument<IUserData>) => {
   return query;
 };
 
-export const countEntityUses = async (identifier: string | ObjectId) => {
+export const countEntityUses = async (
+  identifier: string | ObjectId,
+  userdata?: ServerDocument<IUserData>,
+) => {
   const filter: Filter<ServerDocument<ICompilation>> = {
     [`entities.${identifier.toString()}`]: { $exists: true },
   };
@@ -39,6 +42,20 @@ export const countEntityUses = async (identifier: string | ObjectId) => {
   const compilations = await compilationCollection
     .find(filter)
     .toArray()
+    .then(arr => {
+      return arr.filter(compilation => {
+        if (!compilation.online) {
+          if (!userdata) return false;
+          if (!compilation.access) return false;
+          // TODO: Also check profile
+          const userInAccess = compilation.access.some(
+            entry => entry._id.toString() === userdata._id.toString(),
+          );
+          if (!userInAccess) return false;
+        }
+        return true;
+      });
+    })
     .catch(err => {
       log('Error counting entity uses', err, filter);
       return [];
