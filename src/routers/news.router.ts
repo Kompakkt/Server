@@ -36,7 +36,8 @@ export const newsRouter = new Elysia()
         {
           response: { 200: t.Array(INewsItemSchema) },
           detail: {
-            description: 'Get news items. Returns all items for users with canModifyNews flag, only published for others.',
+            description:
+              'Get news items. Returns all items for users with canModifyNews flag, only published for others.',
             tags: [RouterTags.News],
           },
         },
@@ -187,7 +188,6 @@ export const newsRouter = new Elysia()
             403: t.Any(),
             500: t.Any(),
           },
-          type: 'multipart/form-data',
           detail: {
             description: 'Upload an image for a news item (requires canModifyNews flag)',
             tags: [RouterTags.News],
