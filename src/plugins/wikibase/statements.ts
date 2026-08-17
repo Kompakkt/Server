@@ -19,10 +19,7 @@ type PatchReplaceOp = { op: 'replace'; path: string; value: unknown };
 
 const asArray = <T>(value: T | T[]): T[] => (Array.isArray(value) ? value : [value]);
 
-export const buildStatement = (
-  propertyId: string,
-  value: SimplifiedClaimValue,
-): RestStatement => {
+export const buildStatement = (propertyId: string, value: SimplifiedClaimValue): RestStatement => {
   if (typeof value === 'string') {
     return { property: { id: propertyId }, value: { type: 'value', content: value } };
   }

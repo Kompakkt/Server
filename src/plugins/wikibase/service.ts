@@ -47,7 +47,12 @@ import {
   getWikibaseClassInstancesSpark,
 } from './sparks';
 import { simplifySparqlResults, sparqlQueryUrl } from './sparql';
-import { buildStatements, replaceItemPatch, type RestStatements, type SimplifiedClaims } from './statements';
+import {
+  buildStatements,
+  replaceItemPatch,
+  type RestStatements,
+  type SimplifiedClaims,
+} from './statements';
 
 type UndoPartial<T> = T extends Partial<infer R> ? R : T;
 
@@ -146,15 +151,18 @@ const getIdFromWikibaseItem = (item: string | IWikibaseItem) => {
   return item.id;
 };
 
-const extractQIds = (text: string): string[] =>
-  Array.from(text.matchAll(/Q\d+/gi)).map(m => m[0]);
+const extractQIds = (text: string): string[] => Array.from(text.matchAll(/Q\d+/gi)).map(m => m[0]);
 
 const resolveIdFromCreateError = async (
   res: addItemResponse,
   label: string | undefined,
 ): Promise<string> => {
-  const data = res.data as { code?: string; message?: string; context?: Record<string, unknown> } | undefined;
-  const text = data ? `${data.code ?? ''} ${data.message ?? ''} ${JSON.stringify(data.context ?? {})}` : '';
+  const data = res.data as
+    | { code?: string; message?: string; context?: Record<string, unknown> }
+    | undefined;
+  const text = data
+    ? `${data.code ?? ''} ${data.message ?? ''} ${JSON.stringify(data.context ?? {})}`
+    : '';
   const fromError = extractQIds(text).at(0);
   if (fromError) {
     log('Resolved existing Wikibase item id from create error', fromError);
@@ -173,9 +181,7 @@ const resolveIdFromCreateError = async (
   throw new Error(`Failed to resolve existing Wikibase item from create error: ${text}`);
 };
 
-const createItem = async (
-  request: AddItemBody,
-): Promise<string | undefined> => {
+const createItem = async (request: AddItemBody): Promise<string | undefined> => {
   try {
     const res = await addItem(request);
     if (res.status === 201 && (res.data as { id?: string }).id) {
@@ -307,12 +313,9 @@ export class WikibaseService {
       [WBAnnotationPredicates.perspectiveTargetXAxis]: asVector3(target).x.toFixed(fixedPos),
       [WBAnnotationPredicates.perspectiveTargetYAxis]: asVector3(target).y.toFixed(fixedPos),
       [WBAnnotationPredicates.perspectiveTargetZAxis]: asVector3(target).z.toFixed(fixedPos),
-      [WBAnnotationPredicates.selectorRefPointXAxis]:
-        asVector3(referencePoint).x.toFixed(fixedPos),
-      [WBAnnotationPredicates.selectorRefPointYAxis]:
-        asVector3(referencePoint).y.toFixed(fixedPos),
-      [WBAnnotationPredicates.selectorRefPointZAxis]:
-        asVector3(referencePoint).z.toFixed(fixedPos),
+      [WBAnnotationPredicates.selectorRefPointXAxis]: asVector3(referencePoint).x.toFixed(fixedPos),
+      [WBAnnotationPredicates.selectorRefPointYAxis]: asVector3(referencePoint).y.toFixed(fixedPos),
+      [WBAnnotationPredicates.selectorRefPointZAxis]: asVector3(referencePoint).z.toFixed(fixedPos),
       [WBAnnotationPredicates.selectorRefNormalXAxis]:
         asVector3(referenceNormal).x.toFixed(fixedPos),
       [WBAnnotationPredicates.selectorRefNormalYAxis]:

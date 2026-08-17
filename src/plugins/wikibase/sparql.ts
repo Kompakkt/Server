@@ -1,10 +1,10 @@
 import { WikibaseConfiguration } from './config';
 
 type SparqlBinding = {
-  value: string;
-  type: string;
+  'value': string;
+  'type': string;
   'xml:lang'?: string;
-  datatype?: string;
+  'datatype'?: string;
 };
 
 type SparqlResults = {
@@ -27,9 +27,7 @@ const parseUri = (uri: string) => {
   if (uri.match(/http.*\/entity\/statement\//)) {
     return convertStatementUriToGuid(uri);
   }
-  return uri
-    .replace(/^https?:\/\/.*\/entity\//, '')
-    .replace(/^https?:\/\/.*\/prop\/direct\//, '');
+  return uri.replace(/^https?:\/\/.*\/entity\//, '').replace(/^https?:\/\/.*\/prop\/direct\//, '');
 };
 
 const parseValue = (valueObj: SparqlBinding | undefined): unknown => {
@@ -37,7 +35,12 @@ const parseValue = (valueObj: SparqlBinding | undefined): unknown => {
   const { value } = valueObj;
   if (valueObj.type === 'uri') return parseUri(value);
   const datatype = (valueObj.datatype || '').replace('http://www.w3.org/2001/XMLSchema#', '');
-  if (datatype === 'decimal' || datatype === 'integer' || datatype === 'float' || datatype === 'double') {
+  if (
+    datatype === 'decimal' ||
+    datatype === 'integer' ||
+    datatype === 'float' ||
+    datatype === 'double'
+  ) {
     return parseFloat(value);
   }
   if (datatype === 'boolean') return value === 'true';
@@ -69,7 +72,8 @@ const addAssociatedValue = (
   richVarData: Record<string, unknown>,
 ) => {
   let shortAssociatedVarName = associatedVarName.split(varName)[1];
-  shortAssociatedVarName = shortAssociatedVarName[0].toLowerCase() + shortAssociatedVarName.slice(1);
+  shortAssociatedVarName =
+    shortAssociatedVarName[0].toLowerCase() + shortAssociatedVarName.slice(1);
   if (shortAssociatedVarName === 'altLabel') shortAssociatedVarName = 'aliases';
   const associatedVarData = input[associatedVarName];
   if (associatedVarData != null) richVarData[shortAssociatedVarName] = associatedVarData.value;
@@ -100,7 +104,9 @@ const getSimplifiedResult = (
   return simplifiedResult;
 };
 
-export const simplifySparqlResults = <T = Record<string, unknown>>(input: SparqlResults | string): T[] => {
+export const simplifySparqlResults = <T = Record<string, unknown>>(
+  input: SparqlResults | string,
+): T[] => {
   if (typeof input === 'string') input = JSON.parse(input) as SparqlResults;
   const { vars } = input.head;
   const results = input.results.bindings;

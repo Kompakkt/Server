@@ -110,7 +110,9 @@ export class WikibaseConnector {
 
   private async apiPost(params: Record<string, string>, formData?: FormData): Promise<unknown> {
     const url = new URL(this.apiUrl);
-    const headers = formData ? this.authHeaders() : this.authHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
+    const headers = formData
+      ? this.authHeaders()
+      : this.authHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' });
     let body: URLSearchParams | FormData;
     if (formData) {
       for (const [key, value] of Object.entries(params)) formData.append(key, value);

@@ -1,22 +1,15 @@
 import type { IAnnotation, IDigitalEntity } from '@kompakkt/common';
 import { Configuration, type IConfiguration } from 'src/configuration';
 import type { IWikibaseAnnotationExtension, IWikibaseDigitalEntityExtension } from './common';
-import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 export type IWikibaseConfiguration = {
-  KompakktAddress?: string;
   Public?: string;
   PrefixDomain?: string;
   Domain: string;
   SPARQLEndpoint: string;
   RestAPIURL: string;
   OauthToken: string;
-  Username?: string;
-  Password?: string;
-  AdminUsername?: string;
-  AdminPassword?: string;
   TTLFileURL?: string;
-  OpenApiUrl?: string;
 };
 
 export const isWikibaseConfiguration = (obj: unknown): obj is IWikibaseConfiguration => {

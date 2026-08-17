@@ -5,7 +5,9 @@ console.time('generate-wikibase-client');
 const OPENAPI_URL = process.env['WIKIBASE_OPENAPI_URL'];
 if (!OPENAPI_URL) {
   console.error('WIKIBASE_OPENAPI_URL environment variable is not set.');
-  console.error('Set it to the Wikibase REST API OpenAPI document URL, e.g. https://wikibase.example/w/rest_v1/openapi.json');
+  console.error(
+    'Set it to the Wikibase REST API OpenAPI document URL, e.g. https://wikibase.example/w/rest_v1/openapi.json',
+  );
   process.exit(1);
 }
 
