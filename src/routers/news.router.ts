@@ -94,12 +94,16 @@ export const newsRouter = new Elysia()
         '/:id',
         async ({ params: { id }, body, status }) => {
           const _id = new ObjectId(id);
-          const { title, content, link, imageUrl, published } = body;
+          const { title, content, link, imageUrl, published, date } = body;
 
-          const updateResult = await newsCollection.updateOne(
-            { _id },
-            { $set: { title, content, link, imageUrl, published } },
-          );
+          if (date !== undefined && Number.isNaN(Date.parse(date))) {
+            return status(400, 'Invalid date');
+          }
+
+          const updateDoc: Record<string, unknown> = { title, content, link, imageUrl, published };
+          if (date !== undefined) updateDoc.date = date;
+
+          const updateResult = await newsCollection.updateOne({ _id }, { $set: updateDoc });
           if (!updateResult.matchedCount) return status(404, 'News item not found');
 
           const updated = await newsCollection.findOne({ _id });
@@ -115,9 +119,13 @@ export const newsRouter = new Elysia()
             link: t.Optional(t.String()),
             imageUrl: t.Optional(t.String()),
             published: t.Optional(t.Boolean()),
+            date: t.Optional(
+              t.String({ description: 'ISO 8601 date string to override the stored date' }),
+            ),
           }),
           response: {
             200: INewsItemSchema,
+            400: t.Any(),
             403: t.Any(),
             404: t.Any(),
             500: t.Any(),
