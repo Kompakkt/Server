@@ -2,12 +2,20 @@ import type { IPublicProfile, IUserData } from '@kompakkt/common';
 import { ProfileType } from '@kompakkt/common';
 import type { Filter } from 'mongodb';
 import { info } from 'src/logger';
-import { profileCollection, userCollection } from 'src/mongo';
+import { Migrations, migrationCollection, profileCollection, userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
 const INSTITUTION = 'institution' as const;
 
 export const migrateInstitutionProfiles = async () => {
+  const migrated = await migrationCollection.findOne({
+    name: Migrations.migrateInstitutionProfiles,
+  });
+  if (migrated) {
+    info('Skipping migrateInstitutionProfiles, migration record already present');
+    return;
+  }
+
   const profileFilter = { type: INSTITUTION } as unknown as Filter<ServerDocument<IPublicProfile>>;
   const profileResult = await profileCollection.updateMany(profileFilter, {
     $set: { type: ProfileType.organization },
@@ -27,4 +35,9 @@ export const migrateInstitutionProfiles = async () => {
   info(
     `Migrated ${userResult.modifiedCount} user profile reference(s) from '${INSTITUTION}' to '${ProfileType.organization}'`,
   );
+
+  await migrationCollection.insertOne({
+    name: Migrations.migrateInstitutionProfiles,
+    completedAt: Date.now(),
+  });
 };

@@ -210,6 +210,11 @@ const resolveDocument = async <T extends ServerDocument<T>>(
     : isTypeGuard(obj)
       ? obj
       : undefined;
+  if (!entity) {
+    log(
+      `Resolve diagnostics: resolveDocument(${collection.collectionName}, ${JSON.stringify(obj)}) resolved to nothing`,
+    );
+  }
   return entity || undefined;
 };
 
@@ -242,7 +247,12 @@ const createResolver = <T extends ServerDocument<T>>(
         return undefined;
       }));
 
-    if (!entity) return undefined;
+    if (!entity) {
+      log(
+        `Resolve diagnostics: createResolver(${collection.collectionName}) returning undefined for ${JSON.stringify(obj)}`,
+      );
+      return undefined;
+    }
 
     await entitiesCache.set(`${collection.collectionName}::${entity._id}`, entity).catch(error => {
       err(`Error caching document: ${error.toString()}`);

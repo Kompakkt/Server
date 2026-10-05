@@ -161,10 +161,10 @@ const migrateCollection = async (
 };
 
 export const migrateCreatorAndAccessFields = async () => {
-  /*const result = await migrationCollection.findOne({
+  const result = await migrationCollection.findOne({
     name: Migrations.migrateCreatorAndAccessFields,
   });
-  if (result) return;*/
+  if (result) return;
 
   const results = await Promise.allSettled([
     migrateCollection(entityCollection),

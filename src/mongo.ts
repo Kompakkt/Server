@@ -84,7 +84,11 @@ export const followsCollection = accountsDb.collection<{
 
 export enum Migrations {
   migrateCreatorAndAccessFields = 'migrateCreatorAndAccessFields',
+  backfillProfileOwnerId = 'backfillProfileOwnerId',
   migrateUserProfiles = 'migrateUserProfiles',
+  migrateInstitutionProfiles = 'migrateInstitutionProfiles',
+  ensureDefaultUserProfile = 'ensureDefaultUserProfile',
+  ensureEntityCreatorIsProfile = 'ensureEntityCreatorIsProfile',
   migrateFinishedDraftEntities = 'migrateFinishedDraftEntities',
   migrateCompilationOnlineField = 'migrateCompilationOnlineField',
   migrateUserFlags = 'migrateUserFlags',

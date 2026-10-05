@@ -77,6 +77,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         const mediaType =
           {
             model: 'entity',
+            ifc: 'entity',
             cloud: 'entity',
             splat: 'entity',
           }[entity.mediaType] ?? entity.mediaType;

@@ -45,9 +45,15 @@ import {
 import { resolveAny } from './modules/api.v1/resolving-strategies';
 import { saveHandler } from './modules/api.v1/save-to-collection';
 import { increasePopularity } from './modules/api.v2/increase-popularity';
-import { checkIsOwner, makeUserOwnerOf } from './modules/user-management/users';
+import { makeUserOwnerOf } from './modules/user-management/users';
+import { resolveProfileForUser } from './modules/user-management/profile-members';
 import { RouterTags } from './tags';
-import type { AccessField, AccessFieldEntry, CreatorField } from '@kompakkt/common';
+import type {
+  AccessField,
+  AccessFieldEntry,
+  CreatorField,
+  ProfileReference,
+} from '@kompakkt/common';
 import { AllCollectionsSchemaUnion } from 'src/types/schema-unions';
 
 /**
@@ -298,6 +304,25 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               return !!result;
             })();
 
+            // Optional profile attribution: uploads can be made under one of the user's profiles
+            const requestedProfileId = (() => {
+              if (typeof body !== 'object' || body === null) return;
+              const candidate = (body as Record<string, unknown>).profileId;
+              return typeof candidate === 'string' ? candidate : undefined;
+            })();
+            delete (body as Record<string, unknown>).profileId;
+            let actingProfile: ProfileReference | undefined;
+            if (requestedProfileId) {
+              const resolvedProfile = await resolveProfileForUser(userdata, requestedProfileId);
+              if (!resolvedProfile) {
+                return status(403, 'You do not have access to the requested profile');
+              }
+              if (!doesEntityExist && resolvedProfile.role === EntityAccessRole.viewer) {
+                return status(403, 'Viewer membership cannot create content under this profile');
+              }
+              actingProfile = { profileId: resolvedProfile.profileId, type: resolvedProfile.type };
+            }
+
             const canProceed = await (async (): Promise<boolean> => {
               // Creation always allowed here
               if (!doesEntityExist) return true;
@@ -322,7 +347,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
                 const parentEntity = await entityCollection.findOne({
                   'relatedDigitalEntity._id': { $in: [_id.toString(), new ObjectId(_id)] },
                 });
-                const hasParentPermission = PermissionHelper.isUserMinimumRole(
+                const hasParentPermission = await PermissionHelper.isUserMinimumRole(
                   parentEntity,
                   userdata,
                   EntityAccessRole.editor,
@@ -342,25 +367,37 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
               collection,
               body,
               userdata,
+              actingProfile,
             }).catch(error => {
-              err(error);
+              err(`Push diagnostics: saveHandler threw for ${collection} ${body._id}:`, error);
               return false;
             });
+            log(
+              `Push diagnostics: saveHandler returned ${saveResult ? 'SUCCESS' : 'FALSE'} for ${collection} ${body._id}`,
+            );
             if (!saveResult) return status(500, 'Failed saving document');
 
             if (!doesEntityExist) {
               log(`Making user owner of ${body._id} to ${collection}`);
-              await makeUserOwnerOf({ docs: body, collection, userdata }).catch(error => {
-                err(`Error making user owner of ${body._id} to ${collection}`, error);
-              });
+              await makeUserOwnerOf({ docs: body, collection, userdata, actingProfile }).catch(
+                error => {
+                  err(`Error making user owner of ${body._id} to ${collection}`, error);
+                },
+              );
             }
 
+            log(
+              `Push diagnostics: before resolveAny of ${collection} ${body._id} (profileId: ${actingProfile?.profileId ?? 'none'})`,
+            );
             const resolveResult = await resolveAny(collection, {
               _id: body._id,
             }).catch(error => {
-              err(error);
+              err(`Push diagnostics: resolveAny threw for ${collection} ${body._id}:`, error);
               return undefined;
             });
+            log(
+              `Push diagnostics: resolveAny returned ${resolveResult ? 'a document' : 'UNDEFINED'} for ${collection} ${body._id}`,
+            );
             if (!resolveResult) return status(500, 'Failed resolving saved document');
 
             void exploreCache.flush();
@@ -390,31 +427,23 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
           async ({ status, params: { identifier }, body, userdata }) => {
             if (!userdata) return status(401, 'User not authenticated');
             if (!body || !isEntitySettings(body)) return status(400, 'Invalid body');
-            const preview = body.preview;
+            const { profileId, ...settingsBody } = body as typeof body & {
+              profileId?: string;
+            };
+            const preview = settingsBody.preview;
             const entity = await entityCollection.findOne({
               _id: new ObjectId(identifier),
             });
             if (!entity) return status(404, 'Entity not found');
 
-            const hasAccess = await (async () => {
-              const currentAccess = entity.access.find(
-                user => user._id === userdata._id.toString(),
-              );
-              const isOwner = await checkIsOwner({
-                doc: entity,
-                collection: Collection.entity,
+            const hasAccess =
+              userdata.role === UserRank.admin ||
+              (await PermissionHelper.isUserMinimumRole(
+                entity,
                 userdata,
-              });
-
-              const isAdmin = userdata.role === UserRank.admin;
-
-              return (
-                currentAccess?.role === EntityAccessRole.owner ||
-                currentAccess?.role === EntityAccessRole.editor ||
-                isOwner ||
-                isAdmin
-              );
-            })();
+                EntityAccessRole.editor,
+                profileId,
+              ));
 
             if (!hasAccess) return status(403, 'User does not have permission to edit this entity');
 
@@ -427,7 +456,7 @@ const apiV1Router = new Elysia().use(configServer).group('/api/v1', app =>
             );
 
             // Overwrite old settings
-            const settings = { ...body, preview: finalImagePath };
+            const settings = { ...settingsBody, preview: finalImagePath };
             const result = await entityCollection.updateOne(
               { _id: new ObjectId(entity._id.toString()) },
               { $set: { settings: { ...entity.settings, ...settings } } },

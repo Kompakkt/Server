@@ -10,6 +10,7 @@ import {
   resolveEntity,
 } from './resolving-strategies';
 import { checkIsOwner } from '../user-management/users';
+import { PermissionHelper } from 'src/routers/handlers/permission.service';
 import { log } from 'src/logger';
 
 export const findSingleHandler = async (
@@ -27,15 +28,12 @@ export const findSingleHandler = async (
   if (!doc) return undefined;
   // Check if user has access to the entity
   const existsInUserdata = userdata ? await checkIsOwner({ collection, doc, userdata }) : false;
-  const userInAccess = userdata
-    ? // Hotfix: Some entities do not have an access field yet due to migration issues.
-      Array.isArray(doc.access)
-      ? doc.access.find(user => user._id === userdata._id.toString())
-      : undefined
+  const userRoleInAccess = userdata
+    ? await PermissionHelper.getUserRoleInAccess(doc, userdata)
     : undefined;
   const isAdmin = userdata?.role === UserRank.admin;
 
-  const userHasAccess = isAdmin || existsInUserdata || !!userInAccess;
+  const userHasAccess = isAdmin || existsInUserdata || !!userRoleInAccess;
   if (isAdmin && !doc.online)
     log(`Admin ${userdata.username} requested access to ${doc._id.toString()}`);
 

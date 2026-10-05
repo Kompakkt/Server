@@ -22,7 +22,7 @@ export const RouterTagDescriptions: Record<keyof typeof RouterTags, string> = {
   'Upload': 'Endpoints for handling file uploads and retrieving uploaded files',
   'Utility': 'Utility endpoints for various helper functions',
   'Monitoring': 'Endpoints for monitoring system health and performance',
-  'Profile': 'Endpoints related to public user & institution profiles',
+  'Profile': 'Endpoints related to public user & organization profiles',
   'News': 'Endpoints for managing news items displayed on the home page',
 } as const;
 

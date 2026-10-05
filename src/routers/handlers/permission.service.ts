@@ -3,12 +3,14 @@ import { ObjectId } from 'mongodb';
 import {
   Collection,
   EntityAccessRole,
+  ProfileMemberRole,
+  ProfileType,
   isCollection,
   isEntityAccessRole,
   type IUserData,
 } from '@kompakkt/common';
 import { log } from 'src/logger';
-import { collectionMap } from 'src/mongo';
+import { collectionMap, profileCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { authService } from './auth.service';
 import type { AccessField } from '@kompakkt/common';
@@ -50,15 +52,76 @@ const editorCollections = [Collection.entity, Collection.annotation, Collection.
 
 export const PermissionHelper = new (class {
   /**
-   * Get the user's role in the document's access field.
+   * Resolve the membership role a user holds in an organization profile.
+   * Falls back to the profile document when the user's role-stamped link entry
+   * is missing or stale.
    */
-  getUserRoleInAccess(document: unknown, userdata: ServerDocument<IUserData> | IUserData) {
+  async getMembershipRole(
+    profileId: string,
+    userdata: ServerDocument<IUserData> | IUserData,
+  ): Promise<ProfileMemberRole | undefined> {
+    const userId = userdata._id.toString();
+    const entry = userdata.profiles?.find(profileEntry => profileEntry.profileId === profileId);
+    if (entry?.type !== ProfileType.organization) return;
+    if (entry.role) return entry.role;
+
+    const profile = await profileCollection.findOne({ _id: new ObjectId(profileId) });
+    if (!profile || profile.type !== ProfileType.organization) return;
+    if (profile.ownerId === userId) return ProfileMemberRole.owner;
+    return profile.members?.find(member => member.userId === userId)?.role;
+  }
+
+  /**
+   * Membership baseline: users with no explicit access entry on a document
+   * inherit their role from the organization profile that owns the document.
+   */
+  async getMembershipBaselineRole(
+    document: unknown,
+    userdata: ServerDocument<IUserData> | IUserData,
+  ): Promise<EntityAccessRole | undefined> {
+    if (!isRecord(document) || !isRecord(document.creator)) return;
+    if (!isRecord(document.creator.profile)) return;
+    const ownerProfileId = document.creator.profile.profileId;
+    if (typeof ownerProfileId !== 'string') return;
+
+    const membershipRole = await this.getMembershipRole(ownerProfileId, userdata);
+    return isEntityAccessRole(membershipRole) ? membershipRole : undefined;
+  }
+
+  /**
+   * Get the user's role in the document's access field.
+   *
+   * Resolution order:
+   * 1. Explicit entry scoped to the requested profile (`profileId` given).
+   * 2. Legacy fallback: entries without a profile reference still grant access.
+   * 3. Membership baseline for organization-owned content when the user has
+   *    no explicit entry on the document at all.
+   */
+  async getUserRoleInAccess(
+    document: unknown,
+    userdata: ServerDocument<IUserData> | IUserData,
+    profileId?: string,
+  ): Promise<EntityAccessRole | undefined> {
     if (!isDocument(document)) return;
     if (!('access' in document)) return;
     const access = document.access;
     if (!isAccessObject(access)) return;
-    const userAccess = access.find(user => user._id === userdata._id.toString());
-    return userAccess ? userAccess.role : undefined;
+
+    const userId = userdata._id.toString();
+    const userEntries = access.filter(entry => entry._id === userId);
+
+    if (userEntries.length > 0) {
+      if (profileId) {
+        const scoped = userEntries.find(entry => entry.profile?.profileId === profileId);
+        if (scoped) return scoped.role;
+        const legacy = userEntries.find(entry => !entry.profile);
+        return legacy?.role;
+      }
+      const legacy = userEntries.find(entry => !entry.profile);
+      return legacy ? legacy.role : userEntries[0]?.role;
+    }
+
+    return await this.getMembershipBaselineRole(document, userdata);
   }
 
   /**
@@ -73,12 +136,13 @@ export const PermissionHelper = new (class {
     return userEntities.includes(document._id.toString());
   }
 
-  isUserMinimumRole(
+  async isUserMinimumRole(
     document: unknown,
     userdata: ServerDocument<IUserData> | IUserData,
     minimumRole: EntityAccessRole,
+    profileId?: string,
   ) {
-    const accessRole = this.getUserRoleInAccess(document, userdata);
+    const accessRole = await this.getUserRoleInAccess(document, userdata, profileId);
     const legacyOwner = this.isUserLegacyOwner(document, userdata);
     if (legacyOwner) return true;
 
@@ -101,10 +165,20 @@ export const PermissionHelper = new (class {
   }
 })();
 
+const getRequestedProfileId = (context: { body: unknown; query: unknown }): string | undefined => {
+  for (const source of [context.body, context.query]) {
+    if (isRecord(source) && hasFieldOfType(source, 'profileId', 'string')) {
+      return source.profileId as string;
+    }
+  }
+  return;
+};
+
 const getUserRole = async (options: {
   userdata?: ServerDocument<IUserData> | IUserData;
   params: { identifier: string; collection: string } | unknown;
   body: { username: string } | unknown;
+  query: unknown;
 }): Promise<EntityAccessRole | undefined> => {
   if (!options.userdata) return;
 
@@ -125,8 +199,14 @@ const getUserRole = async (options: {
   });
   if (!document) return;
 
-  // Access field check
-  const userRoleInAccess = PermissionHelper.getUserRoleInAccess(document, options.userdata);
+  const profileId = getRequestedProfileId(options);
+
+  // Access field check (profile-scoped when the request carries a profileId)
+  const userRoleInAccess = await PermissionHelper.getUserRoleInAccess(
+    document,
+    options.userdata,
+    profileId,
+  );
 
   // Legacy check
   const isUserLegacyOwner = PermissionHelper.isUserLegacyOwner(document, options.userdata);

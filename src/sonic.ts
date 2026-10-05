@@ -16,6 +16,7 @@ import {
   type IEntity,
   type IPerson,
   type IPhysicalEntity,
+  type IPublicProfile,
 } from '@kompakkt/common';
 import { HookManager } from './routers/modules/api.v1/hooks';
 import { findParentCompilations, findParentEntities } from './util/cascade-helpers';
@@ -94,7 +95,21 @@ const prepareEntity = (entity?: IEntity | IDocument) => {
   };
 };
 
+const isProfileLike = (data: Record<string, unknown>): data is ServerDocument<IPublicProfile> =>
+  'type' in data && (data.type === 'user' || data.type === 'organization') && 'socials' in data;
+
 export const buildSearchableText = (data: Record<string, unknown>): string => {
+  if (isProfileLike(data)) {
+    return extractText({
+      displayName: data.displayName,
+      description: data.description,
+      location: data.location,
+    })
+      .join(' ')
+      .toLowerCase()
+      .trim();
+  }
+
   if (isEntity(data)) {
     return extractText(prepareEntity(data)).join(' ').toLowerCase().trim();
   }
@@ -114,7 +129,7 @@ export const buildSearchableText = (data: Record<string, unknown>): string => {
   return extractText(data).join(' ').toLowerCase().trim();
 };
 
-type IndexableDocument = ServerDocument<IEntity | ICompilation>;
+type IndexableDocument = ServerDocument<IEntity | ICompilation | IPublicProfile>;
 
 class SonicSearchService {
   #searchChannel = new Search(options);

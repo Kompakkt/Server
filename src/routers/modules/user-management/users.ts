@@ -1,11 +1,13 @@
 import { ObjectId } from 'mongodb';
 import {
   Collection,
+  ProfileType,
   isDocument,
   type IDocument,
   type ITag,
   type IUserData,
 } from '@kompakkt/common';
+import type { ProfileReference } from '@kompakkt/common';
 import { userCollection } from 'src/mongo';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { resolveAny } from '../api.v1/resolving-strategies';
@@ -15,11 +17,19 @@ export const makeUserOwnerOf = async ({
   docs,
   collection,
   userdata,
+  actingProfile,
 }: {
   docs: ServerDocument<IDocument> | ServerDocument<IDocument>[];
   collection: Collection;
   userdata: ServerDocument<IUserData>;
+  actingProfile?: ProfileReference;
 }): Promise<boolean> => {
+  // `userdata.data` is the legacy personal-profile ownership list. Documents
+  // created under an organization profile belong to that profile instead
+  // (tracked via `creator.profile` / `access[].profile`), so they must not be
+  // appended to the uploader's personal data.
+  if (actingProfile?.type === ProfileType.organization) return true;
+
   const docIds = (Array.isArray(docs) ? docs : [docs]).map(doc => doc._id.toString());
   if (!userdata.data) userdata.data = {};
   if (!userdata.data[collection]) userdata.data[collection] = [];

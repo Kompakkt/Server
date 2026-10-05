@@ -120,6 +120,8 @@ const getUploadedFiles = async ({
       case 'entity':
       case 'model':
         return ['.obj', '.babylon', '.gltf', '.glb', '.stl'];
+      case 'ifc':
+        return ['.ifc', '.frag'];
       case 'splat':
         return ['.splat', '.spz', '.spx', '.ply'];
       case 'cloud':
@@ -160,6 +162,7 @@ const GLOBS_BY_MEDIA_TYPE: Record<string, Bun.Glob | undefined> = {
   cloud: new Bun.Glob('*.copc.laz'),
   model: new Bun.Glob('*.compressed.glb'),
   splat: new Bun.Glob('*.spz'),
+  ifc: new Bun.Glob('*.frag'),
 };
 
 const getProcessedFiles = async (paths: string[], mediaType: string) => {
@@ -276,6 +279,7 @@ const PRECOMPRESSED_TYPES = [
   '.zip',
   '.splat',
   '.spz',
+  '.frag',
   '.webp',
   '.jpg',
   '.jpeg',
@@ -837,6 +841,7 @@ const uploadRouter = new Elysia()
             model: ['.obj'],
             cloud: ['.las', '.laz'],
             splat: ['.splat', '.spx', '.ply'],
+            ifc: ['.ifc'],
           };
 
           const hasUnprocessedFiles = files.some(file =>

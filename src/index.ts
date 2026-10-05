@@ -27,6 +27,7 @@ import { migrateCreatorAndAccessFields } from './jobs/migrate-creator-and-access
 import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-entities';
 import { migrateCompilationOnline } from './jobs/migrate-compilation-online';
 import { migrateUserFlags } from './jobs/migrate-user-flags';
+import { backfillProfileOwnerId } from './jobs/backfill-profile-owner-id';
 import { RootDirectory } from './environment';
 import { Configuration } from './configuration';
 
@@ -48,6 +49,7 @@ const jobs = {
   ensureDefaultUserProfile,
   ensureEntityCreatorIsProfile,
   migrateUserFlags,
+  backfillProfileOwnerId,
 } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);

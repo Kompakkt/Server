@@ -45,7 +45,7 @@ export const ensureSortableProperties = async () => {
             entity.__normalizedName = entity.displayName?.trim().toLowerCase() ?? '';
           }
         }
-        await entityCollection.updateOne(
+        await collection.updateOne(
           { _id: entity._id },
           {
             $set: {

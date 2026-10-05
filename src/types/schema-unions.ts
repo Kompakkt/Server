@@ -28,29 +28,38 @@ import { t } from 'elysia';
  * TODO: Refactor the server to not have any catch-all routes, and instead have specific routes for each collection type. This would allow us to remove this union type and the associated complexity.
  * Alternatively, maybe we can do some "additionalProperties"-shenanigans on the non-resolved schemas to not automatically omit properties of the resolved schemas?
  */
+/**
+ * Elysia forces `additionalProperties: false` onto union members and falls back to
+ * cleaning the body against the first union member when validation fails. Without
+ * declaring `profileId` on every member, a push body carrying it (org-profile uploads)
+ * fails the union check and gets reduced to `{ _id }` before reaching the handler.
+ */
+const withProfileId = (schema: Parameters<typeof t.Composite>[0][number]) =>
+  t.Composite([schema, t.Object({ profileId: t.Optional(t.String()) })]);
+
 export const AllCollectionsSchemaUnion = t.Union([
-  IAddressSchema,
-  IAnnotationSchema,
-  IContactSchema,
-  ITagSchema,
+  withProfileId(IAddressSchema),
+  withProfileId(IAnnotationSchema),
+  withProfileId(IContactSchema),
+  withProfileId(ITagSchema),
 
-  IEntityResolvedSchema,
-  IEntityResolvedOnlyDigitalEntitySchema,
-  IEntitySchema,
+  withProfileId(IEntityResolvedSchema),
+  withProfileId(IEntityResolvedOnlyDigitalEntitySchema),
+  withProfileId(IEntitySchema),
 
-  IPersonResolvedSchema,
-  IPersonSchema,
+  withProfileId(IPersonResolvedSchema),
+  withProfileId(IPersonSchema),
 
-  ICompilationResolvedOnlyEntitiesSchema,
-  ICompilationResolvedSchema,
-  ICompilationSchema,
+  withProfileId(ICompilationResolvedOnlyEntitiesSchema),
+  withProfileId(ICompilationResolvedSchema),
+  withProfileId(ICompilationSchema),
 
-  IInstitutionResolvedSchema,
-  IInstitutionSchema,
+  withProfileId(IInstitutionResolvedSchema),
+  withProfileId(IInstitutionSchema),
 
-  IDigitalEntityResolvedSchema,
-  IDigitalEntitySchema,
+  withProfileId(IDigitalEntityResolvedSchema),
+  withProfileId(IDigitalEntitySchema),
 
-  IPhysicalEntityResolvedSchema,
-  IPhysicalEntitySchema,
+  withProfileId(IPhysicalEntityResolvedSchema),
+  withProfileId(IPhysicalEntitySchema),
 ]);

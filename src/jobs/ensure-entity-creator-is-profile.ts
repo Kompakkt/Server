@@ -1,14 +1,48 @@
 import { ObjectId } from 'mongodb';
 import { ProfileType } from '@kompakkt/common';
-import { warn } from 'src/logger';
-import { entityCollection, userCollection } from 'src/mongo';
+import { info, warn } from 'src/logger';
+import { Migrations, entityCollection, migrationCollection, userCollection } from 'src/mongo';
 
 export const ensureEntityCreatorIsProfile = async () => {
+  // Repair legacy docs that got the wrong profile-reference shape written
+  // ({_id} instead of {profileId}). Runs before the migration guard so an
+  // already-recorded migration cannot freeze the broken shape in place.
+  const shapeFix = await entityCollection.updateMany(
+    {
+      'creator.profile._id': { $exists: true },
+      'creator.profile.profileId': { $exists: false },
+    },
+    [
+      {
+        $set: {
+          'creator.profile': {
+            profileId: '$creator.profile._id',
+            type: '$creator.profile.type',
+          },
+        },
+      },
+    ],
+  );
+  if (shapeFix.modifiedCount > 0) {
+    info(
+      `Fixed creator.profile shape (_id -> profileId) on ${shapeFix.modifiedCount} entity document(s)`,
+    );
+  }
+
+  const migrated = await migrationCollection.findOne({
+    name: Migrations.ensureEntityCreatorIsProfile,
+  });
+  if (migrated) {
+    info('Skipping ensureEntityCreatorIsProfile, migration record already present');
+    return;
+  }
+
   const cursor = entityCollection.find({
     'creator.fullname': { $ne: null },
     'creator.username': { $ne: null },
     'creator.profile': { $exists: false },
   });
+  let stampedCount = 0;
   for await (const entity of cursor) {
     const user = await userCollection.findOne({
       _id: new ObjectId(entity.creator._id),
@@ -27,11 +61,19 @@ export const ensureEntityCreatorIsProfile = async () => {
       {
         $set: {
           'creator.profile': {
-            _id: profileId,
+            profileId,
             type: ProfileType.user,
           },
         },
       },
     );
+    stampedCount++;
   }
+
+  info(`Stamped creator.profile on ${stampedCount} entity document(s)`);
+
+  await migrationCollection.insertOne({
+    name: Migrations.ensureEntityCreatorIsProfile,
+    completedAt: Date.now(),
+  });
 };

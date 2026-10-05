@@ -41,6 +41,7 @@ import configServer from 'src/server.config';
 import { RESOLVE_FULL_DEPTH } from '../api.v1/resolving-strategies';
 import { resolveUserDocument } from './users';
 import { compilationCollection, entityCollection } from 'src/mongo';
+import { ProfileType } from '@kompakkt/common';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { ObjectId } from 'mongodb';
 
@@ -68,8 +69,12 @@ const resolveUserDataCollection = async <
   }
 
   const fromUserData = (async () => {
-    // TODO: Migrate all user data to be profile-specific, then uncomment this line to prevent returning all user data when a profileId is specified
-    // if (profileId) return [];
+    // Legacy userdata.data is implicitly the personal profile; only include it
+    // when no profile is requested or the personal profile is requested.
+    const personalProfileId = user.profiles.find(
+      profile => profile.type === ProfileType.user,
+    )?.profileId;
+    if (profileId && profileId !== personalProfileId) return [];
     const data = user.data[collection] ?? [];
     const resolved = await Promise.all(
       Array.from(new Set(data)).map(docId => resolveUserDocument(docId, collection, depth)),
@@ -79,11 +84,15 @@ const resolveUserDataCollection = async <
   })();
 
   const fromAccess = (async () => {
+    // Include docs the profile owns via creator and docs shared with the profile via access
+    const profileFilter = {
+      $or: [{ 'access.profile.profileId': profileId }, { 'creator.profile.profileId': profileId }],
+    };
     const documents =
       collection === Collection.entity
-        ? await entityCollection.find({ 'access.profile.profileId': profileId }).toArray()
+        ? await entityCollection.find(profileFilter).toArray()
         : collection === Collection.compilation
-          ? await compilationCollection.find({ 'access.profile.profileId': profileId }).toArray()
+          ? await compilationCollection.find(profileFilter).toArray()
           : [];
     const resolved = await Promise.all(
       documents.map(entity => resolveUserDocument(entity._id, collection, depth)),

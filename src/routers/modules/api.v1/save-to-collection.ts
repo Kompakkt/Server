@@ -40,12 +40,37 @@ import { stripUser } from 'src/util/userdata-transformation';
 import { makeUserOwnerOf } from '../user-management/users';
 import { HookManager } from './hooks';
 import { saveMetadataFiles } from 'src/util/save-metadata-files';
-import type { AccessField, CreatorField } from '@kompakkt/common';
+import type { AccessField, CreatorField, ProfileReference } from '@kompakkt/common';
 
 type TransformFn<T> = (
   obj: ServerDocument<IDocument>,
   user: ServerDocument<IUserData>,
+  actingProfile?: ProfileReference,
 ) => Promise<Partial<T>>;
+
+/**
+ * Stamp the acting user's profile reference onto their access entries, and
+ * default the access field to the creator as sole owner when absent.
+ */
+const stampCreatorProfile = (
+  access: AccessField | undefined,
+  creator: CreatorField,
+): AccessField => {
+  const entries: AccessField = access?.length
+    ? access
+    : [
+        {
+          _id: creator._id,
+          fullname: creator.fullname,
+          username: creator.username,
+          role: EntityAccessRole.owner,
+          profile: creator.profile,
+        },
+      ];
+  return entries.map(entry =>
+    entry._id === creator._id ? { ...entry, profile: entry.profile ?? creator.profile } : entry,
+  );
+};
 
 const flattenRecordArray = (obj?: Record<string, any>): Record<string, IDocument[]> => {
   if (!obj) return {};
@@ -105,13 +130,14 @@ const transformAnnotation: TransformFn<IAnnotation> = async (body, user) => {
   return asAnnotation;
 };
 
-const transformEntity: TransformFn<IEntity> = async (body, user) => {
+const transformEntity: TransformFn<IEntity> = async (body, user, actingProfile) => {
   const asEntity = body as unknown as Partial<IEntity>;
 
   const userProfile = user.profiles.find(p => p.type === ProfileType.user)!;
+  const profile = actingProfile ?? userProfile;
   const strippedUser: CreatorField = {
     ...stripUser(user),
-    profile: userProfile,
+    profile,
   };
 
   const digitalEntity = asEntity.relatedDigitalEntity?._id
@@ -119,6 +145,14 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
         _id: new ObjectId(asEntity.relatedDigitalEntity._id),
       })
     : undefined;
+
+  const isNew = !(await entityCollection.findOne(
+    { _id: new ObjectId(asEntity._id) },
+    { projection: { _id: 1 } },
+  ));
+  // Creator stays immutable on edits; new documents are attributed to the caller under the acting profile
+  const creator = isNew ? strippedUser : (asEntity.creator ?? strippedUser);
+  const access = isNew ? stampCreatorProfile(asEntity.access, strippedUser) : asEntity.access;
 
   const name = (digitalEntity?.title ?? asEntity.name ?? `Temp-${asEntity._id?.toString()}`).trim();
 
@@ -158,8 +192,8 @@ const transformEntity: TransformFn<IEntity> = async (body, user) => {
             )
           : asEntity.settings?.preview!,
     },
-    creator: asEntity.creator,
-    access: asEntity.access,
+    creator,
+    access,
     options: asEntity.options ?? {
       allowDownload: false,
     },
@@ -198,13 +232,29 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
   };
 };
 
-const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
+const transformCompilation: TransformFn<ICompilation> = async (body, user, actingProfile) => {
   const asCompilation = body as unknown as Partial<ICompilation>;
 
   // NOTE: We update the filterable properties using hook running in the background after save
   // This means that there might be a slight delay when filtering, but it should not be noticeable
   // and it avoids slowing down the save operation significantly
   // See: `src/jobs/ensure-filterable-properties.ts`
+
+  const userProfile = user.profiles.find(p => p.type === ProfileType.user)!;
+  const profile = actingProfile ?? userProfile;
+  const strippedUser: CreatorField = {
+    ...stripUser(user),
+    profile,
+  };
+
+  const isNew = !(await compilationCollection.findOne(
+    { _id: new ObjectId(asCompilation._id) },
+    { projection: { _id: 1 } },
+  ));
+  const creator = isNew ? strippedUser : (asCompilation.creator ?? strippedUser);
+  const access = isNew
+    ? stampCreatorProfile(asCompilation.access, strippedUser)
+    : asCompilation.access;
 
   return {
     __hits: asCompilation.__hits ?? 0,
@@ -220,8 +270,8 @@ const transformCompilation: TransformFn<ICompilation> = async (body, user) => {
     description: asCompilation.description ?? '',
     entities: flattenRecord(asCompilation.entities),
     name: asCompilation.name ?? '',
-    creator: asCompilation.creator,
-    access: asCompilation.access,
+    creator,
+    access,
     online: asCompilation.online ?? true,
   };
 };
@@ -319,6 +369,16 @@ const transformPhysicalEntity: TransformFn<IPhysicalEntity> = async body => {
   };
 };
 
+/**
+ * Whether the pushed document is a plain `{ _id }` reference that needs no saving.
+ *
+ * Returns `boolean` rather than acting as an inline type guard: `isUnresolved`
+ * narrows its argument to `IDocument`, i.e. `{ _id: any }`, which
+ * `ServerDocument<IDocument>` structurally satisfies — so the negative branch
+ * would collapse to `never` and every `obj._id` access below would fail to compile.
+ */
+const isUnresolvedDocument = (value: unknown): boolean => isUnresolved(value);
+
 const createSaver = <T extends ServerDocument<T>>(
   collection: DbCollection<T>,
   transform: TransformFn<T>,
@@ -330,13 +390,14 @@ const createSaver = <T extends ServerDocument<T>>(
   return async (
     obj: ServerDocument<IDocument> | string | undefined,
     userdata: ServerDocument<IUserData>,
+    actingProfile?: ProfileReference,
   ) => {
     if (!obj) {
       return false;
     }
 
     // Assume it is already saved and does not need to be saved
-    if (typeof obj === 'string' || isUnresolved(obj)) {
+    if (typeof obj === 'string' || isUnresolvedDocument(obj)) {
       return true;
     }
 
@@ -359,7 +420,7 @@ const createSaver = <T extends ServerDocument<T>>(
       log(`Finished additional processing on ${collection.collectionName} ${obj._id}`);
     }
     log(`Transforming ${collection.collectionName} ${obj._id}`);
-    const transformedPreHook = await transform(structuredClone(obj), userdata);
+    const transformedPreHook = await transform(structuredClone(obj), userdata, actingProfile);
     log(`Transformed ${collection.collectionName} ${obj._id}`);
 
     log(`Running onTransform hooks ${collection.collectionName} ${obj._id}`);
@@ -479,10 +540,12 @@ export const saveHandler = async ({
   collection,
   body,
   userdata,
+  actingProfile,
 }: {
   collection: Collection;
   body: IDocument;
   userdata: ServerDocument<IUserData>;
+  actingProfile?: ProfileReference;
 }) => {
   switch (collection) {
     case Collection.address:
@@ -490,13 +553,13 @@ export const saveHandler = async ({
     case Collection.annotation:
       return annotationSaver(body, userdata);
     case Collection.compilation:
-      return compilationSaver(body, userdata);
+      return compilationSaver(body, userdata, actingProfile);
     case Collection.contact:
       return contactSaver(body, userdata);
     case Collection.digitalentity:
       return digitalEntitySaver(body, userdata);
     case Collection.entity:
-      return entitySaver(body, userdata);
+      return entitySaver(body, userdata, actingProfile);
     case Collection.institution:
       return institutionSaver(body, userdata);
     case Collection.person:
