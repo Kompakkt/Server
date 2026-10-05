@@ -3,11 +3,13 @@ import { createStream } from 'rotating-file-stream';
 import { join } from 'node:path';
 import { RootDirectory } from './environment';
 
+export const LoggerOutputPath = join(RootDirectory, 'logs');
+
 const stream = createStream('server.log', {
   interval: '1d',
   size: '10M',
   compress: 'gzip',
-  path: join(RootDirectory, 'logs'),
+  path: LoggerOutputPath,
 });
 
 const logger = new Logger({
@@ -43,7 +45,7 @@ const mapLogObjects = (arg: unknown) => {
   return message.replaceAll(/\s+/g, ' ').replaceAll(__dirname, '').trim();
 };
 
-export const log = (...args: unknown[]) => logger.silly(...args.map(mapLogObjects));
-export const info = (...args: unknown[]) => logger.info(...args.map(mapLogObjects));
-export const warn = (...args: unknown[]) => logger.warn(...args.map(mapLogObjects));
-export const err = (...args: unknown[]) => logger.error(...args.map(mapLogObjects));
+export const log = (...args: unknown[]) => logger.silly(args.map(mapLogObjects).join('\t'));
+export const info = (...args: unknown[]) => logger.info(args.map(mapLogObjects).join('\t'));
+export const warn = (...args: unknown[]) => logger.warn(args.map(mapLogObjects).join('\t'));
+export const err = (...args: unknown[]) => logger.error(args.map(mapLogObjects).join('\t'));

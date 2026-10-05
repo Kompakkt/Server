@@ -10,7 +10,6 @@ import { RouterTags } from './tags';
 import { info } from 'src/logger';
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
-import sharp from 'sharp';
 
 const NEWS_UPLOAD_DIR = join(RootDirectory, Configuration.Uploads.UploadDirectory, 'news');
 const MAX_NEWS_IMAGE_RESOLUTION = 800;
@@ -170,14 +169,10 @@ export const newsRouter = new Elysia()
             const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
             const filepath = join(NEWS_UPLOAD_DIR, filename);
 
-            await sharp(buffer)
-              .resize({
-                fit: 'inside',
-                width: MAX_NEWS_IMAGE_RESOLUTION,
-                height: MAX_NEWS_IMAGE_RESOLUTION,
-              })
+            await new Bun.Image(buffer)
+              .resize(MAX_NEWS_IMAGE_RESOLUTION, MAX_NEWS_IMAGE_RESOLUTION, { fit: 'inside' })
               .webp({ quality: 80 })
-              .toFile(filepath);
+              .write(filepath);
 
             info(`News image uploaded: ${filename}`);
             return { url: `/server/uploads/news/${filename}` };

@@ -1,5 +1,4 @@
 import type { ObjectId } from 'mongodb';
-import sharp from 'sharp';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
 import { err } from 'src/logger';
@@ -24,17 +23,17 @@ export const updatePreviewImage = async (
   };
 
   const minifyBuffer = (buffer: Buffer) =>
-    sharp(buffer)
-      .resize({ fit: 'inside', width: maxResolution, height: maxResolution })
+    new Bun.Image(buffer)
+      .resize(maxResolution, maxResolution, { fit: 'inside' })
       .webp({ quality: 80 })
       .toBuffer();
 
   const writeBufferToFile = async (buffer: Buffer) => {
     const subfolderPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/previews/${subfolder}/`;
-    const filePath = `${subfolderPath}${identifier}.webp`;
+    const filePath = `${subfolderPath}${identifier.toString()}.webp`;
     await ensure(subfolderPath);
     await Bun.write(filePath, buffer);
-    return `previews/${subfolder}/${identifier}.webp`;
+    return `previews/${subfolder}/${identifier.toString()}.webp`;
   };
 
   const getPreviewImagePath = async (input: string) => {
