@@ -127,7 +127,10 @@ const transformAnnotation: TransformFn<IAnnotation> = async (body, user) => {
     err('Error updating preview image:', error);
   }
 
-  return asAnnotation;
+  return {
+    ...asAnnotation,
+    __updatedAt: Date.now(),
+  };
 };
 
 const transformEntity: TransformFn<IEntity> = async (body, user, actingProfile) => {
@@ -159,6 +162,7 @@ const transformEntity: TransformFn<IEntity> = async (body, user, actingProfile) 
   return {
     __hits: asEntity.__hits ?? 0,
     __createdAt: asEntity.__createdAt ?? new ObjectId(asEntity._id).getTimestamp().getTime(),
+    __updatedAt: Date.now(),
     __normalizedName: name.toLowerCase(),
     __annotationCount: Object.keys(asEntity.annotations || {}).length,
     __downloadable: asEntity.__downloadable ?? asEntity.options?.allowDownload ?? false,
@@ -205,6 +209,7 @@ const transformDigitalEntity: TransformFn<IDigitalEntity> = async body => {
   const asDigitalEntity = body as unknown as Partial<IDigitalEntity>;
   return {
     _id: asDigitalEntity._id,
+    __updatedAt: Date.now(),
     biblioRefs: asDigitalEntity.biblioRefs ?? [],
     creation: asDigitalEntity.creation ?? [],
     description: asDigitalEntity.description ?? '',
@@ -260,6 +265,7 @@ const transformCompilation: TransformFn<ICompilation> = async (body, user, actin
     __hits: asCompilation.__hits ?? 0,
     __createdAt:
       asCompilation.__createdAt ?? new ObjectId(asCompilation._id).getTimestamp().getTime(),
+    __updatedAt: Date.now(),
     __normalizedName: asCompilation.name?.trim().toLowerCase() ?? '',
     __annotationCount: Object.keys(asCompilation.annotations || {}).length,
     __downloadable: asCompilation.__downloadable ?? false,

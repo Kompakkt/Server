@@ -17,6 +17,7 @@ import { decreatePopularityTimer } from './jobs/decrease-popularity-timer';
 import { ensureGaplessLicenses } from './jobs/ensure-gapless-licenses';
 import { ensureSearchIndex } from './jobs/ensure-search-index';
 import { ensureSortableProperties } from './jobs/ensure-sortable-properties';
+import { ensureUpdatedAt } from './jobs/ensure-updated-at';
 import { ensureUploadStructure } from './jobs/ensure-upload-structure';
 import { ensureFilterableProperties } from './jobs/ensure-filterable-properties';
 import { ensureEntitySettingsScaleAsVector } from './jobs/ensure-entity-settings-scale-as-vector';
@@ -43,6 +44,7 @@ const jobs = {
   ensureGaplessLicenses,
   ensureSearchIndex,
   ensureSortableProperties,
+  ensureUpdatedAt,
   ensureUploadStructure,
   ensureFilterableProperties,
   ensureEntitySettingsScaleAsVector,
