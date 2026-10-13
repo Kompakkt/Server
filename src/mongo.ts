@@ -89,6 +89,7 @@ export enum Migrations {
   migrateInstitutionProfiles = 'migrateInstitutionProfiles',
   ensureDefaultUserProfile = 'ensureDefaultUserProfile',
   ensureEntityCreatorIsProfile = 'ensureEntityCreatorIsProfile',
+  indexPersonalProfiles = 'indexPersonalProfiles',
   migrateFinishedDraftEntities = 'migrateFinishedDraftEntities',
   migrateCompilationOnlineField = 'migrateCompilationOnlineField',
   migrateUserFlags = 'migrateUserFlags',

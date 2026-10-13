@@ -29,6 +29,7 @@ import { migrateFinishedDraftEntities } from './jobs/migrate-finished-draft-enti
 import { migrateCompilationOnline } from './jobs/migrate-compilation-online';
 import { migrateUserFlags } from './jobs/migrate-user-flags';
 import { backfillProfileOwnerId } from './jobs/backfill-profile-owner-id';
+import { indexPersonalProfiles } from './jobs/index-personal-profiles';
 import { RootDirectory } from './environment';
 import { Configuration } from './configuration';
 
@@ -52,6 +53,7 @@ const jobs = {
   ensureEntityCreatorIsProfile,
   migrateUserFlags,
   backfillProfileOwnerId,
+  indexPersonalProfiles,
 } as const;
 for (const [name, job] of Object.entries(jobs)) {
   log(`Running job ${name}`);

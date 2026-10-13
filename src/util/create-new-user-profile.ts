@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { ProfileType, type IUserData } from '@kompakkt/common';
 import { profileCollection } from 'src/mongo';
+import { indexProfile } from 'src/util/profile-index';
 import type { ServerDocument } from './document-with-objectid-type';
 
 /**
@@ -12,24 +13,24 @@ import type { ServerDocument } from './document-with-objectid-type';
  * @returns
  */
 export const createNewUserProfile = async (user: Omit<ServerDocument<IUserData>, 'profiles'>) => {
-  const id = new ObjectId();
-  const profileInsertResult = await profileCollection
-    .insertOne({
-      _id: new ObjectId(),
-      displayName: user.fullname,
-      type: ProfileType.user,
-      description: undefined,
-      imageUrl: undefined,
-      location: undefined,
-      socials: { website: undefined },
-    })
-    .catch(err => {
-      console.error('Error inserting profile for new user:', err);
-      return null;
-    });
+  const profile = {
+    _id: new ObjectId(),
+    displayName: user.fullname,
+    type: ProfileType.user,
+    description: undefined,
+    imageUrl: undefined,
+    location: undefined,
+    socials: { website: undefined },
+  };
+  const profileInsertResult = await profileCollection.insertOne(profile).catch(err => {
+    console.error('Error inserting profile for new user:', err);
+    return null;
+  });
   if (!profileInsertResult) {
     throw new Error('Failed creating user profile');
   }
+
+  indexProfile({ ...profile, _id: profileInsertResult.insertedId });
 
   return {
     profileId: profileInsertResult.insertedId.toString(),

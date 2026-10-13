@@ -153,6 +153,11 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         const entity = await dbCollection.findOne({ _id: new ObjectId(docId) });
         if (!entity) return status(404, 'Entity not found');
 
+        const actorId = userdata._id.toString();
+        const personalProfileId = userdata.profiles?.find(
+          profile => profile.type === ProfileType.user,
+        )?.profileId;
+
         const targetUserId = body.targetUserId;
         const targetOwner = await userCollection.findOne({ _id: new ObjectId(targetUserId) });
         const targetOwnerProfile = targetOwner?.profiles.find(
@@ -186,11 +191,28 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           targetProfileRef = targetOwnerProfile;
         }
 
-        // Ensure the current user is the owner (profile-scoped when requested)
+        // The profile the current user acts as. Ownership is checked and the
+        // current user's access entry is removed for this profile. Falls back to
+        // the personal profile (or legacy, profile-less access) when omitted.
+        const providedActingProfileId =
+          'actingProfileId' in body && typeof body.actingProfileId === 'string'
+            ? body.actingProfileId
+            : undefined;
+        const actingProfileId = providedActingProfileId ?? personalProfileId;
+        if (providedActingProfileId) {
+          const resolvedActingProfile = await resolveProfileForUser(
+            userdata,
+            providedActingProfileId,
+          );
+          if (!resolvedActingProfile)
+            return status(403, 'You do not have access to the requested acting profile');
+        }
+
+        // Ensure the current user is the owner under the acting profile.
         const currentRole = await PermissionHelper.getUserRoleInAccess(
           entity,
           userdata,
-          requestedProfileId,
+          actingProfileId,
         );
         const isOwner = currentRole
           ? currentRole === EntityAccessRole.owner
@@ -199,53 +221,101 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             ) ?? false);
         if (!isOwner) return status(403, 'You must be an owner to transfer ownership');
 
-        // Add/set the target user as owner
-        const targetUserIndex = entity.access.findIndex(user => user._id === targetUserId);
-        if (targetUserIndex >= 0) {
-          entity.access[targetUserIndex].role = EntityAccessRole.owner;
-          entity.access[targetUserIndex].profile = targetProfileRef;
+        // Resolve a user's access entry for a profile, optionally falling back to
+        // a legacy entry without a profile reference.
+        const findAccessIndex = (
+          userId: string,
+          profileId: string | undefined,
+          includeLegacy: boolean,
+        ): number => {
+          const scoped = entity.access.findIndex(
+            entry =>
+              entry._id === userId &&
+              (profileId === undefined || entry.profile?.profileId === profileId),
+          );
+          if (scoped >= 0) return scoped;
+          if (includeLegacy && profileId !== undefined) {
+            return entity.access.findIndex(entry => entry._id === userId && !entry.profile);
+          }
+          return -1;
+        };
+
+        const actorEntryIndex = (() => {
+          const scoped = findAccessIndex(actorId, actingProfileId, true);
+          if (scoped >= 0) return scoped;
+          // Requests that do not name an acting profile keep the legacy
+          // behaviour of operating on the user's first access entry.
+          return providedActingProfileId ? -1 : entity.access.findIndex(e => e._id === actorId);
+        })();
+        const isSelfTransfer = targetUserId === actorId;
+
+        if (isSelfTransfer) {
+          // Moving content between the current user's own profiles: re-scope the
+          // existing entry instead of removing it, otherwise the user would lose
+          // their access entirely.
+          if (actorEntryIndex < 0)
+            return status(404, 'The current user has no ownership entry to transfer');
+
+          const targetEntryIndex = findAccessIndex(targetUserId, targetProfileRef.profileId, true);
+          if (targetEntryIndex >= 0 && targetEntryIndex !== actorEntryIndex) {
+            entity.access[targetEntryIndex].role = EntityAccessRole.owner;
+            entity.access[targetEntryIndex].profile = targetProfileRef;
+            entity.access.splice(actorEntryIndex, 1);
+          } else {
+            entity.access[actorEntryIndex].role = EntityAccessRole.owner;
+            entity.access[actorEntryIndex].profile = targetProfileRef;
+          }
         } else {
-          entity.access.push({
-            _id: targetOwner._id.toString(),
-            fullname: targetOwner.fullname,
-            username: targetOwner.username,
-            role: EntityAccessRole.owner,
-            profile: targetProfileRef,
-          });
+          // Add/set the target user as owner under the target profile.
+          const targetEntryIndex = findAccessIndex(targetUserId, targetProfileRef.profileId, true);
+          if (targetEntryIndex >= 0) {
+            entity.access[targetEntryIndex].role = EntityAccessRole.owner;
+            entity.access[targetEntryIndex].profile = targetProfileRef;
+          } else {
+            entity.access.push({
+              _id: targetOwner._id.toString(),
+              fullname: targetOwner.fullname,
+              username: targetOwner.username,
+              role: EntityAccessRole.owner,
+              profile: targetProfileRef,
+            });
+          }
+
+          // Remove the current user's entry for the acting profile.
+          if (actorEntryIndex >= 0) {
+            entity.access.splice(actorEntryIndex, 1);
+          } else {
+            return status(
+              500,
+              'Current user not found in entity access list, cannot remove ownership',
+            );
+          }
         }
 
-        // Remove the current user as owner
-        const currentOwnerIndex = entity.access.findIndex(
-          user => user._id === userdata._id.toString(),
-        );
-        if (currentOwnerIndex >= 0) {
-          entity.access.splice(currentOwnerIndex, 1);
-        } else {
-          return status(
-            500,
-            'Current user not found in entity access list, cannot remove ownership',
-          );
-        }
+        // Legacy: swap owner in userdata. Skipped for self-transfers, where the
+        // same user keeps ownership and only the profile reference changes.
+        if (!isSelfTransfer) {
+          const legacyOwnerResults = await Promise.allSettled([
+            makeUserOwnerOf({
+              collection,
+              docs: [entity],
+              userdata: targetOwner,
+            }),
+            undoUserOwnerOf({
+              collection,
+              docs: [entity],
+              userdata,
+            }),
+          ]);
 
-        // Legacy: swap owner in userdata
-        const legacyOwnerResults = await Promise.allSettled([
-          makeUserOwnerOf({
-            collection,
-            docs: [entity],
-            userdata: targetOwner,
-          }),
-          undoUserOwnerOf({
-            collection,
-            docs: [entity],
-            userdata,
-          }),
-        ]);
-
-        const legacySwapSuccess = legacyOwnerResults.every(result => result.status === 'fulfilled');
-        if (!legacySwapSuccess) {
-          warn(
-            `Failed to update ownership in userdata for one or more operations: ${{ docId, targetUserId, userId: userdata._id.toString() }}`,
+          const legacySwapSuccess = legacyOwnerResults.every(
+            result => result.status === 'fulfilled',
           );
+          if (!legacySwapSuccess) {
+            warn(
+              `Failed to update ownership in userdata for one or more operations: ${JSON.stringify({ docId, targetUserId, userId: actorId })}`,
+            );
+          }
         }
 
         // Update the entity in the database
@@ -278,7 +348,13 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             profileId: t.Optional(
               t.String({
                 description:
-                  'When provided, ownership transfers under this profile; the target user must be linked to it.',
+                  'The target profile ownership transfers under; the target user must be linked to it. Defaults to the target user personal profile.',
+              }),
+            ),
+            actingProfileId: t.Optional(
+              t.String({
+                description:
+                  'The profile the current user acts as; ownership is checked and the current user entry is removed for it. Defaults to the current user personal profile.',
               }),
             ),
           }),
@@ -288,7 +364,13 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
             profileId: t.Optional(
               t.String({
                 description:
-                  'When provided, ownership transfers under this profile; the target user must be linked to it.',
+                  'The target profile ownership transfers under; the target user must be linked to it. Defaults to the target user personal profile.',
+              }),
+            ),
+            actingProfileId: t.Optional(
+              t.String({
+                description:
+                  'The profile the current user acts as; ownership is checked and the current user entry is removed for it. Defaults to the current user personal profile.',
               }),
             ),
           }),
@@ -304,7 +386,7 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
         },
         detail: {
           description:
-            'Transfers ownership of an entity or compilation to another user, removing the current user as owner and ensuring the target user is set as the new owner.',
+            'Transfers ownership of an entity or compilation to a profile. The current user must own the document under the acting profile; the target user must be linked to the target profile. Transferring to one of the current user own profiles re-scopes their access entry instead of removing it.',
           tags: [RouterTags['API V2']],
         },
       },

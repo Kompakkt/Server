@@ -1,5 +1,4 @@
 import {
-  Collection,
   ICompilationSchema,
   IEntitySchema,
   IPublicProfileSchema,
@@ -33,12 +32,12 @@ import {
 import { RouterTags } from 'src/routers/tags';
 import configServer from 'src/server.config';
 import { MAX_PROFILE_IMAGE_RESOLUTION, updatePreviewImage } from 'src/util/image-helpers';
+import {
+  PROFILE_SONIC_COLLECTION,
+  deleteProfileFromIndex,
+  indexProfile,
+} from 'src/util/profile-index';
 import { searchService } from 'src/sonic';
-
-const PROFILE_SONIC_COLLECTION = 'profile' as Collection;
-const indexProfile = (profile: IPublicProfile & { _id: ObjectId | string }): void => {
-  searchService.updateDocument(PROFILE_SONIC_COLLECTION, profile);
-};
 
 const stripManagedProfileFields = (body: Partial<IPublicProfile> & { type: ProfileType }): void => {
   delete body.members;
@@ -444,6 +443,7 @@ export const profileRouter = new Elysia()
       }
 
       const updatedProfile = await profileCollection.findOne({ _id });
+      if (updatedProfile) indexProfile(updatedProfile);
       return updatedProfile;
     },
     {
@@ -662,7 +662,7 @@ export const profileRouter = new Elysia()
       const deleteResult = await profileCollection.deleteOne({ _id: new ObjectId(id) });
       if (deleteResult.deletedCount <= 0) return status(404, 'Profile not found');
 
-      searchService.deleteDocument(PROFILE_SONIC_COLLECTION, { _id: id });
+      deleteProfileFromIndex(id);
 
       return status(200, { deleted: id });
     },
@@ -687,25 +687,29 @@ export const profileRouter = new Elysia()
   )
   .get(
     '/search',
-    async ({ query: { q } }) => {
+    async ({ query: { q, type } }) => {
       const trimmedQuery = q.trim();
+      const scope = type ?? ProfileType.organization;
+      const typeFilter = scope === 'all' ? {} : { type: scope };
 
-      // Empty query: list the newest organizational profiles for discovery
+      // Empty query: list the newest matching profiles for discovery
       if (!trimmedQuery) {
         return await profileCollection
-          .find({ type: ProfileType.organization })
+          .find(typeFilter)
           .sort({ __createdAt: -1 })
           .limit(20)
           .toArray();
       }
 
+      // Personal and organizational profiles are both Sonic-indexed; the scope
+      // only filters the resolved documents afterwards.
       const foundIds = await searchService.search(PROFILE_SONIC_COLLECTION, trimmedQuery);
       if (foundIds.length === 0) return [];
 
       return await profileCollection
         .find({
           _id: { $in: foundIds },
-          type: ProfileType.organization,
+          ...typeFilter,
         })
         .limit(20)
         .toArray();
@@ -715,11 +719,17 @@ export const profileRouter = new Elysia()
         200: t.Array(IPublicProfileSchema),
       },
       query: t.Object({
-        q: t.String({ description: 'The search query for organizational profiles.' }),
+        q: t.String({ description: 'The search query for profiles.' }),
+        type: t.Optional(
+          t.UnionEnum(['user', 'organization', 'all'], {
+            description:
+              'Restrict results to one profile type, or "all" to include personal and organizational profiles. Defaults to organizational profiles.',
+          }),
+        ),
       }),
       detail: {
         description:
-          'Full-text search over organizational profiles (name, description, location) backed by Sonic. Public endpoint.',
+          'Full-text search over public profiles (name, description, location) backed by Sonic. Defaults to organizational profiles; pass type=user or type=all to include personal profiles. Public endpoint.',
         tags: [RouterTags['API V2'], RouterTags.Profile],
       },
       isLoggedIn: false,
