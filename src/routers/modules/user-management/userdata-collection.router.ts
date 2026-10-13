@@ -75,12 +75,37 @@ const resolveUserDataCollection = async <
       profile => profile.type === ProfileType.user,
     )?.profileId;
     if (profileId && profileId !== personalProfileId) return [];
-    const data = user.data[collection] ?? [];
+
+    const dataIds = Array.from(new Set(user.data[collection] ?? []))
+      .map(entry => {
+        if (!entry) return undefined;
+        return typeof entry === 'string' ? entry : entry._id?.toString();
+      })
+      .filter((id): id is string => !!id && ObjectId.isValid(id));
+    if (dataIds.length === 0) return [];
+
+    // `userdata.data` is the only association for documents the profile backfill
+    // could not stamp (very old entries). Documents that already carry profile
+    // ownership are resolved through `access` instead, so they are skipped here
+    // to avoid listing them twice (e.g. organisation-owned documents showing up
+    // on the uploader's personal profile).
+    const unstampedFilter = {
+      '_id': { $in: dataIds.map(id => new ObjectId(id)) },
+      'access.profile.profileId': { $exists: false },
+      'creator.profile.profileId': { $exists: false },
+    };
+    const unstampedIds = (
+      collection === Collection.entity
+        ? await entityCollection.find(unstampedFilter, { projection: { _id: 1 } }).toArray()
+        : collection === Collection.compilation
+          ? await compilationCollection.find(unstampedFilter, { projection: { _id: 1 } }).toArray()
+          : []
+    ).map(doc => doc._id.toString());
+
     const resolved = await Promise.all(
-      Array.from(new Set(data)).map(docId => resolveUserDocument(docId, collection, depth)),
+      unstampedIds.map(docId => resolveUserDocument(docId, collection, depth)),
     );
-    const filtered = resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
-    return filtered;
+    return resolved.filter((obj): obj is IDocument => !!obj && obj !== undefined);
   })();
 
   const fromAccess = (async () => {

@@ -253,11 +253,18 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           // Moving content between the current user's own profiles: re-scope the
           // existing entry instead of removing it, otherwise the user would lose
           // their access entirely.
-          if (actorEntryIndex < 0)
-            return status(404, 'The current user has no ownership entry to transfer');
-
           const targetEntryIndex = findAccessIndex(targetUserId, targetProfileRef.profileId, true);
-          if (targetEntryIndex >= 0 && targetEntryIndex !== actorEntryIndex) {
+          const alreadyOwnedUnderTarget =
+            targetEntryIndex >= 0 &&
+            entity.access[targetEntryIndex].role === EntityAccessRole.owner;
+
+          if (actorEntryIndex < 0) {
+            // No entry for the acting profile. This is a no-op when the user
+            // already owns the document under the target profile; otherwise
+            // there is nothing that could be transferred.
+            if (!alreadyOwnedUnderTarget)
+              return status(404, 'The current user has no ownership entry to transfer');
+          } else if (targetEntryIndex >= 0 && targetEntryIndex !== actorEntryIndex) {
             entity.access[targetEntryIndex].role = EntityAccessRole.owner;
             entity.access[targetEntryIndex].profile = targetProfileRef;
             entity.access.splice(actorEntryIndex, 1);
@@ -292,30 +299,36 @@ const apiV2Router = new Elysia().use(configServer).group('/api/v2', app =>
           }
         }
 
-        // Legacy: swap owner in userdata. Skipped for self-transfers, where the
-        // same user keeps ownership and only the profile reference changes.
-        if (!isSelfTransfer) {
-          const legacyOwnerResults = await Promise.allSettled([
-            makeUserOwnerOf({
-              collection,
-              docs: [entity],
-              userdata: targetOwner,
-            }),
-            undoUserOwnerOf({
-              collection,
-              docs: [entity],
-              userdata,
-            }),
-          ]);
+        // Legacy: keep `userdata.data` (the personal-profile ownership list) in
+        // sync. `makeUserOwnerOf` is a no-op for organization targets, so the
+        // target profile is passed to it.
+        const targetIsPersonalProfile = targetProfileRef.type === ProfileType.user;
+        const legacySwaps = isSelfTransfer
+          ? [
+              targetIsPersonalProfile
+                ? makeUserOwnerOf({
+                    collection,
+                    docs: [entity],
+                    userdata,
+                    actingProfile: targetProfileRef,
+                  })
+                : undoUserOwnerOf({ collection, docs: [entity], userdata }),
+            ]
+          : [
+              makeUserOwnerOf({
+                collection,
+                docs: [entity],
+                userdata: targetOwner,
+                actingProfile: targetProfileRef,
+              }),
+              undoUserOwnerOf({ collection, docs: [entity], userdata }),
+            ];
 
-          const legacySwapSuccess = legacyOwnerResults.every(
-            result => result.status === 'fulfilled',
+        const legacyOwnerResults = await Promise.allSettled(legacySwaps);
+        if (!legacyOwnerResults.every(result => result.status === 'fulfilled')) {
+          warn(
+            `Failed to update ownership in userdata for one or more operations: ${JSON.stringify({ docId, targetUserId, userId: actorId })}`,
           );
-          if (!legacySwapSuccess) {
-            warn(
-              `Failed to update ownership in userdata for one or more operations: ${JSON.stringify({ docId, targetUserId, userId: actorId })}`,
-            );
-          }
         }
 
         // Update the entity in the database
