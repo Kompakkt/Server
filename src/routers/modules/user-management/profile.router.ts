@@ -306,6 +306,7 @@ export const profileRouter = new Elysia()
       },
       body: t.Omit(IPublicProfileSchema, ['_id']),
       isLoggedIn: true,
+      testingCanManageOrganizations: true,
       detail: {
         description: 'Creates a new organizational profile.',
         tags: [RouterTags['API V2'], RouterTags.Profile],

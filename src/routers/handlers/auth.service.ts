@@ -113,6 +113,16 @@ export const authService = new Elysia({ name: 'authService' })
         return;
       },
     },
+    testingCanManageOrganizations: {
+      resolve: ({ status, userdata }) => {
+        if (!userdata?.flags?.includes(UserFlag.testingCanManageOrganizations))
+          return status(
+            'Forbidden',
+            'You need the testingCanManageOrganizations flag to access this resource',
+          );
+        return;
+      },
+    },
     verifyLoginData: {
       resolve: async ({ status, body, params, useAuthController }) => {
         if (!isSignInBody(body)) return status('Forbidden', 'Invalid sign-in data');
