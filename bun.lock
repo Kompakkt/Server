@@ -10,7 +10,7 @@
         "@elysiajs/openapi": "^1.4.16",
         "@elysiajs/server-timing": "^1.4.0",
         "@elysiajs/static": "^1.4.7",
-        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#49b7d222f9d6edd719ae7183ba53c96acedd9d0f",
+        "@kompakkt/common": "git+https://github.com/Kompakkt/Common.git#044af84217ffafddad839841cc35a9e9027f5e3c",
         "@react-email/components": "^1.0.11",
         "@react-email/preview-server": "^5.2.10",
         "@react-email/render": "^2.0.5",
@@ -237,7 +237,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#49b7d22", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-49b7d22", "sha512-PujVgRn0bLS+yLJZ/+XD3cK3qLe5h5ZWOMOfLfsZuhbRQx/IJqhHquaoJQ/zLRRKmx850mJshg/fwUh13etdhg=="],
+    "@kompakkt/common": ["@kompakkt/common@github:Kompakkt/Common#044af84", { "dependencies": { "elysia": "^1.4.28" } }, "Kompakkt-Common-044af84", "sha512-mktp8KwOaSm0TpErbyzlpgWSKo53kqu/WqsefTMI7l5UJReZWLp9rVQPV2ayyKHh6dqPGKuALlv2IDpkuryI0g=="],
 
     "@kompakkt/openapi-gen": ["@kompakkt/openapi-gen@workspace:packages/openapi-gen"],
 

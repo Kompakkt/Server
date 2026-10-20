@@ -3,7 +3,6 @@ import { ObjectId } from 'mongodb';
 import { mkdir } from 'node:fs/promises';
 import { Configuration } from 'src/configuration';
 import { RootDirectory } from 'src/environment';
-import { entityCollection } from 'src/mongo';
 import configServer from 'src/server.config';
 import { authService } from './handlers/auth.service';
 import { addAnnotationsToAnnotationList, countEntityUses } from './modules/utility/utility';
@@ -15,8 +14,34 @@ import {
   ICompilationSchema,
   UserRank,
 } from '@kompakkt/common';
+import type { IEntity } from '@kompakkt/common';
 import { info } from 'src/logger';
+import { entityCollection } from 'src/mongo';
+import type { AuthUser } from 'src/mongo';
+import type { ServerDocument } from 'src/util/document-with-objectid-type';
 import { RouterTags } from './tags';
+
+const SKYBOX_SIZE_LIMIT = 50 * 1024 * 1024;
+const SKYBOX_BASE64_LIMIT = Math.ceil((SKYBOX_SIZE_LIMIT * 4) / 3);
+const SKYBOX_MAGIC_BYTES = [0x86, 0x16, 0x87, 0x96, 0xf6, 0xd6, 0x96, 0x36];
+
+const hasEntityWriteAccess = async (entity: ServerDocument<IEntity>, userdata: AuthUser) => {
+  const currentAccess = entity.access.find(user => user._id === userdata._id.toString());
+  const isOwner = await checkIsOwner({
+    doc: entity,
+    collection: Collection.entity,
+    userdata,
+  });
+
+  const isAdmin = userdata.role === UserRank.admin;
+
+  return (
+    currentAccess?.role === EntityAccessRole.owner ||
+    currentAccess?.role === EntityAccessRole.editor ||
+    isOwner ||
+    isAdmin
+  );
+};
 
 const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
   app
@@ -50,23 +75,7 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
         if (!entity) return status(404, 'Not Found');
 
-        const hasAccess = await (async () => {
-          const currentAccess = entity.access.find(user => user._id === userdata._id.toString());
-          const isOwner = await checkIsOwner({
-            doc: entity,
-            collection: Collection.entity,
-            userdata,
-          });
-
-          const isAdmin = userdata.role === UserRank.admin;
-
-          return (
-            currentAccess?.role === EntityAccessRole.owner ||
-            currentAccess?.role === EntityAccessRole.editor ||
-            isOwner ||
-            isAdmin
-          );
-        })();
+        const hasAccess = await hasEntityWriteAccess(entity, userdata);
 
         if (!hasAccess)
           return status(
@@ -118,6 +127,63 @@ const utilityRouter = new Elysia().use(configServer).group('/utility', app =>
         detail: {
           description:
             'Generate a video preview for an entity based on provided screenshots. You must have access to the entity to use this endpoint.',
+          tags: [RouterTags.Utility],
+        },
+      },
+    )
+    .post(
+      '/custom-skybox',
+      async ({ body: { entityId, data }, status, userdata }) => {
+        if (!userdata) return status(403, 'Forbidden');
+        const entity = await entityCollection.findOne({ _id: new ObjectId(entityId) });
+        if (!entity) return status(404, 'Not Found');
+
+        const hasAccess = await hasEntityWriteAccess(entity, userdata);
+        if (!hasAccess)
+          return status(
+            403,
+            'Forbidden - You do not have permission to upload a custom skybox for this entity',
+          );
+
+        if (data.length > SKYBOX_BASE64_LIMIT) {
+          return status(413, 'Payload Too Large');
+        }
+
+        const buffer = Buffer.from(data, 'base64');
+        if (
+          !SKYBOX_MAGIC_BYTES.every((byte, index) => buffer.at(index) === byte) ||
+          buffer.byteLength > SKYBOX_SIZE_LIMIT
+        )
+          return status(400, 'Bad Request - Not a valid Babylon environment texture file');
+
+        const skyboxPath = `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/skyboxes/`;
+        await mkdir(skyboxPath, { recursive: true });
+        await Bun.write(`${skyboxPath}${entityId}.env`, buffer);
+
+        const finalPath = `/server/skyboxes/${entityId}.env`;
+        await entityCollection.updateOne(
+          { _id: new ObjectId(entityId) },
+          { $set: { 'settings.skybox.url': finalPath } },
+        );
+
+        return { status: 'OK', skyboxUrl: finalPath };
+      },
+      {
+        response: {
+          200: t.Object({ status: t.Literal('OK'), skyboxUrl: t.String() }),
+          400: t.Any(),
+          403: t.Any(),
+          404: t.Any(),
+          413: t.Any(),
+        },
+        body: t.Object({
+          entityId: t.String(),
+          data: t.String(),
+        }),
+        isLoggedIn: true,
+        detail: {
+          description:
+            'Upload a custom skybox environment file for an entity. You must have access to the entity to use this endpoint.',
           tags: [RouterTags.Utility],
         },
       },

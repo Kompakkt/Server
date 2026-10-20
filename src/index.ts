@@ -98,7 +98,7 @@ PluginController.routers$.subscribe(async routerConfigs => {
   })
     .onRequest(({ request: { url, method, headers }, status }) => {
       url = url.slice(url.indexOf('/server/') + 7);
-      if (url.indexOf('/previews') === -1) {
+      if (url.indexOf('/previews') === -1 && url.indexOf('/skyboxes') === -1) {
         queueMicrotask(() => {
           const date = new Date().toISOString().replaceAll(/[TZ]/g, ' ').trim();
           const user = Bun.hash(headers.get('cookie') ?? '');
@@ -223,6 +223,32 @@ PluginController.routers$.subscribe(async routerConfigs => {
         detail: {
           description:
             'Serve preview files. This endpoint is used internally by the frontend and should not be used directly.',
+          tags: [RouterTags.Utility],
+        },
+      },
+    )
+    .get(
+      '/skyboxes/*',
+      async ({ params, status }) => {
+        const path = params['*'];
+        if (path.includes('/') || path.includes('..')) {
+          return status(404, 'Skybox not found');
+        }
+        const file = Bun.file(
+          `${RootDirectory}/${Configuration.Uploads.UploadDirectory}/skyboxes/${path}`,
+        );
+        if (await file.exists()) return file;
+
+        return status(404, 'Skybox not found');
+      },
+      {
+        response: {
+          200: t.File(),
+          404: t.Any(),
+        },
+        detail: {
+          description:
+            'Serve uploaded custom skybox environment files. This endpoint is used internally by the frontend and should not be used directly.',
           tags: [RouterTags.Utility],
         },
       },

@@ -9,7 +9,7 @@ export const ensureUploadStructure = async () => {
   const directories = [
     `${RootDirectory}/${UploadDirectory}`,
     `${RootDirectory}/${TempDirectory}`,
-    ...['audio', 'image', 'metadata_files', 'model', 'previews', 'video'].map(
+    ...['audio', 'image', 'metadata_files', 'model', 'previews', 'skyboxes', 'video'].map(
       folder => `${RootDirectory}/${UploadDirectory}/${folder}`,
     ),
   ];
