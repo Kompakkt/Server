@@ -1,8 +1,8 @@
-import { type Collection, type IPublicProfile } from '@kompakkt/common';
+import { type IPublicProfile } from '@kompakkt/common';
 import type { ObjectId } from 'mongodb';
-import { searchService } from 'src/sonic';
+import { PROFILE_SONIC_COLLECTION, searchService } from 'src/sonic';
 
-export const PROFILE_SONIC_COLLECTION = 'profile' as Collection;
+export { PROFILE_SONIC_COLLECTION };
 
 /** Index (or re-index) a public profile in Sonic. Applies to personal and organizational profiles. */
 export const indexProfile = (profile: IPublicProfile & { _id: ObjectId | string }): void => {

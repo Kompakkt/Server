@@ -35,6 +35,8 @@ const options: Options = {
   auth: undefined,
 };
 
+export const PROFILE_SONIC_COLLECTION = 'profile' as Collection;
+
 const extractText = (value: unknown): string[] => {
   if (value === null || value === undefined) return [];
   if (typeof value === 'string') {
@@ -172,6 +174,7 @@ class SonicSearchService {
     const existingLists = await Promise.all([
       this.#searchChannel.list(Collection.entity, 'default'),
       this.#searchChannel.list(Collection.compilation, 'default'),
+      this.#searchChannel.list(PROFILE_SONIC_COLLECTION, 'default'),
     ]);
     return existingLists.some(list => list.length > 0);
   }
@@ -331,6 +334,37 @@ class SonicSearchService {
       err(`Failed to search in collection ${collection}:`, error);
       return [];
     }
+  }
+
+  async searchWithPrefixCompletion(
+    collection: string,
+    query: string,
+    bucket = 'default',
+    limit = 100,
+  ): Promise<ObjectId[]> {
+    query = query.trim();
+    if (!query) return [];
+
+    const words = query.split(/\s+/);
+    const prefix = words.slice(0, -1).join(' ');
+    const completions = await this.suggest(collection, query, bucket);
+    const candidates = [...new Set([query, ...completions])];
+
+    const idLists = await Promise.all(
+      candidates.map(candidate => this.search(collection, candidate, bucket, limit)),
+    );
+    const seen = new Set<string>();
+    const results: ObjectId[] = [];
+    for (const idList of idLists) {
+      for (const id of idList) {
+        const key = id.toString();
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push(id);
+        }
+      }
+    }
+    return results;
   }
 
   async suggest(

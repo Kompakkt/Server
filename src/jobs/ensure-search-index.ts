@@ -1,11 +1,12 @@
 import { Collection } from '@kompakkt/common';
 import { err, log } from 'src/logger';
-import { compilationCollection, entityCollection } from 'src/mongo';
+import { compilationCollection, entityCollection, profileCollection } from 'src/mongo';
 import {
   RESOLVE_FULL_DEPTH,
   resolveCompilation,
   resolveEntity,
 } from 'src/routers/modules/api.v1/resolving-strategies';
+import { PROFILE_SONIC_COLLECTION } from 'src/util/profile-index';
 import { searchService } from 'src/sonic';
 
 export const SearchIndexJobState = new (class {
@@ -36,8 +37,15 @@ export const SearchIndexJobState = new (class {
     }
     const compilationsDuration = ((performance.now() - startTime) / 1000).toFixed(2);
 
+    const profileCursor = profileCollection.find({});
+    startTime = performance.now();
+    for await (const profile of profileCursor) {
+      await searchService.updateDocument(PROFILE_SONIC_COLLECTION, profile);
+    }
+    const profilesDuration = ((performance.now() - startTime) / 1000).toFixed(2);
+
     log(
-      `Updated search index, entities took ${entitiesDuration}s, compilations took ${compilationsDuration}s`,
+      `Updated search index, entities took ${entitiesDuration}s, compilations took ${compilationsDuration}s, profiles took ${profilesDuration}s`,
     );
   }
 

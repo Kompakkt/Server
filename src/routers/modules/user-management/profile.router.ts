@@ -261,7 +261,7 @@ export const profileRouter = new Elysia()
         ownerId: userdata._id.toString(),
         members: [],
         // Same convention as entities/compilations (see save-to-collection.ts):
-        // the ms epoch derived from the ObjectId. `/profile/search` orders by it.
+        // the ms epoch derived from the ObjectId.
         __createdAt: _id.getTimestamp().getTime(),
       });
 
@@ -697,14 +697,18 @@ export const profileRouter = new Elysia()
       if (!trimmedQuery) {
         return await profileCollection
           .find(typeFilter)
-          .sort({ __createdAt: -1 })
+          // Sorted by _id, not __createdAt: personal profiles have no __createdAt.
+          .sort({ _id: -1 })
           .limit(20)
           .toArray();
       }
 
       // Personal and organizational profiles are both Sonic-indexed; the scope
       // only filters the resolved documents afterwards.
-      const foundIds = await searchService.search(PROFILE_SONIC_COLLECTION, trimmedQuery);
+      const foundIds = await searchService.searchWithPrefixCompletion(
+        PROFILE_SONIC_COLLECTION,
+        trimmedQuery,
+      );
       if (foundIds.length === 0) return [];
 
       return await profileCollection
