@@ -9,6 +9,7 @@ import {
   type IPublicProfile,
   type IStrippedUserData,
 } from '@kompakkt/common';
+import { distance } from 'fastest-levenshtein';
 import Elysia, { t } from 'elysia';
 import { ObjectId } from 'mongodb';
 import {
@@ -711,13 +712,32 @@ export const profileRouter = new Elysia()
       );
       if (foundIds.length === 0) return [];
 
-      return await profileCollection
+      const matches = await profileCollection
         .find({
           _id: { $in: foundIds },
           ...typeFilter,
         })
-        .limit(20)
         .toArray();
+
+      // Sonic returns matches unordered and its typo tolerance drags in near
+      // matches, so rank by summed Levenshtein distance of each query word to
+      // its closest display-name word.
+      const queryWords = trimmedQuery.toLowerCase().split(/\s+/);
+      const rank = (displayName: string | undefined) => {
+        const nameWords = (displayName ?? '').toLowerCase().split(/\s+/);
+        return queryWords.reduce(
+          (sum, queryWord) =>
+            sum +
+            Math.min(...nameWords.map(nameWord => distance(queryWord, nameWord))),
+          0,
+        );
+      };
+      matches.sort(
+        (a, b) =>
+          rank(a.displayName) - rank(b.displayName) ||
+          (a.displayName?.length ?? 0) - (b.displayName?.length ?? 0),
+      );
+      return matches.slice(0, 20);
     },
     {
       response: {

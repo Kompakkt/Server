@@ -48,6 +48,7 @@
     "elysia": "1.4.30",
     "elysia-helmet": "^3.1.0",
     "elysia-prometheus": "^1.1.1",
+    "fastest-levenshtein": "^1.0.16",
     "jose": "^6.2.2",
     "ky": "^1.14.3",
     "mime": "^4.1.0",

@@ -40,7 +40,7 @@ export const SearchIndexJobState = new (class {
     const profileCursor = profileCollection.find({});
     startTime = performance.now();
     for await (const profile of profileCursor) {
-      await searchService.updateDocument(PROFILE_SONIC_COLLECTION, profile);
+      searchService.updateDocument(PROFILE_SONIC_COLLECTION, profile);
     }
     const profilesDuration = ((performance.now() - startTime) / 1000).toFixed(2);
 
