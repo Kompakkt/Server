@@ -7,6 +7,7 @@ type RequestOptions = {
   options?: RequestInit;
   responseFormat?: ResponseFormat;
   cookieJar?: CookieJar;
+  throwOnHttpError?: boolean;
 };
 
 class CookieJar {
@@ -51,6 +52,7 @@ const request = (method: string, url: string, obj: RequestOptions) => {
   const options = obj.options || {};
   const cookieJar = obj.cookieJar || defaultCookieJar;
   const responseFormat = obj.responseFormat || 'json';
+  const throwOnHttpError = obj.throwOnHttpError ?? false;
 
   const urlObj = new URL(url);
   for (const [key, value] of Object.entries(obj.params || {})) {
@@ -64,8 +66,14 @@ const request = (method: string, url: string, obj: RequestOptions) => {
       Cookie: cookieJar.toCookieString(),
     },
     method,
-  }).then(response => {
+  }).then(async response => {
     cookieJar.append(response.headers.getSetCookie());
+    if (throwOnHttpError && !response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText}: ${body.slice(0, 256).replace(/\s+/g, ' ')}`,
+      );
+    }
     switch (responseFormat) {
       case 'blob':
         return response.blob();
