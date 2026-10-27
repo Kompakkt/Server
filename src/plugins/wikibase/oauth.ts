@@ -23,8 +23,8 @@ const keyAndSecret = () => ({
 
 const restBase = () => {
   const RestAPIURL = WikibaseConfiguration?.RestAPIURL ?? '';
-  const stripped = RestAPIURL.replace(/wikibase\/v1\/?$/, '');
-  return stripped || `${WikibaseConfiguration?.Domain ?? ''}`;
+  const stripped = RestAPIURL.replace(/wikibase\/v1\/?$/, '').replace(/\/+$/, '');
+  return stripped || `${WikibaseConfiguration?.Domain ?? ''}`.replace(/\/+$/, '');
 };
 
 const exchangeAccessToken = async (): Promise<AccessTokenResponse> => {
