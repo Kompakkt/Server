@@ -289,7 +289,6 @@ const PRECOMPRESSED_TYPES = [
 
 // Prepare folder structure
 const { UploadDirectory } = Configuration.Uploads;
-const uploadDir = `${RootDirectory}/${UploadDirectory}/`;
 
 const uploadRouter = new Elysia()
   .use(configServer)
@@ -635,7 +634,7 @@ const uploadRouter = new Elysia()
         '/chunk/init',
         async ({ status }) => {
           const uploadId = new ObjectId().toString();
-          const tempDir = join(uploadDir, 'chunks', uploadId);
+          const tempDir = join(RootDirectory, UploadDirectory, 'chunks', uploadId);
           const result = await ensure(tempDir)
             .then(() => true)
             .catch(e => {
@@ -665,7 +664,7 @@ const uploadRouter = new Elysia()
       .post(
         '/chunk/upload',
         async ({ body: { chunk, uploadId, index }, status }) => {
-          const tempDir = join(uploadDir, 'chunks', uploadId);
+          const tempDir = join(RootDirectory, UploadDirectory, 'chunks', uploadId);
           await ensure(tempDir, false);
           const chunkPath = join(tempDir, `chunk_${index.toString().padStart(4, '0')}`);
           const writeSuccess = await Bun.write(chunkPath, chunk)
@@ -701,11 +700,11 @@ const uploadRouter = new Elysia()
         '/chunk/finish',
         async ({ status, body: { uploadId, filename, token, type, relativePath } }) => {
           try {
-            const tempDir = join(uploadDir, 'chunks', uploadId);
+            const tempDir = join(RootDirectory, UploadDirectory, 'chunks', uploadId);
             if (!(await exists(tempDir))) {
               return status(400, 'Invalid uploadId');
             }
-            const basePath = join(uploadDir, type, token);
+            const basePath = join(RootDirectory, UploadDirectory, type, token);
             const sluggedRelativePath = slug(relativePath).trim();
             const destPath =
               sluggedRelativePath.length > 0
@@ -781,7 +780,7 @@ const uploadRouter = new Elysia()
         '/file',
         async ({ status, body: { file, token, type, relativePath } }) => {
           const serverChecksum = await calculateMD5(file.stream());
-          const basePath = join(uploadDir, type, token);
+          const basePath = join(RootDirectory, UploadDirectory, type, token);
           const sluggedRelativePath = slug(relativePath).trim();
           const destPath =
             sluggedRelativePath.length > 0
