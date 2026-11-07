@@ -12,7 +12,10 @@ export const customFetch = async (input: string, init: RequestInit = {}): Promis
   const token = await getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   headers.set('User-Agent', USER_AGENT);
-  const url = `${baseUrl().replaceAll(/v1\/?/gi, '')}${input}`.replaceAll(/(?<!.https?:)\/\//g, '/');
+  const url = `${baseUrl().replaceAll(/v1\/?/gi, '')}${input}`.replaceAll(
+    /(?<!.https?:)\/\//g,
+    '/',
+  );
   info(`[WikibasePlugin] fetching`, url);
   return Bun.fetch(url, { ...init, headers });
 };

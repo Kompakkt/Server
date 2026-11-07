@@ -19,7 +19,7 @@ const logger = new Logger({
     enabled: true,
     style: true,
     timeZone: 'local',
-  }
+  },
 });
 logger.attachTransport(obj => {
   stream.write(JSON.stringify(obj) + '\n');

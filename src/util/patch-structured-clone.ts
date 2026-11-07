@@ -40,7 +40,11 @@ const patchedStructureClone = <T = unknown>(
       const isObjectId = (obj as Record<string, unknown>)[key] instanceof ObjectId;
       if (isObjectId)
         (cloned as Record<string, unknown>)[key] = (obj as Record<string, unknown>)[key];
-      else restoreObjectIds((obj as Record<string, unknown>)[key], (cloned as Record<string, unknown>)[key]);
+      else
+        restoreObjectIds(
+          (obj as Record<string, unknown>)[key],
+          (cloned as Record<string, unknown>)[key],
+        );
     });
 
     const id = (cloned as { _id?: unknown })._id;

@@ -10,9 +10,18 @@ Kompakkt annotations/digital entities there.
   (currently spec `1.4`, produced from the instance's
   `/w/rest.php/wikibase/v1/openapi.json`).
 - A registered **OAuth 2.0 consumer** authorised against a user holding the
-  rights the plugin needs: **edit**, **upload**, **delete** (MediaWiki grants
-  `editpage`, `uploadfile`, `delete`). That consumer's access token is the
-  single credential the plugin uses.
+  rights the plugin needs: **read**, **edit**, **createpage**, **item-create**,
+  **item-term**, and **delete** (MediaWiki grants `basic`, `editpage`,
+  `createeditmovepage`, `delete`, plus a wiki-side
+  `$wgGrantPermissions['editpage']['item-create'] = true` mapping if the wiki
+  requires `item-create` for Wikibase entity creation, which wikibase4research
+  does). That consumer's access token is the single credential the plugin uses.
+- On plugin load, the consumer's effective rights are verified against
+  `api.php?action=query&meta=userinfo&uiprop=rights` (the Action API already
+  applies the consumer's grants to the user's rights). If required rights are
+  missing, the plugin refuses to load and logs which rights are missing and
+  which grants/mappings to fix. A missing `delete` right is only a warning
+  since deletion is only used by `onDelete` hooks.
 - A **`User-Agent`** the Wikibase REST API accepts (the Wikimedia UA policy
   wants name/version + a contact). The plugin sends
   `Kompakkt-Server/0.0.1 (https://kompakkt.de)` by default; override with

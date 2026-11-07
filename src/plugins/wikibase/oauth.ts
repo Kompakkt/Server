@@ -1,5 +1,5 @@
 import { err, warn } from './logger';
-import { post } from 'src/util/requests';
+import { get, post } from 'src/util/requests';
 import { WikibaseConfiguration } from './config';
 
 type OAuth2TokenResponse = {
@@ -26,6 +26,9 @@ const restBase = () => {
   const stripped = RestAPIURL.replace(/wikibase\/v1\/?$/, '').replace(/\/+$/, '');
   return stripped || `${WikibaseConfiguration?.Domain ?? ''}`.replace(/\/+$/, '');
 };
+
+// The Action API lives next to rest.php (e.g. …/w/api.php next to …/w/rest.php)
+const apiPhpUrl = () => restBase().replace(/rest\.php$/, 'api.php');
 
 const exchangeAccessToken = async (): Promise<AccessTokenResponse> => {
   const { key, secret } = keyAndSecret();
@@ -103,4 +106,34 @@ export const getAccessToken = async (): Promise<string> => {
 export const hasWikibaseOAuthCredentials = () => {
   const { key, secret } = keyAndSecret();
   return (!!key && !!secret) || !!staticToken();
+};
+
+export type WikibaseUserinfoResponse = {
+  query?: { userinfo?: { name?: string; rights?: string[] } };
+  error?: { info?: string };
+};
+
+/**
+ * Queries the effective rights of the OAuth session against the wiki.
+ *
+ * The Action API applies the consumer's accepted grants to the user's own
+ * rights, so the returned list reflects exactly what the plugin is allowed
+ * to do, independent of wiki-specific grant-to-right mappings
+ * ($wgGrantPermissions). See MediaWiki SessionProvider::getAllowedUserRights.
+ */
+export const getEffectiveUserRights = async (): Promise<WikibaseUserinfoResponse> => {
+  const token = await getAccessToken();
+  const url = apiPhpUrl();
+  return get(url, {
+    params: { action: 'query', meta: 'userinfo', uiprop: 'rights', format: 'json' },
+    options: {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent':
+          Bun.env['CONFIGURATION_EXTENSION_WIKIBASE_USER_AGENT'] ??
+          'Kompakkt-Server/0.0.1 (https://kompakkt.de)',
+      },
+    },
+    responseFormat: 'json',
+  }) as Promise<WikibaseUserinfoResponse>;
 };

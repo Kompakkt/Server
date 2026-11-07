@@ -109,6 +109,18 @@ type AnnotationResponseItem = {
   fileView?: string;
 };
 
+export const ChoiceTypes = {
+  agents: [WBClasses.human, WBClasses.group, WBClasses.organization],
+  techniques: [WBClasses.technique],
+  software: [WBClasses.software],
+  bibliorefs: [WBClasses.bibliographicWork],
+  physicalobjects: [WBClasses.humanMadeObject],
+  concepts: [WBClasses.conceptualObject],
+  media: [WBClasses.iconographicConcept],
+  licenses: [WBClasses.licence],
+};
+export type Choice = keyof typeof ChoiceTypes;
+
 const isValueLabelItem = (item: MetadataField): item is ValueLabelItem => {
   return (
     typeof item !== 'string' &&
@@ -584,40 +596,57 @@ export class WikibaseService {
     return [{ parents: parents.reverse(), siblings: siblings }];
   }
 
-  public async fetchMetadataChoices(force?: boolean): Promise<IMetadataChoices | undefined> {
-    log('Fetching metadata choices from Wikibase');
-    // // TODO this needs to be rethought as there will be "physical objects" which are not buildings.
-    // // building ensemble will always be subclass of human-made object, although a room is not a "subclass of" a building!
-    // // we could test a recursive "subclass of" or "has part" (tibt:P5*/tibt:P2*) and see how that performs
+  public async fetchChoices(
+    choiceList: Choice[],
+    force: boolean,
+  ): Promise<Record<Choice, IWikibaseItem[]>> {
+    const choices: Record<Choice, IWikibaseItem[]> = {
+      agents: [],
+      bibliorefs: [],
+      concepts: [],
+      licenses: [],
+      media: [],
+      physicalobjects: [],
+      software: [],
+      techniques: [],
+    };
 
-    // let building_class_ids = await this.wikibaseRead('select ?parts where {tib:Q58 tibt:P5* ?parts}')
-    // building_class_ids = building_class_ids.map(d => d['parts'])
-    // result.physical_objs = await this.wikibaseClassInstances(building_class_ids);
-
-    // updated to pull all instances of humanMadeObject directly.
-    const cached = await pluginCache.get<IMetadataChoices>('wikibase::fetchMetadataChoices');
-    if (cached && !force) {
-      log('Returning cached metadata choices from Wikibase');
-      return cached;
+    log('Fetching choices from Wikibase', choiceList);
+    for (const choice of choiceList) {
+      if (choice in ChoiceTypes) {
+        const classes = ChoiceTypes[choice];
+        if (!force) {
+          const cached = await pluginCache.get<IWikibaseItem[]>(
+            `wikibase::fetchChoices::${choice}`,
+          );
+          if (cached) {
+            choices[choice] = cached;
+            continue;
+          }
+          const live = await this.wikibaseClassInstances(classes);
+          if (live.length > 0) await pluginCache.set(`wikibase::fetchChoices::${choice}`, live, 60);
+          choices[choice] = live;
+        }
+      }
     }
+    log('Got choices from Wikibase', choices);
+
+    return choices;
+  }
+
+  public async fetchMetadataChoices(force?: boolean): Promise<IMetadataChoices | undefined> {
     try {
-      const result = {
-        persons: await this.wikibaseClassInstances([
-          WBClasses.human,
-          WBClasses.group,
-          WBClasses.organization,
-        ]),
-        techniques: await this.wikibaseClassInstances([WBClasses.technique]),
-        software: await this.wikibaseClassInstances([WBClasses.software]),
-        bibliographic_refs: await this.wikibaseClassInstances([WBClasses.bibliographicWork]),
-        physical_objs: await this.wikibaseClassInstances([WBClasses.humanMadeObject]),
-      } satisfies IMetadataChoices;
-      log(
-        `Fetched ${result.persons.length} persons, ${result.techniques.length} techniques, ${result.software.length} software, ${result.bibliographic_refs.length} bibliographic references, and ${result.physical_objs.length} physical objects from Wikibase`,
+      const choices = await this.fetchChoices(
+        ['agents', 'techniques', 'software', 'bibliorefs', 'physicalobjects'],
+        force ?? false,
       );
-      const combinedLength = Object.values(result).reduce((acc, arr) => acc + arr.length, 0);
-      if (combinedLength > 0) pluginCache.set('wikibase::fetchMetadataChoices', result, 60);
-      return result;
+      return {
+        persons: choices.agents,
+        bibliographic_refs: choices.bibliorefs,
+        physical_objs: choices.physicalobjects,
+        software: choices.software,
+        techniques: choices.techniques,
+      } satisfies IMetadataChoices;
     } catch (error) {
       err('Error fetching metadata choices from Wikibase', error);
       return undefined;
@@ -627,32 +656,19 @@ export class WikibaseService {
   public async fetchAnnotationLinkChoices(
     force?: boolean,
   ): Promise<IAnnotationLinkChoices | undefined> {
-    if (!isWikibaseConfiguration(WikibaseConfiguration)) {
-      return undefined;
-    }
-
-    const cached = await pluginCache.get<IAnnotationLinkChoices>(
-      'wikibase::fetchAnnotationLinkChoices',
-    );
-    if (cached && !force) {
-      log('Returning cached annotation link choices from Wikibase');
-      return cached;
-    }
     try {
-      const result = {
-        relatedAgents: await this.wikibaseClassInstances([WBClasses.human]),
-        relatedMedia: await this.wikibaseClassInstances([WBClasses.mediaItem]),
-        relatedConcepts: await this.wikibaseClassInstances([WBClasses.iconographicConcept]),
-        licenses: await this.wikibaseClassInstances([WBClasses.licence]),
-      } satisfies IAnnotationLinkChoices;
-      log(
-        `Fetched ${result.relatedAgents.length} related agents, ${result.relatedMedia.length} related media, ${result.relatedConcepts.length} related concepts, and ${result.licenses.length} licenses from Wikibase`,
+      const choices = await this.fetchChoices(
+        ['agents', 'licenses', 'concepts', 'media'],
+        force ?? false,
       );
-      const combinedLength = Object.values(result).reduce((acc, arr) => acc + arr.length, 0);
-      if (combinedLength > 0) pluginCache.set('wikibase::fetchAnnotationLinkChoices', result, 60);
-      return result;
+      return {
+        relatedAgents: choices.agents,
+        licenses: choices.licenses,
+        relatedConcepts: choices.concepts,
+        relatedMedia: choices.media,
+      } satisfies IAnnotationLinkChoices;
     } catch (error) {
-      err('Error fetching annotation link choices from Wikibase', error);
+      err('Error fetching metadata choices from Wikibase', error);
       return undefined;
     }
   }

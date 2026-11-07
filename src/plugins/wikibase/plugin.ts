@@ -5,7 +5,7 @@ import {
   type IAnnotation,
   type IDigitalEntity,
 } from '@kompakkt/common';
-import { log } from './logger';
+import { err, log, warn } from './logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';
 import { isWikibaseConfiguration, isWikibaseDigitalEntity, WikibaseConfiguration } from './config';
@@ -17,6 +17,7 @@ import {
 } from './ensure-extension-data';
 import wikibaseRouter, { wikibaseRouterTag } from './router';
 import { WikibaseService } from './service';
+import { getAccessToken, getEffectiveUserRights, hasWikibaseOAuthCredentials } from './oauth';
 import { pluginCache } from 'src/redis';
 import type { IWikibaseDigitalEntityExtensionData } from './common';
 import { restoreOriginalAnnotation } from './restore-original-data-model';
@@ -86,6 +87,78 @@ const disableDeletedWikibaseEntities = async (): Promise<void> => {
   }
 };
 
+const REQUIRED_WIKIBASE_RIGHTS: Record<string, string> = {
+  'read': 'OAuth grant: basic',
+  'edit': 'OAuth grant: editpage',
+  'createpage': 'OAuth grant: createeditmovepage',
+  'item-create':
+    "a wiki-side $wgGrantPermissions mapping, e.g. $wgGrantPermissions['editpage']['item-create'] = true",
+  'item-term': 'OAuth grant: editpage',
+};
+
+// Only used by onDelete hooks, so a missing right should not block the plugin
+const OPTIONAL_WIKIBASE_RIGHTS: Record<string, string> = {
+  delete: 'OAuth grant: delete',
+};
+
+const checkWikibaseOAuthGrants = async (): Promise<boolean> => {
+  if (!hasWikibaseOAuthCredentials()) {
+    log('No OAuth credentials configured for Wikibase, skipping grant check');
+    return true;
+  }
+
+  let token = '';
+  try {
+    token = await getAccessToken();
+  } catch (error) {
+    err('Failed to obtain OAuth token for Wikibase grant check', error);
+    return false;
+  }
+  if (!token) {
+    log('No OAuth token available for Wikibase, skipping grant check');
+    return true;
+  }
+
+  const userinfo = await getEffectiveUserRights().catch(error => {
+    log('Failed to query Wikibase userinfo for grant check', error);
+    return undefined;
+  });
+  if (!userinfo || typeof userinfo !== 'object') {
+    log('Unexpected response from Wikibase userinfo, skipping grant check');
+    return true;
+  }
+  if (userinfo.error) {
+    err(`Wikibase rejected the OAuth grant check: ${JSON.stringify(userinfo.error)}`);
+    return false;
+  }
+  const rights = userinfo.query?.userinfo?.rights;
+  if (!Array.isArray(rights)) {
+    log('Wikibase userinfo response did not include rights, skipping grant check');
+    return true;
+  }
+
+  const effectiveRights = new Set(rights);
+  const missingRequired = Object.entries(REQUIRED_WIKIBASE_RIGHTS)
+    .filter(([right]) => !effectiveRights.has(right))
+    .map(([right, hint]) => `${right} (${hint})`);
+  const missingOptional = Object.entries(OPTIONAL_WIKIBASE_RIGHTS)
+    .filter(([right]) => !effectiveRights.has(right))
+    .map(([right, hint]) => `${right} (${hint})`);
+  if (missingRequired.length > 0) {
+    err(
+      `Wikibase OAuth consumer is missing required rights: ${missingRequired.join(', ')}.`,
+      'Adjust the grants of the OAuth consumer or the wiki grant-to-right mapping and restart.',
+    );
+    return false;
+  }
+  if (missingOptional.length > 0) {
+    warn(`Wikibase OAuth consumer is missing optional rights: ${missingOptional.join(', ')}.`);
+  }
+
+  log(`Wikibase OAuth grants verified for user ${userinfo.query?.userinfo?.name}`);
+  return true;
+};
+
 class WikibasePlugin extends Plugin {
   routers = {
     wikibaseRouter: {
@@ -116,6 +189,12 @@ class WikibasePlugin extends Plugin {
     ).catch(() => undefined);
     if (!paramInfo) {
       log('Wikibase instance not reachable');
+      return false;
+    }
+
+    const grantsOkay = await checkWikibaseOAuthGrants();
+    if (!grantsOkay) {
+      log('Wikibase OAuth grant check failed');
       return false;
     }
 
