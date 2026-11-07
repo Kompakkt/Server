@@ -3,6 +3,28 @@ import { log } from 'src/logger';
 
 const oldStructureClone = global.structuredClone;
 
+// structuredClone flattens class instances into plain objects, which strips
+// ObjectIds of their methods (toString becomes Object.prototype.toString, so
+// _id serializes as "[object Object]"). Re-attach the original, immutable
+// ObjectId instances at their positions in the clone instead of trying to
+// rebuild them from the clone's internal representation, which changes
+// between bson versions (buffer in <=7.1.x, i0..i3 in >=7.3.x).
+// Requires a single bson module instance for `instanceof` to recognize them.
+const restoreObjectIds = (original: unknown, cloned: unknown): void => {
+  if (original === null || typeof original !== 'object' || original instanceof ObjectId) return;
+  if (cloned === null || typeof cloned !== 'object') return;
+
+  for (const key of Object.keys(original)) {
+    if (!Object.hasOwn(cloned, key)) continue;
+    const originalValue = (original as Record<string, unknown>)[key];
+    if (originalValue instanceof ObjectId) {
+      (cloned as Record<string, unknown>)[key] = originalValue;
+    } else {
+      restoreObjectIds(originalValue, (cloned as Record<string, unknown>)[key]);
+    }
+  }
+};
+
 const patchedStructureClone = <T = unknown>(
   obj: T,
   options?: Parameters<typeof oldStructureClone>[1],
@@ -11,23 +33,20 @@ const patchedStructureClone = <T = unknown>(
     return obj;
   }
 
-  const hasId = (obj: object): obj is { _id: string | ObjectId | { buffer: Uint8Array } } => {
-    return Object.hasOwn(obj, '_id');
-  };
-
   const cloned = oldStructureClone(obj, options);
-  if (Array.isArray(cloned)) {
-    return cloned;
-  }
 
-  if (!hasId(cloned)) return cloned;
+  if (cloned !== null && typeof cloned === 'object' && !Array.isArray(cloned)) {
+    Object.keys(obj as Record<string, unknown>).forEach(key => {
+      const isObjectId = (obj as Record<string, unknown>)[key] instanceof ObjectId;
+      if (isObjectId)
+        (cloned as Record<string, unknown>)[key] = (obj as Record<string, unknown>)[key];
+      else restoreObjectIds((obj as Record<string, unknown>)[key], (cloned as Record<string, unknown>)[key]);
+    });
 
-  if (typeof cloned._id === 'string') {
-    cloned._id = new ObjectId(cloned._id);
-  }
-
-  if (typeof cloned._id === 'object' && 'buffer' in cloned._id) {
-    cloned._id = new ObjectId(cloned._id.buffer);
+    const id = (cloned as { _id?: unknown })._id;
+    if (typeof id === 'string') {
+      (cloned as { _id?: unknown })._id = new ObjectId(id);
+    }
   }
 
   return cloned;
