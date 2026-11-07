@@ -1,4 +1,5 @@
 import { getAccessToken } from './oauth';
+import { info } from 'src/logger';
 
 const USER_AGENT =
   Bun.env['CONFIGURATION_EXTENSION_WIKIBASE_USER_AGENT'] ??
@@ -11,5 +12,7 @@ export const customFetch = async (input: string, init: RequestInit = {}): Promis
   const token = await getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   headers.set('User-Agent', USER_AGENT);
-  return Bun.fetch(`${baseUrl()}${input}`, { ...init, headers });
+  const url = `${baseUrl().replaceAll(/v1\/?/gi, '')}${input}`.replaceAll(/(?<!.https?:)\/\//g, '/');
+  info(`[WikibasePlugin] fetching`, url);
+  return Bun.fetch(url, { ...init, headers });
 };

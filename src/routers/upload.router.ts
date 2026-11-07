@@ -296,7 +296,7 @@ const uploadRouter = new Elysia()
   .get(
     'uploads/*',
     async ({ request: { url }, headers, status }) => {
-      const uploadDir = join(RootDirectory, Configuration.Uploads.UploadDirectory);
+      const uploadDir = join(RootDirectory, UploadDirectory);
 
       const requestedPath = url.split('/uploads').at(-1)!;
       const decodedPath = requestedPath
