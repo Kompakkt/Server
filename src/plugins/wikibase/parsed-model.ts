@@ -1,5 +1,5 @@
 import { WikibaseConfiguration } from './config';
-import { log, err, info } from 'src/logger';
+import { log, err, info } from './logger';
 
 const turtleUrl =
   WikibaseConfiguration?.TTLFileURL ??

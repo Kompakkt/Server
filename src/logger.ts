@@ -13,9 +13,13 @@ const stream = createStream('server.log', {
 });
 
 const logger = new Logger({
-  name: 'Server',
   minLevel: 0,
   type: 'pretty',
+  pretty: {
+    enabled: true,
+    style: true,
+    timeZone: 'local',
+  }
 });
 logger.attachTransport(obj => {
   stream.write(JSON.stringify(obj) + '\n');
@@ -49,3 +53,10 @@ export const log = (...args: unknown[]) => logger.silly(args.map(mapLogObjects).
 export const info = (...args: unknown[]) => logger.info(args.map(mapLogObjects).join('\t'));
 export const warn = (...args: unknown[]) => logger.warn(args.map(mapLogObjects).join('\t'));
 export const err = (...args: unknown[]) => logger.error(args.map(mapLogObjects).join('\t'));
+
+export const prefixedLogger = (prefix: string) => ({
+  log: (...args: any[]) => log(`[${prefix}]`, ...args),
+  info: (...args: any[]) => info(`[${prefix}]`, ...args),
+  err: (...args: any[]) => err(`[${prefix}]`, ...args),
+  warn: (...args: any[]) => warn(`[${prefix}]`, ...args),
+});

@@ -1,4 +1,4 @@
-import { log, warn } from 'src/logger';
+import { log, warn } from './logger';
 import { isWikibaseConfiguration, WikibaseConfiguration } from './config';
 
 export default async () => {

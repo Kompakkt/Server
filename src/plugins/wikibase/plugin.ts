@@ -5,7 +5,7 @@ import {
   type IAnnotation,
   type IDigitalEntity,
 } from '@kompakkt/common';
-import { log } from 'src/logger';
+import { log } from './logger';
 import { HookManager } from 'src/routers/modules/api.v1/hooks';
 import { type ServerDocument } from 'src/util/document-with-objectid-type';
 import { isWikibaseConfiguration, isWikibaseDigitalEntity, WikibaseConfiguration } from './config';
@@ -255,7 +255,7 @@ class WikibasePlugin extends Plugin {
             await pluginCache.set(key, fresh, 3600);
             return fresh;
           })().catch(error => {
-            console.log(error);
+            log(error);
             return undefined;
           });
 
@@ -302,7 +302,7 @@ class WikibasePlugin extends Plugin {
             await pluginCache.set(key, fresh, 3600);
             return fresh;
           })().catch(error => {
-            console.log(error);
+            log(error);
             return undefined;
           });
 

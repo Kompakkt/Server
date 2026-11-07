@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { Configuration } from 'src/configuration';
-import { err, log, warn } from 'src/logger';
+import { err, log, warn } from './logger';
 import { RootDirectory } from '../../environment';
 import { getAccessToken } from './oauth';
 

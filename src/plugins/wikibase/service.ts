@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { asVector3 } from '@kompakkt/common';
 import { Configuration } from 'src/configuration';
-import { err, info, log, warn } from 'src/logger';
+import { err, info, log, warn } from './logger';
 import { annotationCollection, digitalEntityCollection, entityCollection } from 'src/mongo';
 import { pluginCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';

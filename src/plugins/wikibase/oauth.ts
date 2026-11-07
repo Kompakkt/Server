@@ -1,4 +1,4 @@
-import { err, warn } from 'src/logger';
+import { err, warn } from './logger';
 import { post } from 'src/util/requests';
 import { WikibaseConfiguration } from './config';
 

@@ -1,5 +1,5 @@
+import { info } from './logger';
 import { getAccessToken } from './oauth';
-import { info } from 'src/logger';
 
 const USER_AGENT =
   Bun.env['CONFIGURATION_EXTENSION_WIKIBASE_USER_AGENT'] ??
