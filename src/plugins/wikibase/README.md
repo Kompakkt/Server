@@ -88,6 +88,12 @@ WIKIBASE_OPENAPI_URL=https://wikibase.example/w/rest.php/wikibase/v1/openapi.jso
   bun run generate:wikibase-client
 ```
 
+Note: the generated PATCH requests may not carry the
+`Content-Type: application/json-patch+json` header the Wikibase REST API
+requires for `PATCH /entities/items/{id}` (without it the API answers
+`415 rest-unsupported-content-type`). The call sites in `service.ts` pass the
+header explicitly; preserve that when touching the PATCH calls.
+
 The generator runs `orval`, then rewrites every `fetch(...)` call to use the
 `customFetch` mutator in `rest-fetch.ts`, which prepends
 `CONFIGURATION_EXTENSION_WIKIBASE_REST_API_URL` and injects the OAuth bearer

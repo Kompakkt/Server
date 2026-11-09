@@ -359,13 +359,17 @@ export class WikibaseService {
 
     const statements: RestStatements = buildStatements(wbClaims);
     log('updateAnnotation statements', statements);
-    const patchResponse = await patchItem(id, {
-      patch: replaceItemPatch({
-        statements,
-        labels: { en: annotation.label.en },
-        descriptions: { en: annotation.description.en },
-      }),
-    }).catch(error => {
+    const patchResponse = await patchItem(
+      id,
+      {
+        patch: replaceItemPatch({
+          statements,
+          labels: { en: annotation.label.en },
+          descriptions: { en: annotation.description.en },
+        }),
+      },
+      { headers: { 'Content-Type': 'application/json-patch+json' } },
+    ).catch(error => {
       err(`Failed editing annotation: ${error}`);
       return undefined;
     });
@@ -547,13 +551,17 @@ export class WikibaseService {
 
     const statements = buildStatements(claims);
     log('updateDigitalEntity statements', statements);
-    const editResponse = await patchItem(id, {
-      patch: replaceItemPatch({
-        statements,
-        labels: { en: entity.label.en },
-        descriptions: { en: entity.description.en },
-      }),
-    }).catch(error => {
+    const patch = replaceItemPatch({
+      statements,
+      labels: { en: entity.label.en },
+      descriptions: { en: entity.description.en },
+    });
+    log('updateDigitalEntity patch', patch);
+    const editResponse = await patchItem(
+      id,
+      { patch },
+      { headers: { 'Content-Type': 'application/json-patch+json' } },
+    ).catch(error => {
       err(`Failed editing digital entity: ${error}`);
       return undefined;
     });

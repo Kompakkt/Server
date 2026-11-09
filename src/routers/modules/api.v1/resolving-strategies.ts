@@ -40,10 +40,14 @@ import {
 } from 'src/mongo';
 import { entitiesCache, resolveCache } from 'src/redis';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
-import { HookManager } from './hooks';
+import { HookManager, type HookOptions } from './hooks';
 
 type Resolvable<T> = ServerDocument<IDocument | T> | string | ObjectId;
-type ResolveFn<T> = (obj: Resolvable<T>, depth: number) => Promise<ServerDocument<T> | undefined>;
+type ResolveFn<T> = (
+  obj: Resolvable<T>,
+  depth: number,
+  options?: HookOptions,
+) => Promise<ServerDocument<T> | undefined>;
 type DangerousArray = (IDocument | ObjectId | string | undefined | null)[];
 
 /**
@@ -231,8 +235,13 @@ const createResolver = <T extends ServerDocument<T>>(
   additionalProcessing?: ResolverFunction<T>,
 ): ResolveFn<T> => {
   // @ts-expect-error Unsure of correct typing, but it works
-  return async (obj: ServerDocument<T>, depth: number = RESOLVE_FULL_DEPTH) => {
-    const cachedEntity = obj?._id
+  return async (
+    obj: ServerDocument<T>,
+    depth: number = RESOLVE_FULL_DEPTH,
+    options?: HookOptions,
+  ) => {
+    const skipCache = options?.skipWikibaseCache === true;
+    const cachedEntity = obj?._id && !skipCache
       ? await entitiesCache
           .get<ServerDocument<T>>(`${collection.collectionName}::${obj._id}`)
           .catch(error => {
@@ -264,6 +273,8 @@ const createResolver = <T extends ServerDocument<T>>(
       collection.collectionName as Collection,
       'onResolve',
       entity,
+      undefined,
+      options,
     );
     transformed._id = entity._id; // Ensure _id remains of type ObjectId
     // log(`Finished onResolve hooks ${collection.collectionName} ${entity._id}`);

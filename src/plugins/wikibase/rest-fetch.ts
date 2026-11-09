@@ -12,9 +12,10 @@ export const customFetch = async (input: string, init: RequestInit = {}): Promis
   const token = await getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   headers.set('User-Agent', USER_AGENT);
-  const url = `${baseUrl().replaceAll(/v1\/?/gi, '')}${input}`.replaceAll(
-    /(?<!.https?:)\/\//g,
-    '/',
+  const url = `${baseUrl().replaceAll(/v1\/?/gi, '')}${input}`.replace(
+    // Collapse repeated path slashes but never touch the `://` of the protocol
+    /([^:/]\/)\/+/g,
+    '$1',
   );
   info(`[WikibasePlugin] fetching`, url);
   return Bun.fetch(url, { ...init, headers });

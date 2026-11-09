@@ -16,9 +16,12 @@ import {
 import { info } from 'src/logger';
 import type { ServerDocument } from 'src/util/document-with-objectid-type';
 
+export type HookOptions = { skipWikibaseCache?: boolean };
+
 export type HookFn<T extends ServerDocument<IDocument>> = (
   doc: T,
   userdata?: ServerDocument<IUserData>,
+  options?: HookOptions,
 ) => Promise<T>;
 export type HookType = 'onTransform' | 'onResolve' | 'onDelete' | 'afterSave';
 
@@ -62,6 +65,7 @@ export const HookManager = new (class {
     type: HookType,
     doc: T,
     userdata?: ServerDocument<IUserData>,
+    options?: HookOptions,
   ): Promise<T> {
     const hooks = this.hooks[collection][type] as unknown as Array<HookFn<T>>;
 
@@ -69,7 +73,7 @@ export const HookManager = new (class {
 
     for (const hook of hooks) {
       try {
-        currentDoc = await hook(structuredClone(currentDoc), userdata);
+        currentDoc = await hook(structuredClone(currentDoc), userdata, options);
       } catch (error) {
         info('Failed to run hook', error);
       }

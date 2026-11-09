@@ -213,9 +213,13 @@ class WikibasePlugin extends Plugin {
         // We can use this to ensure that the related digital entity is also updated in Wikibase.
         if (!entity.finished) return entity;
 
+        // The wikibase metadata cache is skipped here: a cached snapshot can predate the
+        // changes that were just saved, and re-saving that stale data would revert the edit
+        // (see SKMono-a38).
         const digitalEntity = await resolveDigitalEntity(
           { _id: entity.relatedDigitalEntity._id },
           0,
+          { skipWikibaseCache: true },
         );
         if (!digitalEntity) {
           log(`Related digital entity not found for entity ${entity._id}`);
@@ -305,7 +309,7 @@ class WikibasePlugin extends Plugin {
     HookManager.addHook<ServerDocument<IDigitalEntity>>({
       collection: Collection.digitalentity,
       type: 'onResolve',
-      callback: async digitalEntity => {
+      callback: async (digitalEntity, _userdata, options) => {
         try {
           if (!SearchIndexJobState.isDone) {
             // log('Search index job is not done, skipping wikibase transform');
@@ -327,6 +331,7 @@ class WikibasePlugin extends Plugin {
 
           const extensionData = await (async () => {
             const key = `wikibase::fetchWikibaseMetadata::${wikibaseId}`;
+            if (options?.skipWikibaseCache) return service.fetchWikibaseMetadata(wikibaseId);
             const cached = await pluginCache.get<IWikibaseDigitalEntityExtensionData>(key);
             if (cached) return cached;
             const fresh = await service.fetchWikibaseMetadata(wikibaseId);

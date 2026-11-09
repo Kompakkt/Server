@@ -1,3 +1,5 @@
+import { log } from "./logger";
+
 type QualifierMap = Record<string, string | string[]>;
 
 type SimplifiedClaimValue = string | { value: string; qualifiers?: QualifierMap };
@@ -47,7 +49,8 @@ export const buildStatements = (claims: SimplifiedClaims): RestStatements => {
     if (raw === undefined || raw === null) continue;
     const values = asArray(raw);
     if (values.length === 0) continue;
-    statements[propertyId] = values.map(v => buildStatement(propertyId, v));
+    // Some claims actually can arrive as null/undefined, filter them out
+    statements[propertyId] = values.filter(v => !!v).map(v => buildStatement(propertyId, v));
   }
   return statements;
 };
