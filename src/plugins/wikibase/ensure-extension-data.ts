@@ -31,6 +31,16 @@ export const ensureDigitalEntityExtensionData = (
     digitalEntity.extensions.wikibase.id ??= digitalEntity.wikibase_id;
   }
 
+  // Some legacy digital entities have missing fields until they are saved again
+  // TODO: Actual migration
+  digitalEntity.title ??= '';
+  digitalEntity.description ??= '';
+  digitalEntity.licence ??= '';
+  digitalEntity.type ??= '';
+  digitalEntity.persons ??= [];
+  digitalEntity.institutions ??= [];
+  digitalEntity.phyObjs ??= [];
+
   return digitalEntity;
 };
 

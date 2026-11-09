@@ -637,7 +637,7 @@ export class WikibaseService {
         }
       }
     }
-    log('Got choices from Wikibase', choices);
+    log('Got choices from Wikibase', Object.entries(choices).map(([key, arr]) => [key, arr.length]));
 
     return choices;
   }
